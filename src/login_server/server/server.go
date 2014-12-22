@@ -7,11 +7,40 @@ package server
  */
 
 import (
+	"errors"
 	"fmt"
+	"libtethealla/encryption"
 	"net"
 	"os"
 	"sync"
 )
+
+type Client struct {
+	conn   *net.TCPConn
+	ipAddr string
+
+	clientCrypt *encryption.PSOCrypt
+	serverCrypt *encryption.PSOCrypt
+}
+
+// Create and initialize a new struct to hold client information.
+func NewClient(conn *net.TCPConn) (*Client, error) {
+	client := new(Client)
+	client.conn = conn
+	client.ipAddr = conn.RemoteAddr().String()
+
+	client.clientCrypt = encryption.NewCrypt()
+	client.serverCrypt = encryption.NewCrypt()
+	client.clientCrypt.CreateKeys()
+	client.serverCrypt.CreateKeys()
+
+	var err error = nil
+	if SendWelcome(client) != 0 {
+		err = errors.New("Error sending welcome packet to: " + client.ipAddr)
+		client = nil
+	}
+	return client, err
+}
 
 // Create a TCP socket that is listening and ready to Accept().
 func OpenSocket(host, port string) *net.TCPListener {

@@ -1,31 +1,38 @@
 package server
 
+// LOGIN server logic.
+
 import (
+	"container/list"
 	"fmt"
 	"net"
 	"sync"
 )
 
-// Main worker thread for the LOGIN portion of the server.
-func openLoginPort() {
+var loginClients *list.List = list.New()
+
+// Main worker for the login server. Creates the socket and starts listening for connections,
+// spawning off client threads to handle communications for each client.
+func handleLoginConnections() {
 	loginConfig := GetConfig()
 	var socket *net.TCPListener = OpenSocket(loginConfig.Hostname(), loginConfig.LoginPort())
 	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.Hostname(), loginConfig.LoginPort())
-
-	var connection *net.TCPConn
-	var err error
 	for {
-		connection, err = socket.AcceptTCP()
+		connection, err := socket.AcceptTCP()
 		if err != nil {
 			fmt.Println("Error accepting connection: " + err.Error())
 			continue
 		}
-		fmt.Printf("Accepted LOGIN connection from %s\n", connection.RemoteAddr())
+		client, err := NewClient(connection)
+		if err != nil {
+			continue
+		}
+		loginClients.PushBack(connection)
+		fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
 	}
-
 }
 
 func StartLogin(wg *sync.WaitGroup) {
-	openLoginPort()
+	handleLoginConnections()
 	wg.Done()
 }

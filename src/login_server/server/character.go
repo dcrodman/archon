@@ -1,5 +1,7 @@
 package server
 
+// CHARACTER server logic.
+
 import (
 	"fmt"
 	"net"
@@ -10,7 +12,7 @@ import (
 func openCharacterPort() {
 	loginConfig := GetConfig()
 	var socket *net.TCPListener = OpenSocket(loginConfig.Hostname(), loginConfig.CharacterPort())
-	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n", loginConfig.Hostname(), loginConfig.CharacterPort())
+	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n", loginConfig.Hostname(), loginConfig.CharacterPort())
 
 	var connection *net.TCPConn
 	var err error

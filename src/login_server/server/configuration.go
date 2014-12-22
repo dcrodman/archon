@@ -1,8 +1,6 @@
 package server
 
-/* Singleton package for handling the login and character server config. */
-
-import ()
+// Singleton package for handling the login and character server config.
 
 type configuration struct {
 	host          string
