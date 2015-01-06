@@ -17,6 +17,7 @@ func handleLoginConnections() {
 	loginConfig := GetConfig()
 	var socket *net.TCPListener = OpenSocket(loginConfig.Hostname(), loginConfig.LoginPort())
 	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.Hostname(), loginConfig.LoginPort())
+
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {
@@ -29,6 +30,7 @@ func handleLoginConnections() {
 		}
 		loginClients.PushBack(connection)
 		fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
+		// Spawn handler thread for client (Include defer/recover function in handler)
 	}
 }
 

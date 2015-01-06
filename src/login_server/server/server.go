@@ -44,9 +44,11 @@ func NewClient(conn *net.TCPConn) (*Client, error) {
 
 // Create a TCP socket that is listening and ready to Accept().
 func OpenSocket(host, port string) *net.TCPListener {
-	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
+	addrStr := host + ":" + port
+	fmt.Println("Opening socket on " + addrStr)
+	hostAddress, err := net.ResolveTCPAddr("tcp", addrStr)
 	if err != nil {
-		fmt.Println("Error Creating Socket: " + err.Error())
+		fmt.Println("Error creating socket: " + err.Error())
 		os.Exit(1)
 	}
 	socket, err := net.ListenTCP("tcp", hostAddress)
