@@ -3,15 +3,14 @@
 package server
 
 import (
-	//"bytes"
-	"fmt"
 	"libtethealla/util"
 )
 
 // Packet headers.
 
 const WELCOME_TYPE = 0x03
-const WELCOME_SIZE = 0x93
+
+const WELCOME_SIZE = 0xC8
 
 // Other constants.
 
@@ -34,11 +33,15 @@ type WelcomePkt struct {
 	ClientVector []uint8 // 48b
 }
 
-// Build/Send functions.
-
-func SendPacket(client *Client, pkt []byte) int {
-	fmt.Println("Would Send:")
-	util.PrintPayload(pkt)
+func SendPacket(client *Client, pkt []byte, length int) int {
+	// Write will return the number of bytes sent, but at this point I'm assuming that the
+	// method will handle sending all of bytes to the client (as opposed to C's send) so I'm
+	// going to ignore it unless it becomes a problem.
+	_, err := client.conn.Write(pkt[:length])
+	if err != nil {
+		// TODO: Log error.
+		return -1
+	}
 	return 0
 }
 
@@ -51,7 +54,7 @@ func SendWelcome(client *Client) int {
 	pkt.ServerVector = client.serverCrypt.Vector
 
 	data := util.StructToBytes(pkt)
-	return SendPacket(client, data)
+	return SendPacket(client, data, WELCOME_SIZE)
 }
 
 func init() {
