@@ -13,11 +13,11 @@ const ServerConfigDir = "/usr/local/share/archon"
 const displayWidth = 16
 
 type ServerError struct {
-	message string
+	Message string
 }
 
-func (err *ServerError) Error() string {
-	return err.message
+func (err ServerError) Error() string {
+	return err.Message
 }
 
 // Sets the values of a slice of bytes (up to length) to 0.

@@ -6,7 +6,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"libarchon/encryption"
 	"libarchon/util"
@@ -40,7 +39,7 @@ func NewClient(conn *net.TCPConn) (*Client, error) {
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
-		err = errors.New("Error sending welcome packet to: " + client.ipAddr)
+		err = util.ServerError{Message: "Error sending welcome packet to: " + client.ipAddr}
 		client = nil
 	}
 	return client, err
