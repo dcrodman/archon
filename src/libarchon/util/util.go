@@ -86,7 +86,7 @@ func BytesFromStruct(data interface{}) []byte {
 	}
 
 	if valKind != reflect.Struct {
-		panic("data must of type struct or ptr to struct, got: " + valKind.String())
+		panic("BytesFromStruct(): data must of type struct or ptr to struct, got: " + valKind.String())
 	}
 
 	bytes := new(bytes.Buffer)
@@ -128,7 +128,7 @@ func BytesFromStruct(data interface{}) []byte {
 // in mistranslated values (or possibly a panic).
 func StructFromBytes(data []byte, targetStruct interface{}) {
 	if kind := reflect.TypeOf(targetStruct).Kind(); kind != reflect.Ptr {
-		panic("targetStruct must be a ptr to struct, got: " + kind.String())
+		panic("StructFromBytes(): targetStruct must be a ptr to struct, got: " + kind.String())
 	}
 	reader := bytes.NewReader(data)
 	binary.Read(reader, binary.LittleEndian, targetStruct)
