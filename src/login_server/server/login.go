@@ -72,7 +72,7 @@ func handleLoginClient(client *Client) {
 
 // Main worker for the login server. Creates the socket and starts listening for connections,
 // spawning off client threads to handle communications for each client.
-func handleLoginConnections() {
+func StartLogin(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
 	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetLoginPort())
 	if err != nil {
@@ -94,9 +94,5 @@ func handleLoginConnections() {
 		loginClients.PushBack(connection)
 		go handleLoginClient(client)
 	}
-}
-
-func StartLogin(wg *sync.WaitGroup) {
-	handleLoginConnections()
 	wg.Done()
 }

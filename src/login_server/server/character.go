@@ -10,7 +10,7 @@ import (
 )
 
 // Main worker thread for the CHARACTER portion of the server.
-func openCharacterPort() {
+func StartCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
 	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetCharacterPort())
 	if err != nil {
@@ -27,10 +27,5 @@ func openCharacterPort() {
 		}
 		fmt.Printf("Accepted CHARACTER connection from %s\n", connection.RemoteAddr())
 	}
-
-}
-
-func StartCharacter(wg *sync.WaitGroup) {
-	openCharacterPort()
 	wg.Done()
 }
