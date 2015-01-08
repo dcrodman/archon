@@ -10,6 +10,8 @@ import (
 // Packet headers.
 const BBHeaderSize = 0x08
 const WelcomeType = 0x03
+const LoginType = 0x93
+
 const WelcomeSize = 0xC8
 
 // Other constants.

@@ -20,9 +20,6 @@ type Client struct {
 
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
-	recvData    []byte
-	recvSize    int
-	packetSize  uint16
 }
 
 // Create and initialize a new struct to hold client information.
@@ -30,7 +27,6 @@ func NewClient(conn *net.TCPConn) (*Client, error) {
 	client := new(Client)
 	client.conn = conn
 	client.ipAddr = conn.RemoteAddr().String()
-	client.recvData = make([]byte, 1024)
 
 	client.clientCrypt = encryption.NewCrypt()
 	client.serverCrypt = encryption.NewCrypt()
