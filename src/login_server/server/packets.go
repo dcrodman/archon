@@ -3,23 +3,21 @@
 package server
 
 import (
+	"fmt"
 	"libtethealla/util"
 )
 
 // Packet headers.
-
-const WELCOME_TYPE = 0x03
-
-const WELCOME_SIZE = 0xC8
+const BBHeaderSize = 0x08
+const WelcomeType = 0x03
+const WelcomeSize = 0xC8
 
 // Other constants.
-
 const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
 
 var copyrightBytes []byte = make([]byte, 96)
 
-// Struct types.
-
+// Packet structures.
 type BBPktHeader struct {
 	Size    uint16
 	Type    uint16
@@ -28,11 +26,12 @@ type BBPktHeader struct {
 
 type WelcomePkt struct {
 	Header       BBPktHeader
-	Copyright    []byte  // 96b
-	ServerVector []uint8 // 48b
-	ClientVector []uint8 // 48b
+	Copyright    [96]byte
+	ServerVector [48]uint8
+	ClientVector [48]uint8
 }
 
+// Send the packet serialized (or otherwise contained) in pkt to a client.
 func SendPacket(client *Client, pkt []byte, length int) int {
 	// Write will return the number of bytes sent, but at this point I'm assuming that the
 	// method will handle sending all of bytes to the client (as opposed to C's send) so I'm
@@ -45,16 +44,19 @@ func SendPacket(client *Client, pkt []byte, length int) int {
 	return 0
 }
 
+// Send the welcome packet to a client with the copyright message and encryption vectors.
 func SendWelcome(client *Client) int {
 	pkt := new(WelcomePkt)
-	pkt.Header.Size = WELCOME_SIZE
-	pkt.Header.Type = WELCOME_TYPE
-	pkt.Copyright = copyrightBytes
-	pkt.ClientVector = client.clientCrypt.Vector
-	pkt.ServerVector = client.serverCrypt.Vector
+	pkt.Header.Size = WelcomeSize
+	pkt.Header.Type = WelcomeType
+	copy(pkt.Copyright[:], copyrightBytes)
+	copy(pkt.ClientVector[:], client.clientCrypt.Vector)
+	copy(pkt.ServerVector[:], client.serverCrypt.Vector)
 
-	data := util.StructToBytes(pkt)
-	return SendPacket(client, data, WELCOME_SIZE)
+	data := util.BytesFromStruct(pkt)
+	fmt.Println("Sending Welcome Packet")
+	util.PrintPayload(data, WelcomeSize)
+	return SendPacket(client, data, WelcomeSize)
 }
 
 func init() {
