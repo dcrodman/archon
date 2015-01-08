@@ -9,6 +9,7 @@ import (
 	"strconv"
 )
 
+const ServerConfigDir = "/usr/local/share/archon"
 const displayWidth = 16
 
 type ServerError struct {

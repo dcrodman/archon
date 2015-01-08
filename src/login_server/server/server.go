@@ -1,15 +1,15 @@
-package server
-
 /*
  * Starting point for the login server. Initializes the configuration package and takes care of
  * launching the LOGIN and CHARACTER servers. Also provides top-level functions and other code
  * shared between the two (found in login.go and character.go).
  */
+package server
 
 import (
 	"errors"
 	"fmt"
-	"libtethealla/encryption"
+	"libarchon/encryption"
+	"libarchon/util"
 	"net"
 	"os"
 	"sync"
@@ -46,29 +46,21 @@ func NewClient(conn *net.TCPConn) (*Client, error) {
 	return client, err
 }
 
-// Create a TCP socket that is listening and ready to Accept().
-func OpenSocket(host, port string) *net.TCPListener {
-	addrStr := host + ":" + port
-	fmt.Println("Opening socket on " + addrStr)
-	hostAddress, err := net.ResolveTCPAddr("tcp", addrStr)
-	if err != nil {
-		fmt.Println("Error creating socket: " + err.Error())
-		os.Exit(1)
-	}
-	socket, err := net.ListenTCP("tcp", hostAddress)
-	if err != nil {
-		fmt.Println("Error Listening on Socket: " + err.Error())
-		os.Exit(1)
-	}
-	return socket
-}
-
 func Start() {
-	GetConfig().InitFromMap(map[string]string{
-		"hostname":      "127.0.0.1",
-		"loginPort":     "12000",
-		"characterPort": "12001",
-	})
+	// Initialize our config singleton from one of two expected file locations.
+	fmt.Printf("Loading config file %v...", loginConfigFile)
+	err := GetConfig().InitFromFile(loginConfigFile)
+	if err != nil {
+		path := util.ServerConfigDir + "/" + loginConfigFile
+		fmt.Printf("Failed.\nLoading config from %v...", path)
+		err = GetConfig().InitFromFile(path)
+		if err != nil {
+			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
+			os.Exit(-1)
+		}
+	}
+	// TODO: Validate that the configuration struct was populated.
+	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", GetConfig().String())
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

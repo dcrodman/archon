@@ -4,20 +4,23 @@ package server
 
 import (
 	"fmt"
-	"net"
+	"libarchon/util"
+	"os"
 	"sync"
 )
 
 // Main worker thread for the CHARACTER portion of the server.
 func openCharacterPort() {
 	loginConfig := GetConfig()
-	var socket *net.TCPListener = OpenSocket(loginConfig.Hostname(), loginConfig.CharacterPort())
-	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n", loginConfig.Hostname(), loginConfig.CharacterPort())
+	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetCharacterPort())
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n", loginConfig.GetHostname(), loginConfig.GetCharacterPort())
 
-	var connection *net.TCPConn
-	var err error
 	for {
-		connection, err = socket.AcceptTCP()
+		connection, err := socket.AcceptTCP()
 		if err != nil {
 			fmt.Println("Error accepting connection: " + err.Error())
 			continue

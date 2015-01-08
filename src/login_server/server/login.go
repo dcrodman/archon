@@ -5,8 +5,8 @@ package server
 import (
 	"container/list"
 	"fmt"
-	"libtethealla/util"
-	"net"
+	"libarchon/util"
+	"os"
 	"sync"
 )
 
@@ -74,8 +74,12 @@ func handleLoginClient(client *Client) {
 // spawning off client threads to handle communications for each client.
 func handleLoginConnections() {
 	loginConfig := GetConfig()
-	var socket *net.TCPListener = OpenSocket(loginConfig.Hostname(), loginConfig.LoginPort())
-	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.Hostname(), loginConfig.LoginPort())
+	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetLoginPort())
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.GetHostname(), loginConfig.GetLoginPort())
 
 	for {
 		connection, err := socket.AcceptTCP()

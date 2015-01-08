@@ -1,37 +1,20 @@
+// Singleton package for handling the login and character server config.
 package server
 
-// Singleton package for handling the login and character server config.
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
+const loginConfigFile = "login_config.json"
 
 type configuration struct {
-	host          string
-	loginPort     string
-	characterPort string
+	Hostname      string
+	LoginPort     string
+	CharacterPort string
 }
 
 var loginConfig *configuration = nil
-
-func (config *configuration) Hostname() string {
-	return config.host
-}
-
-func (config *configuration) LoginPort() string {
-	return config.loginPort
-}
-
-func (config *configuration) CharacterPort() string {
-	return config.characterPort
-}
-
-func (config *configuration) InitFromMap(configMap map[string]string) {
-	config.host = configMap["hostname"]
-	config.loginPort = configMap["loginPort"]
-	config.characterPort = configMap["characterPort"]
-}
-
-/*
-func InitFromFile(fileName string) {
-}
-*/
 
 func GetConfig() *configuration {
 	if loginConfig == nil {
@@ -40,6 +23,35 @@ func GetConfig() *configuration {
 	return loginConfig
 }
 
-// TODO: Other fields
+func (config *configuration) GetHostname() string {
+	return config.Hostname
+}
 
-// TODO: Load other files and resources
+func (config *configuration) GetLoginPort() string {
+	return config.LoginPort
+}
+
+func (config *configuration) GetCharacterPort() string {
+	return config.CharacterPort
+}
+
+func (config *configuration) InitFromMap(configMap map[string]string) {
+	config.Hostname = configMap["hostname"]
+	config.LoginPort = configMap["loginPort"]
+	config.CharacterPort = configMap["characterPort"]
+}
+
+func (config *configuration) InitFromFile(fileName string) error {
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	json.Unmarshal(data, config)
+	return nil
+}
+
+func (config *configuration) String() string {
+	return "Hostname: " + config.GetHostname() + "\n" +
+		"Login Port: " + config.GetLoginPort() + "\n" +
+		"Character Port: " + config.GetCharacterPort()
+}
