@@ -1,4 +1,4 @@
-// Shared methods and operations common to each of the server components.
+// Functions and constants shared between server components.
 package util
 
 import (
@@ -9,7 +9,25 @@ import (
 	"strconv"
 )
 
-const DISPLAY_WIDTH = 16
+const displayWidth = 16
+
+type ServerError struct {
+	message string
+}
+
+func (err *ServerError) Error() string {
+	return err.message
+}
+
+// Sets the values of a slice of bytes (up to length) to 0.
+func ZeroSlice(arr []byte, length int) {
+	if arrLen := len(arr); arrLen < length {
+		length = arrLen
+	}
+	for i := 0; i < length; i++ {
+		arr[i] = 0
+	}
+}
 
 func printPacketLine(data []uint8, length int, offset int) {
 	fmt.Printf("%04x ", offset)
@@ -24,7 +42,7 @@ func printPacketLine(data []uint8, length int, offset int) {
 		j++
 	}
 	// Fill in the gap if we don't have enough bytes to fill the line.
-	for i := length; i < DISPLAY_WIDTH; i++ {
+	for i := length; i < displayWidth; i++ {
 		if i == 8 {
 			fmt.Print("  ")
 		}
