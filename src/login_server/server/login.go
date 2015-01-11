@@ -44,6 +44,9 @@ func processPacket(client *Client, pkt []byte) error {
 	switch pktHeader.Type {
 	case LoginType:
 		handleLogin(client, pkt)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c .
+		break
 	default:
 		fmt.Printf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 	}
@@ -123,6 +126,7 @@ func handleLoginClient(client *Client) {
 // Main worker for the login server. Creates the socket and starts listening for connections,
 // spawning off client threads to handle communications for each client.
 func StartLogin(wg *sync.WaitGroup) {
+
 	loginConfig := GetConfig()
 	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetLoginPort())
 	if err != nil {

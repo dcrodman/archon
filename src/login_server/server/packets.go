@@ -28,7 +28,9 @@ import (
 
 // Packet headers.
 const BBHeaderSize = 0x08
+
 const WelcomeType = 0x03
+const DisconnectType = 0x05
 const LoginType = 0x93
 
 const WelcomeSize = 0xC8
