@@ -31,7 +31,7 @@ func ZeroSlice(arr []byte, length int) {
 }
 
 func printPacketLine(data []uint8, length int, offset int) {
-	fmt.Printf("%04x ", offset)
+	fmt.Printf("%04X ", offset)
 	// Print our bytes.
 	for i, j := 0, 0; i < length; i++ {
 		if j == 8 {
