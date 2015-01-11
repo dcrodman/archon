@@ -22,22 +22,21 @@
 package server
 
 import (
-	"container/list"
 	"fmt"
 	"libarchon/util"
 	"os"
 	"sync"
 )
 
-var loginClients *list.List = list.New()
+var connections *util.ConnectionList = util.NewClientList()
 
-func handleLogin(client *Client, pkt []byte) {
+func handleLogin(client *LoginClient, pkt []byte) {
 
 }
 
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
-func processPacket(client *Client, pkt []byte) error {
+func processPacket(client *LoginClient, pkt []byte) error {
 	var pktHeader BBPktHeader
 	util.StructFromBytes(pkt, &pktHeader)
 
@@ -45,7 +44,7 @@ func processPacket(client *Client, pkt []byte) error {
 	case LoginType:
 		handleLogin(client, pkt)
 	case DisconnectType:
-		// Just wait until we recv 0 from the client to d/c .
+		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
 		fmt.Printf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
@@ -58,12 +57,13 @@ func processPacket(client *Client, pkt []byte) error {
 
 // Handle communication with a particular client until the connection is closed or an
 // error is encountered.
-func handleLoginClient(client *Client) {
+func handleLoginClient(client *LoginClient) {
 	defer func() {
 		if err := recover(); err != nil {
 			// TODO: Log to error file instead of stdout.
 			fmt.Printf("Encountered communicating with client %s: %s\n", client.ipAddr, err)
 		}
+		connections.RemoveClient(client)
 	}()
 
 	fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
@@ -82,7 +82,6 @@ func handleLoginClient(client *Client) {
 			} else if bytes == 0 {
 				// The client disconnected, we're done.
 				client.conn.Close()
-				// TODO: Remove the client from our connections list (obtain a lock).
 				break
 			}
 
@@ -126,14 +125,14 @@ func handleLoginClient(client *Client) {
 // Main worker for the login server. Creates the socket and starts listening for connections,
 // spawning off client threads to handle communications for each client.
 func StartLogin(wg *sync.WaitGroup) {
-
 	loginConfig := GetConfig()
 	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetLoginPort())
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.GetHostname(), loginConfig.GetLoginPort())
+	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n",
+		loginConfig.GetHostname(), loginConfig.GetLoginPort())
 
 	for {
 		connection, err := socket.AcceptTCP()
@@ -145,7 +144,7 @@ func StartLogin(wg *sync.WaitGroup) {
 		if err != nil {
 			continue
 		}
-		loginClients.PushBack(connection)
+		connections.AddClient(client)
 		go handleLoginClient(client)
 	}
 	wg.Done()

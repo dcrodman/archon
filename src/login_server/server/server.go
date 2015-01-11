@@ -31,7 +31,8 @@ import (
 	"sync"
 )
 
-type Client struct {
+// Struct for holding client-specific data.
+type LoginClient struct {
 	conn   *net.TCPConn
 	ipAddr string
 
@@ -39,9 +40,12 @@ type Client struct {
 	serverCrypt *encryption.PSOCrypt
 }
 
+func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
+func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
+
 // Create and initialize a new struct to hold client information.
-func NewClient(conn *net.TCPConn) (*Client, error) {
-	client := new(Client)
+func NewClient(conn *net.TCPConn) (*LoginClient, error) {
+	client := new(LoginClient)
 	client.conn = conn
 	client.ipAddr = conn.RemoteAddr().String()
 

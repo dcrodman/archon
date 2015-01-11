@@ -55,7 +55,7 @@ type WelcomePkt struct {
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
-func SendPacket(client *Client, pkt []byte, length int) int {
+func SendPacket(client *LoginClient, pkt []byte, length int) int {
 	// Write will return the number of bytes sent, but at this point I'm assuming that the
 	// method will handle sending all of bytes to the client (as opposed to C's send) so I'm
 	// going to ignore it unless it becomes a problem.
@@ -68,7 +68,7 @@ func SendPacket(client *Client, pkt []byte, length int) int {
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendWelcome(client *Client) int {
+func SendWelcome(client *LoginClient) int {
 	pkt := new(WelcomePkt)
 	pkt.Header.Size = WelcomeSize
 	pkt.Header.Type = WelcomeType
