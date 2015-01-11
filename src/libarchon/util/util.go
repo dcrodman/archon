@@ -31,6 +31,7 @@ import (
 const ServerConfigDir = "/usr/local/share/archon"
 const displayWidth = 16
 
+// Global error to indicate problems encountered during server operation.
 type ServerError struct {
 	Message string
 }
@@ -46,51 +47,6 @@ func ZeroSlice(arr []byte, length int) {
 	}
 	for i := 0; i < length; i++ {
 		arr[i] = 0
-	}
-}
-
-func printPacketLine(data []uint8, length int, offset int) {
-	fmt.Printf("%04X ", offset)
-	// Print our bytes.
-	for i, j := 0, 0; i < length; i++ {
-		if j == 8 {
-			// Visual aid - spacing between groups of 8 bytes.
-			j = 0
-			fmt.Print("  ")
-		}
-		fmt.Printf("%02x ", data[i])
-		j++
-	}
-	// Fill in the gap if we don't have enough bytes to fill the line.
-	for i := length; i < displayWidth; i++ {
-		if i == 8 {
-			fmt.Print("  ")
-		}
-		fmt.Print("   ")
-	}
-	fmt.Print("    ")
-	// Display the print characters as-is, others as periods.
-	for i := 0; i < length; i++ {
-		c := data[i]
-		if strconv.IsPrint(rune(c)) {
-			fmt.Printf("%c", data[i])
-		} else {
-			fmt.Print(".")
-		}
-	}
-	fmt.Println()
-}
-
-// Print the contents of a packet to stdout in two columns, one for bytes and the other
-// for their ascii representation.
-func PrintPayload(data []uint8, pktLen int) {
-	for rem, offset := pktLen, 0; rem > 0; rem -= displayWidth {
-		if rem < displayWidth {
-			printPacketLine(data[(pktLen-rem):pktLen], rem, offset)
-		} else {
-			printPacketLine(data[offset:offset+displayWidth], displayWidth, offset)
-		}
-		offset += displayWidth
 	}
 }
 
@@ -142,13 +98,59 @@ func BytesFromStruct(data interface{}) []byte {
 	return bytes.Bytes()
 }
 
-// Populates the struct pointed to by targetStructby reading in a stream of bytes and filling the values
-// in sequential order. Note that the struct itself must be of fixed width; dynamic types will result
-// in mistranslated values (or possibly a panic).
+// Populates the struct pointed to by targetStructby reading in a stream of bytes and filling
+// the values in sequential order. Note that the struct itself must be of fixed width; dynamic
+// types will result in mistranslated values (or possibly a panic).
 func StructFromBytes(data []byte, targetStruct interface{}) {
 	if kind := reflect.TypeOf(targetStruct).Kind(); kind != reflect.Ptr {
 		panic("StructFromBytes(): targetStruct must be a ptr to struct, got: " + kind.String())
 	}
 	reader := bytes.NewReader(data)
 	binary.Read(reader, binary.LittleEndian, targetStruct)
+}
+
+// Write one line of data to stdout.
+func printPacketLine(data []uint8, length int, offset int) {
+	fmt.Printf("%04X ", offset)
+	// Print our bytes.
+	for i, j := 0, 0; i < length; i++ {
+		if j == 8 {
+			// Visual aid - spacing between groups of 8 bytes.
+			j = 0
+			fmt.Print("  ")
+		}
+		fmt.Printf("%02x ", data[i])
+		j++
+	}
+	// Fill in the gap if we don't have enough bytes to fill the line.
+	for i := length; i < displayWidth; i++ {
+		if i == 8 {
+			fmt.Print("  ")
+		}
+		fmt.Print("   ")
+	}
+	fmt.Print("    ")
+	// Display the print characters as-is, others as periods.
+	for i := 0; i < length; i++ {
+		c := data[i]
+		if strconv.IsPrint(rune(c)) {
+			fmt.Printf("%c", data[i])
+		} else {
+			fmt.Print(".")
+		}
+	}
+	fmt.Println()
+}
+
+// Print the contents of a packet to stdout in two columns, one for bytes and the other
+// for their ascii representation.
+func PrintPayload(data []uint8, pktLen int) {
+	for rem, offset := pktLen, 0; rem > 0; rem -= displayWidth {
+		if rem < displayWidth {
+			printPacketLine(data[(pktLen-rem):pktLen], rem, offset)
+		} else {
+			printPacketLine(data[offset:offset+displayWidth], displayWidth, offset)
+		}
+		offset += displayWidth
+	}
 }

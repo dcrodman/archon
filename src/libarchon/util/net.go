@@ -18,7 +18,50 @@
  */
 package util
 
-import "net"
+import (
+	"container/list"
+	"net"
+	"sync"
+)
+
+type Client interface {
+	Connection() *net.TCPConn
+	IPAddr() string
+}
+
+// Synchronized list for maintaining a list of connected clients.
+type ConnectionList struct {
+	clientList *list.List
+	mutex      sync.RWMutex
+}
+
+func NewClientList() *ConnectionList {
+	newList := new(ConnectionList)
+	newList.clientList = list.New()
+	return newList
+}
+
+func (cl *ConnectionList) AddClient(c Client) {
+	cl.mutex.Lock()
+	cl.clientList.PushBack(c)
+	cl.mutex.Unlock()
+}
+
+func (cl *ConnectionList) RemoveClient(c Client) {
+	cl.mutex.Lock()
+	for client := cl.clientList.Front(); client != nil; client = client.Next() {
+		// TODO: Do we care if the client isn't present?
+		if client.Value == c {
+			cl.clientList.Remove(client)
+			break
+		}
+	}
+	cl.mutex.Unlock()
+}
+
+func (cl *ConnectionList) Count() int {
+	return cl.clientList.Len()
+}
 
 // Create a TCP socket that is listening and ready to Accept().
 func OpenSocket(host, port string) (*net.TCPListener, error) {
