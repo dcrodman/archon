@@ -31,6 +31,11 @@ type configuration struct {
 	Hostname      string
 	LoginPort     string
 	CharacterPort string
+	DBHost        string
+	DBPort        string
+	DBName        string
+	DBUsername    string
+	DBPassword    string
 }
 
 var loginConfig *configuration = nil
@@ -42,18 +47,7 @@ func GetConfig() *configuration {
 	return loginConfig
 }
 
-func (config *configuration) GetHostname() string {
-	return config.Hostname
-}
-
-func (config *configuration) GetLoginPort() string {
-	return config.LoginPort
-}
-
-func (config *configuration) GetCharacterPort() string {
-	return config.CharacterPort
-}
-
+// Debug only
 func (config *configuration) InitFromMap(configMap map[string]string) {
 	config.Hostname = configMap["hostname"]
 	config.LoginPort = configMap["loginPort"]
@@ -70,7 +64,12 @@ func (config *configuration) InitFromFile(fileName string) error {
 }
 
 func (config *configuration) String() string {
-	return "Hostname: " + config.GetHostname() + "\n" +
-		"Login Port: " + config.GetLoginPort() + "\n" +
-		"Character Port: " + config.GetCharacterPort()
+	return "Hostname: " + config.Hostname + "\n" +
+		"Login Port: " + config.LoginPort + "\n" +
+		"Character Port: " + config.CharacterPort + "\n" +
+		"Database Host: " + config.DBHost + "\n" +
+		"Database Port: " + config.DBPort + "\n" +
+		"Database Name: " + config.DBName + "\n" +
+		"Database Username: " + config.DBUsername + "\n" +
+		"Database Password: " + config.DBPassword
 }

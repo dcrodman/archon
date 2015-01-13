@@ -23,6 +23,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"libarchon/encryption"
 	"libarchon/util"
@@ -30,6 +31,8 @@ import (
 	"os"
 	"sync"
 )
+
+var archonDb *sql.DB
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -63,20 +66,33 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 }
 
 func Start() {
+	config := GetConfig()
 	// Initialize our config singleton from one of two expected file locations.
 	fmt.Printf("Loading config file %v...", loginConfigFile)
-	err := GetConfig().InitFromFile(loginConfigFile)
+	err := config.InitFromFile(loginConfigFile)
 	if err != nil {
 		path := util.ServerConfigDir + "/" + loginConfigFile
 		fmt.Printf("Failed.\nLoading config from %v...", path)
-		err = GetConfig().InitFromFile(path)
+		err = config.InitFromFile(path)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			os.Exit(-1)
 		}
 	}
 	// TODO: Validate that the configuration struct was populated.
-	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", GetConfig().String())
+	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", config.String())
+
+	// Initialize the database.
+	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
+		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
+	fmt.Printf("Connecting to MySQL database %s...", dbName)
+	archonDb, err := sql.Open("mysql", dbName)
+	if err != nil || archonDb.Ping() != nil {
+		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
+		os.Exit(-1)
+	}
+	fmt.Println("Done.")
+	defer archonDb.Close()
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

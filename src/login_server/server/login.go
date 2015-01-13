@@ -126,13 +126,13 @@ func handleLoginClient(client *LoginClient) {
 // spawning off client threads to handle communications for each client.
 func StartLogin(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
-	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetLoginPort())
+	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.LoginPort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
 	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n",
-		loginConfig.GetHostname(), loginConfig.GetLoginPort())
+		loginConfig.Hostname, loginConfig.LoginPort)
 
 	for {
 		connection, err := socket.AcceptTCP()

@@ -15,6 +15,7 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
+*
 * CHARACTER server logic.
  */
 package server
@@ -29,12 +30,13 @@ import (
 // Main worker thread for the CHARACTER portion of the server.
 func StartCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
-	socket, err := util.OpenSocket(loginConfig.GetHostname(), loginConfig.GetCharacterPort())
+	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n", loginConfig.GetHostname(), loginConfig.GetCharacterPort())
+	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n",
+		loginConfig.Hostname, loginConfig.CharacterPort)
 
 	for {
 		connection, err := socket.AcceptTCP()
