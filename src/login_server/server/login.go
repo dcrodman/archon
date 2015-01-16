@@ -31,7 +31,14 @@ import (
 var connections *util.ConnectionList = util.NewClientList()
 
 func handleLogin(client *LoginClient, pkt []byte) {
+	// Check if the account exists
+	// Hash the password
+	// Hardware ban?
+	// Account ban?
+	// Does the account need to be activated?
+	// Already connected to the server
 
+	// Check the version string
 }
 
 // Process packets sent to the LOGIN port by sending them off to another handler or by
@@ -64,6 +71,7 @@ func handleLoginClient(client *LoginClient) {
 			fmt.Printf("Encountered communicating with client %s: %s\n", client.ipAddr, err)
 		}
 		connections.RemoveClient(client)
+		fmt.Println("Removed client from connection list")
 	}()
 
 	fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
@@ -145,6 +153,7 @@ func StartLogin(wg *sync.WaitGroup) {
 			continue
 		}
 		connections.AddClient(client)
+		fmt.Println("Added client to connection list")
 		go handleLoginClient(client)
 	}
 	wg.Done()
