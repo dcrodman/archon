@@ -50,8 +50,22 @@ type BBPktHeader struct {
 type WelcomePkt struct {
 	Header       BBPktHeader
 	Copyright    [96]byte
-	ServerVector [48]uint8
-	ClientVector [48]uint8
+	ServerVector [48]byte
+	ClientVector [48]byte
+}
+
+type LoginPkt struct {
+	Header        BBPktHeader
+	Unknown       [8]byte
+	ClientVersion uint16
+	Unknown2      [6]byte
+	TeamId        uint32
+	Username      [16]byte
+	Padding       [32]byte
+	Password      [16]byte
+	Unknown3      [40]byte
+	HardwareInfo  [8]byte
+	Version       [40]byte
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.

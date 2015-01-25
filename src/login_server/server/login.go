@@ -31,6 +31,17 @@ import (
 var connections *util.ConnectionList = util.NewClientList()
 
 func handleLogin(client *LoginClient, pkt []byte) {
+	var loginPkt LoginPkt
+	util.StructFromBytes(pkt, &loginPkt)
+
+	username := string(loginPkt.Username[:16])
+	fmt.Printf("%s (len %v)", username, len(username))
+	/*
+			row := archonDb.QueryRow("SELECT username, password, guildcard, is_gm,"
+				"is_banned, is_active, team_id FROM account_data "+
+				"WHERE username = ? AND password = ?", )
+		defer row.Close()
+	*/
 	// Check if the account exists
 	// Hash the password
 	// Hardware ban?
