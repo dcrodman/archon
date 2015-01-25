@@ -2,3 +2,4 @@
 *.idea
 pkg/*
 src/github.com/go-sql-driver
+*.sublime-*
