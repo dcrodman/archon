@@ -25,6 +25,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"libarchon/encryption"
 	"libarchon/util"
 	"net"
@@ -85,7 +86,7 @@ func Start() {
 	// Initialize the database.
 	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
 		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
-	fmt.Printf("Connecting to MySQL database %s...", dbName)
+	fmt.Printf("Connecting to MySQL database...")
 	archonDb, err := sql.Open("mysql", dbName)
 	if err != nil || archonDb.Ping() != nil {
 		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")

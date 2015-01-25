@@ -4,7 +4,7 @@
 	"CharacterPort" : "12001",
 	"DBHost" : "127.0.0.1",
 	"DBPort" : "3306",
-	"DBName" : "",
-	"DBUsername" : "",
-	"DBPassword" : ""
+	"DBName" : "archondb",
+	"DBUsername" : "archonadmin",
+	"DBPassword" : "psoadminpassword"
 }
