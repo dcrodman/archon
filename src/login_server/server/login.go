@@ -84,6 +84,7 @@ func handleLoginClient(client *LoginClient) {
 			// TODO: Log to error file instead of stdout.
 			fmt.Printf("Encountered communicating with client %s: %s\n", client.ipAddr, err)
 		}
+		client.conn.Close()
 		connections.RemoveClient(client)
 		fmt.Println("Removed client from connection list")
 	}()
