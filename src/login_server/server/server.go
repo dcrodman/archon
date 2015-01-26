@@ -23,17 +23,16 @@
 package server
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"libarchon/encryption"
 	"libarchon/util"
 	"net"
 	"os"
 	"sync"
 )
-
-var archonDb *sql.DB
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -46,10 +45,49 @@ type LoginClient struct {
 	recvData   []byte
 	recvSize   int
 	packetSize uint16
+
+	guildcard int
+	isGm      bool
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
+
+// Handle account verification tasks common to both the login and character servers.
+func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
+	var loginPkt LoginPkt
+	util.StructFromBytes(client.recvData, &loginPkt)
+
+	// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
+	hasher := sha256.New()
+	hasher.Write(util.StripPadding(loginPkt.Password[:]))
+	pktUername := string(util.StripPadding(loginPkt.Username[:]))
+	pktPassword := hex.EncodeToString(hasher.Sum(nil)[:])
+
+	var username, password string
+	var isBanned, isActive bool
+	row := GetConfig().Database().QueryRow("SELECT username, password, guildcard, is_gm, is_banned, "+
+		"is_active from account_data  WHERE username = ? and password = ?", pktUername, pktPassword)
+	err := row.Scan(&username, &password, &client.guildcard, &client.isGm, &isBanned, &isActive)
+	switch {
+	case err == sql.ErrNoRows:
+		// TODO: Send E6, return better error
+		fmt.Printf("Account doesn't exist\n")
+		return nil, err
+	case err != nil:
+		// TODO: Send E6 for database error and log
+		return nil, err
+	case isBanned:
+		// TODO: Send E6, return error
+		fmt.Printf("Account banned\n")
+	case !isActive:
+		// TODO: Send E6, return error
+		fmt.Printf("Account must be activated\n")
+	}
+	// TODO: Hardware ban check.
+
+	return &loginPkt, nil
+}
 
 // Create and initialize a new struct to hold client information.
 func NewClient(conn *net.TCPConn) (*LoginClient, error) {
@@ -83,6 +121,7 @@ func Start() {
 		err = config.InitFromFile(path)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
+			fmt.Printf("%s\n", err.Error())
 			os.Exit(-1)
 		}
 	}
@@ -90,16 +129,15 @@ func Start() {
 	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", config.String())
 
 	// Initialize the database.
-	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
-		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
-	fmt.Printf("Connecting to MySQL database...")
-	archonDb, err := sql.Open("mysql", dbName)
-	if err != nil || archonDb.Ping() != nil {
+	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
+	err = config.InitDb()
+	if err != nil {
 		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
+		fmt.Printf("Error: %s\n", err)
 		os.Exit(-1)
 	}
 	fmt.Println("Done.")
-	defer archonDb.Close()
+	defer config.CloseDb()
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

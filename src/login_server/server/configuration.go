@@ -21,7 +21,10 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
 )
 
@@ -36,6 +39,8 @@ type configuration struct {
 	DBName        string
 	DBUsername    string
 	DBPassword    string
+
+	database *sql.DB
 }
 
 var loginConfig *configuration = nil
@@ -47,13 +52,8 @@ func GetConfig() *configuration {
 	return loginConfig
 }
 
-// Debug only
-func (config *configuration) InitFromMap(configMap map[string]string) {
-	config.Hostname = configMap["hostname"]
-	config.LoginPort = configMap["loginPort"]
-	config.CharacterPort = configMap["characterPort"]
-}
-
+// Populate config with the contents of a JSON file at path fileName. Config parameters
+// in the file must match the above fields exactly in order to be read.
 func (config *configuration) InitFromFile(fileName string) error {
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -62,6 +62,32 @@ func (config *configuration) InitFromFile(fileName string) error {
 	json.Unmarshal(data, config)
 	return nil
 }
+
+/*
+func (config *configuration) InitFromMap(configMap map[string]string) {
+	config.Hostname = configMap["hostname"]
+	config.LoginPort = configMap["loginPort"]
+	config.CharacterPort = configMap["characterPort"]
+}
+*/
+
+// Establish a connection to the database and ping it to verify.
+func (config *configuration) InitDb() error {
+	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
+		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
+	var err error
+	config.database, err = sql.Open("mysql", dbName)
+	if err != nil || config.database.Ping() != nil {
+		return err
+	}
+	return nil
+}
+
+func (config *configuration) CloseDb() {
+	config.database.Close()
+}
+
+func (config *configuration) Database() *sql.DB { return config.database }
 
 func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +

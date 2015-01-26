@@ -28,49 +28,52 @@ import (
 	"sync"
 )
 
+const clientVersionString = "TethVer12510"
+
 var connections *util.ConnectionList = util.NewClientList()
 
-func handleLogin(client *LoginClient, pkt []byte) {
-	var loginPkt LoginPkt
-	util.StructFromBytes(pkt, &loginPkt)
+func handleLogin(client *LoginClient) error {
+	loginPkt, err := VerifyAccount(client)
+	if err != nil {
+		return err
+	}
+	// Already connected to the server?
+	if connections.HasClient(client) {
+		// TODO: E6;  D/C this client or existing client?
+	}
 
-	username := string(loginPkt.Username[:16])
-	fmt.Printf("%s (len %v)", username, len(username))
-	/*
-			row := archonDb.QueryRow("SELECT username, password, guildcard, is_gm,"
-				"is_banned, is_active, team_id FROM account_data "+
-				"WHERE username = ? AND password = ?", )
-		defer row.Close()
-	*/
-	// Check if the account exists
-	// Hash the password
-	// Hardware ban?
-	// Account ban?
-	// Does the account need to be activated?
-	// Already connected to the server
-
-	// Check the version string
+	// Check the version string.
+	if clientVersionString != string(util.StripPadding(loginPkt.Version[:])) {
+		// TODO: E6 patch error
+		fmt.Printf("Incorrect version\n")
+	}
+	// TODO: E6 all good
+	return nil
 }
 
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
-func processPacket(client *LoginClient) error {
+func processLoginPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
 	util.StructFromBytes(client.recvData, &pktHeader)
 
 	fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
 	util.PrintPayload(client.recvData, int(pktHeader.Size))
 
+	var err error = nil
 	switch pktHeader.Type {
 	case LoginType:
-		handleLogin(client)
+		err = handleLogin(client)
+		if err != nil {
+			// err = SendRedirect(client)
+		}
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
 		fmt.Printf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 	}
-	return nil
+	return err
 }
 
 // Handle communication with a particular client until the connection is closed or an
@@ -124,7 +127,7 @@ func handleLoginClient(client *LoginClient) {
 
 		// We have the whole thing; decrypt the rest of it and pass it along.
 		client.clientCrypt.Decrypt(client.recvData[BBHeaderSize:client.recvSize], uint32(client.packetSize))
-		if err := processPacket(client); err != nil {
+		if err := processLoginPacket(client); err != nil {
 			fmt.Println(err.Error())
 			break
 		}

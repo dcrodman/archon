@@ -26,17 +26,18 @@ import (
 	"libarchon/util"
 )
 
-// Packet headers.
 const BBHeaderSize = 0x08
-
-const WelcomeType = 0x03
-const DisconnectType = 0x05
-const LoginType = 0x93
-
-const WelcomeSize = 0xC8
-
-// Other constants.
 const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
+
+const (
+	WelcomeType    = 0x03
+	DisconnectType = 0x05
+	LoginType      = 0x93
+)
+
+const (
+	WelcomeSize = 0xC8
+)
 
 var copyrightBytes []byte = make([]byte, 96)
 
