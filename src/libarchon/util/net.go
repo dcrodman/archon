@@ -47,6 +47,19 @@ func (cl *ConnectionList) AddClient(c Client) {
 	cl.mutex.Unlock()
 }
 
+func (cl *ConnectionList) HasClient(c Client) bool {
+	found := false
+	cl.mutex.RLock()
+	for client := cl.clientList.Front(); client != nil; client = client.Next() {
+		if client.Value == c {
+			found = true
+			break
+		}
+	}
+	cl.mutex.RUnlock()
+	return found
+}
+
 func (cl *ConnectionList) RemoveClient(c Client) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {

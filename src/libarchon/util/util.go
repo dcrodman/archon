@@ -40,6 +40,16 @@ func (err ServerError) Error() string {
 	return err.Message
 }
 
+// Returns a slice of b without the trailing 0s.
+func StripPadding(b []byte) []byte {
+	for i := len(b) - 1; i >= 0; i-- {
+		if b[i] != 0 {
+			return b[:i+1]
+		}
+	}
+	return b
+}
+
 // Sets the values of a slice of bytes (up to length) to 0.
 func ZeroSlice(arr []byte, length int) {
 	if arrLen := len(arr); arrLen < length {
