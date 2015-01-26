@@ -63,7 +63,6 @@ func (cl *ConnectionList) HasClient(c Client) bool {
 func (cl *ConnectionList) RemoveClient(c Client) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
-		// TODO: Do we care if the client isn't present?
 		if client.Value == c {
 			cl.clientList.Remove(client)
 			break
