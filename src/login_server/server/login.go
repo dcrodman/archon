@@ -54,22 +54,22 @@ func handleLogin(client *LoginClient, pkt []byte) {
 
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
-func processPacket(client *LoginClient, pkt []byte) error {
+func processPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
-	util.StructFromBytes(pkt, &pktHeader)
+	util.StructFromBytes(client.recvData, &pktHeader)
+
+	fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
+	util.PrintPayload(client.recvData, int(pktHeader.Size))
 
 	switch pktHeader.Type {
 	case LoginType:
-		handleLogin(client, pkt)
+		handleLogin(client)
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
 		fmt.Printf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 	}
-
-	fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
-	util.PrintPayload(pkt, int(pktHeader.Size))
 	return nil
 }
 
@@ -88,13 +88,10 @@ func handleLoginClient(client *LoginClient) {
 	fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
-	var recvSize int
-	var packetSize uint16
-	recvData := make([]byte, 1024)
 	for {
 		// Wait for the packet header.
-		for recvSize < BBHeaderSize {
-			bytes, err := client.conn.Read(recvData[recvSize:])
+		for client.recvSize < BBHeaderSize {
+			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
 			if err != nil {
 				// Socket error, nothing we can do now. TODO: log instead of panic().
 				panic(err.Error())
@@ -104,11 +101,11 @@ func handleLoginClient(client *LoginClient) {
 				break
 			}
 
-			recvSize += bytes
-			if recvSize >= BBHeaderSize {
+			client.recvSize += bytes
+			if client.recvSize >= BBHeaderSize {
 				// We have our header; decrypt it.
-				client.clientCrypt.Decrypt(recvData[:BBHeaderSize], BBHeaderSize)
-				packetSize, err = util.GetPacketSize(recvData[:2])
+				client.clientCrypt.Decrypt(client.recvData[:BBHeaderSize], BBHeaderSize)
+				client.packetSize, err = util.GetPacketSize(client.recvData[:2])
 				if err != nil {
 					// Something is seriously wrong if this causes an error. Bail.
 					panic(err.Error())
@@ -117,17 +114,17 @@ func handleLoginClient(client *LoginClient) {
 		}
 
 		// Wait until we have the entire packet.
-		for recvSize < int(packetSize) {
-			bytes, err := client.conn.Read(recvData[recvSize:])
+		for client.recvSize < int(client.packetSize) {
+			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
 			if err != nil {
 				panic(err.Error())
 			}
-			recvSize += bytes
+			client.recvSize += bytes
 		}
 
 		// We have the whole thing; decrypt the rest of it and pass it along.
-		client.clientCrypt.Decrypt(recvData[BBHeaderSize:recvSize], uint32(packetSize))
-		if err := processPacket(client, recvData); err != nil {
+		client.clientCrypt.Decrypt(client.recvData[BBHeaderSize:client.recvSize], uint32(client.packetSize))
+		if err := processPacket(client); err != nil {
 			fmt.Println(err.Error())
 			break
 		}
@@ -135,9 +132,9 @@ func handleLoginClient(client *LoginClient) {
 		// Alternatively, we could set the slice to to nil here and make() a new one in order
 		// to allow the garbage collector to handle cleanup, but I expect that would have a
 		// noticable impact on performance. Instead, we're going to clear it manually.
-		util.ZeroSlice(recvData, recvSize)
-		recvSize = 0
-		packetSize = 0
+		util.ZeroSlice(client.recvData, client.recvSize)
+		client.recvSize = 0
+		client.packetSize = 0
 	}
 }
 
@@ -150,9 +147,7 @@ func StartLogin(wg *sync.WaitGroup) {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n",
-		loginConfig.Hostname, loginConfig.LoginPort)
-
+	fmt.Printf("Waiting for LOGIN connections on %s:%s...\n", loginConfig.Hostname, loginConfig.LoginPort)
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {

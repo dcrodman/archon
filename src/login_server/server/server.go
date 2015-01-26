@@ -42,6 +42,10 @@ type LoginClient struct {
 
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
+
+	recvData   []byte
+	recvSize   int
+	packetSize uint16
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
@@ -57,6 +61,8 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 	client.serverCrypt = encryption.NewCrypt()
 	client.clientCrypt.CreateKeys()
 	client.serverCrypt.CreateKeys()
+
+	client.recvData = make([]byte, 1024)
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
