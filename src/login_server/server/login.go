@@ -71,7 +71,8 @@ func processLoginPacket(client *LoginClient) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		fmt.Printf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
 	}
 	return err
 }
@@ -81,8 +82,8 @@ func processLoginPacket(client *LoginClient) error {
 func handleLoginClient(client *LoginClient) {
 	defer func() {
 		if err := recover(); err != nil {
-			// TODO: Log to error file instead of stdout.
-			fmt.Printf("Encountered communicating with client %s: %s\n", client.ipAddr, err)
+			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n", client.ipAddr, err)
+			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
 		}
 		client.conn.Close()
 		connections.RemoveClient(client)
@@ -155,7 +156,7 @@ func StartLogin(wg *sync.WaitGroup) {
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {
-			fmt.Println("Error accepting connection: " + err.Error())
+			LogMsg("Failed to accept connection: "+err.Error(), LogTypeError, LogPriorityHigh)
 			continue
 		}
 		client, err := NewClient(connection)

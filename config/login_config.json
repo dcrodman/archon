@@ -6,5 +6,6 @@
 	"DBPort" : "3306",
 	"DBName" : "archondb",
 	"DBUsername" : "archonadmin",
-	"DBPassword" : "psoadminpassword"
+	"DBPassword" : "psoadminpassword",
+	"LogLevel" : 4
 }

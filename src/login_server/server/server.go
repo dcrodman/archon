@@ -75,7 +75,8 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 		fmt.Printf("Account doesn't exist\n")
 		return nil, err
 	case err != nil:
-		// TODO: Send E6 for database error and log
+		// TODO: Send E6 for database error
+		LogMsg(fmt.Sprintf("SQL Error: %s", err.Error()), LogTypeError, LogPriorityCritical)
 		return nil, err
 	case isBanned:
 		// TODO: Send E6, return error
@@ -125,7 +126,6 @@ func Start() {
 			os.Exit(-1)
 		}
 	}
-	// TODO: Validate that the configuration struct was populated.
 	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", config.String())
 
 	// Initialize the database.
