@@ -26,6 +26,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"libarchon/encryption"
 	"libarchon/util"
@@ -72,18 +73,18 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 	switch {
 	case err == sql.ErrNoRows:
 		// TODO: Send E6, return better error
-		fmt.Printf("Account doesn't exist\n")
-		return nil, err
+		return nil, errors.New("Account does not exist for username: " + username)
 	case err != nil:
 		// TODO: Send E6 for database error
-		LogMsg(fmt.Sprintf("SQL Error: %s", err.Error()), LogTypeError, LogPriorityCritical)
-		return nil, err
+		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
+		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
+		return nil, &util.ServerError{Message: errMsg}
 	case isBanned:
 		// TODO: Send E6, return error
-		fmt.Printf("Account banned\n")
+		return nil, errors.New("Account banned: " + username)
 	case !isActive:
 		// TODO: Send E6, return error
-		fmt.Printf("Account must be activated\n")
+		return nil, errors.New("Account must be activated for username: " + username)
 	}
 	// TODO: Hardware ban check.
 

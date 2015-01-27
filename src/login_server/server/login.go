@@ -35,6 +35,7 @@ var connections *util.ConnectionList = util.NewClientList()
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := VerifyAccount(client)
 	if err != nil {
+		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
 		return err
 	}
 	// Already connected to the server?
@@ -87,7 +88,6 @@ func handleLoginClient(client *LoginClient) {
 		}
 		client.conn.Close()
 		connections.RemoveClient(client)
-		fmt.Println("Removed client from connection list")
 	}()
 
 	fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
@@ -130,7 +130,6 @@ func handleLoginClient(client *LoginClient) {
 		// We have the whole thing; decrypt the rest of it and pass it along.
 		client.clientCrypt.Decrypt(client.recvData[BBHeaderSize:client.recvSize], uint32(client.packetSize))
 		if err := processLoginPacket(client); err != nil {
-			fmt.Println(err.Error())
 			break
 		}
 
@@ -164,7 +163,6 @@ func StartLogin(wg *sync.WaitGroup) {
 			continue
 		}
 		connections.AddClient(client)
-		fmt.Println("Added client to connection list")
 		go handleLoginClient(client)
 	}
 	wg.Done()
