@@ -47,7 +47,7 @@ type LoginClient struct {
 	recvSize   int
 	packetSize uint16
 
-	guildcard int
+	guildcard uint32
 	isGm      bool
 }
 
@@ -67,27 +67,38 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 
 	var username, password string
 	var isBanned, isActive bool
-	row := GetConfig().Database().QueryRow("SELECT username, password, guildcard, is_gm, is_banned, "+
-		"is_active from account_data  WHERE username = ? and password = ?", pktUername, pktPassword)
-	err := row.Scan(&username, &password, &client.guildcard, &client.isGm, &isBanned, &isActive)
+	row := GetConfig().Database().QueryRow("SELECT username, password, "+
+		"guildcard, is_gm, is_banned, is_active from account_data "+
+		"WHERE username = ? and password = ?", pktUername, pktPassword)
+	err := row.Scan(&username, &password, &client.guildcard,
+		&client.isGm, &isBanned, &isActive)
 	switch {
+	// Check if we have a valid username/combination.
 	case err == sql.ErrNoRows:
-		// TODO: Send E6, return better error
+		// The same error is returned for invalid passwords as attempts to log in
+		// with a nonexistent username as some measure of account security. Note
+		// that if this is changed to query by username and add a password check,
+		// the index on account_data will need to be modified.
+		SendSecurity(client, BBLoginErrorPassword, 0)
 		return nil, errors.New("Account does not exist for username: " + username)
+	// Database error?
 	case err != nil:
-		// TODO: Send E6 for database error
+		// TODO: Send error message (1A)
+		SendSecurity(client, BBLoginErrorUnknown, 0)
 		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
 		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
 		return nil, &util.ServerError{Message: errMsg}
+	// Is the account banned?
 	case isBanned:
-		// TODO: Send E6, return error
+		SendSecurity(client, BBLoginErrorBanned, 0)
 		return nil, errors.New("Account banned: " + username)
+	// Has the account been activated?
 	case !isActive:
-		// TODO: Send E6, return error
+		// TODO: Send message (1A)
+		SendSecurity(client, BBLoginErrorUnregistered, 0)
 		return nil, errors.New("Account must be activated for username: " + username)
 	}
 	// TODO: Hardware ban check.
-
 	return &loginPkt, nil
 }
 

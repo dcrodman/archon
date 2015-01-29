@@ -29,25 +29,51 @@ import (
 const BBHeaderSize = 0x08
 const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
 
+// Packet types for packets sent to and from the login and character servers.
 const (
 	WelcomeType    = 0x03
 	DisconnectType = 0x05
 	LoginType      = 0x93
+	SecurityType   = 0xE6
 )
 
+// Sizes of packets sent to the client. Not a 1-1 mapping with the types above, these are
+// helpful because it's difficult to get the full packet size and update the packet header.
 const (
-	WelcomeSize = 0xC8
+	WelcomeSize  = 0xC8
+	SecuritySize = 0x44
+	MessageSize  = 0x12
+)
+
+// Error code types used for packet E6.
+type BBLoginError uint32
+
+const (
+	BBLoginErrorNone         = 0x0
+	BBLoginErrorUnknown      = 0x1
+	BBLoginErrorPassword     = 0x2
+	BBLoginErrorPassword2    = 0x3 // Same as password
+	BBLoginErrorMaintenance  = 0x4
+	BBLoginErrorUserInUse    = 0x5
+	BBLoginErrorBanned       = 0x6
+	BBLoginErrorBanned2      = 0x7 // Same as banned
+	BBLoginErrorUnregistered = 0x8
+	BBLoginErrorExpiredSub   = 0x9
+	BBLoginErrorLocked       = 0xA
+	BBLoginErrorPatch        = 0xB
+	BBLoginErrorDisconnect   = 0xC
 )
 
 var copyrightBytes []byte = make([]byte, 96)
 
-// Packet structures.
+// Packet header for every packet sent between the server and BlueBurst clients.
 type BBPktHeader struct {
 	Size    uint16
 	Type    uint16
 	Padding uint32
 }
 
+// Welcome packet with encryption vectors sent to the client upon initial connection.
 type WelcomePkt struct {
 	Header       BBPktHeader
 	Copyright    [96]byte
@@ -55,6 +81,7 @@ type WelcomePkt struct {
 	ClientVector [48]byte
 }
 
+// Login Packet (0x93) sent to both the login and character servers.
 type LoginPkt struct {
 	Header        BBPktHeader
 	Unknown       [8]byte
@@ -68,6 +95,30 @@ type LoginPkt struct {
 	HardwareInfo  [8]byte
 	Version       [40]byte
 }
+
+// Not entirely sure what this is for.
+type BBClientConfig struct {
+	Magic       uint32 // Must be set to 0x48615467
+	BBGameState uint8  // Status of connected client
+	BBPlayerNum uint8  // Selected Character
+	Flags       uint16
+	Ports       [4]uint16
+	Unused      [4]uint32
+	Unused2     [2]uint32
+}
+
+// Security packet (0xE6) sent to the client to indicate the state of client login.
+type SecurityPacket struct {
+	Header       BBPktHeader
+	ErrorCode    uint32
+	PlayerTag    uint32
+	Guildcard    uint32
+	TeamId       uint32
+	Config       BBClientConfig
+	Capabilities uint32
+	Padding      uint32
+}
+
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -105,6 +156,25 @@ func SendWelcome(client *LoginClient) int {
 	fmt.Println("Sending Welcome Packet")
 	util.PrintPayload(data, WelcomeSize)
 	return SendPacket(client, data, WelcomeSize)
+}
+
+func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) int {
+	pkt := new(SecurityPacket)
+	pkt.Header.Type = SecurityType
+	pkt.Header.Size = SecuritySize
+
+	// Constants set according to how Newserv does it.
+	pkt.ErrorCode = uint32(errorCode)
+	pkt.PlayerTag = 0x00010000
+	pkt.Guildcard = client.guildcard
+	pkt.TeamId = teamId
+	pkt.Capabilities = 0x00000102
+	pkt.Config.Magic = 0x48615467
+
+	data := util.BytesFromStruct(pkt)
+	fmt.Println("Sending Security Packet")
+	util.PrintPayload(data, SecuritySize)
+	return SendEncrypted(client, data, SecuritySize)
 }
 
 func init() {

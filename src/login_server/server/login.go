@@ -22,6 +22,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"libarchon/util"
 	"os"
@@ -38,17 +39,23 @@ func handleLogin(client *LoginClient) error {
 		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
 		return err
 	}
-	// Already connected to the server?
-	if connections.HasClient(client) {
-		// TODO: E6;  D/C this client or existing client?
-	}
+	// TODO: Already connected to the server?
+	/*
+		Broken since this will always be true by this point (need to check for
+		multiple occurrences)
+		if connections.HasClient(client) {
+			SendSecurity(client, BBLoginErrorUserInUse, 0)
+			return errors.New("Client already connected to login server")
+		}
+	*/
 
 	// Check the version string.
 	if clientVersionString != string(util.StripPadding(loginPkt.Version[:])) {
-		// TODO: E6 patch error
-		fmt.Printf("Incorrect version\n")
+		SendSecurity(client, BBLoginErrorPatch, 0)
+		return errors.New("Incorrect version string")
 	}
-	// TODO: E6 all good
+
+	SendSecurity(client, BBLoginErrorNone, 0)
 	return nil
 }
 
