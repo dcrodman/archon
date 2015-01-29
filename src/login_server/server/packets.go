@@ -70,16 +70,26 @@ type LoginPkt struct {
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
+// Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *LoginClient, pkt []byte, length int) int {
-	// Write will return the number of bytes sent, but at this point I'm assuming that the
-	// method will handle sending all of bytes to the client (as opposed to C's send) so I'm
-	// going to ignore it unless it becomes a problem.
 	_, err := client.conn.Write(pkt[:length])
 	if err != nil {
-		// TODO: Log error.
+		LogMsg("Error sending to client "+client.ipAddr+": "+err.Error(),
+			LogTypeInfo, LogPriorityMedium)
 		return -1
 	}
 	return 0
+}
+
+// Send data to client after padding it to a length disible by 8 and
+// encrypting it with the client's server ciper.
+func SendEncrypted(client *LoginClient, data []byte, length int) int {
+	for length%8 != 0 {
+		length++
+		data = append(data, 0)
+	}
+	client.serverCrypt.Encrypt(data, uint32(length))
+	return SendPacket(client, data, length)
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
