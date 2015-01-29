@@ -30,13 +30,14 @@ import (
 	"io/ioutil"
 	"libarchon/util"
 	"os"
+	"strconv"
 	"time"
 )
 
 const loginConfigFile = "login_config.json"
 
-type LogType int
-type LogPriority int
+type LogType byte
+type LogPriority byte
 
 // Constants for the configurable log level that control the amount of information
 // written to the server logs. The higher the number, the lower the priority.
@@ -95,6 +96,7 @@ type configuration struct {
 	DBPassword    string
 	Logfile       string
 	LogLevel      LogPriority
+	DebugMode     bool
 
 	database *sql.DB
 }
@@ -168,6 +170,10 @@ func (config *configuration) Database() *sql.DB {
 }
 
 func (config *configuration) String() string {
+	logfile := config.Logfile
+	if logfile == "" {
+		logfile = "Standard Out"
+	}
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
@@ -175,5 +181,8 @@ func (config *configuration) String() string {
 		"Database Port: " + config.DBPort + "\n" +
 		"Database Name: " + config.DBName + "\n" +
 		"Database Username: " + config.DBUsername + "\n" +
-		"Database Password: " + config.DBPassword
+		"Database Password: " + config.DBPassword + "\n" +
+		"Output Logged To: " + logfile + "\n" +
+		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
+		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
 }

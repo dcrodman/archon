@@ -22,6 +22,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"libarchon/util"
 )
@@ -153,8 +155,10 @@ func SendWelcome(client *LoginClient) int {
 	copy(pkt.ServerVector[:], client.serverCrypt.Vector)
 
 	data := util.BytesFromStruct(pkt)
-	fmt.Println("Sending Welcome Packet")
-	util.PrintPayload(data, WelcomeSize)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Welcome Packet")
+		util.PrintPayload(data, WelcomeSize)
+	}
 	return SendPacket(client, data, WelcomeSize)
 }
 
@@ -172,8 +176,10 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 	pkt.Config.Magic = 0x48615467
 
 	data := util.BytesFromStruct(pkt)
-	fmt.Println("Sending Security Packet")
-	util.PrintPayload(data, SecuritySize)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Security Packet")
+		util.PrintPayload(data, SecuritySize)
+	}
 	return SendEncrypted(client, data, SecuritySize)
 }
 

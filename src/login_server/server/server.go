@@ -124,6 +124,7 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 }
 
 func Start() {
+	fmt.Println("Initializing Archon LOGIN and CHARACTER servers...")
 	config := GetConfig()
 	// Initialize our config singleton from one of two expected file locations.
 	fmt.Printf("Loading config file %v...", loginConfigFile)
@@ -138,7 +139,7 @@ func Start() {
 			os.Exit(-1)
 		}
 	}
-	fmt.Printf("Done.\n--Configuration Parameters--\n%v\n\n", config.String())
+	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)

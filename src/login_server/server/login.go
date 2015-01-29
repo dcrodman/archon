@@ -97,7 +97,7 @@ func handleLoginClient(client *LoginClient) {
 		connections.RemoveClient(client)
 	}()
 
-	fmt.Printf("Accepted LOGIN connection from %s\n", client.ipAddr)
+	LogMsg("Accepted LOGIN connection from "+client.ipAddr, LogTypeInfo, LogPriorityHigh)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
