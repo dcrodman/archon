@@ -62,7 +62,7 @@ func ZeroSlice(arr []byte, length int) {
 
 // Serializes the fields of a struct to an array of bytes in the order in which the fields are
 // declared. Calls panic() if data is not a struct or pointer to struct.
-func BytesFromStruct(data interface{}) []byte {
+func BytesFromStruct(data interface{}) ([]byte, int) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()
 	if valKind == reflect.Ptr {
@@ -105,7 +105,7 @@ func BytesFromStruct(data interface{}) []byte {
 		}
 	*/
 	binary.Write(bytes, binary.LittleEndian, val.Interface())
-	return bytes.Bytes()
+	return bytes.Bytes(), bytes.Len()
 }
 
 // Populates the struct pointed to by targetStructby reading in a stream of bytes and filling

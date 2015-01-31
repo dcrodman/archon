@@ -38,8 +38,7 @@ const (
 	RedirectType   = 0x19
 )
 
-// Sizes of packets sent to the client. Not a 1-1 mapping with the types above, these are
-// helpful because it's difficult to get the full packet size and update the packet header.
+// Packet sizes for those that are fixed.
 const (
 	WelcomeSize  = 0xC8
 	SecuritySize = 0x44
@@ -131,7 +130,7 @@ type RedirectPacket struct {
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
-func SendPacket(client *LoginClient, pkt []byte, length int) int {
+func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
 	_, err := client.conn.Write(pkt[:length])
 	if err != nil {
 		LogMsg("Error sending to client "+client.ipAddr+": "+err.Error(),
@@ -143,10 +142,11 @@ func SendPacket(client *LoginClient, pkt []byte, length int) int {
 
 // Send data to client after padding it to a length disible by 8 and
 // encrypting it with the client's server ciper.
-func SendEncrypted(client *LoginClient, data []byte, length int) int {
-	for length%8 != 0 {
-		length++
-		data = append(data, 0)
+func SendEncrypted(client *LoginClient, data []byte, length uint16) int {
+	length = fixLength(data, length)
+	if GetConfig().DebugMode {
+		util.PrintPayload(data, int(length))
+		fmt.Println()
 	}
 	client.serverCrypt.Encrypt(data, uint32(length))
 	return SendPacket(client, data, length)
@@ -161,7 +161,7 @@ func SendWelcome(client *LoginClient) int {
 	copy(pkt.ClientVector[:], client.clientCrypt.Vector)
 	copy(pkt.ServerVector[:], client.serverCrypt.Vector)
 
-	data := util.BytesFromStruct(pkt)
+	data, _ := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Welcome Packet")
 		util.PrintPayload(data, WelcomeSize)
@@ -183,11 +183,9 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 	pkt.Capabilities = 0x00000102
 	pkt.Config.Magic = 0x48615467
 
-	data := util.BytesFromStruct(pkt)
+	data, _ := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Security Packet")
-		util.PrintPayload(data, SecuritySize)
-		fmt.Println()
 	}
 	return SendEncrypted(client, data, SecuritySize)
 }
@@ -199,13 +197,23 @@ func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	copy(pkt.IPAddr[:], ipAddr[:])
 	pkt.Port = port
 
-	data := util.BytesFromStruct(pkt)
+	data, _ := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Redirect Packet")
-		util.PrintPayload(data, RedirectSize)
-		fmt.Println()
 	}
 	return SendEncrypted(client, data, RedirectSize)
+}
+
+// Pad the length of a packet to a multiple of 8 and set the first two
+// bytes of the header.
+func fixLength(data []byte, length uint16) uint16 {
+	for length%8 != 0 {
+		length++
+		_ = append(data, 0)
+	}
+	// TODO: Length to LE
+	data[0] = byte(length)
+	return length
 }
 
 func init() {

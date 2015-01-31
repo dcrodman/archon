@@ -73,6 +73,7 @@ func processLoginPacket(client *LoginClient) error {
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
 		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		fmt.Println()
 	}
 
 	var err error = nil
@@ -99,7 +100,7 @@ func handleLoginClient(client *LoginClient) {
 		}
 		client.conn.Close()
 		connections.RemoveClient(client)
-		LogMsg("Disconnected client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
+		LogMsg("Disconnected LOGIN client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
 	}()
 
 	LogMsg("Accepted LOGIN connection from "+client.ipAddr, LogTypeInfo, LogPriorityMedium)

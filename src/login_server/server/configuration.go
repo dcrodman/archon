@@ -71,7 +71,7 @@ func LogMsg(message string, logType LogType, priority LogPriority) {
 		logMsg = fmt.Sprintf("%s [INFO] %s\n", timestamp, message)
 	}
 	if config.Logfile == "" {
-		fmt.Println(logMsg)
+		fmt.Printf(logMsg)
 	} else {
 		logfile, err := os.OpenFile("login_server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
