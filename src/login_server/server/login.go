@@ -24,6 +24,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"io"
 	"libarchon/util"
 	"os"
 	"strconv"
@@ -69,16 +70,15 @@ func processLoginPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
 	util.StructFromBytes(client.recvData, &pktHeader)
 
-	fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
-	util.PrintPayload(client.recvData, int(pktHeader.Size))
+	if GetConfig().DebugMode {
+		fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
+		util.PrintPayload(client.recvData, int(pktHeader.Size))
+	}
 
 	var err error = nil
 	switch pktHeader.Type {
 	case LoginType:
 		err = handleLogin(client)
-		if err != nil {
-			// err = SendRedirect(client)
-		}
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
@@ -99,22 +99,25 @@ func handleLoginClient(client *LoginClient) {
 		}
 		client.conn.Close()
 		connections.RemoveClient(client)
+		LogMsg("Disconnected client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
 	}()
 
-	LogMsg("Accepted LOGIN connection from "+client.ipAddr, LogTypeInfo, LogPriorityHigh)
+	LogMsg("Accepted LOGIN connection from "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
 		// Wait for the packet header.
 		for client.recvSize < BBHeaderSize {
 			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
-			if err != nil {
-				// Socket error, nothing we can do now. TODO: log instead of panic().
-				panic(err.Error())
-			} else if bytes == 0 {
+			if bytes == 0 || err == io.EOF {
 				// The client disconnected, we're done.
 				client.conn.Close()
-				break
+				return
+			} else if err != nil {
+				// Socket error, nothing we can do now
+				LogMsg("Socket Error ("+client.ipAddr+") "+err.Error(),
+					LogTypeWarning, LogPriorityMedium)
+				return
 			}
 
 			client.recvSize += bytes
