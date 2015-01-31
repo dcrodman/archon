@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"libarchon/util"
 	"os"
+	"strconv"
 	"sync"
 )
 
@@ -56,6 +57,9 @@ func handleLogin(client *LoginClient) error {
 	}
 
 	SendSecurity(client, BBLoginErrorNone, 0)
+	config := GetConfig()
+	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	SendRedirect(client, uint16(charPort), config.HostnameBytes())
 	return nil
 }
 

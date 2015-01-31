@@ -35,6 +35,7 @@ const (
 	DisconnectType = 0x05
 	LoginType      = 0x93
 	SecurityType   = 0xE6
+	RedirectType   = 0x19
 )
 
 // Sizes of packets sent to the client. Not a 1-1 mapping with the types above, these are
@@ -43,6 +44,7 @@ const (
 	WelcomeSize  = 0xC8
 	SecuritySize = 0x44
 	MessageSize  = 0x12
+	RedirectSize = 0x10
 )
 
 // Error code types used for packet E6.
@@ -119,6 +121,13 @@ type SecurityPacket struct {
 	Padding      uint32
 }
 
+// The address of the next server; in this case, the character server.
+type RedirectPacket struct {
+	Header  BBPktHeader
+	IPAddr  [4]uint8
+	Port    uint16
+	Padding uint16
+}
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -179,6 +188,21 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 		util.PrintPayload(data, SecuritySize)
 	}
 	return SendEncrypted(client, data, SecuritySize)
+}
+
+func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
+	pkt := new(RedirectPacket)
+	pkt.Header.Type = RedirectType
+	pkt.Header.Size = RedirectSize
+	copy(pkt.IPAddr[:], ipAddr[:])
+	pkt.Port = port
+
+	data := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Redirect Packet")
+		util.PrintPayload(data, RedirectSize)
+	}
+	return SendEncrypted(client, data, RedirectSize)
 }
 
 func init() {

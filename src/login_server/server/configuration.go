@@ -31,6 +31,7 @@ import (
 	"libarchon/util"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -103,6 +104,7 @@ type configuration struct {
 
 // Singleton instance.
 var loginConfig *configuration = nil
+var cachedHostBytes [4]byte
 
 // This functiion should be used to get access to the server config instead of directly
 // referencing the loginConfig pointer.
@@ -140,6 +142,20 @@ func (config *configuration) enforceDefaults() {
 		// The log level must be at least open to critical messages.
 		config.LogLevel = LogPriorityCritical
 	}
+}
+
+// Convert the hostname string into 4 bytes to be used with the redirect packet.
+func (config *configuration) HostnameBytes() [4]byte {
+	// Hacky, but chances are the IP address isn't going to start with 0 and a
+	// fixed-length array can't be null.
+	if cachedHostBytes[0] == 0x00 {
+		parts := strings.Split(config.Hostname, ".")
+		for i := 0; i < 4; i++ {
+			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
+			cachedHostBytes[i] = uint8(tmp)
+		}
+	}
+	return cachedHostBytes
 }
 
 // Establish a connection to the database and ping it to verify.
