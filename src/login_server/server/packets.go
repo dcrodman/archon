@@ -165,6 +165,7 @@ func SendWelcome(client *LoginClient) int {
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Welcome Packet")
 		util.PrintPayload(data, WelcomeSize)
+		fmt.Println()
 	}
 	return SendPacket(client, data, WelcomeSize)
 }
@@ -186,6 +187,7 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Security Packet")
 		util.PrintPayload(data, SecuritySize)
+		fmt.Println()
 	}
 	return SendEncrypted(client, data, SecuritySize)
 }
@@ -201,6 +203,7 @@ func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Redirect Packet")
 		util.PrintPayload(data, RedirectSize)
+		fmt.Println()
 	}
 	return SendEncrypted(client, data, RedirectSize)
 }

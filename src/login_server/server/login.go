@@ -71,7 +71,7 @@ func processLoginPacket(client *LoginClient) error {
 	util.StructFromBytes(client.recvData, &pktHeader)
 
 	if GetConfig().DebugMode {
-		fmt.Printf("\nGot %v bytes from client:\n", pktHeader.Size)
+		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
 		util.PrintPayload(client.recvData, int(pktHeader.Size))
 	}
 
