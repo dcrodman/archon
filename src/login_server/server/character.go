@@ -31,9 +31,18 @@ import (
 var charConnections *util.ConnectionList = util.NewClientList()
 
 func handleCharLogin(client *LoginClient) error {
+	_, err := VerifyAccount(client)
+	if err != nil {
+		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
+		return err
+	}
+
+	SendSecurity(client, BBLoginErrorNone, 0)
 	return nil
 }
 
+// Process packets sent to the CHARACTER port by sending them off to another
+// handler or by taking some brief action.
 func processCharacterPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
 	util.StructFromBytes(client.recvData, &pktHeader)
@@ -58,6 +67,8 @@ func processCharacterPacket(client *LoginClient) error {
 	return err
 }
 
+// Handle communication with a particular client until the connection is closed or an
+// error is encountered.
 func handleCharacterClient(client *LoginClient) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -108,8 +119,12 @@ func handleCharacterClient(client *LoginClient) {
 			client.recvSize += bytes
 		}
 
-		// We have the whole thing; decrypt the rest of it and pass it along.
-		client.clientCrypt.Decrypt(client.recvData[BBHeaderSize:client.recvSize], uint32(client.packetSize))
+		// We have the whole thing; decrypt the rest of it if needed and pass it along.
+		if client.packetSize > BBHeaderSize {
+			client.clientCrypt.Decrypt(
+				client.recvData[BBHeaderSize:client.packetSize],
+				uint32(client.packetSize-BBHeaderSize))
+		}
 		if err := processCharacterPacket(client); err != nil {
 			break
 		}

@@ -142,8 +142,12 @@ func handleLoginClient(client *LoginClient) {
 			client.recvSize += bytes
 		}
 
-		// We have the whole thing; decrypt the rest of it and pass it along.
-		client.clientCrypt.Decrypt(client.recvData[BBHeaderSize:client.recvSize], uint32(client.packetSize))
+		// We have the whole thing; decrypt the rest of it if needed and pass it along.
+		if client.packetSize > BBHeaderSize {
+			client.clientCrypt.Decrypt(
+				client.recvData[BBHeaderSize:client.packetSize],
+				uint32(client.packetSize-BBHeaderSize))
+		}
 		if err := processLoginPacket(client); err != nil {
 			break
 		}
