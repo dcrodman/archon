@@ -33,7 +33,7 @@ import (
 
 const clientVersionString = "TethVer12510"
 
-var connections *util.ConnectionList = util.NewClientList()
+var loginConnections *util.ConnectionList = util.NewClientList()
 
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := VerifyAccount(client)
@@ -99,7 +99,7 @@ func handleLoginClient(client *LoginClient) {
 			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
 		}
 		client.conn.Close()
-		connections.RemoveClient(client)
+		loginConnections.RemoveClient(client)
 		LogMsg("Disconnected LOGIN client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
 	}()
 
@@ -177,7 +177,7 @@ func StartLogin(wg *sync.WaitGroup) {
 		if err != nil {
 			continue
 		}
-		connections.AddClient(client)
+		loginConnections.AddClient(client)
 		go handleLoginClient(client)
 	}
 	wg.Done()
