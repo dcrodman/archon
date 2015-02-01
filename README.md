@@ -11,6 +11,8 @@ game server that can be run across multiple platforms with little setup overhead
 The project is currently in its early stages and changing rapidly while the PSO 
 protocol is pieced together and the core server architecture developed.
 
+Forks, bug fixes, issue reports, etc. are welcome!
+
 Installation At a Glance
 ===========
 
