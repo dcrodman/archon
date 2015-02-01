@@ -211,8 +211,9 @@ func fixLength(data []byte, length uint16) uint16 {
 		length++
 		_ = append(data, 0)
 	}
-	// TODO: Length to LE
-	data[0] = byte(length)
+	// TODO: This might cause problems on big endian machines.
+	data[0] = byte(length & 0xFF)
+	data[1] = byte((length & 0xFF00) >> 8)
 	return length
 }
 
