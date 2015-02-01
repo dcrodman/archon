@@ -113,7 +113,7 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 	client.clientCrypt.CreateKeys()
 	client.serverCrypt.CreateKeys()
 
-	client.recvData = make([]byte, 1024)
+	client.recvData = make([]byte, 2048)
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
