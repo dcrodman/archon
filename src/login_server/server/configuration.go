@@ -164,10 +164,10 @@ func (config *configuration) InitDb() error {
 		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
 	var err error
 	config.database, err = sql.Open("mysql", dbName)
-	if err != nil || config.database.Ping() != nil {
-		return err
+	if err == nil {
+		err = config.database.Ping()
 	}
-	return nil
+	return err
 }
 
 func (config *configuration) CloseDb() {
