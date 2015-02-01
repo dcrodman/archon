@@ -170,6 +170,8 @@ func SendWelcome(client *LoginClient) int {
 	return SendPacket(client, data, WelcomeSize)
 }
 
+// Send the security initialization packet with information about the user's
+// authentication status.
 func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) int {
 	pkt := new(SecurityPacket)
 	pkt.Header.Type = SecurityType
@@ -190,6 +192,7 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 	return SendEncrypted(client, data, SecuritySize)
 }
 
+// Send the redirect packet, providing the IP and port of the next server.
 func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = RedirectType
