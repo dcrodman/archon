@@ -37,7 +37,7 @@ func handleCharLogin(client *LoginClient) error {
 		return err
 	}
 
-	SendSecurity(client, BBLoginErrorNone, 0)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard)
 	return nil
 }
 

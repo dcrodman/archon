@@ -57,7 +57,7 @@ func handleLogin(client *LoginClient) error {
 		return errors.New("Incorrect version string")
 	}
 
-	SendSecurity(client, BBLoginErrorNone, 0)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard)
 	config := GetConfig()
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	SendRedirect(client, uint16(charPort), config.HostnameBytes())
