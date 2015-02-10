@@ -179,7 +179,7 @@ func handleCharLogin(client *LoginClient) error {
 // handler or by taking some brief action.
 func processCharacterPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
-	util.StructFromBytes(client.recvData, &pktHeader)
+	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
