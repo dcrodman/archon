@@ -121,7 +121,7 @@ func StructFromBytes(data []byte, targetStruct interface{}) {
 
 // Write one line of data to stdout.
 func printPacketLine(data []uint8, length int, offset int) {
-	fmt.Printf("%04X ", offset)
+	fmt.Printf("(%04X) ", offset)
 	// Print our bytes.
 	for i, j := 0, 0; i < length; i++ {
 		if j == 8 {

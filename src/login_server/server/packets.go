@@ -31,11 +31,13 @@ const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType    = 0x03
-	DisconnectType = 0x05
-	LoginType      = 0x93
-	SecurityType   = 0xE6
-	RedirectType   = 0x19
+	WelcomeType          = 0x03
+	DisconnectType       = 0x05
+	LoginType            = 0x93
+	SecurityType         = 0xE6
+	RedirectType         = 0x19
+	KeyConfigRequestType = 0xE0
+	OptionsType          = 0xE2
 )
 
 // Packet sizes for those that are fixed.
@@ -44,6 +46,7 @@ const (
 	SecuritySize = 0x44
 	MessageSize  = 0x12
 	RedirectSize = 0x10
+	OptionsSize  = 0xAF8
 )
 
 // Error code types used for packet E6.
@@ -128,6 +131,27 @@ type RedirectPacket struct {
 	Padding uint16
 }
 
+// Based on the key config structure from sylverant and newserv. KeyConfig
+// and JoystickConfig are saved in the database.
+type KeyTeamConfig struct {
+	Unknown            [0x114]uint8
+	KeyConfig          [0x16C]uint8
+	JoystickConfig     [0x38]uint8
+	Guildcard          uint32
+	TeamId             uint32
+	TeamInfo           [2]uint32
+	TeamPrivilegeLevel uint16
+	Reserved           uint16
+	Teamname           [0x10]uint16
+	TeamFlag           [0x0800]uint8
+	TeamRewards        [2]uint32
+}
+
+type OptionsPacket struct {
+	Header          BBPktHeader
+	PlayerKeyConfig KeyTeamConfig
+}
+
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
@@ -205,6 +229,32 @@ func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 		fmt.Println("Sending Redirect Packet")
 	}
 	return SendEncrypted(client, data, RedirectSize)
+}
+
+// Send the client's configuration options. keyConfig should be 420 bytes long and either
+// point to the default keys array or loaded from the database.
+func SendOptions(client *LoginClient, keyConfig []byte) int {
+	if len(keyConfig) != 420 {
+		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
+	}
+	pkt := new(OptionsPacket)
+	pkt.Header.Type = OptionsType
+	pkt.Header.Size = OptionsSize
+
+	pkt.PlayerKeyConfig.Guildcard = client.guildcard
+	// TODO: What to do about team stuff?
+	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
+	copy(pkt.PlayerKeyConfig.JoystickConfig[:], keyConfig[0x16C:])
+
+	// Sylverant sets these to enable all team rewards? Not sure what this means yet.
+	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
+	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
+
+	data, _ := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Key Config Packet")
+	}
+	return SendEncrypted(client, data, OptionsSize)
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two

@@ -17,3 +17,8 @@ CREATE TABLE account_data (
 );
 
 CREATE INDEX LoginIndex ON account_data (username, password);
+
+CREATE TABLE player_options (
+  guildcard int(11) NOT NULL PRIMARY KEY,
+  key_config blob
+);

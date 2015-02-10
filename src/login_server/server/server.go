@@ -67,6 +67,7 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 
 	var username, password string
 	var isBanned, isActive bool
+	// TODO: Also query for team id and save to client.
 	row := GetConfig().Database().QueryRow("SELECT username, password, "+
 		"guildcard, is_gm, is_banned, is_active from account_data "+
 		"WHERE username = ? and password = ?", pktUername, pktPassword)
