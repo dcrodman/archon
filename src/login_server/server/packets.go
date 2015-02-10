@@ -31,13 +31,13 @@ const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType          = 0x03
-	DisconnectType       = 0x05
-	LoginType            = 0x93
-	SecurityType         = 0xE6
-	RedirectType         = 0x19
-	KeyConfigRequestType = 0xE0
-	OptionsType          = 0xE2
+	WelcomeType        = 0x03
+	DisconnectType     = 0x05
+	LoginType          = 0x93
+	SecurityType       = 0xE6
+	RedirectType       = 0x19
+	OptionsRequestType = 0xE0
+	OptionsType        = 0xE2
 )
 
 // Packet sizes for those that are fixed.

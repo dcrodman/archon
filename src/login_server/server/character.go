@@ -194,7 +194,7 @@ func processCharacterPacket(client *LoginClient) error {
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
-	case KeyConfigRequestType:
+	case OptionsRequestType:
 		handleKeyConfig(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
