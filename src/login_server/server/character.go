@@ -142,6 +142,19 @@ var baseSymbolChats = [1248]byte{
 
 var charConnections *util.ConnectionList = util.NewClientList()
 
+func handleCharLogin(client *LoginClient) error {
+	_, err := VerifyAccount(client)
+	if err != nil {
+		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
+		return err
+	}
+
+	SendSecurity(client, BBLoginErrorNone, client.guildcard)
+	return nil
+}
+
+// Handle the options request - load key config and other option data from the datebase
+// or provide defaults for new accounts.
 func handleKeyConfig(client *LoginClient) error {
 	optionData := make([]byte, 420)
 	archondb := GetConfig().Database()
@@ -164,14 +177,29 @@ func handleKeyConfig(client *LoginClient) error {
 	return nil
 }
 
-func handleCharLogin(client *LoginClient) error {
-	_, err := VerifyAccount(client)
-	if err != nil {
-		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
-		return err
+// Handle the character preview. Will either return information about a character given
+// a particular slot in a 0xE5 response or indicate an empty slot via 0xE4.
+func handleCharacterSelect(client *LoginClient) error {
+	archondb := GetConfig().Database()
+	var pkt CharPreviewRequestPacket
+	util.StructFromBytes(client.recvData[:8], &pkt)
+
+	var charData CharacterData
+	err := archondb.QueryRow("SELECT character_data from characters "+
+		"where guildcard = ? and slot_num = ?", client.guildcard, pkt.Slot).Scan(&charData)
+	if err == sql.ErrNoRows {
+		// We don't have a character for this slot - send the E4 ack.
+		SendCharPreviewNone(client, pkt.Slot)
+		return nil
+	} else if err != nil {
+		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
+		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
+		return &util.ServerError{Message: errMsg}
+	} else {
+		// We've got a match - send the character preview.
+		// TODO: Send E5
 	}
 
-	SendSecurity(client, BBLoginErrorNone, client.guildcard)
 	return nil
 }
 
@@ -196,6 +224,8 @@ func processCharacterPacket(client *LoginClient) error {
 		break
 	case OptionsRequestType:
 		handleKeyConfig(client)
+	case CharPreviewReqType:
+		handleCharacterSelect(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)

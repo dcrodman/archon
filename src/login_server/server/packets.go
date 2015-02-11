@@ -31,13 +31,16 @@ const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType        = 0x03
-	DisconnectType     = 0x05
-	LoginType          = 0x93
-	SecurityType       = 0xE6
-	RedirectType       = 0x19
-	OptionsRequestType = 0xE0
-	OptionsType        = 0xE2
+	WelcomeType         = 0x03
+	DisconnectType      = 0x05
+	LoginType           = 0x93
+	SecurityType        = 0xE6
+	RedirectType        = 0x19
+	OptionsRequestType  = 0xE0
+	OptionsType         = 0xE2
+	CharPreviewReqType  = 0xE3
+	CharPreviewNoneType = 0xE4
+	CharPreviewType     = 0xE5
 )
 
 // Packet sizes for those that are fixed.
@@ -147,9 +150,22 @@ type KeyTeamConfig struct {
 	TeamRewards        [2]uint32
 }
 
+// Option packet containing keyboard and joystick config, team options, etc.
 type OptionsPacket struct {
 	Header          BBPktHeader
 	PlayerKeyConfig KeyTeamConfig
+}
+
+type CharPreviewRequestPacket struct {
+	Header  BBPktHeader
+	Slot    uint32
+	Padding uint32
+}
+
+type CharPreviewNonePacket struct {
+	Header BBPktHeader
+	Slot   uint32
+	Error  uint32
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -255,6 +271,25 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 		fmt.Println("Sending Key Config Packet")
 	}
 	return SendEncrypted(client, data, OptionsSize)
+}
+
+// Send the character preview acknowledgement packet to tell them that we don't
+// have any data for that slot.
+func SendCharPreviewNone(client *LoginClient, slotNum uint32) int {
+	pkt := new(CharPreviewNonePacket)
+	pkt.Header.Type = CharPreviewNoneType
+	pkt.Slot = slotNum
+	pkt.Error = 0x02
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Character Ack Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+func SendCharPreview() {
+
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two
