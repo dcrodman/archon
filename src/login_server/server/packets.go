@@ -41,6 +41,9 @@ const (
 	CharPreviewReqType  = 0xE3
 	CharPreviewNoneType = 0xE4
 	CharPreviewType     = 0xE5
+	ChecksumType        = 0x01E8
+	ChecksumAckType     = 0x02E8
+	GuildcardReqType    = 0x03E8
 )
 
 // Packet sizes for those that are fixed.
@@ -168,6 +171,12 @@ type CharPreviewNonePacket struct {
 	Error  uint32
 }
 
+// Sent in response to 0x01E8 to acknowledge a checksum (really it's just ignored).
+type ChecksumAckPacket struct {
+	Header BBPktHeader
+	Ack    uint32
+}
+
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
@@ -289,7 +298,20 @@ func SendCharPreviewNone(client *LoginClient, slotNum uint32) int {
 }
 
 func SendCharPreview() {
+	// TODO
+}
 
+// Acknowledge the checksum the client sent us.
+func SendChecksumAck(client *LoginClient, ack uint32) int {
+	pkt := new(ChecksumAckPacket)
+	pkt.Header.Type = ChecksumAckType
+	pkt.Ack = ack
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Checksum Ack Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two

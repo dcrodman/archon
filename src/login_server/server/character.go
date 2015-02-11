@@ -226,6 +226,9 @@ func processCharacterPacket(client *LoginClient) error {
 		handleKeyConfig(client)
 	case CharPreviewReqType:
 		handleCharacterSelect(client)
+	case ChecksumType:
+		// Everybody else seems to ignore this, so...
+		SendChecksumAck(client, 1)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
