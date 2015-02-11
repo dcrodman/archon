@@ -16,9 +16,21 @@ CREATE TABLE account_data (
   lastchar tinyblob
 );
 
-CREATE INDEX LoginIndex ON account_data (username, password);
+-- Queried every time a user logs in.
+CREATE INDEX login_index ON account_data (username, password);
 
 CREATE TABLE player_options (
-  guildcard int(11) NOT NULL PRIMARY KEY,
-  key_config blob
+  guildcard int(11) PRIMARY KEY,
+  key_config blob,
+  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
 );
+
+CREATE TABLE characters (
+  guildcard int(11) PRIMARY KEY,
+  slot_num tinyint(2),
+  character_data blob,
+  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
+);
+
+-- This table may get big, so keep an index to make queries from paket E3 fast.
+CREATE INDEX character_index ON characters(guildcard, slot_num);
