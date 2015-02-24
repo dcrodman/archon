@@ -8,8 +8,8 @@ whose servers I'm studying as I write Archon.
 
 The goal of this project is to build a configurable, high-performing, and scalable
 PSOBB server that can be run across multiple platforms with little setup overhead. 
-The project is currently in its early stages and changing rapidly while the PSO 
-protocol is pieced together and the core server architecture developed.
+The project is currently in its early stages and changing rapidly while I piece 
+together the PSO protocol and develop a core archiecture.
 
 Forks, bug fixes, issue reports, etc. are welcome!
 
@@ -29,4 +29,6 @@ With Go (and Git) installed, you should be able to run the following:
     mkdir pkg bin
     export GOPATH=$(pwd)
 
-and then *go build* whichever server packages you want to run. 
+and then *go install* whichever server packages you want to run. For example:
+
+    go install login_server
