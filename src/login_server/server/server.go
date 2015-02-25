@@ -49,6 +49,8 @@ type LoginClient struct {
 
 	guildcard uint32
 	isGm      bool
+
+	gcData []byte
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
@@ -58,7 +60,7 @@ func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 func DBError(err error) error {
 	errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
 	LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-	&util.ServerError{Message: errMsg}
+	return &util.ServerError{Message: errMsg}
 }
 
 // Handle account verification tasks common to both the login and character servers.

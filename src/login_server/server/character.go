@@ -23,6 +23,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"libarchon/util"
 	"os"
@@ -167,6 +168,29 @@ type CharacterData struct {
 	Playtime       uint32
 }
 
+// Guildcard entries per player.
+type GuildcardEntry struct {
+	Guildcard   uint32
+	Name        [24]uint16
+	TeamName    [16]uint16
+	Description [88]uint16
+	Reserved    uint8
+	Language    uint8
+	SectionID   uint8
+	CharClass   uint8
+	padding     uint32
+	Comment     [88]uint16
+}
+
+// Per-player guildcard data chunk.
+type GuildcardData struct {
+	Unknown  [0x114]uint8
+	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
+	Unknown2 [0x78]uint8
+	Entries  [104]GuildcardEntry
+	Unknown3 [0x1BC]uint8
+}
+
 var charConnections *util.ConnectionList = util.NewClientList()
 
 func handleCharLogin(client *LoginClient) error {
@@ -175,7 +199,6 @@ func handleCharLogin(client *LoginClient) error {
 		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
 		return err
 	}
-
 	SendSecurity(client, BBLoginErrorNone, client.guildcard)
 	return nil
 }
@@ -217,14 +240,42 @@ func handleCharacterSelect(client *LoginClient) error {
 		SendCharPreviewNone(client, pkt.Slot)
 		return nil
 	} else if err != nil {
-		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
-		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-		return &util.ServerError{Message: errMsg}
+		return DBError(err)
 	} else {
 		// We've got a match - send the character preview.
-		// TODO: Send E5
+		// TODO: Send E5 once character creation is implemented
 	}
+	return nil
+}
 
+// Load the player's saved guildcards, build the chunk data, and send the chunk header.
+func handleGuildcardDataStart(client *LoginClient) error {
+	archondb := GetConfig().Database()
+	rows, err := archondb.Query(
+		"SELECT friend_gc, name, team_name, description, language, "+
+			"section_id, char_class, comment FROM guildcard_entries "+
+			"WHERE guildcard = ?", client.guildcard)
+	if err != nil {
+		return DBError(err)
+	}
+	defer rows.Close()
+	gcData := new(GuildcardData)
+	// Maximum of 140 entries can be sent.
+	for i := 0; rows.Next() && i < 140; i++ {
+		// Blobs are scanned as []uint8, so they need to be converted to []uint16.
+		var name, teamName, desc, comment []uint8
+		entry := &gcData.Entries[i]
+		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc, &entry.Language,
+			&entry.SectionID, &entry.CharClass, &comment)
+		if err != nil {
+			panic(err)
+		}
+		// TODO: Convert blobs from uint8 into uint16 (utf-16le?)
+	}
+	var size int
+	client.gcData, size = util.BytesFromStruct(gcData)
+	checksum := crc32.ChecksumIEEE(client.gcData)
+	SendGuildcardHeader(client, checksum, uint32(size))
 	return nil
 }
 
@@ -248,12 +299,14 @@ func processCharacterPacket(client *LoginClient) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	case OptionsRequestType:
-		handleKeyConfig(client)
+		err = handleKeyConfig(client)
 	case CharPreviewReqType:
-		handleCharacterSelect(client)
+		err = handleCharacterSelect(client)
 	case ChecksumType:
 		// Everybody else seems to ignore this, so...
 		SendChecksumAck(client, 1)
+	case GuildcardReqType:
+		err = handleGuildcardDataStart(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)

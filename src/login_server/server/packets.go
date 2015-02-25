@@ -44,6 +44,8 @@ const (
 	ChecksumType        = 0x01E8
 	ChecksumAckType     = 0x02E8
 	GuildcardReqType    = 0x03E8
+	GuildcardHeaderType = 0x01DC
+	GuildcardChunkType  = 0x02DC
 )
 
 // Packet sizes for those that are fixed.
@@ -175,6 +177,22 @@ type CharPreviewNonePacket struct {
 type ChecksumAckPacket struct {
 	Header BBPktHeader
 	Ack    uint32
+}
+
+// Received from the client to request a guildcard data chunk.
+type GuildcardChunkReqPacket struct {
+	Header         BBPktHeader
+	unknown        uint32
+	ChunkRequested uint32
+	Continue       uint32
+}
+
+// Chunk header with info about the guildcard data we're about to send.
+type GuildcardHeaderPacket struct {
+	Header   BBPktHeader
+	unknown  uint32
+	Length   uint32
+	Checksum uint32
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -310,6 +328,20 @@ func SendChecksumAck(client *LoginClient, ack uint32) int {
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Checksum Ack Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send the guildcard chunk header.
+func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint32) int {
+	pkt := new(GuildcardHeaderPacket)
+	pkt.Header.Type = GuildcardHeaderType
+	pkt.Checksum = checksum
+	pkt.Length = dataLen
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Guildcard Header Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }

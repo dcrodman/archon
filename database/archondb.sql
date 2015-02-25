@@ -34,3 +34,17 @@ CREATE TABLE characters (
 
 -- This table may get big, so keep an index to make queries from paket E3 fast.
 CREATE INDEX character_index ON characters(guildcard, slot_num);
+
+CREATE TABLE guildcard_entries (
+  guildcard int(11) PRIMARY KEY,
+  friend_gc int(11) NOT NULL,
+  name blob,
+  team_name blob,
+  description blob,
+  language tinyint,
+  section_id tinyint,
+  char_class tinyint,
+  comment blob,
+  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard),
+  FOREIGN KEY (friend_gc) REFERENCES account_data(guildcard)
+);
