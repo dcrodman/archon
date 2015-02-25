@@ -140,6 +140,33 @@ var baseSymbolChats = [1248]byte{
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 }
 
+// Struct used by Character Info packet.
+type CharacterData struct {
+	Experience     uint32
+	Level          uint32
+	GuildcardStr   [16]byte
+	Unknown        [2]uint32
+	NameColor      uint32
+	Model          uint8
+	Padding        [15]byte
+	NameColorChksm uint32
+	SectionId      byte
+	Class          byte
+	V2flags        byte
+	Version        byte
+	V1Flags        uint32
+	Costume        uint16
+	Skin           uint16
+	Head           uint16
+	HairRed        uint16
+	HairGreen      uint16
+	HairBlue       uint16
+	PropX          float32
+	PropY          float32
+	Name           [16]uint16
+	Playtime       uint32
+}
+
 var charConnections *util.ConnectionList = util.NewClientList()
 
 func handleCharLogin(client *LoginClient) error {
