@@ -50,7 +50,8 @@ type LoginClient struct {
 	guildcard uint32
 	isGm      bool
 
-	gcData []byte
+	gcData     []byte
+	gcDataSize uint16
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }

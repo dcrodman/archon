@@ -31,21 +31,22 @@ const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType         = 0x03
-	DisconnectType      = 0x05
-	LoginType           = 0x93
-	SecurityType        = 0xE6
-	RedirectType        = 0x19
-	OptionsRequestType  = 0xE0
-	OptionsType         = 0xE2
-	CharPreviewReqType  = 0xE3
-	CharPreviewNoneType = 0xE4
-	CharPreviewType     = 0xE5
-	ChecksumType        = 0x01E8
-	ChecksumAckType     = 0x02E8
-	GuildcardReqType    = 0x03E8
-	GuildcardHeaderType = 0x01DC
-	GuildcardChunkType  = 0x02DC
+	WelcomeType           = 0x03
+	DisconnectType        = 0x05
+	LoginType             = 0x93
+	SecurityType          = 0xE6
+	RedirectType          = 0x19
+	OptionsRequestType    = 0xE0
+	OptionsType           = 0xE2
+	CharPreviewReqType    = 0xE3
+	CharPreviewNoneType   = 0xE4
+	CharPreviewType       = 0xE5
+	ChecksumType          = 0x01E8
+	ChecksumAckType       = 0x02E8
+	GuildcardReqType      = 0x03E8
+	GuildcardHeaderType   = 0x01DC
+	GuildcardChunkType    = 0x02DC
+	GuildcardChunkReqType = 0x03DC
 )
 
 // Packet sizes for those that are fixed.
@@ -56,6 +57,8 @@ const (
 	RedirectSize = 0x10
 	OptionsSize  = 0xAF8
 )
+
+const MAX_CHUNK_SIZE = 0x6800
 
 // Error code types used for packet E6.
 type BBLoginError uint32
@@ -179,20 +182,28 @@ type ChecksumAckPacket struct {
 	Ack    uint32
 }
 
+// Chunk header with info about the guildcard data we're about to send.
+type GuildcardHeaderPacket struct {
+	Header   BBPktHeader
+	Unknown  uint32
+	Length   uint16
+	Padding  uint16
+	Checksum uint32
+}
+
 // Received from the client to request a guildcard data chunk.
 type GuildcardChunkReqPacket struct {
 	Header         BBPktHeader
-	unknown        uint32
+	Unknown        uint32
 	ChunkRequested uint32
 	Continue       uint32
 }
 
-// Chunk header with info about the guildcard data we're about to send.
-type GuildcardHeaderPacket struct {
-	Header   BBPktHeader
-	unknown  uint32
-	Length   uint32
-	Checksum uint32
+type GuildcardChunkPacket struct {
+	Header  BBPktHeader
+	Unknown uint32
+	Chunk   uint32
+	Data    []uint8
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -333,15 +344,39 @@ func SendChecksumAck(client *LoginClient, ack uint32) int {
 }
 
 // Send the guildcard chunk header.
-func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint32) int {
+func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint16) int {
 	pkt := new(GuildcardHeaderPacket)
 	pkt.Header.Type = GuildcardHeaderType
-	pkt.Checksum = checksum
+	pkt.Unknown = 0x00000001
 	pkt.Length = dataLen
+	pkt.Checksum = checksum
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Guildcard Header Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
+	pkt := new(GuildcardChunkPacket)
+	pkt.Header.Type = GuildcardChunkType
+	pkt.Chunk = chunkNum
+
+	// The client will only accept 0x6800 bytes of a chunk per packet.
+	offset := uint16(chunkNum) * MAX_CHUNK_SIZE
+	remaining := client.gcDataSize - offset
+	if remaining > MAX_CHUNK_SIZE {
+		pkt.Data = make([]uint8, MAX_CHUNK_SIZE)
+		copy(pkt.Data[:], client.gcData[offset:offset+MAX_CHUNK_SIZE])
+	} else {
+		pkt.Data = make([]uint8, remaining)
+		copy(pkt.Data[:], client.gcData[offset:])
+	}
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Guildcard Chunk Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }

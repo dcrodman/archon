@@ -275,8 +275,19 @@ func handleGuildcardDataStart(client *LoginClient) error {
 	var size int
 	client.gcData, size = util.BytesFromStruct(gcData)
 	checksum := crc32.ChecksumIEEE(client.gcData)
-	SendGuildcardHeader(client, checksum, uint32(size))
+	client.gcDataSize = uint16(size)
+	SendGuildcardHeader(client, checksum, client.gcDataSize)
 	return nil
+}
+
+func handleGuildcardChunk(client *LoginClient) {
+	var chunkReq GuildcardChunkReqPacket
+	util.StructFromBytes(client.recvData[:], &chunkReq)
+	if chunkReq.Continue != 0x01 {
+		// Cancelled sending guildcard chunks - disconnect?
+		return
+	}
+	SendGuildcardChunk(client, chunkReq.ChunkRequested)
 }
 
 // Process packets sent to the CHARACTER port by sending them off to another
@@ -307,6 +318,8 @@ func processCharacterPacket(client *LoginClient) error {
 		SendChecksumAck(client, 1)
 	case GuildcardReqType:
 		err = handleGuildcardDataStart(client)
+	case GuildcardChunkReqType:
+		handleGuildcardChunk(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
