@@ -75,36 +75,35 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 	}
 
 	bytes := new(bytes.Buffer)
-	/* Keeping my original implementation here just in case since it's capable of working
-	with types of dynamic size, unlike the binary.Write function.
-		for i := 0; i < val.NumField(); i++ {
-			field := val.Field(i)
+	// It's possible to use binary.Write on val.Interface itself, but doing so prevents
+	// this function from working with dynamically sized types.
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
 
-			switch kind := field.Kind(); kind {
-			case reflect.Struct:
-				binary.Write(bytes, binary.LittleEndian, StructToBytes(field.Interface()))
-			case reflect.Array, reflect.Slice:
-				binary.Write(bytes, binary.LittleEndian, field.Interface())
-			case reflect.Uint8:
-				binary.Write(bytes, binary.LittleEndian, uint8(field.Uint()))
-			case reflect.Uint16:
-				binary.Write(bytes, binary.LittleEndian, uint16(field.Uint()))
-			case reflect.Uint32:
-				binary.Write(bytes, binary.LittleEndian, uint32(field.Uint()))
-			case reflect.Uint, reflect.Uint64:
-				binary.Write(bytes, binary.LittleEndian, field.Uint())
-			case reflect.Int8:
-				binary.Write(bytes, binary.LittleEndian, int8(field.Int()))
-			case reflect.Int16:
-				binary.Write(bytes, binary.LittleEndian, int16(field.Int()))
-			case reflect.Int32:
-				binary.Write(bytes, binary.LittleEndian, int32(field.Int()))
-			case reflect.Int, reflect.Int64:
-				binary.Write(bytes, binary.LittleEndian, field.Int())
-			}
+		switch kind := field.Kind(); kind {
+		case reflect.Struct:
+			b, _ := BytesFromStruct(field.Interface())
+			binary.Write(bytes, binary.LittleEndian, b)
+		case reflect.Array, reflect.Slice:
+			binary.Write(bytes, binary.LittleEndian, field.Interface())
+		case reflect.Uint8:
+			binary.Write(bytes, binary.LittleEndian, uint8(field.Uint()))
+		case reflect.Uint16:
+			binary.Write(bytes, binary.LittleEndian, uint16(field.Uint()))
+		case reflect.Uint32:
+			binary.Write(bytes, binary.LittleEndian, uint32(field.Uint()))
+		case reflect.Uint, reflect.Uint64:
+			binary.Write(bytes, binary.LittleEndian, field.Uint())
+		case reflect.Int8:
+			binary.Write(bytes, binary.LittleEndian, int8(field.Int()))
+		case reflect.Int16:
+			binary.Write(bytes, binary.LittleEndian, int16(field.Int()))
+		case reflect.Int32:
+			binary.Write(bytes, binary.LittleEndian, int32(field.Int()))
+		case reflect.Int, reflect.Int64:
+			binary.Write(bytes, binary.LittleEndian, field.Int())
 		}
-	*/
-	binary.Write(bytes, binary.LittleEndian, val.Interface())
+	}
 	return bytes.Bytes(), bytes.Len()
 }
 
