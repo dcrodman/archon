@@ -54,6 +54,13 @@ type LoginClient struct {
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 
+// Helper for logging SQL errors and creating an Error instance.
+func DBError(err error) error {
+	errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
+	LogMsg(errMsg, LogTypeError, LogPriorityCritical)
+	&util.ServerError{Message: errMsg}
+}
+
 // Handle account verification tasks common to both the login and character servers.
 func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 	var loginPkt LoginPkt
@@ -86,9 +93,7 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 	case err != nil:
 		// TODO: Send error message (1A)
 		SendSecurity(client, BBLoginErrorUnknown, 0)
-		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
-		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-		return nil, &util.ServerError{Message: errMsg}
+		return nil, DBError(err)
 	// Is the account banned?
 	case isBanned:
 		SendSecurity(client, BBLoginErrorBanned, 0)

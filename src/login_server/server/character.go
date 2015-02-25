@@ -196,9 +196,7 @@ func handleKeyConfig(client *LoginClient) error {
 			"(guildcard, key_config) VALUES (?, ?)", client.guildcard, optionData[:420])
 	}
 	if err != nil {
-		errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
-		LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-		return &util.ServerError{Message: errMsg}
+		return DBError(err)
 	}
 	SendOptions(client, optionData)
 	return nil
