@@ -358,6 +358,7 @@ func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint16) i
 	return SendEncrypted(client, data, uint16(size))
 }
 
+// Send the next chunk of guildcard data.
 func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 	pkt := new(GuildcardChunkPacket)
 	pkt.Header.Type = GuildcardChunkType
@@ -367,11 +368,9 @@ func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 	offset := uint16(chunkNum) * MAX_CHUNK_SIZE
 	remaining := client.gcDataSize - offset
 	if remaining > MAX_CHUNK_SIZE {
-		pkt.Data = make([]uint8, MAX_CHUNK_SIZE)
-		copy(pkt.Data[:], client.gcData[offset:offset+MAX_CHUNK_SIZE])
+		pkt.Data = client.gcData[offset : offset+MAX_CHUNK_SIZE]
 	} else {
-		pkt.Data = make([]uint8, remaining)
-		copy(pkt.Data[:], client.gcData[offset:])
+		pkt.Data = client.gcData[offset:]
 	}
 
 	data, size := util.BytesFromStruct(pkt)
