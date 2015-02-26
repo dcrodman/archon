@@ -99,12 +99,12 @@ type configuration struct {
 	LogLevel      LogPriority
 	DebugMode     bool
 
-	database *sql.DB
+	database        *sql.DB
+	cachedHostBytes [4]byte
 }
 
 // Singleton instance.
 var loginConfig *configuration = nil
-var cachedHostBytes [4]byte
 
 // This functiion should be used to get access to the server config instead of directly
 // referencing the loginConfig pointer.
@@ -144,24 +144,11 @@ func (config *configuration) enforceDefaults() {
 	}
 }
 
-// Convert the hostname string into 4 bytes to be used with the redirect packet.
-func (config *configuration) HostnameBytes() [4]byte {
-	// Hacky, but chances are the IP address isn't going to start with 0 and a
-	// fixed-length array can't be null.
-	if cachedHostBytes[0] == 0x00 {
-		parts := strings.Split(config.Hostname, ".")
-		for i := 0; i < 4; i++ {
-			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
-			cachedHostBytes[i] = uint8(tmp)
-		}
-	}
-	return cachedHostBytes
-}
-
 // Establish a connection to the database and ping it to verify.
 func (config *configuration) InitDb() error {
 	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
 		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
+
 	var err error
 	config.database, err = sql.Open("mysql", dbName)
 	if err == nil {
@@ -183,6 +170,20 @@ func (config *configuration) Database() *sql.DB {
 		panic(util.ServerError{Message: "Attempt to reference uninitialized database"})
 	}
 	return config.database
+}
+
+// Convert the hostname string into 4 bytes to be used with the redirect packet.
+func (config *configuration) HostnameBytes() [4]byte {
+	// Hacky, but chances are the IP address isn't going to start with 0 and a
+	// fixed-length array can't be null.
+	if config.cachedHostBytes[0] == 0x00 {
+		parts := strings.Split(config.Hostname, ".")
+		for i := 0; i < 4; i++ {
+			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
+			config.cachedHostBytes[i] = uint8(tmp)
+		}
+	}
+	return config.cachedHostBytes
 }
 
 func (config *configuration) String() string {
