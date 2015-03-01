@@ -25,11 +25,28 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"io/ioutil"
 	"libarchon/util"
 	"os"
 	"sync"
 )
 
+var charConnections *util.ConnectionList = util.NewClientList()
+
+// Cache the parameter chunk data and header so that the param
+// files aren't re-read every time.
+type ParameterEntry struct {
+	Size     uint32
+	Checksum uint32
+	Offset   uint32
+	Filename [0x40]uint8
+}
+
+var paramHeaderData []byte
+var paramChunkData []byte
+
+// Default keyboard/joystick configuration used for players who are logging
+// in for the first time.
 var baseKeyConfig = [420]byte{
 	0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00,
@@ -168,7 +185,7 @@ type CharacterData struct {
 	Playtime       uint32
 }
 
-// Guildcard entries per player.
+// Per-player friend guildcard entries.
 type GuildcardEntry struct {
 	Guildcard   uint32
 	Name        [24]uint16
@@ -190,8 +207,6 @@ type GuildcardData struct {
 	Entries  [104]GuildcardEntry
 	Unknown3 [0x1BC]uint8
 }
-
-var charConnections *util.ConnectionList = util.NewClientList()
 
 func handleCharLogin(client *LoginClient) error {
 	_, err := VerifyAccount(client)
@@ -320,6 +335,8 @@ func processCharacterPacket(client *LoginClient) error {
 		err = handleGuildcardDataStart(client)
 	case GuildcardChunkReqType:
 		handleGuildcardChunk(client)
+	case ParameterHeaderReqType:
+		SendParameterHeader(client, paramHeaderData)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
@@ -398,9 +415,50 @@ func handleCharacterClient(client *LoginClient) {
 	}
 }
 
+// Load the PSOBB parameter files, build the parameter header, and init/cache
+// the param file chunks.
+func loadParameterFiles() {
+	// Hardcoding these since they shouldn't need to change and it takes a
+	// step out of reading them all.
+	paramFiles := []string{
+		"ItemMagEdit.prs",
+		"ItemPMT.prs",
+		"BattleParamEntry.dat",
+		"BattleParamEntry_on.dat",
+		"BattleParamEntry_lab.dat",
+		"BattleParamEntry_lab_on.dat",
+		"BattleParamEntry_ep4.dat",
+		"BattleParamEntry_ep4_on.dat",
+		"PlyLevelTbl.prs",
+	}
+	offset := 0
+	paramChunkData = make([]byte, 1024)
+
+	for _, paramFile := range paramFiles {
+		data, err := ioutil.ReadFile("parameters/" + paramFile)
+		if err != nil {
+			panic(err)
+		}
+		paramChunkData = append(paramChunkData, data...)
+		fileSize := len(data)
+
+		entry := new(ParameterEntry)
+		copy(entry.Filename[:], []uint8(paramFile))
+		entry.Size = uint32(fileSize)
+		entry.Checksum = crc32.ChecksumIEEE(data)
+		entry.Offset = uint32(offset)
+		offset += fileSize
+
+		bytes, _ := util.BytesFromStruct(entry)
+		paramHeaderData = append(paramHeaderData, bytes...)
+	}
+}
+
 // Main worker thread for the CHARACTER portion of the server.
 func StartCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
+	loadParameterFiles()
+
 	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
 	if err != nil {
 		fmt.Println(err)

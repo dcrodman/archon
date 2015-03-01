@@ -28,7 +28,6 @@ import (
 	"strconv"
 )
 
-const ServerConfigDir = "/usr/local/share/archon"
 const displayWidth = 16
 
 // Global error to indicate problems encountered during server operation.

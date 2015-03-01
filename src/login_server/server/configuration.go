@@ -35,6 +35,7 @@ import (
 	"time"
 )
 
+const ServerConfigDir = "/usr/local/share/archon"
 const loginConfigFile = "login_config.json"
 
 type LogType byte
@@ -86,6 +87,7 @@ func LogMsg(message string, logType LogType, priority LogPriority) {
 	}
 }
 
+// Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
 	Hostname      string
 	LoginPort     string

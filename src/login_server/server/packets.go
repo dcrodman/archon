@@ -31,22 +31,26 @@ const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType           = 0x03
-	DisconnectType        = 0x05
-	LoginType             = 0x93
-	SecurityType          = 0xE6
-	RedirectType          = 0x19
-	OptionsRequestType    = 0xE0
-	OptionsType           = 0xE2
-	CharPreviewReqType    = 0xE3
-	CharPreviewNoneType   = 0xE4
-	CharPreviewType       = 0xE5
-	ChecksumType          = 0x01E8
-	ChecksumAckType       = 0x02E8
-	GuildcardReqType      = 0x03E8
-	GuildcardHeaderType   = 0x01DC
-	GuildcardChunkType    = 0x02DC
-	GuildcardChunkReqType = 0x03DC
+	WelcomeType            = 0x03
+	DisconnectType         = 0x05
+	LoginType              = 0x93
+	SecurityType           = 0xE6
+	RedirectType           = 0x19
+	OptionsRequestType     = 0xE0
+	OptionsType            = 0xE2
+	CharPreviewReqType     = 0xE3
+	CharPreviewNoneType    = 0xE4
+	CharPreviewType        = 0xE5
+	ChecksumType           = 0x01E8
+	ChecksumAckType        = 0x02E8
+	GuildcardReqType       = 0x03E8
+	GuildcardHeaderType    = 0x01DC
+	GuildcardChunkType     = 0x02DC
+	GuildcardChunkReqType  = 0x03DC
+	ParameterHeaderType    = 0x01EB
+	ParameterChunkType     = 0x02EB
+	ParameterChunkReqType  = 0x03EB
+	ParameterHeaderReqType = 0x04EB
 )
 
 // Packet sizes for those that are fixed.
@@ -204,6 +208,12 @@ type GuildcardChunkPacket struct {
 	Unknown uint32
 	Chunk   uint32
 	Data    []uint8
+}
+
+// Parameter header containing details about the param files we're about to send.
+type ParameterHeaderPacket struct {
+	Header  BBPktHeader
+	Entries []byte
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -376,6 +386,19 @@ func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Guildcard Chunk Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send the header for the parameter files we're about to start sending.
+func SendParameterHeader(client *LoginClient, entries []byte) int {
+	pkt := new(ParameterHeaderPacket)
+	pkt.Header.Type = ParameterHeaderType
+	pkt.Entries = entries
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Parameter Header Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }

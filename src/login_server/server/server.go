@@ -139,9 +139,9 @@ func Start() {
 	fmt.Printf("Loading config file %v...", loginConfigFile)
 	err := config.InitFromFile(loginConfigFile)
 	if err != nil {
-		path := util.ServerConfigDir + "/" + loginConfigFile
-		fmt.Printf("Failed.\nLoading config from %v...", path)
-		err = config.InitFromFile(path)
+		os.Chdir(ServerConfigDir)
+		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+loginConfigFile)
+		err = config.InitFromFile(loginConfigFile)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			fmt.Printf("%s\n", err.Error())
