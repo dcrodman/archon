@@ -434,8 +434,6 @@ func handleCharacterClient(client *LoginClient) {
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
 func loadParameterFiles() {
-	// Hardcoding these since they shouldn't need to change and it takes a
-	// step out of reading them all.
 	offset := 0
 	var tmpChunkData []byte
 

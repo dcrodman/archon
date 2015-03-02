@@ -53,15 +53,6 @@ const (
 	ParameterHeaderReqType = 0x04EB
 )
 
-// Packet sizes for those that are fixed.
-const (
-	WelcomeSize  = 0xC8
-	SecuritySize = 0x44
-	MessageSize  = 0x12
-	RedirectSize = 0x10
-	OptionsSize  = 0xAF8
-)
-
 const MAX_CHUNK_SIZE = 0x6800
 
 // Error code types used for packet E6.
@@ -249,19 +240,19 @@ func SendEncrypted(client *LoginClient, data []byte, length uint16) int {
 // Send the welcome packet to a client with the copyright message and encryption vectors.
 func SendWelcome(client *LoginClient) int {
 	pkt := new(WelcomePkt)
-	pkt.Header.Size = WelcomeSize
 	pkt.Header.Type = WelcomeType
+	pkt.Header.Size = 0xC8
 	copy(pkt.Copyright[:], copyrightBytes)
 	copy(pkt.ClientVector[:], client.clientCrypt.Vector)
 	copy(pkt.ServerVector[:], client.serverCrypt.Vector)
 
-	data, _ := util.BytesFromStruct(pkt)
+	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Welcome Packet")
-		util.PrintPayload(data, WelcomeSize)
+		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return SendPacket(client, data, WelcomeSize)
+	return SendPacket(client, data, uint16(size))
 }
 
 // Send the security initialization packet with information about the user's
@@ -269,7 +260,6 @@ func SendWelcome(client *LoginClient) int {
 func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) int {
 	pkt := new(SecurityPacket)
 	pkt.Header.Type = SecurityType
-	pkt.Header.Size = SecuritySize
 
 	// Constants set according to how Newserv does it.
 	pkt.ErrorCode = uint32(errorCode)
@@ -279,26 +269,25 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) in
 	pkt.Capabilities = 0x00000102
 	pkt.Config.Magic = 0x48615467
 
-	data, _ := util.BytesFromStruct(pkt)
+	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Security Packet")
 	}
-	return SendEncrypted(client, data, SecuritySize)
+	return SendEncrypted(client, data, uint16(size))
 }
 
 // Send the redirect packet, providing the IP and port of the next server.
 func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = RedirectType
-	pkt.Header.Size = RedirectSize
 	copy(pkt.IPAddr[:], ipAddr[:])
 	pkt.Port = port
 
-	data, _ := util.BytesFromStruct(pkt)
+	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Redirect Packet")
 	}
-	return SendEncrypted(client, data, RedirectSize)
+	return SendEncrypted(client, data, uint16(size))
 }
 
 // Send the client's configuration options. keyConfig should be 420 bytes long and either
@@ -309,7 +298,6 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 	}
 	pkt := new(OptionsPacket)
 	pkt.Header.Type = OptionsType
-	pkt.Header.Size = OptionsSize
 
 	pkt.PlayerKeyConfig.Guildcard = client.guildcard
 	// TODO: What to do about team stuff?
@@ -320,11 +308,11 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
 	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
 
-	data, _ := util.BytesFromStruct(pkt)
+	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Key Config Packet")
 	}
-	return SendEncrypted(client, data, OptionsSize)
+	return SendEncrypted(client, data, uint16(size))
 }
 
 // Send the character preview acknowledgement packet to tell them that we don't
