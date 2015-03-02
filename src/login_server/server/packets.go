@@ -87,9 +87,9 @@ var copyrightBytes []byte = make([]byte, 96)
 
 // Packet header for every packet sent between the server and BlueBurst clients.
 type BBPktHeader struct {
-	Size    uint16
-	Type    uint16
-	Padding uint32
+	Size  uint16
+	Type  uint16
+	Flags uint32
 }
 
 // Welcome packet with encryption vectors sent to the client upon initial connection.
@@ -214,6 +214,12 @@ type GuildcardChunkPacket struct {
 type ParameterHeaderPacket struct {
 	Header  BBPktHeader
 	Entries []byte
+}
+
+type ParameterChunkPacket struct {
+	Header BBPktHeader
+	Chunk  uint32
+	Data   []byte
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -391,14 +397,30 @@ func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 }
 
 // Send the header for the parameter files we're about to start sending.
-func SendParameterHeader(client *LoginClient, entries []byte) int {
+func SendParameterHeader(client *LoginClient, numEntries uint32, entries []byte) int {
 	pkt := new(ParameterHeaderPacket)
 	pkt.Header.Type = ParameterHeaderType
+	pkt.Header.Flags = numEntries
 	pkt.Entries = entries
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Parameter Header Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Index into chunkData and send the specified chunk of parameter data.
+func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int {
+	pkt := new(ParameterChunkPacket)
+	pkt.Header.Type = ParameterChunkType
+	pkt.Chunk = chunk
+
+	pkt.Data = chunkData
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Parameter Chunk Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }
