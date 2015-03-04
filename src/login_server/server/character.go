@@ -353,6 +353,10 @@ func processCharacterPacket(client *LoginClient) error {
 		var pkt BBPktHeader
 		util.StructFromBytes(client.recvData[:], &pkt)
 		SendParameterChunk(client, paramChunkData[int(pkt.Flags)], pkt.Flags)
+	case SetFlagType:
+		var pkt SetFlagPacket
+		util.StructFromBytes(client.recvData[:], &pkt)
+		client.flag = pkt.Flag
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		LogMsg(msg, LogTypeInfo, LogPriorityMedium)

@@ -51,6 +51,7 @@ const (
 	ParameterChunkType     = 0x02EB
 	ParameterChunkReqType  = 0x03EB
 	ParameterHeaderReqType = 0x04EB
+	SetFlagType            = 0x00EC
 )
 
 const MAX_CHUNK_SIZE = 0x6800
@@ -211,6 +212,11 @@ type ParameterChunkPacket struct {
 	Header BBPktHeader
 	Chunk  uint32
 	Data   []byte
+}
+
+type SetFlagPacket struct {
+	Header BBPktHeader
+	Flag   uint32
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.

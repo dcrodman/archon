@@ -52,6 +52,8 @@ type LoginClient struct {
 
 	gcData     []byte
 	gcDataSize uint16
+
+	flag uint32
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
