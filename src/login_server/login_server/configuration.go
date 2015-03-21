@@ -44,14 +44,14 @@ type LogPriority byte
 // Constants for the configurable log level that control the amount of information
 // written to the server logs. The higher the number, the lower the priority.
 const (
-	LogPriorityCritical = 1
-	LogPriorityHigh     = 2
-	LogPriorityMedium   = 3
-	LogPriorityLow      = 4
+	LogPriorityCritical LogPriority = 1
+	LogPriorityHigh                 = 2
+	LogPriorityMedium               = 3
+	LogPriorityLow                  = 4
 
-	LogTypeInfo    = 1 << iota
-	LogTypeWarning = 1 << iota
-	LogTypeError   = 1 << iota
+	LogTypeInfo    LogType = 1 << iota
+	LogTypeWarning         = 1 << iota
+	LogTypeError           = 1 << iota
 )
 
 // Logs a message to either the user's configured logfile or to standard out. Only messages
