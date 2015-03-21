@@ -221,7 +221,7 @@ type SetFlagPacket struct {
 
 type CharPreviewPacket struct {
 	Header    BBPktHeader
-	Guildcard uint32
+	Slot      uint32
 	Character *CharacterPreview
 }
 
@@ -329,11 +329,11 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 
 // Send the character preview acknowledgement packet to tell them that we don't
 // have any data for that slot.
-func SendCharPreviewNone(client *LoginClient, slotNum uint32) int {
+func SendCharPreviewNone(client *LoginClient, slotNum uint32, errVal uint32) int {
 	pkt := new(CharPreviewNonePacket)
 	pkt.Header.Type = CharPreviewNoneType
 	pkt.Slot = slotNum
-	pkt.Error = 0x02
+	pkt.Error = errVal
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
@@ -428,7 +428,7 @@ func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int
 func SendCharacterPreview(client *LoginClient, charPreview CharacterPreview) int {
 	pkt := new(CharPreviewPacket)
 	pkt.Header.Type = CharPreviewType
-	pkt.Guildcard = client.guildcard
+	pkt.Slot = 0
 	pkt.Character = &charPreview
 
 	data, size := util.BytesFromStruct(pkt)

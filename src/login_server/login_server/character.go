@@ -126,6 +126,7 @@ type GuildcardData struct {
 	Unknown3 [0x1BC]uint8
 }
 
+// Handle initial login - verify the account and send security data.
 func handleCharLogin(client *LoginClient) error {
 	_, err := VerifyAccount(client)
 	if err != nil {
@@ -170,7 +171,7 @@ func handleCharacterSelect(client *LoginClient) error {
 		"where guildcard = ? and slot_num = ?", client.guildcard, pkt.Slot).Scan(&charData)
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot - send the E4 ack.
-		SendCharPreviewNone(client, pkt.Slot)
+		SendCharPreviewNone(client, pkt.Slot, 2)
 		return nil
 	} else if err != nil {
 		return DBError(err)
@@ -237,6 +238,8 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// Load the key config from the db?
 	// Delete or update the character based on the dressing room flag
 
+	// This packet is treated as an ack in this case?
+	SendCharPreviewNone(client, charPkt.Slot, 0)
 	return nil
 }
 
