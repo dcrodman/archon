@@ -19,9 +19,9 @@
 package main
 
 import (
-	"login_server/server"
+	"login_server/login_server"
 )
 
 func main() {
-	server.Start()
+	login_server.Start()
 }

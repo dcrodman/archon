@@ -80,7 +80,7 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 		field := val.Field(i)
 
 		switch kind := field.Kind(); kind {
-		case reflect.Struct:
+		case reflect.Struct, reflect.Ptr:
 			b, _ := BytesFromStruct(field.Interface())
 			binary.Write(bytes, binary.LittleEndian, b)
 		case reflect.Array, reflect.Slice:

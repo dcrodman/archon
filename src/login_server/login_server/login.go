@@ -19,7 +19,7 @@
 * LOGIN server logic.
  */
 
-package server
+package login_server
 
 import (
 	"errors"

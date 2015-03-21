@@ -20,7 +20,7 @@
 * launching the LOGIN and CHARACTER servers. Also provides top-level functions and other code
 * shared between the two (found in login.go and character.go).
  */
-package server
+package login_server
 
 import (
 	"crypto/sha256"

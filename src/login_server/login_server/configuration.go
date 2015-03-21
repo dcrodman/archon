@@ -20,7 +20,7 @@
 * responsible for establishing a connection to the database to be maintained
 * during execution.
  */
-package server
+package login_server
 
 import (
 	"database/sql"

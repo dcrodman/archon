@@ -19,7 +19,7 @@
 * Packet constants and handlers. All handlers return 0 on success, negative int on
 * db error, and a positive int for any other errors.
  */
-package server
+package login_server
 
 import (
 	"fmt"
@@ -217,6 +217,12 @@ type ParameterChunkPacket struct {
 type SetFlagPacket struct {
 	Header BBPktHeader
 	Flag   uint32
+}
+
+type CharPreviewPacket struct {
+	Header    BBPktHeader
+	Guildcard uint32
+	Character *CharacterPreview
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -417,6 +423,20 @@ func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int
 		fmt.Println("Sending Parameter Chunk Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
+}
+
+func SendCharacterPreview(client *LoginClient, charPreview CharacterPreview) int {
+	pkt := new(CharPreviewPacket)
+	pkt.Header.Type = CharPreviewType
+	pkt.Guildcard = client.guildcard
+	pkt.Character = &charPreview
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Character Preview Packet - Dry Run")
+	}
+	util.PrintPayload(data, size)
+	return 0
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two
