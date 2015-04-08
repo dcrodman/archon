@@ -26,7 +26,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
+	_ "go-sql-driver"
 	"io/ioutil"
 	"libarchon/util"
 	"os"
@@ -108,7 +108,7 @@ type configuration struct {
 // Singleton instance.
 var loginConfig *configuration = nil
 
-// This functiion should be used to get access to the server config instead of directly
+// This function should be used to get access to the server config instead of directly
 // referencing the loginConfig pointer.
 func GetConfig() *configuration {
 	if loginConfig == nil {

@@ -24,8 +24,7 @@ visit the [Golang website](http://golang.org/).
 
 With Go (and Git) installed, you should be able to run the following:
 
-    git clone git@github.com:dcrodman/archon.git
-    go get github.com/go-sql-driver/mysql
+    git clone --recursive git@github.com:dcrodman/archon.git
     cd archon
     mkdir pkg bin
     export GOPATH=$(pwd)
