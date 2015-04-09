@@ -84,7 +84,7 @@ type CharacterPreview struct {
 	GuildcardStr   [16]byte
 	Unknown        [2]uint32
 	NameColor      uint32
-	Model          uint8
+	Model          byte
 	Padding        [15]byte
 	NameColorChksm uint32
 	SectionId      byte
@@ -139,7 +139,6 @@ func handleCharLogin(client *LoginClient) error {
 		// Send B1
 		// Send A0
 		// Send EE
-		panic("It worked!")
 		fmt.Println("Shipgate stuff")
 	}
 	return nil
@@ -178,13 +177,13 @@ func handleCharacterSelect(client *LoginClient) error {
 	err := archondb.QueryRow("SELECT * from characters "+
 		"where guildcard = ? and slot_num = ?", client.guildcard, pkt.Slot).Scan(&charData)
 	if err == sql.ErrNoRows {
-		// We don't have a character for this slot - send the E4 ack.
+		// We don't have a character for this slot.
 		SendCharPreviewNone(client, pkt.Slot, 2)
 		return nil
 	} else if err != nil {
 		return DBError(err)
 	} else {
-		// We've got a match - send the character preview.
+		// They have a character in that slot; send the character preview.
 		// TODO: Send E5 once character creation is implemented
 	}
 	return nil
@@ -244,6 +243,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// Set up the default inventory
 	// Copy in the shit from charPkt
 	// Load the key config from the db?
+
 	if client.flag == 0x02 {
 		// Update the character
 		fmt.Println("Updating character")
