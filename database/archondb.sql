@@ -57,14 +57,14 @@ CREATE TABLE characters (
   hair_color_green smallint,
   proportion_x int,
   proportion_y int,
-  name blob,
+  --name blob,
   playtime int,
-  unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
-  techniques blob,
-  options blob,
+  --unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
+  --techniques blob,
+  --options blob,
   bank_use int,
   bank_meseta int,
-  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
+  --FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
 );
 
 -- This table may get big, so keep an index to make queries from paket E3 fast.

@@ -133,7 +133,13 @@ func handleCharLogin(client *LoginClient) error {
 		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
 		return err
 	}
-	SendSecurity(client, BBLoginErrorNone, client.guildcard)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+	if client.config.CharSelected == 1 {
+		// Send B1
+		// Send A0
+		// Send EE
+		fmt.Println("Shipgate stuff")
+	}
 	return nil
 }
 
@@ -167,7 +173,7 @@ func handleCharacterSelect(client *LoginClient) error {
 	util.StructFromBytes(client.recvData[:8], &pkt)
 
 	var charData CharacterPreview
-	err := archondb.QueryRow("SELECT character_data from characters "+
+	err := archondb.QueryRow("SELECT * from characters "+
 		"where guildcard = ? and slot_num = ?", client.guildcard, pkt.Slot).Scan(&charData)
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot - send the E4 ack.
@@ -236,7 +242,19 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// Set up the default inventory
 	// Copy in the shit from charPkt
 	// Load the key config from the db?
-	// Delete or update the character based on the dressing room flag
+	if client.flag == 0x02 {
+		// Update the character
+		fmt.Println("Updating character")
+	} else {
+		// Recreate the character
+		fmt.Println("Recreating character")
+	}
+
+	// Send the security packet with the updated state and slot number so that
+	// we know a character has been selected.
+	client.config.CharSelected = 1
+	client.config.SlotNum = uint8(charPkt.Slot)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 
 	// This packet is treated as an ack in this case?
 	SendCharPreviewNone(client, charPkt.Slot, 0)

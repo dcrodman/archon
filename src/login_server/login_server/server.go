@@ -48,12 +48,13 @@ type LoginClient struct {
 	packetSize uint16
 
 	guildcard uint32
+	teamId    uint32
 	isGm      bool
 
 	gcData     []byte
 	gcDataSize uint16
-
-	flag uint32
+	config     ClientConfig
+	flag       uint32
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
@@ -81,10 +82,10 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 	var isBanned, isActive bool
 	// TODO: Also query for team id and save to client.
 	row := GetConfig().Database().QueryRow("SELECT username, password, "+
-		"guildcard, is_gm, is_banned, is_active from account_data "+
+		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
 		"WHERE username = ? and password = ?", pktUername, pktPassword)
 	err := row.Scan(&username, &password, &client.guildcard,
-		&client.isGm, &isBanned, &isActive)
+		&client.isGm, &isBanned, &isActive, &client.teamId)
 	switch {
 	// Check if we have a valid username/combination.
 	case err == sql.ErrNoRows:
@@ -92,23 +93,26 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 		// with a nonexistent username as some measure of account security. Note
 		// that if this is changed to query by username and add a password check,
 		// the index on account_data will need to be modified.
-		SendSecurity(client, BBLoginErrorPassword, 0)
+		SendSecurity(client, BBLoginErrorPassword, 0, 0)
 		return nil, errors.New("Account does not exist for username: " + username)
 	// Database error?
 	case err != nil:
 		// TODO: Send error message (1A)
-		SendSecurity(client, BBLoginErrorUnknown, 0)
+		SendSecurity(client, BBLoginErrorUnknown, 0, 0)
 		return nil, DBError(err)
 	// Is the account banned?
 	case isBanned:
-		SendSecurity(client, BBLoginErrorBanned, 0)
+		SendSecurity(client, BBLoginErrorBanned, 0, 0)
 		return nil, errors.New("Account banned: " + username)
 	// Has the account been activated?
 	case !isActive:
 		// TODO: Send message (1A)
-		SendSecurity(client, BBLoginErrorUnregistered, 0)
+		SendSecurity(client, BBLoginErrorUnregistered, 0, 0)
 		return nil, errors.New("Account must be activated for username: " + username)
 	}
+	// Copy over the config, which should indicate how far they are in the login flow.
+	util.StructFromBytes(loginPkt.Security[:], &client.config)
+
 	// TODO: Hardware ban check.
 	return &loginPkt, nil
 }

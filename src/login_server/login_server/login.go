@@ -51,15 +51,20 @@ func handleLogin(client *LoginClient) error {
 		}
 	*/
 
-	// Check the version string.
-	if clientVersionString != string(util.StripPadding(loginPkt.Version[:])) {
-		SendSecurity(client, BBLoginErrorPatch, 0)
+	// The first time we receive this packet the client will have included the
+	// version string in the security data; check it.
+	if clientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
+		SendSecurity(client, BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
 	}
+	// Newserv sets this field when the client first connects. I think this is
+	// used to indicate that the client has made it through the LOGIN server,
+	// but for now we'll just set it and leave it alone.
+	client.config.Magic = 0x48615467
 
-	SendSecurity(client, BBLoginErrorNone, client.guildcard)
 	config := GetConfig()
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	SendRedirect(client, uint16(charPort), config.HostnameBytes())
 	return nil
 }

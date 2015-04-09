@@ -104,18 +104,18 @@ type LoginPkt struct {
 	Password      [16]byte
 	Unknown3      [40]byte
 	HardwareInfo  [8]byte
-	Version       [40]byte
+	Security      [40]byte
 }
 
-// Not entirely sure what this is for.
-type BBClientConfig struct {
-	Magic       uint32 // Must be set to 0x48615467
-	BBGameState uint8  // Status of connected client
-	BBPlayerNum uint8  // Selected Character
-	Flags       uint16
-	Ports       [4]uint16
-	Unused      [4]uint32
-	Unused2     [2]uint32
+// Represent the client's progression through the login process.
+type ClientConfig struct {
+	Magic        uint32 // Must be set to 0x48615467
+	CharSelected uint8  // Has a character been selected?
+	SlotNum      uint8  // Slot number of selected Character
+	Flags        uint16
+	Ports        [4]uint16
+	Unused       [4]uint32
+	Unused2      [2]uint32
 }
 
 // Security packet (0xE6) sent to the client to indicate the state of client login.
@@ -125,9 +125,8 @@ type SecurityPacket struct {
 	PlayerTag    uint32
 	Guildcard    uint32
 	TeamId       uint32
-	Config       BBClientConfig
+	Config       *ClientConfig
 	Capabilities uint32
-	Padding      uint32
 }
 
 // The address of the next server; in this case, the character server.
@@ -269,17 +268,17 @@ func SendWelcome(client *LoginClient) int {
 
 // Send the security initialization packet with information about the user's
 // authentication status.
-func SendSecurity(client *LoginClient, errorCode BBLoginError, teamId uint32) int {
+func SendSecurity(client *LoginClient, errorCode BBLoginError, guildcard uint32, teamId uint32) int {
 	pkt := new(SecurityPacket)
 	pkt.Header.Type = SecurityType
 
 	// Constants set according to how Newserv does it.
 	pkt.ErrorCode = uint32(errorCode)
 	pkt.PlayerTag = 0x00010000
-	pkt.Guildcard = client.guildcard
+	pkt.Guildcard = guildcard
 	pkt.TeamId = teamId
+	pkt.Config = &client.config
 	pkt.Capabilities = 0x00000102
-	pkt.Config.Magic = 0x48615467
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
