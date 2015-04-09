@@ -133,3 +133,47 @@ var BaseSymbolChats = [1248]byte{
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 }
+
+// Load the PSOBB parameter files, build the parameter header, and init/cache
+// the param file chunks for the EB packets.
+func loadParameterFiles() {
+	offset := 0
+	var tmpChunkData []byte
+
+	for _, paramFile := range paramFiles {
+		data, err := ioutil.ReadFile("parameters/" + paramFile)
+		if err != nil {
+			panic(err)
+		}
+		fileSize := len(data)
+
+		entry := new(ParameterEntry)
+		entry.Size = uint32(fileSize)
+		entry.Checksum = crc32.ChecksumIEEE(data)
+		entry.Offset = uint32(offset)
+		copy(entry.Filename[:], []uint8(paramFile))
+
+		offset += fileSize
+
+		// We don't care what the actual entries are for the packet, so just append
+		// the bytes to save us having to do the conversion every time.
+		bytes, _ := util.BytesFromStruct(entry)
+		paramHeaderData = append(paramHeaderData, bytes...)
+
+		tmpChunkData = append(tmpChunkData, data...)
+	}
+
+	// Offset should at this point be the total size of the files to send - break
+	// it all up into indexable chunks.
+	paramChunkData = make(map[int][]byte)
+	chunks := offset / MAX_CHUNK_SIZE
+	for i := 0; i < chunks; i++ {
+		dataOff := i * MAX_CHUNK_SIZE
+		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MAX_CHUNK_SIZE]
+		offset -= MAX_CHUNK_SIZE
+	}
+	// Add any remaining data
+	if offset > 0 {
+		paramChunkData[chunks] = tmpChunkData[chunks*MAX_CHUNK_SIZE:]
+	}
+}
