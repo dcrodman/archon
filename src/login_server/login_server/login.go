@@ -27,6 +27,7 @@ import (
 	"io"
 	"libarchon/util"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"sync"
 )
@@ -66,6 +67,7 @@ func handleLogin(client *LoginClient) error {
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	SendRedirect(client, uint16(charPort), config.HostnameBytes())
+
 	return nil
 }
 
@@ -100,7 +102,8 @@ func processLoginPacket(client *LoginClient) error {
 func handleLoginClient(client *LoginClient) {
 	defer func() {
 		if err := recover(); err != nil {
-			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n", client.ipAddr, err)
+			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
+				client.ipAddr, err, debug.Stack())
 			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
 		}
 		client.conn.Close()

@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"libarchon/util"
 	"os"
+	"runtime/debug"
 	"sync"
 )
 
@@ -138,6 +139,7 @@ func handleCharLogin(client *LoginClient) error {
 		// Send B1
 		// Send A0
 		// Send EE
+		panic("It worked!")
 		fmt.Println("Shipgate stuff")
 	}
 	return nil
@@ -314,12 +316,11 @@ func processCharacterPacket(client *LoginClient) error {
 // error is encountered.
 func handleCharacterClient(client *LoginClient) {
 	defer func() {
-		/*
-			if err := recover(); err != nil {
-				errMsg := fmt.Sprintf("Error in client communication: %s: %s\n", client.ipAddr, err)
-				LogMsg(errMsg, LogTypeError, LogPriorityHigh)
-			}
-		*/
+		if err := recover(); err != nil {
+			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
+				client.ipAddr, err, debug.Stack())
+			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
+		}
 		client.conn.Close()
 		charConnections.RemoveClient(client)
 		LogMsg("Disconnected CHARACTER client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
