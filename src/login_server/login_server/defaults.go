@@ -21,6 +21,12 @@
 
 package login_server
 
+import (
+	"hash/crc32"
+	"io/ioutil"
+	"libarchon/util"
+)
+
 // Default keyboard/joystick configuration used for players who are logging
 // in for the first time.
 var BaseKeyConfig = [420]byte{

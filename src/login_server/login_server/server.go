@@ -64,7 +64,7 @@ func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 func DBError(err error) error {
 	errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
 	LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-	return &util.ServerError{Message: errMsg}
+	return errors.New(errMsg)
 }
 
 // Handle account verification tasks common to both the login and character servers.
@@ -131,7 +131,7 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
-		err = util.ServerError{Message: "Error sending welcome packet to: " + client.ipAddr}
+		err = errors.New("Error sending welcome packet to: " + client.ipAddr)
 		client = nil
 	}
 	return client, err

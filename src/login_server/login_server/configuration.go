@@ -28,7 +28,6 @@ import (
 	"fmt"
 	_ "go-sql-driver"
 	"io/ioutil"
-	"libarchon/util"
 	"os"
 	"strconv"
 	"strings"
@@ -169,7 +168,7 @@ func (config *configuration) Database() *sql.DB {
 	if config.database == nil {
 		// Don't implicitly initialize the database - if there's an error or other action that causes
 		// the reference to become nil then we're probably leaking a connection.
-		panic(util.ServerError{Message: "Attempt to reference uninitialized database"})
+		panic("Attempt to reference uninitialized database")
 	}
 	return config.database
 }

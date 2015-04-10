@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"io/ioutil"
 	"libarchon/util"
 	"os"
 	"runtime/debug"
@@ -338,7 +337,7 @@ func handleCharacterClient(client *LoginClient) {
 				client.conn.Close()
 				return
 			} else if err != nil {
-				// Socket error, nothing we can do now
+				// Socket error, nothing we can do now.
 				LogMsg("Socket Error ("+client.ipAddr+") "+err.Error(),
 					LogTypeWarning, LogPriorityMedium)
 				return

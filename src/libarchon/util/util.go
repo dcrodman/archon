@@ -30,15 +30,6 @@ import (
 
 const displayWidth = 16
 
-// Global error to indicate problems encountered during server operation.
-type ServerError struct {
-	Message string
-}
-
-func (err ServerError) Error() string {
-	return err.Message
-}
-
 // Returns a slice of b without the trailing 0s.
 func StripPadding(b []byte) []byte {
 	for i := len(b) - 1; i >= 0; i-- {

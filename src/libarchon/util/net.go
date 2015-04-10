@@ -20,11 +20,14 @@ package util
 
 import (
 	"container/list"
+	"errors"
 	"net"
 	"sync"
 )
 
-type Client interface {
+// Client interface to make it possible to share common client-related
+// functionality between servers without exposing the server-specific config.
+type ServerClient interface {
 	Connection() *net.TCPConn
 	IPAddr() string
 }
@@ -35,19 +38,20 @@ type ConnectionList struct {
 	mutex      sync.RWMutex
 }
 
+// Factory method for creating new ConnectionLists.
 func NewClientList() *ConnectionList {
 	newList := new(ConnectionList)
 	newList.clientList = list.New()
 	return newList
 }
 
-func (cl *ConnectionList) AddClient(c Client) {
+func (cl *ConnectionList) AddClient(c ServerClient) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
 	cl.mutex.Unlock()
 }
 
-func (cl *ConnectionList) HasClient(c Client) bool {
+func (cl *ConnectionList) HasClient(c ServerClient) bool {
 	found := false
 	cl.mutex.RLock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
@@ -60,7 +64,7 @@ func (cl *ConnectionList) HasClient(c Client) bool {
 	return found
 }
 
-func (cl *ConnectionList) RemoveClient(c Client) {
+func (cl *ConnectionList) RemoveClient(c ServerClient) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
@@ -79,11 +83,11 @@ func (cl *ConnectionList) Count() int {
 func OpenSocket(host, port string) (*net.TCPListener, error) {
 	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
 	if err != nil {
-		return nil, &ServerError{Message: "Error creating socket: " + err.Error()}
+		return nil, errors.New("Error creating socket: " + err.Error())
 	}
 	socket, err := net.ListenTCP("tcp", hostAddress)
 	if err != nil {
-		return nil, &ServerError{Message: "Error Listening on Socket: " + err.Error()}
+		return nil, errors.New("Error Listening on Socket: " + err.Error())
 	}
 	return socket, nil
 }
