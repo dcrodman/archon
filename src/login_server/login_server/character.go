@@ -32,12 +32,14 @@ import (
 )
 
 var charConnections *util.ConnectionList = util.NewClientList()
+
+// Cached parameter data to avoid computing it every time.
 var paramHeaderData []byte
 var paramChunkData map[int][]byte
 
+// Possible character classes as defined by the game.
 type CharClass uint8
 
-// Possible character classes as defined by the game.
 const (
 	Humar     CharClass = 0x00
 	Hunewearl           = 0x01
@@ -53,20 +55,6 @@ const (
 	Ramarl              = 0x0B
 )
 
-// Parameter files we're expecting. I still don't really know what they're
-// for yet, so emulating what I've seen others do.
-var paramFiles = [...]string{
-	"ItemMagEdit.prs",
-	"ItemPMT.prs",
-	"BattleParamEntry.dat",
-	"BattleParamEntry_on.dat",
-	"BattleParamEntry_lab.dat",
-	"BattleParamEntry_lab_on.dat",
-	"BattleParamEntry_ep4.dat",
-	"BattleParamEntry_ep4_on.dat",
-	"PlyLevelTbl.prs",
-}
-
 // Cache the parameter chunk data and header so that the param
 // files aren't re-read every time.
 type ParameterEntry struct {
@@ -74,6 +62,29 @@ type ParameterEntry struct {
 	Checksum uint32
 	Offset   uint32
 	Filename [0x40]uint8
+}
+
+// Per-player friend guildcard entries.
+type GuildcardEntry struct {
+	Guildcard   uint32
+	Name        [24]uint16
+	TeamName    [16]uint16
+	Description [88]uint16
+	Reserved    uint8
+	Language    uint8
+	SectionID   uint8
+	CharClass   uint8
+	padding     uint32
+	Comment     [88]uint16
+}
+
+// Per-player guildcard data chunk.
+type GuildcardData struct {
+	Unknown  [0x114]uint8
+	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
+	Unknown2 [0x78]uint8
+	Entries  [104]GuildcardEntry
+	Unknown3 [0x1BC]uint8
 }
 
 // Struct used by Character Info packet.
@@ -103,27 +114,16 @@ type CharacterPreview struct {
 	Playtime       uint32
 }
 
-// Per-player friend guildcard entries.
-type GuildcardEntry struct {
-	Guildcard   uint32
-	Name        [24]uint16
-	TeamName    [16]uint16
-	Description [88]uint16
-	Reserved    uint8
-	Language    uint8
-	SectionID   uint8
-	CharClass   uint8
-	padding     uint32
-	Comment     [88]uint16
-}
-
-// Per-player guildcard data chunk.
-type GuildcardData struct {
-	Unknown  [0x114]uint8
-	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
-	Unknown2 [0x78]uint8
-	Entries  [104]GuildcardEntry
-	Unknown3 [0x1BC]uint8
+// Per-character stats.
+type CharacterStats struct {
+	ATP uint16
+	MST uint16
+	EVP uint16
+	HP  uint16
+	DFP uint16
+	TP  uint16
+	LCK uint16
+	ATA uint16
 }
 
 // Handle initial login - verify the account and send security data.
@@ -293,7 +293,7 @@ func processCharacterPacket(client *LoginClient) error {
 	case GuildcardChunkReqType:
 		handleGuildcardChunk(client)
 	case ParameterHeaderReqType:
-		SendParameterHeader(client, uint32(len(paramFiles)), paramHeaderData)
+		SendParameterHeader(client, uint32(len(ParamFiles)), paramHeaderData)
 	case ParameterChunkReqType:
 		var pkt BBPktHeader
 		util.StructFromBytes(client.recvData[:], &pkt)
@@ -386,7 +386,8 @@ func handleCharacterClient(client *LoginClient) {
 // Main worker thread for the CHARACTER portion of the server.
 func StartCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
-	loadParameterFiles()
+	LoadParameterFiles()
+	LoadBaseStats()
 
 	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
 	if err != nil {

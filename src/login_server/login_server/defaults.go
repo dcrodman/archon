@@ -25,7 +25,22 @@ import (
 	"hash/crc32"
 	"io/ioutil"
 	"libarchon/util"
+	"os"
 )
+
+// Parameter files we're expecting. I still don't really know what they're
+// for yet, so emulating what I've seen others do.
+var ParamFiles = [...]string{
+	"ItemMagEdit.prs",
+	"ItemPMT.prs",
+	"BattleParamEntry.dat",
+	"BattleParamEntry_on.dat",
+	"BattleParamEntry_lab.dat",
+	"BattleParamEntry_lab_on.dat",
+	"BattleParamEntry_ep4.dat",
+	"BattleParamEntry_ep4_on.dat",
+	"PlyLevelTbl.prs",
+}
 
 // Default keyboard/joystick configuration used for players who are logging
 // in for the first time.
@@ -140,16 +155,23 @@ var BaseSymbolChats = [1248]byte{
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 }
 
+// Starting stats for any new character. This global should be considered immutable
+// and is populated by LoadBaseStats. The CharClass constants can be used to index
+// into this array to obtain the base stats for each class.
+var BaseStats []CharacterStats
+
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
-func loadParameterFiles() {
+func LoadParameterFiles() {
 	offset := 0
 	var tmpChunkData []byte
 
-	for _, paramFile := range paramFiles {
+	for _, paramFile := range ParamFiles {
 		data, err := ioutil.ReadFile("parameters/" + paramFile)
 		if err != nil {
-			panic(err)
+			LogMsg("Error reading parameter file: "+err.Error(),
+				LogTypeError, LogPriorityCritical)
+			os.Exit(1)
 		}
 		fileSize := len(data)
 
@@ -182,4 +204,27 @@ func loadParameterFiles() {
 	if offset > 0 {
 		paramChunkData[chunks] = tmpChunkData[chunks*MAX_CHUNK_SIZE:]
 	}
+}
+
+// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
+// all seem to rely on this file, so we'll do the same.
+func LoadBaseStats() {
+	// 12 different character classes.
+	BaseStats = make([]CharacterStats, 12)
+	statsFile, err := os.Open("parameters/PlyLevelTbl.prs")
+	if err != nil {
+		LogMsg("Error reading stats file: "+err.Error(),
+			LogTypeError, LogPriorityCritical)
+		os.Exit(1)
+	}
+	// Each struct is 16 bytes long; hardcoded for convenience.
+	compressed := make([]byte, 16*12)
+	if _, err = statsFile.Read(compressed); err != nil {
+		LogMsg("Error reading stats file: "+err.Error(),
+			LogTypeError, LogPriorityCritical)
+		os.Exit(1)
+	}
+	statsFile.Close()
+
+	// TODO: PRS decompression
 }
