@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"libarchon/logger"
 	"libarchon/util"
 	"os"
 	"runtime/debug"
@@ -130,7 +131,7 @@ type CharacterStats struct {
 func handleCharLogin(client *LoginClient) error {
 	_, err := VerifyAccount(client)
 	if err != nil {
-		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
+		log.Info(err.Error(), logger.LogPriorityLow)
 		return err
 	}
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
@@ -159,7 +160,8 @@ func handleKeyConfig(client *LoginClient) error {
 			"(guildcard, key_config) VALUES (?, ?)", client.guildcard, optionData[:420])
 	}
 	if err != nil {
-		return DBError(err)
+		log.DBError(err.Error())
+		return err
 	}
 	SendOptions(client, optionData)
 	return nil
@@ -180,7 +182,8 @@ func handleCharacterSelect(client *LoginClient) error {
 		SendCharPreviewNone(client, pkt.Slot, 2)
 		return nil
 	} else if err != nil {
-		return DBError(err)
+		log.DBError(err.Error())
+		return err
 	} else {
 		// They have a character in that slot; send the character preview.
 		// TODO: Send E5 once character creation is implemented
@@ -196,7 +199,8 @@ func handleGuildcardDataStart(client *LoginClient) error {
 			"section_id, char_class, comment FROM guildcard_entries "+
 			"WHERE guildcard = ?", client.guildcard)
 	if err != nil {
-		return DBError(err)
+		log.DBError(err.Error())
+		return err
 	}
 	defer rows.Close()
 	gcData := new(GuildcardData)
@@ -306,7 +310,7 @@ func processCharacterPacket(client *LoginClient) error {
 		err = handleCharacterUpdate(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
-		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
+		log.Info(msg, logger.LogPriorityMedium)
 	}
 	return err
 }
@@ -318,14 +322,14 @@ func handleCharacterClient(client *LoginClient) {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
+			log.Error(errMsg, logger.LogPriorityHigh)
 		}
 		client.conn.Close()
 		charConnections.RemoveClient(client)
-		LogMsg("Disconnected CHARACTER client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
+		log.Info("Disconnected CHARACTER client "+client.ipAddr, logger.LogPriorityMedium)
 	}()
 
-	LogMsg("Accepted CHARACTER connection from "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
+	log.Info("Accepted CHARACTER connection from "+client.ipAddr, logger.LogPriorityMedium)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
@@ -338,8 +342,8 @@ func handleCharacterClient(client *LoginClient) {
 				return
 			} else if err != nil {
 				// Socket error, nothing we can do now.
-				LogMsg("Socket Error ("+client.ipAddr+") "+err.Error(),
-					LogTypeWarning, LogPriorityMedium)
+				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
+					logger.LogPriorityMedium)
 				return
 			}
 
@@ -400,7 +404,7 @@ func StartCharacter(wg *sync.WaitGroup) {
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {
-			LogMsg("Failed to accept connection: "+err.Error(), LogTypeError, LogPriorityHigh)
+			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
 			continue
 		}
 		client, err := NewClient(connection)

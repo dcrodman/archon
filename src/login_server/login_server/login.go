@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"libarchon/logger"
 	"libarchon/util"
 	"os"
 	"runtime/debug"
@@ -39,7 +40,7 @@ var loginConnections *util.ConnectionList = util.NewClientList()
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := VerifyAccount(client)
 	if err != nil {
-		LogMsg(err.Error(), LogTypeInfo, LogPriorityLow)
+		log.Info(err.Error(), logger.LogPriorityLow)
 		return err
 	}
 	// TODO: Already connected to the server?
@@ -92,7 +93,7 @@ func processLoginPacket(client *LoginClient) error {
 		break
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
-		LogMsg(msg, LogTypeInfo, LogPriorityMedium)
+		log.Info(msg, logger.LogPriorityMedium)
 	}
 	return err
 }
@@ -104,14 +105,14 @@ func handleLoginClient(client *LoginClient) {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			LogMsg(errMsg, LogTypeError, LogPriorityHigh)
+			log.Error(errMsg, logger.LogPriorityHigh)
 		}
 		client.conn.Close()
 		loginConnections.RemoveClient(client)
-		LogMsg("Disconnected LOGIN client "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
+		log.Info("Disconnected CHARACTER client "+client.ipAddr, logger.LogPriorityMedium)
 	}()
 
-	LogMsg("Accepted LOGIN connection from "+client.ipAddr, LogTypeInfo, LogPriorityMedium)
+	log.Info("Accepted CHARACTER connection from "+client.ipAddr, logger.LogPriorityMedium)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
@@ -124,8 +125,8 @@ func handleLoginClient(client *LoginClient) {
 				return
 			} else if err != nil {
 				// Socket error, nothing we can do now
-				LogMsg("Socket Error ("+client.ipAddr+") "+err.Error(),
-					LogTypeWarning, LogPriorityMedium)
+				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
+					logger.LogPriorityMedium)
 				return
 			}
 
@@ -182,7 +183,7 @@ func StartLogin(wg *sync.WaitGroup) {
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {
-			LogMsg("Failed to accept connection: "+err.Error(), LogTypeError, LogPriorityHigh)
+			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
 			continue
 		}
 		client, err := NewClient(connection)

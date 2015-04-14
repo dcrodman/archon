@@ -29,11 +29,14 @@ import (
 	"errors"
 	"fmt"
 	"libarchon/encryption"
+	"libarchon/logger"
 	"libarchon/util"
 	"net"
 	"os"
 	"sync"
 )
+
+var log *logger.Logger
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -59,13 +62,6 @@ type LoginClient struct {
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
-
-// Helper for logging SQL errors and creating an Error instance.
-func DBError(err error) error {
-	errMsg := fmt.Sprintf("SQL Error: %s", err.Error())
-	LogMsg(errMsg, LogTypeError, LogPriorityCritical)
-	return errors.New(errMsg)
-}
 
 // Handle account verification tasks common to both the login and character servers.
 func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
@@ -98,7 +94,8 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 	case err != nil:
 		// TODO: Send error message (1A)
 		SendSecurity(client, BBLoginErrorUnknown, 0, 0)
-		return nil, DBError(err)
+		log.DBError(err.Error())
+		return nil, err
 	// Is the account banned?
 	case isBanned:
 		SendSecurity(client, BBLoginErrorBanned, 0, 0)
@@ -165,6 +162,10 @@ func Start() {
 	}
 	fmt.Println("Done.")
 	defer config.CloseDb()
+
+	// Initialize the logger.
+	log = logger.New(config.logWriter, config.LogLevel)
+	log.Info("Server Initialized", logger.LogPriorityCritical)
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

@@ -7,6 +7,7 @@
 	"DBName" : "archondb",
 	"DBUsername" : "archonadmin",
 	"DBPassword" : "psoadminpassword",
+	"Logfile" : "login_server.log",
 	"LogLevel" : 4,
 	"DebugMode" : true
 }

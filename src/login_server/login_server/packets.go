@@ -23,6 +23,7 @@ package login_server
 
 import (
 	"fmt"
+	"libarchon/logger"
 	"libarchon/util"
 )
 
@@ -229,8 +230,8 @@ type CharPreviewPacket struct {
 func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
 	_, err := client.conn.Write(pkt[:length])
 	if err != nil {
-		LogMsg("Error sending to client "+client.ipAddr+": "+err.Error(),
-			LogTypeInfo, LogPriorityMedium)
+		log.Info("Error sending to client "+client.ipAddr+": "+err.Error(),
+			logger.LogPriorityMedium)
 		return -1
 	}
 	return 0

@@ -24,6 +24,7 @@ package login_server
 import (
 	"hash/crc32"
 	"io/ioutil"
+	"libarchon/logger"
 	"libarchon/util"
 	"os"
 )
@@ -169,8 +170,8 @@ func LoadParameterFiles() {
 	for _, paramFile := range ParamFiles {
 		data, err := ioutil.ReadFile("parameters/" + paramFile)
 		if err != nil {
-			LogMsg("Error reading parameter file: "+err.Error(),
-				LogTypeError, LogPriorityCritical)
+			log.Error("Error reading parameter file: "+err.Error(),
+				logger.LogPriorityCritical)
 			os.Exit(1)
 		}
 		fileSize := len(data)
@@ -213,15 +214,13 @@ func LoadBaseStats() {
 	BaseStats = make([]CharacterStats, 12)
 	statsFile, err := os.Open("parameters/PlyLevelTbl.prs")
 	if err != nil {
-		LogMsg("Error reading stats file: "+err.Error(),
-			LogTypeError, LogPriorityCritical)
+		log.Error("Error reading stats file: "+err.Error(), logger.LogPriorityCritical)
 		os.Exit(1)
 	}
 	// Each struct is 16 bytes long; hardcoded for convenience.
 	compressed := make([]byte, 16*12)
 	if _, err = statsFile.Read(compressed); err != nil {
-		LogMsg("Error reading stats file: "+err.Error(),
-			LogTypeError, LogPriorityCritical)
+		log.Error("Error reading stats file: "+err.Error(), logger.LogPriorityCritical)
 		os.Exit(1)
 	}
 	statsFile.Close()

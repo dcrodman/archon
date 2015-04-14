@@ -27,64 +27,16 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "go-sql-driver"
+	"io"
 	"io/ioutil"
+	"libarchon/logger"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const ServerConfigDir = "/usr/local/share/archon"
 const loginConfigFile = "login_config.json"
-
-type LogType byte
-type LogPriority byte
-
-// Constants for the configurable log level that control the amount of information
-// written to the server logs. The higher the number, the lower the priority.
-const (
-	LogPriorityCritical LogPriority = 1
-	LogPriorityHigh                 = 2
-	LogPriorityMedium               = 3
-	LogPriorityLow                  = 4
-
-	LogTypeInfo    LogType = 1 << iota
-	LogTypeWarning         = 1 << iota
-	LogTypeError           = 1 << iota
-)
-
-// Logs a message to either the user's configured logfile or to standard out. Only messages
-// equal to or greater than the user's specified priority will be written.
-func LogMsg(message string, logType LogType, priority LogPriority) {
-	config := GetConfig()
-	if priority > config.LogLevel {
-		return
-	}
-	var logMsg string
-	timestamp := time.Now().Format("06-01-02 15:04:05")
-	switch logType {
-	case LogTypeError:
-		logMsg = fmt.Sprintf("%s [ERROR] %s\n", timestamp, message)
-	case LogTypeWarning:
-		logMsg = fmt.Sprintf("%s [WARNING] %s\n", timestamp, message)
-	case LogTypeInfo:
-		logMsg = fmt.Sprintf("%s [INFO] %s\n", timestamp, message)
-	}
-	if config.Logfile == "" {
-		fmt.Printf(logMsg)
-	} else {
-		logfile, err := os.OpenFile("login_server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("\nWARNING: Failed to open log file %s: %s\n", logfile, err.Error())
-			return
-		}
-		defer logfile.Close()
-		_, err = logfile.WriteString(logMsg)
-		if err != nil {
-			fmt.Printf("\nWARNING: Error writing to log file: %s\n", err)
-		}
-	}
-}
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
@@ -97,10 +49,11 @@ type configuration struct {
 	DBUsername    string
 	DBPassword    string
 	Logfile       string
-	LogLevel      LogPriority
+	LogLevel      logger.LogPriority
 	DebugMode     bool
 
 	database        *sql.DB
+	logWriter       io.Writer
 	cachedHostBytes [4]byte
 }
 
@@ -123,26 +76,30 @@ func (config *configuration) InitFromFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(data, config)
-	config.enforceDefaults()
-	return nil
-}
+	// Provide default values for fields that are optional or critical.
+	config.Hostname = "127.0.0.1"
+	config.LoginPort = "12000"
+	config.CharacterPort = "12001"
+	config.Logfile = "Standard Out"
 
-// Provide default values for fields that are optional or critical.
-func (config *configuration) enforceDefaults() {
-	if config.Hostname == "" {
-		config.Hostname = "127.0.0.1"
-	}
-	if config.LoginPort == "" {
-		config.LoginPort = "12000"
-	}
-	if config.CharacterPort == "" {
-		config.CharacterPort = "12001"
-	}
-	if config.LogLevel < LogPriorityCritical || config.LogLevel > LogPriorityLow {
+	json.Unmarshal(data, config)
+
+	if config.LogLevel < logger.LogPriorityCritical || config.LogLevel > logger.LogPriorityLow {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = LogPriorityCritical
+		config.LogLevel = logger.LogPriorityCritical
 	}
+
+	if config.Logfile != "Standard Out" {
+		config.logWriter, err = os.OpenFile(config.Logfile,
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Printf("\nWARNING: Failed to open log file %s: %s\n",
+				config.Logfile, err.Error())
+		}
+	} else {
+		config.logWriter = os.Stdout
+	}
+	return nil
 }
 
 // Establish a connection to the database and ping it to verify.
@@ -188,10 +145,6 @@ func (config *configuration) HostnameBytes() [4]byte {
 }
 
 func (config *configuration) String() string {
-	logfile := config.Logfile
-	if logfile == "" {
-		logfile = "Standard Out"
-	}
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
@@ -200,7 +153,7 @@ func (config *configuration) String() string {
 		"Database Name: " + config.DBName + "\n" +
 		"Database Username: " + config.DBUsername + "\n" +
 		"Database Password: " + config.DBPassword + "\n" +
-		"Output Logged To: " + logfile + "\n" +
+		"Output Logged To: " + config.Logfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
 }
