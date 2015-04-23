@@ -33,12 +33,12 @@ import (
 	"sync"
 )
 
-const clientVersionString = "TethVer12510"
+const ClientVersionString = "TethVer12510"
 
 var loginConnections *util.ConnectionList = util.NewClientList()
 
 func handleLogin(client *LoginClient) error {
-	loginPkt, err := VerifyAccount(client)
+	loginPkt, err := verifyAccount(client)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func handleLogin(client *LoginClient) error {
 
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
-	if clientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
+	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
 		SendSecurity(client, BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
 	}
@@ -173,7 +173,7 @@ func handleLoginClient(client *LoginClient) {
 
 // Main worker for the login server. Creates the socket and starts listening for connections,
 // spawning off client threads to handle communications for each client.
-func StartLogin(wg *sync.WaitGroup) {
+func startLogin(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
 	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.LoginPort)
 	if err != nil {
@@ -187,7 +187,7 @@ func StartLogin(wg *sync.WaitGroup) {
 			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
 			continue
 		}
-		client, err := NewClient(connection)
+		client, err := newClient(connection)
 		if err != nil {
 			continue
 		}

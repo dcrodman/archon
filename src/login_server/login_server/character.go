@@ -56,9 +56,9 @@ const (
 	Ramarl              = 0x0B
 )
 
-// Cache the parameter chunk data and header so that the param
-// files aren't re-read every time.
-type ParameterEntry struct {
+// Struct for caching the parameter chunk data and header so
+// that the param files aren't re-read every time.
+type parameterEntry struct {
 	Size     uint32
 	Checksum uint32
 	Offset   uint32
@@ -129,7 +129,7 @@ type CharacterStats struct {
 
 // Handle initial login - verify the account and send security data.
 func handleCharLogin(client *LoginClient) error {
-	_, err := VerifyAccount(client)
+	_, err := verifyAccount(client)
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func handleCharacterClient(client *LoginClient) {
 }
 
 // Main worker thread for the CHARACTER portion of the server.
-func StartCharacter(wg *sync.WaitGroup) {
+func startCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
 	LoadParameterFiles()
 	LoadBaseStats()
@@ -408,7 +408,7 @@ func StartCharacter(wg *sync.WaitGroup) {
 			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
 			continue
 		}
-		client, err := NewClient(connection)
+		client, err := newClient(connection)
 		if err != nil {
 			continue
 		}

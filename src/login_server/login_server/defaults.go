@@ -163,7 +163,7 @@ var BaseStats []CharacterStats
 
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
-func LoadParameterFiles() {
+func loadParameterFiles() {
 	offset := 0
 	var tmpChunkData []byte
 
@@ -176,7 +176,7 @@ func LoadParameterFiles() {
 		}
 		fileSize := len(data)
 
-		entry := new(ParameterEntry)
+		entry := new(parameterEntry)
 		entry.Size = uint32(fileSize)
 		entry.Checksum = crc32.ChecksumIEEE(data)
 		entry.Offset = uint32(offset)
@@ -209,7 +209,7 @@ func LoadParameterFiles() {
 
 // Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
 // all seem to rely on this file, so we'll do the same.
-func LoadBaseStats() {
+func loadBaseStats() {
 	// 12 different character classes.
 	BaseStats = make([]CharacterStats, 12)
 	statsFile, err := os.Open("parameters/PlyLevelTbl.prs")

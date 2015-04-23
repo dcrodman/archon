@@ -64,7 +64,7 @@ func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 
 // Handle account verification tasks common to both the login and character servers.
-func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
+func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 	var loginPkt LoginPkt
 	util.StructFromBytes(client.recvData, &loginPkt)
 
@@ -114,7 +114,7 @@ func VerifyAccount(client *LoginClient) (*LoginPkt, error) {
 }
 
 // Create and initialize a new struct to hold client information.
-func NewClient(conn *net.TCPConn) (*LoginClient, error) {
+func newClient(conn *net.TCPConn) (*LoginClient, error) {
 	client := new(LoginClient)
 	client.conn = conn
 	client.ipAddr = conn.RemoteAddr().String()
@@ -134,7 +134,7 @@ func NewClient(conn *net.TCPConn) (*LoginClient, error) {
 	return client, err
 }
 
-func Start() {
+func StartServer() {
 	fmt.Println("Initializing Archon LOGIN and CHARACTER servers...")
 	config := GetConfig()
 	// Initialize our config singleton from one of two expected file locations.
@@ -170,7 +170,7 @@ func Start() {
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go StartLogin(&wg)
-	go StartCharacter(&wg)
+	go startLogin(&wg)
+	go startCharacter(&wg)
 	wg.Wait()
 }
