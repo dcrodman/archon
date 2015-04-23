@@ -102,7 +102,7 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 		return nil, errors.New("Account banned: " + username)
 	// Has the account been activated?
 	case !isActive:
-		// TODO: Send message (1A)
+		// TODO: Send error message (1A)
 		SendSecurity(client, BBLoginErrorUnregistered, 0, 0)
 		return nil, errors.New("Account must be activated for username: " + username)
 	}

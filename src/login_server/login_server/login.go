@@ -145,8 +145,9 @@ func handleLoginClient(client *LoginClient) {
 		for client.recvSize < int(client.packetSize) {
 			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
 			if err != nil {
-				// TODO: Throw an error instead of panicing here.
-				panic(err.Error())
+				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
+					logger.LogPriorityMedium)
+				return
 			}
 			client.recvSize += bytes
 		}
