@@ -19,9 +19,17 @@
 package main
 
 import (
+	"fmt"
 	"login_server/login_server"
 )
 
 func main() {
+	fmt.Println("Archon Login Server, Copyright (C) 2014 Andrew Rodman")
+	fmt.Println("=====================================================")
+	fmt.Println("This program is free software: you can redistribute it and/or\n" +
+		"modify it under the terms of the GNU General Public License as\n" +
+		"published by the Free Software Foundation, either version 3 of\n" +
+		"the License, or (at your option) any later version.")
+	fmt.Println("This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
 	login_server.Start()
 }
