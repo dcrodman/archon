@@ -50,8 +50,9 @@ func ZeroSlice(arr []byte, length int) {
 	}
 }
 
-// Serializes the fields of a struct to an array of bytes in the order in which the fields are
-// declared. Calls panic() if data is not a struct or pointer to struct.
+// Serializes the fields of a struct to an array of bytes in the order in
+// which the fields are declared. Calls panic() if data is not a struct or
+// pointer to struct, or if there was an error writing a field.
 func BytesFromStruct(data interface{}) ([]byte, int) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()
@@ -61,51 +62,55 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 	}
 
 	if valKind != reflect.Struct {
-		panic("BytesFromStruct(): data must of type struct or ptr to struct, got: " + valKind.String())
+		panic("BytesFromStruct(): data must of type struct " +
+			"or ptr to struct, got: " + valKind.String())
 	}
 
 	bytes := new(bytes.Buffer)
-	// It's possible to use binary.Write on val.Interface itself, but doing so prevents
-	// this function from working with dynamically sized types.
+	// It's possible to use binary.Write on val.Interface itself, but doing
+	// so prevents this function from working with dynamically sized types.
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 
+		var err error
 		switch kind := field.Kind(); kind {
 		case reflect.Struct, reflect.Ptr:
 			b, _ := BytesFromStruct(field.Interface())
-			binary.Write(bytes, binary.LittleEndian, b)
-		case reflect.Array, reflect.Slice:
-			binary.Write(bytes, binary.LittleEndian, field.Interface())
-		case reflect.Uint8:
-			binary.Write(bytes, binary.LittleEndian, uint8(field.Uint()))
-		case reflect.Uint16:
-			binary.Write(bytes, binary.LittleEndian, uint16(field.Uint()))
-		case reflect.Uint32:
-			binary.Write(bytes, binary.LittleEndian, uint32(field.Uint()))
-		case reflect.Uint, reflect.Uint64:
-			binary.Write(bytes, binary.LittleEndian, field.Uint())
-		case reflect.Int8:
-			binary.Write(bytes, binary.LittleEndian, int8(field.Int()))
-		case reflect.Int16:
-			binary.Write(bytes, binary.LittleEndian, int16(field.Int()))
-		case reflect.Int32:
-			binary.Write(bytes, binary.LittleEndian, int32(field.Int()))
-		case reflect.Int, reflect.Int64:
-			binary.Write(bytes, binary.LittleEndian, field.Int())
+			err = binary.Write(bytes, binary.LittleEndian, b)
+		default:
+			err = binary.Write(bytes, binary.LittleEndian, field.Interface())
+		}
+		if err != nil {
+			panic(err.Error())
 		}
 	}
 	return bytes.Bytes(), bytes.Len()
 }
 
-// Populates the struct pointed to by targetStructby reading in a stream of bytes and filling
-// the values in sequential order. Note that the struct itself must be of fixed width; dynamic
-// types will result in mistranslated values (or possibly a panic).
+// Populates the struct pointed to by targetStruct by reading in a stream of
+// bytes and filling the values in sequential order.
 func StructFromBytes(data []byte, targetStruct interface{}) {
-	if kind := reflect.TypeOf(targetStruct).Kind(); kind != reflect.Ptr {
-		panic("StructFromBytes(): targetStruct must be a ptr to struct, got: " + kind.String())
+	targetVal := reflect.ValueOf(targetStruct)
+	if valKind := targetVal.Kind(); valKind != reflect.Ptr {
+		panic("StructFromBytes(): targetStruct must be a " +
+			"ptr to struct, got: " + valKind.String())
 	}
 	reader := bytes.NewReader(data)
-	binary.Read(reader, binary.LittleEndian, targetStruct)
+	val := targetVal.Elem()
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+
+		var err error
+		switch field.Kind() {
+		case reflect.Ptr:
+			err = binary.Read(reader, binary.LittleEndian, field.Interface())
+		default:
+			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
+		}
+		if err != nil {
+			fmt.Printf("%v\n", err.Error())
+		}
+	}
 }
 
 // Write one line of data to stdout.
@@ -141,8 +146,8 @@ func printPacketLine(data []uint8, length int, offset int) {
 	fmt.Println()
 }
 
-// Print the contents of a packet to stdout in two columns, one for bytes and the other
-// for their ascii representation.
+// Print the contents of a packet to stdout in two columns, one for bytes and
+// the other for their ascii representation.
 func PrintPayload(data []uint8, pktLen int) {
 	for rem, offset := pktLen, 0; rem > 0; rem -= displayWidth {
 		if rem < displayWidth {

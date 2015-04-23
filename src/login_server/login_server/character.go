@@ -231,7 +231,7 @@ func handleGuildcardChunk(client *LoginClient) {
 	var chunkReq GuildcardChunkReqPacket
 	util.StructFromBytes(client.recvData[:], &chunkReq)
 	if chunkReq.Continue != 0x01 {
-		// Cancelled sending guildcard chunks - disconnect?
+		// TODO Cancelled sending guildcard chunks - disconnect
 		return
 	}
 	SendGuildcardChunk(client, chunkReq.ChunkRequested)
@@ -240,6 +240,7 @@ func handleGuildcardChunk(client *LoginClient) {
 // Create or update a character in a slot.
 func handleCharacterUpdate(client *LoginClient) error {
 	var charPkt CharPreviewPacket
+	charPkt.Character = new(CharacterPreview)
 	util.StructFromBytes(client.recvData[:], &charPkt)
 
 	// Copy in the base stats
@@ -249,10 +250,10 @@ func handleCharacterUpdate(client *LoginClient) error {
 
 	if client.flag == 0x02 {
 		// Update the character
-		fmt.Println("Updating character")
+		fmt.Println("Updating character\n")
 	} else {
 		// Recreate the character
-		fmt.Println("Recreating character")
+		fmt.Println("Recreating character\n")
 	}
 
 	// Send the security packet with the updated state and slot number so that
