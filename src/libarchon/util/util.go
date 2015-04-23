@@ -108,7 +108,7 @@ func StructFromBytes(data []byte, targetStruct interface{}) {
 			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
 		}
 		if err != nil {
-			fmt.Printf("%v\n", err.Error())
+			panic(err.Error())
 		}
 	}
 }

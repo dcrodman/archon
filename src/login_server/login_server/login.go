@@ -109,10 +109,10 @@ func handleLoginClient(client *LoginClient) {
 		}
 		client.conn.Close()
 		loginConnections.RemoveClient(client)
-		log.Info("Disconnected CHARACTER client "+client.ipAddr, logger.LogPriorityMedium)
+		log.Info("Disconnected LOGIN client "+client.ipAddr, logger.LogPriorityMedium)
 	}()
 
-	log.Info("Accepted CHARACTER connection from "+client.ipAddr, logger.LogPriorityMedium)
+	log.Info("Accepted LOGIN connection from "+client.ipAddr, logger.LogPriorityMedium)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {

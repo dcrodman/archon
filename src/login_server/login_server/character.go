@@ -172,7 +172,7 @@ func handleKeyConfig(client *LoginClient) error {
 func handleCharacterSelect(client *LoginClient) error {
 	archondb := GetConfig().Database()
 	var pkt CharPreviewRequestPacket
-	util.StructFromBytes(client.recvData[:8], &pkt)
+	util.StructFromBytes(client.recvData[:], &pkt)
 
 	var charData CharacterPreview
 	err := archondb.QueryRow("SELECT * from characters "+
