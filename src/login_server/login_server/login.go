@@ -40,7 +40,6 @@ var loginConnections *util.ConnectionList = util.NewClientList()
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := VerifyAccount(client)
 	if err != nil {
-		log.Info(err.Error(), logger.LogPriorityLow)
 		return err
 	}
 	// TODO: Already connected to the server?
@@ -105,7 +104,7 @@ func handleLoginClient(client *LoginClient) {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			log.Error(errMsg, logger.LogPriorityHigh)
+			log.Error(errMsg, logger.LogPriorityCritical)
 		}
 		client.conn.Close()
 		loginConnections.RemoveClient(client)
@@ -159,6 +158,7 @@ func handleLoginClient(client *LoginClient) {
 				uint32(client.packetSize-BBHeaderSize))
 		}
 		if err := processLoginPacket(client); err != nil {
+			log.Info(err.Error(), logger.LogPriorityLow)
 			break
 		}
 

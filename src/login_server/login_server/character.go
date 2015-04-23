@@ -131,7 +131,6 @@ type CharacterStats struct {
 func handleCharLogin(client *LoginClient) error {
 	_, err := VerifyAccount(client)
 	if err != nil {
-		log.Info(err.Error(), logger.LogPriorityLow)
 		return err
 	}
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
@@ -207,15 +206,15 @@ func handleGuildcardDataStart(client *LoginClient) error {
 
 	// Maximum of 140 entries can be sent.
 	for i := 0; rows.Next() && i < 140; i++ {
-		// Blobs are scanned as []uint8, so they need to be converted to []uint16.
+		// TODO: Extract this out of a blob...
 		var name, teamName, desc, comment []uint8
 		entry := &gcData.Entries[i]
 		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc, &entry.Language,
 			&entry.SectionID, &entry.CharClass, &comment)
 		if err != nil {
-			panic(err)
+			log.DBError(err.Error())
+			return err
 		}
-		// TODO: Convert blobs from uint8 into uint16 (utf-16le?)
 	}
 	var size int
 	client.gcData, size = util.BytesFromStruct(gcData)
@@ -323,7 +322,7 @@ func handleCharacterClient(client *LoginClient) {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			log.Error(errMsg, logger.LogPriorityHigh)
+			log.Error(errMsg, logger.LogPriorityCritical)
 		}
 		client.conn.Close()
 		charConnections.RemoveClient(client)
@@ -376,6 +375,7 @@ func handleCharacterClient(client *LoginClient) {
 				uint32(client.packetSize-BBHeaderSize))
 		}
 		if err := processCharacterPacket(client); err != nil {
+			log.Info(err.Error(), logger.LogPriorityLow)
 			break
 		}
 
