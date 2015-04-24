@@ -391,8 +391,8 @@ func handleCharacterClient(client *LoginClient) {
 // Main worker thread for the CHARACTER portion of the server.
 func startCharacter(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
-	LoadParameterFiles()
-	LoadBaseStats()
+	loadParameterFiles()
+	loadBaseStats()
 
 	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
 	if err != nil {
