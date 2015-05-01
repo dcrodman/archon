@@ -22,9 +22,12 @@
 package login_server
 
 import (
+	// "encoding/json"
+	// "fmt"
 	"hash/crc32"
 	"io/ioutil"
 	"libarchon/logger"
+	"libarchon/prs"
 	"libarchon/util"
 	"os"
 )
@@ -159,7 +162,7 @@ var BaseSymbolChats = [1248]byte{
 // Starting stats for any new character. This global should be considered immutable
 // and is populated by LoadBaseStats. The CharClass constants can be used to index
 // into this array to obtain the base stats for each class.
-var BaseStats []CharacterStats
+var BaseStats [12]CharacterStats
 
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
@@ -210,20 +213,34 @@ func loadParameterFiles() {
 // Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
 // all seem to rely on this file, so we'll do the same.
 func loadBaseStats() {
-	// 12 different character classes.
-	BaseStats = make([]CharacterStats, 12)
-	statsFile, err := os.Open("parameters/PlyLevelTbl.prs")
+	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
+	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
 		log.Error("Error reading stats file: "+err.Error(), logger.LogPriorityCritical)
 		os.Exit(1)
 	}
-	// Each struct is 16 bytes long; hardcoded for convenience.
-	compressed := make([]byte, 16*12)
-	if _, err = statsFile.Read(compressed); err != nil {
-		log.Error("Error reading stats file: "+err.Error(), logger.LogPriorityCritical)
-		os.Exit(1)
-	}
-	statsFile.Close()
+	decompressedSize := prs.DecompressSize(compressed)
+	decompressed := make([]byte, decompressedSize)
+	prs.Decompress(compressed, decompressed)
 
-	// TODO: PRS decompression
+	// var chars = map[int]string{
+	// 	0:  "Humar",
+	// 	1:  "Hunewearl",
+	// 	2:  "Hucast",
+	// 	3:  "Ramar",
+	// 	4:  "Racast",
+	// 	5:  "Racaseal",
+	// 	6:  "Fomarl",
+	// 	7:  "Fonewm",
+	// 	8:  "Fonewearl",
+	// 	9:  "Hucaseal",
+	// 	10: "Fomar",
+	// 	11: "Ramarl",
+	// }
+
+	for i := 0; i < 12; i++ {
+		util.StructFromBytes(decompressed[i*14:], &BaseStats[i])
+		// j, err := json.Marshal(BaseStats[i])
+		// fmt.Printf("\"%s\" : %s,\n", chars[i], j)
+	}
 }
