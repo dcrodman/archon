@@ -174,7 +174,6 @@ func handleCharacterSelect(client *LoginClient) error {
 	util.StructFromBytes(client.recvData[:], &pkt)
 	prev := new(CharacterPreview)
 
-	// TODO: Need name color chsm and possibly unknown
 	archondb := GetConfig().Database()
 	var gc, name []uint8
 	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
