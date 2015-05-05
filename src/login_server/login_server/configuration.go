@@ -80,6 +80,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
+	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 
 	json.Unmarshal(data, config)
