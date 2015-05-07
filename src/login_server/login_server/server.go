@@ -121,8 +121,8 @@ func newClient(conn *net.TCPConn) (*LoginClient, error) {
 
 	client.clientCrypt = encryption.NewCrypt()
 	client.serverCrypt = encryption.NewCrypt()
-	client.clientCrypt.CreateKeys()
-	client.serverCrypt.CreateKeys()
+	client.clientCrypt.CreateBBKeys()
+	client.serverCrypt.CreateBBKeys()
 
 	client.recvData = make([]byte, 2048)
 
