@@ -31,7 +31,9 @@ var copyrightBytes []byte = make([]byte, 96)
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType = 0x02
+	WelcomeType    = 0x02
+	WelcomeAckType = 0x04 // sent
+	LoginType      = 0x04 // received
 )
 
 // Packet header for every packet sent between the server and BlueBurst clients.
@@ -91,10 +93,21 @@ func SendWelcome(client *PatchClient) int {
 	return SendPacket(client, data, uint16(size))
 }
 
+func SendWelcomeAck(client *PatchClient) int {
+	pkt := new(BBPktHeader)
+	pkt.Size = 0x04
+	pkt.Type = WelcomeAckType
+	data, _ := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Welcome Ack")
+	}
+	return SendEncrypted(client, data, 0x0004)
+}
+
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
 func fixLength(data []byte, length uint16) uint16 {
-	for length%8 != 0 {
+	for length%4 != 0 {
 		length++
 		_ = append(data, 0)
 	}

@@ -79,9 +79,12 @@ func processPatchPacket(client *PatchClient) error {
 		util.PrintPayload(client.recvData, int(pktHeader.Size))
 		fmt.Println()
 	}
-
 	var err error = nil
 	switch pktHeader.Type {
+	case WelcomeType:
+		SendWelcomeAck(client)
+	case LoginType:
+
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)
