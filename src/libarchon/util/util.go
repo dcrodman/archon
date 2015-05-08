@@ -30,6 +30,18 @@ import (
 
 const displayWidth = 16
 
+// Expands an array of UTF-16 elements to a slice of uint8 elements in
+// little endian order. E.g: [0x1234] -> [0x34, 0x12]
+func ExpandUtf16(src []uint16) []uint8 {
+	expanded := make([]uint8, 2*len(src))
+	for i, v := range src {
+		idx := i * 2
+		expanded[idx] = uint8(v)
+		expanded[idx+1] = uint8((v >> 8) & 0xFF)
+	}
+	return expanded
+}
+
 // Returns a slice of b without the trailing 0s.
 func StripPadding(b []byte) []byte {
 	for i := len(b) - 1; i >= 0; i-- {
