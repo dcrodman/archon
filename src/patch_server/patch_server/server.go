@@ -84,7 +84,8 @@ func processPatchPacket(client *PatchClient) error {
 	case WelcomeType:
 		SendWelcomeAck(client)
 	case LoginType:
-
+		// Send welcome message and redirect
+		SendWelcomeMessage(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)

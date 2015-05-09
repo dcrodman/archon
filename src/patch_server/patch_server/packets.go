@@ -27,13 +27,14 @@ import (
 const BBHeaderSize = 0x04
 const bbCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
 
-var copyrightBytes []byte = make([]byte, 96)
+var copyrightBytes []byte
 
 // Packet types for packets sent to and from the login and character servers.
 const (
 	WelcomeType    = 0x02
 	WelcomeAckType = 0x04 // sent
 	LoginType      = 0x04 // received
+	MessageType    = 0x13
 )
 
 // Packet header for every packet sent between the server and BlueBurst clients.
@@ -49,6 +50,12 @@ type WelcomePkt struct {
 	Padding      [20]byte
 	ServerVector [4]byte
 	ClientVector [4]byte
+}
+
+// Packet containing the patch server welcome message.
+type WelcomeMessage struct {
+	Header  BBPktHeader
+	Message []byte
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -104,6 +111,20 @@ func SendWelcomeAck(client *PatchClient) int {
 	return SendEncrypted(client, data, 0x0004)
 }
 
+func SendWelcomeMessage(client *PatchClient) int {
+	cfg := GetConfig()
+	pkt := new(WelcomeMessage)
+	pkt.Header.Type = MessageType
+	pkt.Header.Size = BBHeaderSize + cfg.MessageSize
+	pkt.Message = cfg.MessageBytes
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Welcome Message")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
 func fixLength(data []byte, length uint16) uint16 {
@@ -117,5 +138,5 @@ func fixLength(data []byte, length uint16) uint16 {
 }
 
 func init() {
-	copy(copyrightBytes, bbCopyright)
+	copyrightBytes = []byte(bbCopyright)
 }

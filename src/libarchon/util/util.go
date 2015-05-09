@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"unicode/utf16"
 )
 
 const displayWidth = 16
@@ -40,6 +41,12 @@ func ExpandUtf16(src []uint16) []uint8 {
 		expanded[idx+1] = uint8((v >> 8) & 0xFF)
 	}
 	return expanded
+}
+
+// Convert a UTF-8 string to UTF-16 LE and return it as an array of bytes.
+func ConvertToUtf16(str string) []byte {
+	strRunes := bytes.Runes([]byte(str))
+	return ExpandUtf16(utf16.Encode(strRunes))
 }
 
 // Returns a slice of b without the trailing 0s.

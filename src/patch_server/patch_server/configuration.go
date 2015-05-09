@@ -25,10 +25,12 @@ package patch_server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"libarchon/logger"
+	"libarchon/util"
 	"os"
 	"strconv"
 	"strings"
@@ -51,6 +53,8 @@ type configuration struct {
 	database        *sql.DB
 	logWriter       io.Writer
 	cachedHostBytes [4]byte
+	MessageBytes    []byte
+	MessageSize     uint16
 }
 
 // Singleton instance.
@@ -79,6 +83,15 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Logfile = "Standard Out"
 
 	json.Unmarshal(data, config)
+
+	// Convert the welcome message to UTF-16LE and cache it.
+	config.MessageBytes = util.ConvertToUtf16(config.WelcomeMessage)
+	msgLen := len(config.MessageBytes)
+	// Sanity check, the message can't exceed the max size of a packet.
+	if msgLen > (1 << 16) {
+		return errors.New("Message length must be less than 65,000 characters")
+	}
+	config.MessageSize = uint16(msgLen)
 
 	if config.LogLevel < logger.LogPriorityCritical || config.LogLevel > logger.LogPriorityLow {
 		// The log level must be at least open to critical messages.
