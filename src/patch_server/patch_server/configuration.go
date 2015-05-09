@@ -42,8 +42,8 @@ const patchConfigFile = "patch_config.json"
 // Configuration structure that can be shared between the Patch and Data servers.
 type configuration struct {
 	Hostname       string
-	DataPort       string
 	PatchPort      string
+	DataPort       string
 	PatchDir       string
 	WelcomeMessage string
 	Logfile        string
@@ -53,6 +53,7 @@ type configuration struct {
 	database        *sql.DB
 	logWriter       io.Writer
 	cachedHostBytes [4]byte
+	redirectPort    uint16
 	MessageBytes    []byte
 	MessageSize     uint16
 }
@@ -97,6 +98,9 @@ func (config *configuration) InitFromFile(fileName string) error {
 		// The log level must be at least open to critical messages.
 		config.LogLevel = logger.LogPriorityCritical
 	}
+	// Convert the data port to a BE uint for the redirect packet.
+	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
+	config.redirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 
 	if config.Logfile != "Standard Out" {
 		config.logWriter, err = os.OpenFile(config.Logfile,
@@ -123,6 +127,11 @@ func (config *configuration) HostnameBytes() [4]byte {
 		}
 	}
 	return config.cachedHostBytes
+}
+
+// Convenience method; returns a uint16 representation of the Character port.
+func (config *configuration) RedirectPort() uint16 {
+	return config.redirectPort
 }
 
 func (config *configuration) String() string {

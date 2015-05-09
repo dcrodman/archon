@@ -33,6 +33,8 @@ import (
 
 var log *logger.Logger
 
+type pktHandler func(p *PatchClient) error
+
 // Struct for holding client-specific data.
 type PatchClient struct {
 	conn   *net.TCPConn
@@ -84,7 +86,31 @@ func processPatchPacket(client *PatchClient) error {
 	case WelcomeType:
 		SendWelcomeAck(client)
 	case LoginType:
-		// Send welcome message and redirect
+		cfg := GetConfig()
+		if SendWelcomeMessage(client) == 0 {
+			SendRedirect(client, cfg.RedirectPort(), cfg.HostnameBytes())
+		}
+	default:
+		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		log.Info(msg, logger.LogPriorityMedium)
+	}
+	return err
+}
+
+func processDataPacket(client *PatchClient) error {
+	var pktHeader BBPktHeader
+	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
+
+	if GetConfig().DebugMode {
+		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		fmt.Println()
+	}
+	var err error = nil
+	switch pktHeader.Type {
+	case WelcomeType:
+		SendWelcomeAck(client)
+	case LoginType:
 		SendWelcomeMessage(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
@@ -95,7 +121,7 @@ func processPatchPacket(client *PatchClient) error {
 
 // Handle communication with a particular client until the connection is closed or an
 // error is encountered.
-func handlePatchClient(client *PatchClient) {
+func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
@@ -104,10 +130,10 @@ func handlePatchClient(client *PatchClient) {
 		}
 		client.conn.Close()
 		patchConnections.RemoveClient(client)
-		log.Info("Disconnected PATCH client "+client.ipAddr, logger.LogPriorityMedium)
+		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.LogPriorityMedium)
 	}()
 
-	log.Info("Accepted PATCH connection from "+client.ipAddr, logger.LogPriorityMedium)
+	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.LogPriorityMedium)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
@@ -154,7 +180,7 @@ func handlePatchClient(client *PatchClient) {
 				client.recvData[BBHeaderSize:client.packetSize],
 				uint32(client.packetSize-BBHeaderSize))
 		}
-		if err := processPatchPacket(client); err != nil {
+		if err := handler(client); err != nil {
 			log.Info(err.Error(), logger.LogPriorityLow)
 			break
 		}
@@ -190,7 +216,7 @@ func startPatch(wg *sync.WaitGroup) {
 			continue
 		}
 		patchConnections.AddClient(client)
-		go handlePatchClient(client)
+		go handleClient(client, "PATCH", processPatchPacket)
 	}
 	wg.Done()
 }
@@ -217,7 +243,7 @@ func startData(wg *sync.WaitGroup) {
 			continue
 		}
 		patchConnections.AddClient(client)
-		go handlePatchClient(client)
+		go handleClient(client, "DATA", processDataPacket)
 	}
 	wg.Done()
 }

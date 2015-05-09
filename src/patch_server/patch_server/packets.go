@@ -35,6 +35,7 @@ const (
 	WelcomeAckType = 0x04 // sent
 	LoginType      = 0x04 // received
 	MessageType    = 0x13
+	RedirectType   = 0x14
 )
 
 // Packet header for every packet sent between the server and BlueBurst clients.
@@ -56,6 +57,14 @@ type WelcomePkt struct {
 type WelcomeMessage struct {
 	Header  BBPktHeader
 	Message []byte
+}
+
+// The address of the next server; in this case, the character server.
+type RedirectPacket struct {
+	Header  BBPktHeader
+	IPAddr  [4]uint8
+	Port    uint16
+	Padding uint16
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -121,6 +130,20 @@ func SendWelcomeMessage(client *PatchClient) int {
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Welcome Message")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send the redirect packet, providing the IP and port of the next server.
+func SendRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
+	pkt := new(RedirectPacket)
+	pkt.Header.Type = RedirectType
+	copy(pkt.IPAddr[:], ipAddr[:])
+	pkt.Port = port
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Redirect Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }
