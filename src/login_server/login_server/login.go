@@ -29,7 +29,6 @@ import (
 	"libarchon/util"
 	"os"
 	"runtime/debug"
-	"strconv"
 	"sync"
 )
 
@@ -64,10 +63,8 @@ func handleLogin(client *LoginClient) error {
 	client.config.Magic = 0x48615467
 
 	config := GetConfig()
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-	SendRedirect(client, uint16(charPort), config.HostnameBytes())
-
+	SendRedirect(client, uint16(config.RedirectPort()), config.HostnameBytes())
 	return nil
 }
 
