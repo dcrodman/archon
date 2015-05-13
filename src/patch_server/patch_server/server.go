@@ -21,13 +21,16 @@ package patch_server
 import (
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
+	"io/ioutil"
 	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/util"
 	"net"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 )
 
@@ -52,6 +55,36 @@ func (lc PatchClient) IPAddr() string           { return lc.ipAddr }
 
 var patchConnections *util.ConnectionList = util.NewClientList()
 
+// Data for one patch file.
+type PatchEntry struct {
+	filename string
+	checksum uint32
+	fileSize uint32
+	index    uint32
+	dirSteps byte
+	pathDirs []string
+}
+
+// Basic tree structure for holding patch data that more closely represents
+// a file hierarchy and makes it easier to handle the client working dir.
+// Patch files and subdirectories are represented as lists in order to make
+// a breadth-first search easier and the order predictable.
+type PatchDir struct {
+	dirname string
+	patches []*PatchEntry
+	subdirs []*PatchDir
+}
+
+// File names that should be ignored when searching for patch files. This
+// could also be an array but the map makes it quicker to compare.
+var SkipPaths = map[string]byte{".": 1, "..": 1, ".DS_Store": 1, ".rid": 1}
+
+// Each index corresponds to a patch file. This is constructed in the order
+// that the patch tree will be traversed and makes it faster to locate a
+// patch entry when the client sends us an index in the FileStatusPacket.
+var patchTree PatchDir
+var patchIndex []*PatchEntry
+
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	client := new(PatchClient)
@@ -72,8 +105,39 @@ func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	return client, err
 }
 
+// Traverse the patch tree depth-first and send the check file requests.
+func sendFileList(client *PatchClient, node *PatchDir) {
+	// Step into the next directory.
+	SendChangeDir(client, node.dirname)
+	for _, subdir := range node.subdirs {
+		sendFileList(client, subdir)
+	}
+	fmt.Printf("Dir: %s\n", node.dirname)
+	for _, patch := range node.patches {
+		fmt.Printf("File: %s\n", patch.filename)
+		SendCheckFile(client, patch.index, patch.filename)
+	}
+	// Move them back up each time we leave a directory.
+	SendDirAbove(client)
+}
+
+// The client sent us a checksum for one of the patch files. Compare it
+// to what we have and add it to the list of files to update if there
+// is any discrepancy.
+func handleFileStatus(client *PatchClient) {
+	var fileStatus FileStatusPacket
+	util.StructFromBytes(client.recvData[:], &fileStatus)
+
+	patch := patchIndex[fileStatus.PatchId]
+	fmt.Printf("Checking file %s\n", patch.filename)
+	if fileStatus.Checksum != patch.checksum || fileStatus.FileSize != patch.fileSize {
+		fmt.Printf("Needs update\n")
+	}
+}
+
+// Handle a packet sent to the PATCH server.
 func processPatchPacket(client *PatchClient) error {
-	var pktHeader BBPktHeader
+	var pktHeader PCPktHeader
 	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
@@ -91,14 +155,15 @@ func processPatchPacket(client *PatchClient) error {
 			SendRedirect(client, cfg.RedirectPort(), cfg.HostnameBytes())
 		}
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %2x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)
 	}
 	return err
 }
 
+// Handle a packet sent to the DATA server.
 func processDataPacket(client *PatchClient) error {
-	var pktHeader BBPktHeader
+	var pktHeader PCPktHeader
 	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
@@ -111,16 +176,20 @@ func processDataPacket(client *PatchClient) error {
 	case WelcomeType:
 		SendWelcomeAck(client)
 	case LoginType:
-		SendWelcomeMessage(client)
+		SendDataAck(client)
+		sendFileList(client, &patchTree)
+		SendFileListDone(client)
+	case FileStatusType:
+		handleFileStatus(client)
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %02x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)
 	}
 	return err
 }
 
-// Handle communication with a particular client until the connection is closed or an
-// error is encountered.
+// Handle communication with a particular client until the connection is
+// closed or an error is encountered.
 func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -248,10 +317,62 @@ func startData(wg *sync.WaitGroup) {
 	wg.Done()
 }
 
+// Recursively build the list of patch files present in the patch directory
+// to sync with the client. Files are represented in a tree, directories act
+// as nodes (PatchDir) and each keeps a list of patches/subdirectories.
+func loadPatches(node *PatchDir, path string) error {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		fmt.Printf("Couldn't parse %s\n", path)
+		return err
+	}
+	dirs := strings.Split(path, "/")
+	node.dirname = dirs[len(dirs)-1]
+
+	for _, file := range files {
+		filename := file.Name()
+		if _, ignore := SkipPaths[filename]; ignore {
+			continue
+		} else if file.IsDir() {
+			subdir := new(PatchDir)
+			node.subdirs = append(node.subdirs, subdir)
+			loadPatches(subdir, path+"/"+filename)
+		} else {
+			data, err := ioutil.ReadFile(path + "/" + filename)
+			if err != nil {
+				return err
+			}
+			patch := new(PatchEntry)
+			patch.filename = filename
+			patch.fileSize = uint32(file.Size())
+			patch.checksum = crc32.ChecksumIEEE(data)
+
+			node.patches = append(node.patches, patch)
+			fmt.Printf("%s (%d bytes, checksum: %v)\n",
+				path+"/"+filename, patch.fileSize, patch.checksum)
+		}
+	}
+	return nil
+}
+
+// Build the patch index, performing a depth-first search and mapping
+// each patch entry to an array so that they're quickly indexable when
+// we need to look up the patch data.
+func buildPatchIndex(node *PatchDir) {
+	for _, dir := range node.subdirs {
+		buildPatchIndex(dir)
+	}
+	for _, patch := range node.patches {
+		patchIndex = append(patchIndex, patch)
+		patch.index = uint32(len(patchIndex) - 1)
+	}
+}
+
 func StartServer() {
 	fmt.Println("Initializing Archon PATCH and DATA servers...")
-	config := GetConfig()
+
 	// Initialize our config singleton from one of two expected file locations.
+	config := GetConfig()
 	fmt.Printf("Loading config file %v...", patchConfigFile)
 	err := config.InitFromFile(patchConfigFile)
 	if err != nil {
@@ -261,10 +382,20 @@ func StartServer() {
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			fmt.Printf("%s\n", err.Error())
-			os.Exit(-1)
+			os.Exit(1)
 		}
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
+
+	// Construct our patch tree from the specified directory.
+	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
+	os.Chdir(config.PatchDir)
+	if err := loadPatches(&patchTree, "."); err != nil {
+		fmt.Printf("Failed to load patches: %s\n", err.Error())
+		os.Exit(1)
+	}
+	fmt.Println()
+	buildPatchIndex(&patchTree)
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
