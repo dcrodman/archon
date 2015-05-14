@@ -24,6 +24,7 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
+	"libarchon/debugging"
 	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/util"
@@ -110,12 +111,12 @@ func sendFileList(client *PatchClient, node *PatchDir) {
 	SendChangeDir(client, node.dirname)
 	for _, subdir := range node.subdirs {
 		sendFileList(client, subdir)
+		// Move them back up each time we leave a directory.
+		SendDirAbove(client)
 	}
 	for _, patch := range node.patches {
 		SendCheckFile(client, patch.index, patch.filename)
 	}
-	// Move them back up each time we leave a directory.
-	SendDirAbove(client)
 }
 
 // The client sent us a checksum for one of the patch files. Compare it
@@ -369,6 +370,8 @@ func StartServer() {
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
 	log.Info("Server Initialized", logger.LogPriorityCritical)
+
+	go debugging.CreateStackTraceServer("127.0.0.1:8080", "/")
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
