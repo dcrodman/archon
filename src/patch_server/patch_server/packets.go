@@ -24,7 +24,7 @@ import (
 	"libarchon/util"
 )
 
-const BBHeaderSize = 0x04
+const PCHeaderSize = 0x04
 const bbCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
 
 var copyrightBytes []byte
@@ -161,7 +161,7 @@ func SendWelcomeMessage(client *PatchClient) int {
 	cfg := GetConfig()
 	pkt := new(WelcomeMessage)
 	pkt.Header.Type = MessageType
-	pkt.Header.Size = BBHeaderSize + cfg.MessageSize
+	pkt.Header.Size = PCHeaderSize + cfg.MessageSize
 	pkt.Message = cfg.MessageBytes
 
 	data, size := util.BytesFromStruct(pkt)

@@ -136,7 +136,7 @@ func handleFileStatus(client *PatchClient) {
 // Handle a packet sent to the PATCH server.
 func processPatchPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
+	util.StructFromBytes(client.recvData[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
@@ -162,7 +162,7 @@ func processPatchPacket(client *PatchClient) error {
 // Handle a packet sent to the DATA server.
 func processDataPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
+	util.StructFromBytes(client.recvData[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
@@ -205,7 +205,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	// and not interfere with any other clients.
 	for {
 		// Wait for the packet header.
-		for client.recvSize < BBHeaderSize {
+		for client.recvSize < PCHeaderSize {
 			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
 			if bytes == 0 || err == io.EOF {
 				// The client disconnected, we're done.
@@ -219,9 +219,9 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 			}
 
 			client.recvSize += bytes
-			if client.recvSize >= BBHeaderSize {
+			if client.recvSize >= PCHeaderSize {
 				// We have our header; decrypt it.
-				client.clientCrypt.Decrypt(client.recvData[:BBHeaderSize], BBHeaderSize)
+				client.clientCrypt.Decrypt(client.recvData[:PCHeaderSize], PCHeaderSize)
 				client.packetSize, err = util.GetPacketSize(client.recvData[:2])
 				if err != nil {
 					// Something is seriously wrong if this causes an error. Bail.
@@ -242,10 +242,10 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 		}
 
 		// We have the whole thing; decrypt the rest of it if needed and pass it along.
-		if client.packetSize > BBHeaderSize {
+		if client.packetSize > PCHeaderSize {
 			client.clientCrypt.Decrypt(
-				client.recvData[BBHeaderSize:client.packetSize],
-				uint32(client.packetSize-BBHeaderSize))
+				client.recvData[PCHeaderSize:client.packetSize],
+				uint32(client.packetSize-PCHeaderSize))
 		}
 		if err := handler(client); err != nil {
 			log.Info(err.Error(), logger.LogPriorityLow)
