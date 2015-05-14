@@ -15,24 +15,21 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
-*
-* Packet operations common among the various servers.
+* Debugging utilities for server admins.
  */
-package util
+package debugging
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
+	"net/http"
+	"runtime/pprof"
 )
 
-// Extract the packet length from the first two bytes of data.
-func GetPacketSize(data []byte) (uint16, error) {
-	if len(data) < 2 {
-		return 0, errors.New("getSize(): data must be at least two bytes.")
-	}
-	var size uint16
-	reader := bytes.NewReader(data)
-	binary.Read(reader, binary.LittleEndian, &size)
-	return size, nil
+// Creates a simple Http server on host, listening for requests to the url
+// at path. Responses are dumps from pprof containing the stack traces of
+// all running goroutines.
+func CreateStackTraceServer(host, path string) {
+	http.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
+		pprof.Lookup("goroutine").WriteTo(resp, 1)
+	})
+	http.ListenAndServe(host, nil)
 }

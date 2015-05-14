@@ -27,7 +27,7 @@ import (
 
 // Client interface to make it possible to share common client-related
 // functionality between servers without exposing the server-specific config.
-type ServerClient interface {
+type PSOClient interface {
 	Connection() *net.TCPConn
 	IPAddr() string
 }
@@ -45,13 +45,13 @@ func NewClientList() *ConnectionList {
 	return newList
 }
 
-func (cl *ConnectionList) AddClient(c ServerClient) {
+func (cl *ConnectionList) AddClient(c PSOClient) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
 	cl.mutex.Unlock()
 }
 
-func (cl *ConnectionList) HasClient(c ServerClient) bool {
+func (cl *ConnectionList) HasClient(c PSOClient) bool {
 	found := false
 	cl.mutex.RLock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
@@ -64,7 +64,7 @@ func (cl *ConnectionList) HasClient(c ServerClient) bool {
 	return found
 }
 
-func (cl *ConnectionList) RemoveClient(c ServerClient) {
+func (cl *ConnectionList) RemoveClient(c PSOClient) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
@@ -76,7 +76,10 @@ func (cl *ConnectionList) RemoveClient(c ServerClient) {
 }
 
 func (cl *ConnectionList) Count() int {
-	return cl.clientList.Len()
+	cl.mutex.RLock()
+	length := cl.clientList.Len()
+	cl.mutex.Unlock()
+	return length
 }
 
 // Create a TCP socket that is listening and ready to Accept().

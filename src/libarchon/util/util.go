@@ -23,6 +23,7 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -30,6 +31,17 @@ import (
 )
 
 const displayWidth = 16
+
+// Extract the packet length from the first two bytes of data.
+func GetPacketSize(data []byte) (uint16, error) {
+	if len(data) < 2 {
+		return 0, errors.New("getSize(): data must be at least two bytes.")
+	}
+	var size uint16
+	reader := bytes.NewReader(data)
+	binary.Read(reader, binary.LittleEndian, &size)
+	return size, nil
+}
 
 // Expands an array of UTF-16 elements to a slice of uint8 elements in
 // little endian order. E.g: [0x1234] -> [0x34, 0x12]
