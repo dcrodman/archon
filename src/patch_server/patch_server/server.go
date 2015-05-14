@@ -35,6 +35,7 @@ import (
 )
 
 var log *logger.Logger
+var patchConnections *util.ConnectionList = util.NewClientList()
 
 type pktHandler func(p *PatchClient) error
 
@@ -52,8 +53,6 @@ type PatchClient struct {
 
 func (lc PatchClient) Connection() *net.TCPConn { return lc.conn }
 func (lc PatchClient) IPAddr() string           { return lc.ipAddr }
-
-var patchConnections *util.ConnectionList = util.NewClientList()
 
 // Data for one patch file.
 type PatchEntry struct {
@@ -112,9 +111,7 @@ func sendFileList(client *PatchClient, node *PatchDir) {
 	for _, subdir := range node.subdirs {
 		sendFileList(client, subdir)
 	}
-	fmt.Printf("Dir: %s\n", node.dirname)
 	for _, patch := range node.patches {
-		fmt.Printf("File: %s\n", patch.filename)
 		SendCheckFile(client, patch.index, patch.filename)
 	}
 	// Move them back up each time we leave a directory.
@@ -263,17 +260,16 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	}
 }
 
-// Main worker for the patch server. Creates the socket and starts listening for connections,
-// spawning off client threads to handle communications for each client.
-func startPatch(wg *sync.WaitGroup) {
-	patchConfig := GetConfig()
-	socket, err := util.OpenSocket(patchConfig.Hostname, patchConfig.PatchPort)
+// Creates the socket and starts listening for connections on the specified
+// port, spawning off goroutines to handle communications for each client.
+func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
+	cfg := GetConfig()
+	socket, err := util.OpenSocket(cfg.Hostname, port)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for PATCH connections on %s:%s...\n",
-		patchConfig.Hostname, patchConfig.PatchPort)
+	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
 	for {
 		connection, err := socket.AcceptTCP()
 		if err != nil {
@@ -285,34 +281,7 @@ func startPatch(wg *sync.WaitGroup) {
 			continue
 		}
 		patchConnections.AddClient(client)
-		go handleClient(client, "PATCH", processPatchPacket)
-	}
-	wg.Done()
-}
-
-// Main worker for the data server. Creates the socket and starts listening for connections,
-// spawning off client threads to handle communications for each client.
-func startData(wg *sync.WaitGroup) {
-	patchConfig := GetConfig()
-	socket, err := util.OpenSocket(patchConfig.Hostname, patchConfig.DataPort)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-	fmt.Printf("Waiting for DATA connections on %s:%s...\n",
-		patchConfig.Hostname, patchConfig.DataPort)
-	for {
-		connection, err := socket.AcceptTCP()
-		if err != nil {
-			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
-			continue
-		}
-		client, err := newClient(connection)
-		if err != nil {
-			continue
-		}
-		patchConnections.AddClient(client)
-		go handleClient(client, "DATA", processDataPacket)
+		go handleClient(client, id, handler)
 	}
 	wg.Done()
 }
@@ -404,7 +373,7 @@ func StartServer() {
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go startPatch(&wg)
-	go startData(&wg)
+	go startWorker(&wg, "PATCH", config.PatchPort, processPatchPacket)
+	go startWorker(&wg, "DATA", config.DataPort, processDataPacket)
 	wg.Wait()
 }
