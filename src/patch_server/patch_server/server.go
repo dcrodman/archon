@@ -206,7 +206,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	for {
 		// Wait for the packet header.
 		for client.recvSize < PCHeaderSize {
-			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
+			bytes, err := client.conn.Read(client.recvData[client.recvSize:PCHeaderSize])
 			if bytes == 0 || err == io.EOF {
 				// The client disconnected, we're done.
 				client.conn.Close()
@@ -217,8 +217,8 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 					logger.LogPriorityMedium)
 				return
 			}
-
 			client.recvSize += bytes
+
 			if client.recvSize >= PCHeaderSize {
 				// We have our header; decrypt it.
 				client.clientCrypt.Decrypt(client.recvData[:PCHeaderSize], PCHeaderSize)
@@ -227,12 +227,20 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 					// Something is seriously wrong if this causes an error. Bail.
 					panic(err.Error())
 				}
+				// PSO likes to occasionally send us packets that are longer than their
+				// declared size. Adjust the expected length just in case in order to
+				// avoid leaving stray bytes in the buffer.
+				for client.packetSize%PCHeaderSize != 0 {
+					client.packetSize++
+				}
 			}
 		}
 
-		// Wait until we have the entire packet.
+		// Read in the rest of the packet.
 		for client.recvSize < int(client.packetSize) {
-			bytes, err := client.conn.Read(client.recvData[client.recvSize:])
+			remaining := int(client.packetSize) - client.recvSize
+			bytes, err := client.conn.Read(
+				client.recvData[client.recvSize : client.recvSize+remaining])
 			if err != nil {
 				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
 					logger.LogPriorityMedium)
@@ -252,10 +260,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 			break
 		}
 
-		// Alternatively, we could set the slice to to nil here and make() a new one in order
-		// to allow the garbage collector to handle cleanup, but I expect that would have a
-		// noticable impact on performance. Instead, we're going to clear it manually.
-		util.ZeroSlice(client.recvData, client.recvSize)
+		// Extra bytes left in the buffer will just be ignored.
 		client.recvSize = 0
 		client.packetSize = 0
 	}
