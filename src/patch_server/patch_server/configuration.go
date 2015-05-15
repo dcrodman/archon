@@ -82,11 +82,14 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.PatchPort = "11000"
 	config.DataPort = "11001"
 	config.Logfile = "Standard Out"
+	config.WelcomeMessage = "Unconfigured Welcome Message"
 
 	json.Unmarshal(data, config)
 
 	// Convert the welcome message to UTF-16LE and cache it.
 	config.MessageBytes = util.ConvertToUtf16(config.WelcomeMessage)
+	// PSOBB expects this prefix to the message, not completely sure why...
+	config.MessageBytes = append([]byte{0xFF, 0xFE}, config.MessageBytes...)
 	msgLen := len(config.MessageBytes)
 	// Sanity check, the message can't exceed the max size of a packet.
 	if msgLen > (1 << 16) {
