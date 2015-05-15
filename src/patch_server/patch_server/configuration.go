@@ -79,8 +79,8 @@ func (config *configuration) InitFromFile(fileName string) error {
 	}
 	// Provide default values for fields that are optional or critical.
 	config.Hostname = "127.0.0.1"
-	config.PatchPort = "12000"
-	config.DataPort = "12001"
+	config.PatchPort = "11000"
+	config.DataPort = "11001"
 	config.Logfile = "Standard Out"
 
 	json.Unmarshal(data, config)
