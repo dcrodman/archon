@@ -19,6 +19,7 @@
 package patch_server
 
 import (
+	"errors"
 	"fmt"
 	"libarchon/logger"
 	"libarchon/util"
@@ -31,17 +32,23 @@ var copyrightBytes []byte
 
 // Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType      = 0x02
-	WelcomeAckType   = 0x04 // sent
-	LoginType        = 0x04 // received
-	MessageType      = 0x13
-	RedirectType     = 0x14
-	DataAckType      = 0x0B
-	SetDirAboveType  = 0x0A
-	ChangeDirType    = 0x09
-	CheckFileType    = 0x0C
-	FileListDoneType = 0x0D
-	FileStatusType   = 0x0F
+	WelcomeType        = 0x02
+	WelcomeAckType     = 0x04 // sent
+	LoginType          = 0x04 // received
+	MessageType        = 0x13
+	RedirectType       = 0x14
+	DataAckType        = 0x0B
+	SetDirAboveType    = 0x0A
+	ChangeDirType      = 0x09
+	CheckFileType      = 0x0C
+	FileListDoneType   = 0x0D
+	FileStatusType     = 0x0F
+	ClientListDoneType = 0x10
+	UpdateFilesType    = 0x11
+	FileHeaderType     = 0x06
+	FileChunkType      = 0x07
+	FileCompleteType   = 0x08
+	UpdateCompleteType = 0x12
 )
 
 // Blueburst, PC, and Gamecube clients all use a 4 byte header to communicate with the
@@ -93,6 +100,30 @@ type FileStatusPacket struct {
 	PatchId  uint32
 	Checksum uint32
 	FileSize uint32
+}
+
+// Size and number of files that need to be updated.
+type UpdateFilesPacket struct {
+	Header    PCPktHeader
+	TotalSize uint32
+	NumFiles  uint32
+}
+
+// File header for a series of file chunks.
+type FileHeaderPacket struct {
+	Header   PCPktHeader
+	Padding  uint32
+	FileSize uint32
+	Filename [48]byte
+}
+
+// Chunk of data from a file.
+type FileChunkPacket struct {
+	Header   PCPktHeader
+	Chunk    uint32
+	Checksum uint32
+	Size     uint32
+	Data     []byte
 }
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
@@ -234,6 +265,72 @@ func SendFileListDone(client *PatchClient) int {
 		fmt.Println("Sending List Done")
 	}
 	return SendHeader(client, FileListDoneType)
+}
+
+// Send the total number and cumulative size of files that need updating.
+func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
+	pkt := new(UpdateFilesPacket)
+	pkt.Header.Type = UpdateFilesType
+	pkt.NumFiles = num
+	pkt.TotalSize = totalSize
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Update Files")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send the header for a file we're about to update.
+func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
+	pkt := new(FileHeaderPacket)
+	pkt.Header.Type = FileHeaderType
+	pkt.FileSize = patch.fileSize
+	copy(pkt.Filename[:], patch.filename)
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending File Header")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send a chunk of file data.
+func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []byte) int {
+	if chunkSize > MaxChunkSize {
+		panic(errors.New("File chunk size exceeds maximum"))
+		log.Error("Attempted to send "+string(chunkSize)+
+			" byte chunk; max is "+string(MaxChunkSize),
+			logger.LogPriorityCritical)
+	}
+	pkt := new(FileChunkPacket)
+	pkt.Header.Type = FileChunkType
+	pkt.Chunk = chunk
+	pkt.Checksum = chksm
+	pkt.Size = chunkSize
+	pkt.Data = fdata[:chunkSize]
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending File Chunk")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Finished sending a particular file.
+func SendFileComplete(client *PatchClient) int {
+	if GetConfig().DebugMode {
+		fmt.Println("Sending File Complete")
+	}
+	return SendHeader(client, FileCompleteType)
+}
+
+// We've finished updating files.
+func SendUpdateComplete(client *PatchClient) int {
+	if GetConfig().DebugMode {
+		fmt.Println("Sending File Update Done")
+	}
+	return SendHeader(client, UpdateCompleteType)
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two

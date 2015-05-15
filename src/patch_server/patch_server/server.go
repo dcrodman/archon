@@ -38,18 +38,20 @@ import (
 var log *logger.Logger
 var patchConnections *util.ConnectionList = util.NewClientList()
 
+const MaxChunkSize = 24576
+
 type pktHandler func(p *PatchClient) error
 
 // Struct for holding client-specific data.
 type PatchClient struct {
-	conn   *net.TCPConn
-	ipAddr string
-
+	conn        *net.TCPConn
+	ipAddr      string
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
 	recvData    []byte
 	recvSize    int
 	packetSize  uint16
+	updateList  []*PatchEntry
 }
 
 func (lc PatchClient) Connection() *net.TCPConn { return lc.conn }
@@ -58,11 +60,12 @@ func (lc PatchClient) IPAddr() string           { return lc.ipAddr }
 // Data for one patch file.
 type PatchEntry struct {
 	filename string
-	checksum uint32
-	fileSize uint32
-	index    uint32
-	dirSteps byte
-	pathDirs []string
+	// Path relative to the patch dir for convenience.
+	relativePath string
+	pathDirs     []string
+	index        uint32
+	checksum     uint32
+	fileSize     uint32
 }
 
 // Basic tree structure for holding patch data that more closely represents
@@ -129,10 +132,62 @@ func handleFileStatus(client *PatchClient) {
 	util.StructFromBytes(client.recvData[:], &fileStatus)
 
 	patch := patchIndex[fileStatus.PatchId]
-	fmt.Printf("Checking file %s\n", patch.filename)
 	if fileStatus.Checksum != patch.checksum || fileStatus.FileSize != patch.fileSize {
-		fmt.Printf("Needs update\n")
+		client.updateList = append(client.updateList, patch)
 	}
+}
+
+// The client finished sending all of the file check packets. If they have
+// any files that need updating, now's the time to do it.
+func updateClientFiles(client *PatchClient) error {
+	var numFiles, totalSize uint32 = 0, 0
+	for _, patch := range client.updateList {
+		numFiles++
+		totalSize += patch.fileSize
+	}
+
+	// If we have any files to send, do it now.
+	if numFiles > 0 {
+		SendUpdateFiles(client, numFiles, totalSize)
+		SendChangeDir(client, ".")
+		chunkBuf := make([]byte, MaxChunkSize)
+
+		for _, patch := range client.updateList {
+			// Descend into the correct directory if needed.
+			ascendCtr := 0
+			for i := 1; i < len(patch.pathDirs); i++ {
+				ascendCtr++
+				SendChangeDir(client, patch.pathDirs[i])
+			}
+			SendFileHeader(client, patch)
+
+			// Divide the file into chunks and send each one.
+			chunks := int((patch.fileSize / MaxChunkSize) + 1)
+			file, err := os.Open(patch.relativePath)
+			if err != nil {
+				// Critical since this is most likely a filesystem error.
+				log.Error(err.Error(), logger.LogPriorityCritical)
+				return err
+			}
+			for i := 0; i < chunks; i++ {
+				bytes, err := file.ReadAt(chunkBuf, int64(MaxChunkSize*i))
+				if err != nil && err != io.EOF {
+					return err
+				}
+				chksm := crc32.ChecksumIEEE(chunkBuf)
+				SendFileChunk(client, uint32(i), chksm, uint32(bytes), chunkBuf)
+			}
+
+			SendFileComplete(client)
+			// Change back to the top level directory.
+			for ascendCtr > 0 {
+				ascendCtr--
+				SendDirAbove(client)
+			}
+		}
+	}
+	SendUpdateComplete(client)
+	return nil
 }
 
 // Handle a packet sent to the PATCH server.
@@ -181,6 +236,8 @@ func processDataPacket(client *PatchClient) error {
 		SendFileListDone(client)
 	case FileStatusType:
 		handleFileStatus(client)
+	case ClientListDoneType:
+		err = updateClientFiles(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %02x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)
@@ -321,6 +378,8 @@ func loadPatches(node *PatchDir, path string) error {
 			}
 			patch := new(PatchEntry)
 			patch.filename = filename
+			patch.relativePath = path + "/" + filename
+			patch.pathDirs = dirs
 			patch.fileSize = uint32(file.Size())
 			patch.checksum = crc32.ChecksumIEEE(data)
 
