@@ -95,7 +95,9 @@ func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	client.serverCrypt = encryption.NewCrypt()
 	client.clientCrypt.CreateKeys()
 	client.serverCrypt.CreateKeys()
-	client.recvData = make([]byte, 2048)
+	// The client doesn't send this server very big packets, so we can
+	// save some space and keep the buffer small.
+	client.recvData = make([]byte, 256)
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
