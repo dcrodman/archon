@@ -371,6 +371,10 @@ func StartServer() {
 	}
 	fmt.Println()
 	buildPatchIndex(&patchTree)
+	if len(patchIndex) < 1 {
+		fmt.Println("Failed: At least one patch file must be present.")
+		os.Exit(1)
+	}
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
