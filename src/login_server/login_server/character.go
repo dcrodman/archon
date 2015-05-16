@@ -196,6 +196,9 @@ func handleCharacterSelect(client *LoginClient) error {
 
 	if pkt.Selecting == 0x01 {
 		// They've selected a character from the menu.
+		client.config.CharSelected = 1
+		client.config.SlotNum = uint8(pkt.Slot)
+		SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 		SendCharacterAck(client, pkt.Slot, 0x01)
 	} else {
 		// They have a character in that slot; send the character preview.
@@ -317,6 +320,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// we know a character has been selected.
 	client.config.CharSelected = 1
 	client.config.SlotNum = uint8(charPkt.Slot)
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 
 	SendCharacterAck(client, charPkt.Slot, 0)
 	return nil
