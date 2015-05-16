@@ -34,7 +34,7 @@ const (
 	OptionsRequestType     = 0xE0
 	OptionsType            = 0xE2
 	CharPreviewReqType     = 0xE3
-	CharPreviewNoneType    = 0xE4
+	CharAckType            = 0xE4
 	CharPreviewType        = 0xE5
 	ChecksumType           = 0x01E8
 	ChecksumAckType        = 0x02E8
@@ -152,16 +152,18 @@ type OptionsPacket struct {
 	PlayerKeyConfig KeyTeamConfig
 }
 
-type CharPreviewRequestPacket struct {
-	Header  BBPktHeader
-	Slot    uint32
-	Padding uint32
+//
+type CharSelectionPacket struct {
+	Header    BBPktHeader
+	Slot      uint32
+	Selecting uint32
 }
 
-type CharPreviewNonePacket struct {
+// Acknowledge a character selection from the client or indicate an error.
+type CharAckPacket struct {
 	Header BBPktHeader
 	Slot   uint32
-	Error  uint32
+	Flag   uint32
 }
 
 // Sent in response to 0x01E8 to acknowledge a checksum (really it's just ignored).

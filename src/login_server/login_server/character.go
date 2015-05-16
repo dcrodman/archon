@@ -161,13 +161,15 @@ func handleKeyConfig(client *LoginClient) error {
 	return nil
 }
 
-// Handle the character preview. Will either return information about a character given
-// a particular slot in a 0xE5 response or indicate an empty slot via 0xE4.
+// Handle the character select/preview request. Will either return information
+// about a character given a particular slot in via 0xE5 response or ack the
+// selection with an 0xE4 (also used for an empty slot).
 func handleCharacterSelect(client *LoginClient) error {
-	var pkt CharPreviewRequestPacket
+	var pkt CharSelectionPacket
 	util.StructFromBytes(client.recvData[:], &pkt)
 	prev := new(CharacterPreview)
 
+	// Character preview request.
 	archondb := GetConfig().Database()
 	var gc, name []uint8
 	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
@@ -185,11 +187,16 @@ func handleCharacterSelect(client *LoginClient) error {
 
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot.
-		SendCharPreviewNone(client, pkt.Slot, 2)
+		SendCharacterAck(client, pkt.Slot, 2)
 		return nil
 	} else if err != nil {
 		log.DBError(err.Error())
 		return err
+	}
+
+	if pkt.Selecting == 0x01 {
+		// They've selected a character from the menu.
+		SendCharacterAck(client, pkt.Slot, 0x01)
 	} else {
 		// They have a character in that slot; send the character preview.
 		copy(prev.GuildcardStr[:], gc[:])
@@ -311,8 +318,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 	client.config.CharSelected = 1
 	client.config.SlotNum = uint8(charPkt.Slot)
 
-	// This packet is treated as an ack in this case?
-	SendCharPreviewNone(client, charPkt.Slot, 0)
+	SendCharacterAck(client, charPkt.Slot, 0)
 	return nil
 }
 

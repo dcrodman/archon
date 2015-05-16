@@ -132,11 +132,11 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 
 // Send the character preview acknowledgement packet to tell them that we don't
 // have any data for that slot.
-func SendCharPreviewNone(client *LoginClient, slotNum uint32, errVal uint32) int {
-	pkt := new(CharPreviewNonePacket)
-	pkt.Header.Type = CharPreviewNoneType
+func SendCharacterAck(client *LoginClient, slotNum uint32, flag uint32) int {
+	pkt := new(CharAckPacket)
+	pkt.Header.Type = CharAckType
 	pkt.Slot = slotNum
-	pkt.Error = errVal
+	pkt.Flag = flag
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
