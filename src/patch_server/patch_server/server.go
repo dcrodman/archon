@@ -24,9 +24,9 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
-	"libarchon/debugging"
 	"libarchon/encryption"
 	"libarchon/logger"
+	"libarchon/server"
 	"libarchon/util"
 	"net"
 	"os"
@@ -36,7 +36,7 @@ import (
 )
 
 var log *logger.Logger
-var patchConnections *util.ConnectionList = util.NewClientList()
+var patchConnections *server.ConnectionList = server.NewClientList()
 
 const MaxChunkSize = 24576
 
@@ -329,7 +329,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 // port, spawning off goroutines to handle communications for each client.
 func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 	cfg := GetConfig()
-	socket, err := util.OpenSocket(cfg.Hostname, port)
+	socket, err := server.OpenSocket(cfg.Hostname, port)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
@@ -442,7 +442,7 @@ func StartServer() {
 	log.Info("Server Initialized", logger.LogPriorityCritical)
 
 	if config.DebugMode {
-		go debugging.CreateStackTraceServer("127.0.0.1:8080", "/")
+		go server.CreateStackTraceServer("127.0.0.1:8080", "/")
 	}
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.

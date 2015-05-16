@@ -15,13 +15,16 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
+* Debugging utilities for server admins.
  */
-package util
+package server
 
 import (
 	"container/list"
 	"errors"
 	"net"
+	"net/http"
+	"runtime/pprof"
 	"sync"
 )
 
@@ -35,7 +38,32 @@ type PSOClient interface {
 // Synchronized list for maintaining a list of connected clients.
 type ConnectionList struct {
 	clientList *list.List
+	size       int
 	mutex      sync.RWMutex
+}
+
+// Creates a simple Http server on host, listening for requests to the url
+// at path. Responses are dumps from pprof containing the stack traces of
+// all running goroutines.
+func CreateStackTraceServer(host, path string) {
+	http.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
+		pprof.Lookup("goroutine").WriteTo(resp, 1)
+	})
+	http.ListenAndServe(host, nil)
+}
+
+// Opens a TCP socket on host:port and returns either an error or
+// a listener socket ready to Accept().
+func OpenSocket(host, port string) (*net.TCPListener, error) {
+	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
+	if err != nil {
+		return nil, errors.New("Error creating socket: " + err.Error())
+	}
+	socket, err := net.ListenTCP("tcp", hostAddress)
+	if err != nil {
+		return nil, errors.New("Error Listening on Socket: " + err.Error())
+	}
+	return socket, nil
 }
 
 // Factory method for creating new ConnectionLists.
@@ -48,6 +76,7 @@ func NewClientList() *ConnectionList {
 func (cl *ConnectionList) AddClient(c PSOClient) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
+	cl.size++
 	cl.mutex.Unlock()
 }
 
@@ -69,6 +98,7 @@ func (cl *ConnectionList) RemoveClient(c PSOClient) {
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
 			cl.clientList.Remove(client)
+			cl.size--
 			break
 		}
 	}
@@ -77,20 +107,7 @@ func (cl *ConnectionList) RemoveClient(c PSOClient) {
 
 func (cl *ConnectionList) Count() int {
 	cl.mutex.RLock()
-	length := cl.clientList.Len()
-	cl.mutex.Unlock()
+	length := cl.size
+	cl.mutex.RUnlock()
 	return length
-}
-
-// Create a TCP socket that is listening and ready to Accept().
-func OpenSocket(host, port string) (*net.TCPListener, error) {
-	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
-	if err != nil {
-		return nil, errors.New("Error creating socket: " + err.Error())
-	}
-	socket, err := net.ListenTCP("tcp", hostAddress)
-	if err != nil {
-		return nil, errors.New("Error Listening on Socket: " + err.Error())
-	}
-	return socket, nil
 }

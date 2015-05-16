@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"libarchon/logger"
+	"libarchon/server"
 	"libarchon/util"
 	"os"
 	"runtime/debug"
@@ -34,7 +35,7 @@ import (
 
 const ClientVersionString = "TethVer12510"
 
-var loginConnections *util.ConnectionList = util.NewClientList()
+var loginConnections *server.ConnectionList = server.NewClientList()
 
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := verifyAccount(client)
@@ -177,7 +178,7 @@ func handleLoginClient(client *LoginClient) {
 // spawning off client threads to handle communications for each client.
 func startLogin(wg *sync.WaitGroup) {
 	loginConfig := GetConfig()
-	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.LoginPort)
+	socket, err := server.OpenSocket(loginConfig.Hostname, loginConfig.LoginPort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)

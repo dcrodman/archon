@@ -28,9 +28,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"libarchon/debugging"
 	"libarchon/encryption"
 	"libarchon/logger"
+	"libarchon/server"
 	"libarchon/util"
 	"net"
 	"os"
@@ -165,7 +165,7 @@ func StartServer() {
 	defer config.CloseDb()
 
 	if config.DebugMode {
-		go debugging.CreateStackTraceServer("127.0.0.1:8081", "/")
+		go server.CreateStackTraceServer("127.0.0.1:8081", "/")
 	}
 
 	// Initialize the logger.

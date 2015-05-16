@@ -26,13 +26,14 @@ import (
 	"hash/crc32"
 	"io"
 	"libarchon/logger"
+	"libarchon/server"
 	"libarchon/util"
 	"os"
 	"runtime/debug"
 	"sync"
 )
 
-var charConnections *util.ConnectionList = util.NewClientList()
+var charConnections *server.ConnectionList = server.NewClientList()
 
 // Cached parameter data to avoid computing it every time.
 var paramHeaderData []byte
@@ -455,7 +456,7 @@ func startCharacter(wg *sync.WaitGroup) {
 	loadParameterFiles()
 	loadBaseStats()
 
-	socket, err := util.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
+	socket, err := server.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
