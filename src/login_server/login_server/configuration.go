@@ -44,6 +44,7 @@ type configuration struct {
 	LoginPort      string
 	CharacterPort  string
 	MaxConnections int
+	ParametersDir  string
 	DBHost         string
 	DBPort         string
 	DBName         string
@@ -83,6 +84,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
 	config.MaxConnections = 30000
+	config.ParametersDir = ServerConfigDir + "/parameters"
 	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 

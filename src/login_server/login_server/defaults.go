@@ -170,8 +170,9 @@ func loadParameterFiles() {
 	offset := 0
 	var tmpChunkData []byte
 
+	paramDir := GetConfig().ParametersDir
 	for _, paramFile := range ParamFiles {
-		data, err := ioutil.ReadFile("parameters/" + paramFile)
+		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
 			log.Error("Error reading parameter file: "+err.Error(),
 				logger.LogPriorityCritical)
