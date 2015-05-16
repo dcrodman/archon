@@ -32,6 +32,7 @@ import (
 // functionality between servers without exposing the server-specific config.
 type PSOClient interface {
 	Connection() *net.TCPConn
+	IPAddr() string
 }
 
 // Synchronized list for maintaining a list of connected clients.
@@ -79,11 +80,14 @@ func (cl *ConnectionList) AddClient(c PSOClient) {
 	cl.mutex.Unlock()
 }
 
+// Returns true if the list has a PSOClient matching the IP address of c.
+// Note that this comparison is by IP address, not element value.
 func (cl *ConnectionList) HasClient(c PSOClient) bool {
 	found := false
+	clAddr := c.IPAddr()
 	cl.mutex.RLock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
-		if client.Value == c {
+		if client.Value.(PSOClient).IPAddr() == clAddr {
 			found = true
 			break
 		}

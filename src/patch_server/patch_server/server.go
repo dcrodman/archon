@@ -46,6 +46,7 @@ type pktHandler func(p *PatchClient) error
 type PatchClient struct {
 	conn        *net.TCPConn
 	ipAddr      string
+	port        string
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
 	recvData    []byte
@@ -55,6 +56,7 @@ type PatchClient struct {
 }
 
 func (pc PatchClient) Connection() *net.TCPConn { return pc.conn }
+func (pc PatchClient) IPAddr() string           { return pc.ipAddr }
 func (pc PatchClient) Decrypt(data []byte, size uint32) {
 	pc.clientCrypt.Decrypt(data, size)
 }
@@ -94,7 +96,9 @@ var patchIndex []*PatchEntry
 func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	client := new(PatchClient)
 	client.conn = conn
-	client.ipAddr = conn.RemoteAddr().String()
+	addr := strings.Split(conn.RemoteAddr().String(), ":")
+	client.ipAddr = addr[0]
+	client.port = addr[1]
 
 	client.clientCrypt = encryption.NewCrypt()
 	client.serverCrypt = encryption.NewCrypt()

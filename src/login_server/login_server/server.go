@@ -36,6 +36,7 @@ import (
 	"net"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 )
 
@@ -47,6 +48,7 @@ var charConnections *server.ConnectionList = server.NewClientList()
 type LoginClient struct {
 	conn   *net.TCPConn
 	ipAddr string
+	port   string
 
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
@@ -66,6 +68,7 @@ type LoginClient struct {
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
+func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 
 type pktHandler func(p *LoginClient) error
 
@@ -123,7 +126,9 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 func newClient(conn *net.TCPConn) (*LoginClient, error) {
 	client := new(LoginClient)
 	client.conn = conn
-	client.ipAddr = conn.RemoteAddr().String()
+	addr := strings.Split(conn.RemoteAddr().String(), ":")
+	client.ipAddr = addr[0]
+	client.port = addr[1]
 
 	client.clientCrypt = encryption.NewCrypt()
 	client.serverCrypt = encryption.NewCrypt()
@@ -242,8 +247,13 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 			if err != nil {
 				continue
 			}
-			list.AddClient(client)
-			go handleClient(client, id, handler, list)
+			if list.HasClient(client) {
+				SendClientMessage(client, "This computer is already connected to the server.")
+				client.conn.Close()
+			} else {
+				list.AddClient(client)
+				go handleClient(client, id, handler, list)
+			}
 		}
 	}
 	wg.Done()

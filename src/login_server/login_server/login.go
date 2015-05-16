@@ -35,16 +35,6 @@ func handleLogin(client *LoginClient) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Already connected to the server?
-	/*
-		Broken since this will always be true by this point (need to check for
-		multiple occurrences)
-		if connections.HasClient(client) {
-			SendSecurity(client, BBLoginErrorUserInUse, 0)
-			return errors.New("Client already connected to login server")
-		}
-	*/
-
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
 	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
