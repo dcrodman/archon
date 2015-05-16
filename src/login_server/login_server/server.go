@@ -28,16 +28,20 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/server"
 	"libarchon/util"
 	"net"
 	"os"
+	"runtime/debug"
 	"sync"
 )
 
 var log *logger.Logger
+var loginConnections *server.ConnectionList = server.NewClientList()
+var charConnections *server.ConnectionList = server.NewClientList()
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -62,7 +66,8 @@ type LoginClient struct {
 }
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
-func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
+
+type pktHandler func(p *LoginClient) error
 
 // Handle account verification tasks common to both the login and character servers.
 func verifyAccount(client *LoginClient) (*LoginPkt, error) {
@@ -135,9 +140,119 @@ func newClient(conn *net.TCPConn) (*LoginClient, error) {
 	return client, err
 }
 
+// Handle communication with a particular client until the connection is
+// closed or an error is encountered.
+func handleClient(client *LoginClient, desc string, handler pktHandler, list *server.ConnectionList) {
+	defer func() {
+		if err := recover(); err != nil {
+			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
+				client.ipAddr, err, debug.Stack())
+			log.Error(errMsg, logger.LogPriorityCritical)
+		}
+		client.conn.Close()
+		list.RemoveClient(client)
+		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.LogPriorityMedium)
+	}()
+
+	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.LogPriorityMedium)
+	// We're running inside a goroutine at this point, so we can block on this connection
+	// and not interfere with any other clients.
+	for {
+		// Wait for the packet header.
+		for client.recvSize < BBHeaderSize {
+			bytes, err := client.conn.Read(client.recvData[client.recvSize:BBHeaderSize])
+			if bytes == 0 || err == io.EOF {
+				// The client disconnected, we're done.
+				client.conn.Close()
+				return
+			} else if err != nil {
+				// Socket error, nothing we can do now
+				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
+					logger.LogPriorityMedium)
+				return
+			}
+			client.recvSize += bytes
+
+			if client.recvSize >= BBHeaderSize {
+				// We have our header; decrypt it.
+				client.clientCrypt.Decrypt(client.recvData[:BBHeaderSize], BBHeaderSize)
+				client.packetSize, err = util.GetPacketSize(client.recvData[:2])
+				if err != nil {
+					// Something is seriously wrong if this causes an error. Bail.
+					panic(err.Error())
+				}
+				// PSO likes to occasionally send us packets that are longer than their
+				// declared size. Adjust the expected length just in case in order to
+				// avoid leaving stray bytes in the buffer.
+				for client.packetSize%BBHeaderSize != 0 {
+					client.packetSize++
+				}
+			}
+		}
+
+		// Read in the rest of the packet.
+		for client.recvSize < int(client.packetSize) {
+			remaining := int(client.packetSize) - client.recvSize
+			bytes, err := client.conn.Read(
+				client.recvData[client.recvSize : client.recvSize+remaining])
+			if err != nil {
+				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
+					logger.LogPriorityMedium)
+				return
+			}
+			client.recvSize += bytes
+		}
+
+		// We have the whole thing; decrypt the rest of it if needed and pass it along.
+		if client.packetSize > BBHeaderSize {
+			client.clientCrypt.Decrypt(
+				client.recvData[BBHeaderSize:client.packetSize],
+				uint32(client.packetSize-BBHeaderSize))
+		}
+		if err := handler(client); err != nil {
+			log.Info(err.Error(), logger.LogPriorityLow)
+			break
+		}
+
+		// Extra bytes left in the buffer will just be ignored.
+		client.recvSize = 0
+		client.packetSize = 0
+	}
+}
+
+// Creates the socket and starts listening for connections on the specified
+// port, spawning off goroutines to handle communications for each client.
+func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *server.ConnectionList) {
+	cfg := GetConfig()
+	socket, err := server.OpenSocket(cfg.Hostname, port)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
+	for {
+		// Poll until we can accept more clients.
+		for list.Count() < cfg.MaxConnections {
+			connection, err := socket.AcceptTCP()
+			if err != nil {
+				log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
+				continue
+			}
+			client, err := newClient(connection)
+			if err != nil {
+				continue
+			}
+			list.AddClient(client)
+			go handleClient(client, id, handler, list)
+		}
+	}
+	wg.Done()
+}
+
 func StartServer() {
 	fmt.Println("Initializing Archon LOGIN and CHARACTER servers...")
 	config := GetConfig()
+
 	// Initialize our config singleton from one of two expected file locations.
 	fmt.Printf("Loading config file %v...", loginConfigFile)
 	err := config.InitFromFile(loginConfigFile)
@@ -152,6 +267,13 @@ func StartServer() {
 		}
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
+
+	// Initialize the logger.
+	log = logger.New(config.logWriter, config.LogLevel)
+	log.Info("Server Initialized", logger.LogPriorityCritical)
+
+	loadParameterFiles()
+	loadBaseStats()
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
@@ -168,14 +290,10 @@ func StartServer() {
 		go server.CreateStackTraceServer("127.0.0.1:8081", "/")
 	}
 
-	// Initialize the logger.
-	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.LogPriorityCritical)
-
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go startLogin(&wg)
-	go startCharacter(&wg)
+	go startWorker(&wg, "LOGIN", config.LoginPort, processLoginPacket, loginConnections)
+	go startWorker(&wg, "CHARACTER", config.CharacterPort, processCharacterPacket, charConnections)
 	wg.Wait()
 }

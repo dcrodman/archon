@@ -54,8 +54,10 @@ type PatchClient struct {
 	updateList  []*PatchEntry
 }
 
-func (lc PatchClient) Connection() *net.TCPConn { return lc.conn }
-func (lc PatchClient) IPAddr() string           { return lc.ipAddr }
+func (pc PatchClient) Connection() *net.TCPConn { return pc.conn }
+func (pc PatchClient) Decrypt(data []byte, size uint32) {
+	pc.clientCrypt.Decrypt(data, size)
+}
 
 // Data for one patch file.
 type PatchEntry struct {

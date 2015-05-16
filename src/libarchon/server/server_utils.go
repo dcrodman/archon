@@ -32,7 +32,6 @@ import (
 // functionality between servers without exposing the server-specific config.
 type PSOClient interface {
 	Connection() *net.TCPConn
-	IPAddr() string
 }
 
 // Synchronized list for maintaining a list of connected clients.

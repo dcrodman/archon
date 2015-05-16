@@ -24,16 +24,9 @@ import (
 	"database/sql"
 	"fmt"
 	"hash/crc32"
-	"io"
 	"libarchon/logger"
-	"libarchon/server"
 	"libarchon/util"
-	"os"
-	"runtime/debug"
-	"sync"
 )
-
-var charConnections *server.ConnectionList = server.NewClientList()
 
 // Cached parameter data to avoid computing it every time.
 var paramHeaderData []byte
@@ -369,113 +362,4 @@ func processCharacterPacket(client *LoginClient) error {
 		log.Info(msg, logger.LogPriorityMedium)
 	}
 	return err
-}
-
-// Handle communication with a particular client until the connection is closed or an
-// error is encountered.
-func handleCharacterClient(client *LoginClient) {
-	defer func() {
-		if err := recover(); err != nil {
-			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
-				client.ipAddr, err, debug.Stack())
-			log.Error(errMsg, logger.LogPriorityCritical)
-		}
-		client.conn.Close()
-		charConnections.RemoveClient(client)
-		log.Info("Disconnected CHARACTER client "+client.ipAddr, logger.LogPriorityMedium)
-	}()
-
-	log.Info("Accepted CHARACTER connection from "+client.ipAddr, logger.LogPriorityMedium)
-	// We're running inside a goroutine at this point, so we can block on this connection
-	// and not interfere with any other clients.
-	for {
-		// Wait for the packet header.
-		for client.recvSize < BBHeaderSize {
-			bytes, err := client.conn.Read(client.recvData[client.recvSize:BBHeaderSize])
-			if bytes == 0 || err == io.EOF {
-				// The client disconnected, we're done.
-				client.conn.Close()
-				return
-			} else if err != nil {
-				// Socket error, nothing we can do now
-				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
-				return
-			}
-			client.recvSize += bytes
-
-			if client.recvSize >= BBHeaderSize {
-				// We have our header; decrypt it.
-				client.clientCrypt.Decrypt(client.recvData[:BBHeaderSize], BBHeaderSize)
-				client.packetSize, err = util.GetPacketSize(client.recvData[:2])
-				if err != nil {
-					// Something is seriously wrong if this causes an error. Bail.
-					panic(err.Error())
-				}
-				// PSO likes to occasionally send us packets that are longer than their
-				// declared size. Adjust the expected length just in case in order to
-				// avoid leaving stray bytes in the buffer.
-				for client.packetSize%BBHeaderSize != 0 {
-					client.packetSize++
-				}
-			}
-		}
-
-		// Read in the rest of the packet.
-		for client.recvSize < int(client.packetSize) {
-			remaining := int(client.packetSize) - client.recvSize
-			bytes, err := client.conn.Read(
-				client.recvData[client.recvSize : client.recvSize+remaining])
-			if err != nil {
-				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
-				return
-			}
-			client.recvSize += bytes
-		}
-
-		// We have the whole thing; decrypt the rest of it if needed and pass it along.
-		if client.packetSize > BBHeaderSize {
-			client.clientCrypt.Decrypt(
-				client.recvData[BBHeaderSize:client.packetSize],
-				uint32(client.packetSize-BBHeaderSize))
-		}
-		if err := processCharacterPacket(client); err != nil {
-			log.Info(err.Error(), logger.LogPriorityLow)
-			break
-		}
-
-		client.recvSize = 0
-		client.packetSize = 0
-	}
-}
-
-// Main worker thread for the CHARACTER portion of the server.
-func startCharacter(wg *sync.WaitGroup) {
-	loginConfig := GetConfig()
-	loadParameterFiles()
-	loadBaseStats()
-
-	socket, err := server.OpenSocket(loginConfig.Hostname, loginConfig.CharacterPort)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-	fmt.Printf("Waiting for CHARACTER connections on %s:%s...\n\n",
-		loginConfig.Hostname, loginConfig.CharacterPort)
-
-	for {
-		connection, err := socket.AcceptTCP()
-		if err != nil {
-			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
-			continue
-		}
-		client, err := newClient(connection)
-		if err != nil {
-			continue
-		}
-		charConnections.AddClient(client)
-		go handleCharacterClient(client)
-	}
-	wg.Done()
 }
