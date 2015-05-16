@@ -130,7 +130,7 @@ func handleCharLogin(client *LoginClient) error {
 	}
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	if client.config.CharSelected == 1 {
-		// Send B1
+		SendTimestamp(client)
 		// Send A0
 		// Send EE
 		fmt.Println("Shipgate stuff")

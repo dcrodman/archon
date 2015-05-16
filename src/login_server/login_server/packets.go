@@ -47,6 +47,7 @@ const (
 	ParameterChunkReqType  = 0x03EB
 	ParameterHeaderReqType = 0x04EB
 	SetFlagType            = 0x00EC
+	TimestampType          = 0x0B1
 )
 
 const MAX_CHUNK_SIZE = 0x6800
@@ -208,19 +209,28 @@ type ParameterChunkPacket struct {
 	Data   []byte
 }
 
+// Used by the client to indicate whether a character should be recreated or updated.
 type SetFlagPacket struct {
 	Header BBPktHeader
 	Flag   uint32
 }
 
+// Sent to the client for the selection menu and received for updating a character.
 type CharPreviewPacket struct {
 	Header    BBPktHeader
 	Slot      uint32
 	Character *CharacterPreview
 }
 
+// Message in a large text box, usually sent right before a disconnect.
 type ClientMessagePacket struct {
 	Header   BBPktHeader
 	Language uint32
 	Message  []byte
+}
+
+// Indicate the server's current time.
+type TimestampPacket struct {
+	Header    BBPktHeader
+	Timestamp [28]byte
 }

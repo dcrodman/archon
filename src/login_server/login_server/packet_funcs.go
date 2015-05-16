@@ -25,7 +25,11 @@ import (
 	"fmt"
 	"libarchon/logger"
 	"libarchon/util"
+	"syscall"
+	"time"
 )
+
+const TimeFmt = "2006:01:02: 15:05:05"
 
 var copyrightBytes []byte = make([]byte, 96)
 
@@ -250,6 +254,23 @@ func SendClientMessage(client *LoginClient, message string) int {
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Client Message Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+func SendTimestamp(client *LoginClient) int {
+	pkt := new(TimestampPacket)
+	pkt.Header.Type = TimestampType
+
+	var tv syscall.Timeval
+	syscall.Gettimeofday(&tv)
+	t := time.Now().Format(TimeFmt)
+	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
+	copy(pkt.Timestamp[:], stamp)
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Timestamp Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }
