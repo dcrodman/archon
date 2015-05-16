@@ -104,9 +104,9 @@ func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	client.serverCrypt = encryption.NewCrypt()
 	client.clientCrypt.CreateKeys()
 	client.serverCrypt.CreateKeys()
-	// The client doesn't send this server very big packets, so we can
-	// save some space and keep the buffer small.
-	client.recvData = make([]byte, 256)
+	// The client doesn't send this server very big packets. We can
+	// save some space and keep the buffer small, growing later if needed.
+	client.recvData = make([]byte, 128)
 
 	var err error = nil
 	if SendWelcome(client) != 0 {
@@ -300,10 +300,21 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 				}
 			}
 		}
+		pktSize := int(client.packetSize)
+		// Grow the client's receive buffer if they send us a packet bigger
+		// than its current capacity.
+		if pktSize > cap(client.recvData) {
+			newSize := pktSize + len(client.recvData)
+			newBuf := make([]byte, newSize)
+			copy(newBuf, client.recvData)
+			client.recvData = newBuf
+			msg := fmt.Sprintf("Reallocated buffer to %v bytes", newSize)
+			log.Info(msg, logger.LogPriorityLow)
+		}
 
 		// Read in the rest of the packet.
-		for client.recvSize < int(client.packetSize) {
-			remaining := int(client.packetSize) - client.recvSize
+		for client.recvSize < pktSize {
+			remaining := pktSize - client.recvSize
 			bytes, err := client.conn.Read(
 				client.recvData[client.recvSize : client.recvSize+remaining])
 			if err != nil {
