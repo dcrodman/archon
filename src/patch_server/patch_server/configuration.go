@@ -44,6 +44,7 @@ type configuration struct {
 	Hostname       string
 	PatchPort      string
 	DataPort       string
+	MaxConnections int
 	PatchDir       string
 	WelcomeMessage string
 	Logfile        string
@@ -82,6 +83,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.PatchPort = "11000"
 	config.DataPort = "11001"
 	config.Logfile = "Standard Out"
+	config.MaxConnections = 30000
 	config.WelcomeMessage = "Unconfigured Welcome Message"
 
 	json.Unmarshal(data, config)

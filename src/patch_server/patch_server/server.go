@@ -336,17 +336,20 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 	}
 	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
 	for {
-		connection, err := socket.AcceptTCP()
-		if err != nil {
-			log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
-			continue
+		// Poll until we can accept more clients.
+		for patchConnections.Count() < cfg.MaxConnections {
+			connection, err := socket.AcceptTCP()
+			if err != nil {
+				log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
+				continue
+			}
+			client, err := newClient(connection)
+			if err != nil {
+				continue
+			}
+			patchConnections.AddClient(client)
+			go handleClient(client, id, handler)
 		}
-		client, err := newClient(connection)
-		if err != nil {
-			continue
-		}
-		patchConnections.AddClient(client)
-		go handleClient(client, id, handler)
 	}
 	wg.Done()
 }

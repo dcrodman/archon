@@ -40,17 +40,18 @@ const loginConfigFile = "login_config.json"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
-	Hostname      string
-	LoginPort     string
-	CharacterPort string
-	DBHost        string
-	DBPort        string
-	DBName        string
-	DBUsername    string
-	DBPassword    string
-	Logfile       string
-	LogLevel      logger.LogPriority
-	DebugMode     bool
+	Hostname       string
+	LoginPort      string
+	CharacterPort  string
+	MaxConnections int
+	DBHost         string
+	DBPort         string
+	DBName         string
+	DBUsername     string
+	DBPassword     string
+	Logfile        string
+	LogLevel       logger.LogPriority
+	DebugMode      bool
 
 	database        *sql.DB
 	logWriter       io.Writer
@@ -81,6 +82,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
+	config.MaxConnections = 30000
 	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 
