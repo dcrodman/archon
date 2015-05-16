@@ -155,7 +155,7 @@ func SendCharacterPreview(client *LoginClient, charPreview *CharacterPreview) in
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
-		fmt.Println("Sending Character Preview Packet - Dry Run")
+		fmt.Println("Sending Character Preview Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }
@@ -235,6 +235,21 @@ func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {
 		fmt.Println("Sending Parameter Chunk Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
+// Send an error message to the client, usually used before disconnecting.
+func SendClientMessage(client *LoginClient, message string) int {
+	pkt := new(ClientMessagePacket)
+	pkt.Header.Type = ClientMessageType
+	// English? Tethealla sets this.
+	pkt.Language = 0x00450009
+	pkt.Message = util.ConvertToUtf16(message)
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Client Message Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
 }

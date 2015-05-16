@@ -30,6 +30,7 @@ const (
 	LoginType              = 0x93
 	SecurityType           = 0xE6
 	RedirectType           = 0x19
+	ClientMessageType      = 0x1A
 	OptionsRequestType     = 0xE0
 	OptionsType            = 0xE2
 	CharPreviewReqType     = 0xE3
@@ -214,4 +215,10 @@ type CharPreviewPacket struct {
 	Header    BBPktHeader
 	Slot      uint32
 	Character *CharacterPreview
+}
+
+type ClientMessagePacket struct {
+	Header   BBPktHeader
+	Language uint32
+	Message  []byte
 }

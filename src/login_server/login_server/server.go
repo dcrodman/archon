@@ -98,8 +98,8 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 		return nil, errors.New("Account does not exist for username: " + username)
 	// Database error?
 	case err != nil:
-		// TODO: Send error message (1A)
-		SendSecurity(client, BBLoginErrorUnknown, 0, 0)
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
 		log.DBError(err.Error())
 		return nil, err
 	// Is the account banned?
@@ -108,8 +108,8 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 		return nil, errors.New("Account banned: " + username)
 	// Has the account been activated?
 	case !isActive:
-		// TODO: Send error message (1A)
-		SendSecurity(client, BBLoginErrorUnregistered, 0, 0)
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
 		return nil, errors.New("Account must be activated for username: " + username)
 	}
 	// Copy over the config, which should indicate how far they are in the login flow.
