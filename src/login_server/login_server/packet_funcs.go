@@ -257,7 +257,7 @@ func SendClientMessage(client *LoginClient, message string) int {
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
 func fixLength(data []byte, length uint16) uint16 {
-	for length%8 != 0 {
+	for length%BBHeaderSize != 0 {
 		length++
 		_ = append(data, 0)
 	}
