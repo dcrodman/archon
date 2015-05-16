@@ -216,7 +216,8 @@ func handleGuildcardDataStart(client *LoginClient) error {
 
 	// Maximum of 140 entries can be sent.
 	for i := 0; rows.Next() && i < 140; i++ {
-		// TODO: Extract this out of a blob...
+		// TODO: This may not actually work yet, but I haven't gotten to
+		// figuring out how this is used yet.
 		var name, teamName, desc, comment []uint8
 		entry := &gcData.Entries[i]
 		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc,
@@ -240,7 +241,7 @@ func handleGuildcardChunk(client *LoginClient) {
 	var chunkReq GuildcardChunkReqPacket
 	util.StructFromBytes(client.recvData[:], &chunkReq)
 	if chunkReq.Continue != 0x01 {
-		// TODO Cancelled sending guildcard chunks - disconnect
+		// Cancelled sending guildcard chunks.
 		return
 	}
 	SendGuildcardChunk(client, chunkReq.ChunkRequested)
