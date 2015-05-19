@@ -30,6 +30,7 @@ import (
 	"io"
 	"io/ioutil"
 	"libarchon/logger"
+	"libarchon/util"
 	"os"
 	"strconv"
 	"strings"
@@ -43,6 +44,8 @@ type configuration struct {
 	Hostname       string
 	LoginPort      string
 	CharacterPort  string
+	WelcomeMessage string
+
 	MaxConnections int
 	ParametersDir  string
 	DBHost         string
@@ -54,10 +57,11 @@ type configuration struct {
 	LogLevel       logger.LogPriority
 	DebugMode      bool
 
-	database        *sql.DB
-	logWriter       io.Writer
-	cachedHostBytes [4]byte
-	redirectPort    uint16
+	database         *sql.DB
+	logWriter        io.Writer
+	cachedHostBytes  [4]byte
+	cachedWelcomeMsg []byte
+	redirectPort     uint16
 }
 
 // Singleton instance.
@@ -83,12 +87,15 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
+	config.WelcomeMessage = "Add a welcome message here"
 	config.MaxConnections = 30000
 	config.ParametersDir = ServerConfigDir + "/parameters"
 	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 
 	json.Unmarshal(data, config)
+
+	config.cachedWelcomeMsg = util.ConvertToUtf16(config.WelcomeMessage)
 
 	if config.LogLevel < logger.LogPriorityCritical || config.LogLevel > logger.LogPriorityLow {
 		// The log level must be at least open to critical messages.

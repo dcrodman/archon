@@ -275,6 +275,24 @@ func SendTimestamp(client *LoginClient) int {
 	return SendEncrypted(client, data, uint16(size))
 }
 
+func SendShipList(client *LoginClient) {
+	// TODO
+}
+
+// Send whatever scrolling message was set in the config file and
+// converted to UTF-16LE when the server started up.
+func SendScrollMessage(client *LoginClient) int {
+	pkt := new(ScrollMessagePacket)
+	pkt.Header.Type = ScrollMessageType
+	pkt.Message = GetConfig().cachedWelcomeMsg
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Scroll Message Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
+}
+
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
 func fixLength(data []byte, length uint16) uint16 {

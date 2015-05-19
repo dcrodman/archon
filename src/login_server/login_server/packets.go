@@ -46,8 +46,10 @@ const (
 	ParameterChunkType     = 0x02EB
 	ParameterChunkReqType  = 0x03EB
 	ParameterHeaderReqType = 0x04EB
-	SetFlagType            = 0x00EC
-	TimestampType          = 0x0B1
+	SetFlagType            = 0xEC
+	TimestampType          = 0xB1
+	ShipListType           = 0xA0
+	ScrollMessageType      = 0xEE
 )
 
 const MAX_CHUNK_SIZE = 0x6800
@@ -233,4 +235,22 @@ type ClientMessagePacket struct {
 type TimestampPacket struct {
 	Header    BBPktHeader
 	Timestamp [28]byte
+}
+
+type ShipListPacket struct {
+	Header      BBPktHeader
+	NumShips    uint32
+	Padding     uint16
+	Unknown     uint16
+	Unknown2    uint32
+	Unknown3    uint16
+	ServerName  [23]byte
+	ShipEntries []ShipEntry
+}
+
+// Scroll message the client should display on the ship select screen.
+type ScrollMessagePacket struct {
+	Header  BBPktHeader
+	Padding [2]uint32
+	Message []byte
 }

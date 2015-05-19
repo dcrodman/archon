@@ -122,6 +122,13 @@ type CharacterStats struct {
 	LCK uint16
 }
 
+type ShipEntry struct {
+	Unknown  uint16
+	Id       uint32
+	Padding  uint16
+	Shipname [23]byte
+}
+
 // Handle initial login - verify the account and send security data.
 func handleCharLogin(client *LoginClient) error {
 	_, err := verifyAccount(client)
@@ -131,9 +138,8 @@ func handleCharLogin(client *LoginClient) error {
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	if client.config.CharSelected == 1 {
 		SendTimestamp(client)
-		// Send A0
-		// Send EE
-		fmt.Println("Shipgate stuff")
+		SendShipList(client)
+		SendScrollMessage(client)
 	}
 	return nil
 }
