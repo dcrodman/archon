@@ -5,6 +5,6 @@
 	"PatchDir" : "/usr/local/share/archon/patches",
 	"WelcomeMessage" : "Unconfigured",
 	"Logfile" : "patch_server.log",
-	"LogLevel" : 4,
-	"DebugMode" : true
+	"LogLevel" : 3,
+	"DebugMode" : false
 }
