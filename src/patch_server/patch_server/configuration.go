@@ -83,6 +83,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.PatchPort = "11000"
 	config.DataPort = "11001"
 	config.Logfile = "Standard Out"
+	config.PatchDir = "patches/"
 	config.MaxConnections = 30000
 	config.WelcomeMessage = "Unconfigured Welcome Message"
 
