@@ -32,6 +32,7 @@ import (
 const TimeFmt = "2006:01:02: 15:05:05"
 
 var copyrightBytes []byte = make([]byte, 96)
+var serverName = util.ConvertToUtf16("Archon")
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -134,8 +135,9 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 	return SendEncrypted(client, data, uint16(size))
 }
 
-// Send the character preview acknowledgement packet to tell them that we don't
-// have any data for that slot.
+// Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
+// ack'ing a selected character, and 2 indicates that a character doesn't exist
+// in the slot requested via preview request.
 func SendCharacterAck(client *LoginClient, slotNum uint32, flag uint32) int {
 	pkt := new(CharAckPacket)
 	pkt.Header.Type = CharAckType
@@ -164,7 +166,8 @@ func SendCharacterPreview(client *LoginClient, charPreview *CharacterPreview) in
 	return SendEncrypted(client, data, uint16(size))
 }
 
-// Acknowledge the checksum the client sent us.
+// Acknowledge the checksum the client sent us. We don't actually do
+// anything with it but the client won't proceed otherwise.
 func SendChecksumAck(client *LoginClient, ack uint32) int {
 	pkt := new(ChecksumAckPacket)
 	pkt.Header.Type = ChecksumAckType
@@ -258,6 +261,7 @@ func SendClientMessage(client *LoginClient, message string) int {
 	return SendEncrypted(client, data, uint16(size))
 }
 
+// Send a timestamp packet in order to indicate the server's current time.
 func SendTimestamp(client *LoginClient) int {
 	pkt := new(TimestampPacket)
 	pkt.Header.Type = TimestampType
@@ -275,8 +279,24 @@ func SendTimestamp(client *LoginClient) int {
 	return SendEncrypted(client, data, uint16(size))
 }
 
-func SendShipList(client *LoginClient) {
-	// TODO
+// Send the menu items for the ship select screen. ships must always
+// contain at least one entry, the default being "No Ships".
+func SendShipList(client *LoginClient, ships []ShipEntry) int {
+	pkt := new(ShipListPacket)
+	pkt.Header.Type = ShipListType
+
+	pkt.Header.Flags = 0x01
+	pkt.Unknown = 0x02
+	pkt.Unknown2 = 0xFFFFFFF4
+	pkt.Unknown3 = 0x04
+	copy(pkt.ServerName[:], serverName)
+	pkt.ShipEntries = ships
+
+	data, size := util.BytesFromStruct(pkt)
+	if GetConfig().DebugMode {
+		fmt.Println("Sending Ship List Packet")
+	}
+	return SendEncrypted(client, data, uint16(size))
 }
 
 // Send whatever scrolling message was set in the config file and

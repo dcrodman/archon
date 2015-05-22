@@ -44,6 +44,9 @@ var log *logger.Logger
 var loginConnections *server.ConnectionList = server.NewClientList()
 var charConnections *server.ConnectionList = server.NewClientList()
 
+var defaultShip ShipEntry
+var shipList []ShipEntry
+
 // Struct for holding client-specific data.
 type LoginClient struct {
 	conn   *net.TCPConn
@@ -69,6 +72,13 @@ type LoginClient struct {
 
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
+
+type ShipEntry struct {
+	Unknown  uint16 // Always 0x12
+	Id       uint32
+	Padding  uint16
+	Shipname [23]byte
+}
 
 type pktHandler func(p *LoginClient) error
 
@@ -295,6 +305,12 @@ func StartServer() {
 
 	loadParameterFiles()
 	loadBaseStats()
+
+	// Create our "No Ships" item to indicate the absence of any ship servers.
+	defaultShip.Unknown = 0x12
+	defaultShip.Id = 1
+	copy(defaultShip.Shipname[:], util.ConvertToUtf16("No Ships"))
+	shipList = append(shipList, defaultShip)
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)

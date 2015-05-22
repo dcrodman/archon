@@ -50,6 +50,7 @@ const (
 	TimestampType          = 0xB1
 	ShipListType           = 0xA0
 	ScrollMessageType      = 0xEE
+	MenuSelectType         = 0x10
 )
 
 const MAX_CHUNK_SIZE = 0x6800
@@ -237,14 +238,14 @@ type TimestampPacket struct {
 	Timestamp [28]byte
 }
 
+// The list of menu items to display to the client.
 type ShipListPacket struct {
 	Header      BBPktHeader
-	NumShips    uint32
 	Padding     uint16
-	Unknown     uint16
-	Unknown2    uint32
-	Unknown3    uint16
-	ServerName  [23]byte
+	Unknown     uint16 // set to 0xFFFFFFF4
+	Unknown2    uint32 // set to 0x02
+	Unknown3    uint16 // set to 0x04
+	ServerName  [36]byte
 	ShipEntries []ShipEntry
 }
 

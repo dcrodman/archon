@@ -122,13 +122,6 @@ type CharacterStats struct {
 	LCK uint16
 }
 
-type ShipEntry struct {
-	Unknown  uint16
-	Id       uint32
-	Padding  uint16
-	Shipname [23]byte
-}
-
 // Handle initial login - verify the account and send security data.
 func handleCharLogin(client *LoginClient) error {
 	_, err := verifyAccount(client)
@@ -138,7 +131,7 @@ func handleCharLogin(client *LoginClient) error {
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	if client.config.CharSelected == 1 {
 		SendTimestamp(client)
-		SendShipList(client)
+		SendShipList(client, shipList)
 		SendScrollMessage(client)
 	}
 	return nil
@@ -205,7 +198,7 @@ func handleCharacterSelect(client *LoginClient) error {
 		client.config.CharSelected = 1
 		client.config.SlotNum = uint8(pkt.Slot)
 		SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-		SendCharacterAck(client, pkt.Slot, 0x01)
+		SendCharacterAck(client, pkt.Slot, 1)
 	} else {
 		// They have a character in that slot; send the character preview.
 		copy(prev.GuildcardStr[:], gc[:])
@@ -332,6 +325,11 @@ func handleCharacterUpdate(client *LoginClient) error {
 	return nil
 }
 
+// Player selected one of the items on the ship select screen.
+func handleMenuSelect(client *LoginClient) {
+
+}
+
 // Process packets sent to the CHARACTER port by sending them off to another
 // handler or by taking some brief action.
 func processCharacterPacket(client *LoginClient) error {
@@ -374,6 +372,8 @@ func processCharacterPacket(client *LoginClient) error {
 		client.flag = pkt.Flag
 	case CharPreviewType:
 		err = handleCharacterUpdate(client)
+	case MenuSelectType:
+		handleMenuSelect(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
 		log.Info(msg, logger.LogPriorityMedium)
