@@ -40,7 +40,7 @@ func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
 	_, err := client.conn.Write(pkt[:length])
 	if err != nil {
 		log.Info("Error sending to client "+client.ipAddr+": "+err.Error(),
-			logger.LogPriorityMedium)
+			logger.MediumPriority)
 		return -1
 	}
 	return 0

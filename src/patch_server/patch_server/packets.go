@@ -133,7 +133,7 @@ func SendPacket(client *PatchClient, pkt []byte, length uint16) int {
 	_, err := client.conn.Write(pkt[:length])
 	if err != nil {
 		log.Info("Error sending to client "+client.ipAddr+": "+err.Error(),
-			logger.LogPriorityMedium)
+			logger.MediumPriority)
 		return -1
 	}
 	return 0
@@ -302,7 +302,7 @@ func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []
 		panic(errors.New("File chunk size exceeds maximum"))
 		log.Error("Attempted to send "+string(chunkSize)+
 			" byte chunk; max is "+string(MaxChunkSize),
-			logger.LogPriorityCritical)
+			logger.CriticalPriority)
 	}
 	pkt := new(FileChunkPacket)
 	pkt.Header.Type = FileChunkType

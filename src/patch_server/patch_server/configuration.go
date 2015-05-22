@@ -100,9 +100,9 @@ func (config *configuration) InitFromFile(fileName string) error {
 	}
 	config.MessageSize = uint16(msgLen)
 
-	if config.LogLevel < logger.LogPriorityCritical || config.LogLevel > logger.LogPriorityLow {
+	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.LogPriorityCritical
+		config.LogLevel = logger.CriticalPriority
 	}
 	// Convert the data port to a BE uint for the redirect packet.
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)

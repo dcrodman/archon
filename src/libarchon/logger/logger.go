@@ -32,10 +32,10 @@ import (
 type LogPriority byte
 
 const (
-	LogPriorityCritical LogPriority = 1
-	LogPriorityHigh                 = 2
-	LogPriorityMedium               = 3
-	LogPriorityLow                  = 4
+	CriticalPriority LogPriority = 1
+	HighPriority                 = 2
+	MediumPriority               = 3
+	LowPriority                  = 4
 )
 
 type Logger struct {
@@ -75,7 +75,7 @@ func (logger *Logger) Error(msg string, priority LogPriority) {
 func (logger *Logger) DBError(msg string) {
 	errMsg := fmt.Sprintf("[SQL ERROR] %s", msg)
 	fmt.Println(errMsg)
-	logger.Error(msg, LogPriorityCritical)
+	logger.Error(msg, CriticalPriority)
 }
 
 // Logs a message to either the user's configured logfile or to standard out. Only messages

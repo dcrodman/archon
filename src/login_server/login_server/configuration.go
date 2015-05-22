@@ -97,9 +97,9 @@ func (config *configuration) InitFromFile(fileName string) error {
 
 	config.cachedWelcomeMsg = util.ConvertToUtf16(config.WelcomeMessage)
 
-	if config.LogLevel < logger.LogPriorityCritical || config.LogLevel > logger.LogPriorityLow {
+	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.LogPriorityCritical
+		config.LogLevel = logger.CriticalPriority
 	}
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)

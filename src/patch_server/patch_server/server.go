@@ -174,7 +174,7 @@ func updateClientFiles(client *PatchClient) error {
 			file, err := os.Open(patch.relativePath)
 			if err != nil {
 				// Critical since this is most likely a filesystem error.
-				log.Error(err.Error(), logger.LogPriorityCritical)
+				log.Error(err.Error(), logger.CriticalPriority)
 				return err
 			}
 			for i := 0; i < chunks; i++ {
@@ -219,7 +219,7 @@ func processPatchPacket(client *PatchClient) error {
 		}
 	default:
 		msg := fmt.Sprintf("Received unknown packet %2x from %s", pktHeader.Type, client.ipAddr)
-		log.Info(msg, logger.LogPriorityMedium)
+		log.Info(msg, logger.MediumPriority)
 	}
 	return err
 }
@@ -248,7 +248,7 @@ func processDataPacket(client *PatchClient) error {
 		err = updateClientFiles(client)
 	default:
 		msg := fmt.Sprintf("Received unknown packet %02x from %s", pktHeader.Type, client.ipAddr)
-		log.Info(msg, logger.LogPriorityMedium)
+		log.Info(msg, logger.MediumPriority)
 	}
 	return err
 }
@@ -260,14 +260,14 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			log.Error(errMsg, logger.LogPriorityCritical)
+			log.Error(errMsg, logger.CriticalPriority)
 		}
 		client.conn.Close()
 		patchConnections.RemoveClient(client)
-		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.LogPriorityMedium)
+		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.MediumPriority)
 	}()
 
-	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.LogPriorityMedium)
+	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.MediumPriority)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
@@ -281,7 +281,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 			} else if err != nil {
 				// Socket error, nothing we can do now
 				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
+					logger.MediumPriority)
 				return
 			}
 			client.recvSize += bytes
@@ -311,7 +311,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 			copy(newBuf, client.recvData)
 			client.recvData = newBuf
 			msg := fmt.Sprintf("Reallocated buffer to %v bytes", newSize)
-			log.Info(msg, logger.LogPriorityLow)
+			log.Info(msg, logger.LowPriority)
 		}
 
 		// Read in the rest of the packet.
@@ -321,7 +321,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 				client.recvData[client.recvSize : client.recvSize+remaining])
 			if err != nil {
 				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
+					logger.MediumPriority)
 				return
 			}
 			client.recvSize += bytes
@@ -334,7 +334,7 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 				uint32(client.packetSize-PCHeaderSize))
 		}
 		if err := handler(client); err != nil {
-			log.Info(err.Error(), logger.LogPriorityLow)
+			log.Info(err.Error(), logger.LowPriority)
 			break
 		}
 
@@ -359,7 +359,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 		for patchConnections.Count() < cfg.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
-				log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
+				log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
 				continue
 			}
 			client, err := newClient(connection)
@@ -461,7 +461,7 @@ func StartServer() {
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.LogPriorityCritical)
+	log.Info("Server Initialized", logger.CriticalPriority)
 
 	if config.DebugMode {
 		go server.CreateStackTraceServer("127.0.0.1:8080", "/")

@@ -73,7 +73,7 @@ func processLoginPacket(client *LoginClient) error {
 		break
 	default:
 		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
-		log.Info(msg, logger.LogPriorityMedium)
+		log.Info(msg, logger.MediumPriority)
 	}
 	return err
 }

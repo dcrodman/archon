@@ -175,7 +175,7 @@ func loadParameterFiles() {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
 			log.Error("Error reading parameter file: "+err.Error(),
-				logger.LogPriorityCritical)
+				logger.CriticalPriority)
 			os.Exit(1)
 		}
 		fileSize := len(data)
@@ -217,7 +217,7 @@ func loadBaseStats() {
 	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
-		log.Error("Error reading stats file: "+err.Error(), logger.LogPriorityCritical)
+		log.Error("Error reading stats file: "+err.Error(), logger.CriticalPriority)
 		os.Exit(1)
 	}
 	decompressedSize := prs.DecompressSize(compressed)

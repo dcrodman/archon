@@ -162,14 +162,14 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
 				client.ipAddr, err, debug.Stack())
-			log.Error(errMsg, logger.LogPriorityCritical)
+			log.Error(errMsg, logger.CriticalPriority)
 		}
 		client.conn.Close()
 		list.RemoveClient(client)
-		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.LogPriorityMedium)
+		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.MediumPriority)
 	}()
 
-	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.LogPriorityMedium)
+	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.MediumPriority)
 	// We're running inside a goroutine at this point, so we can block on this connection
 	// and not interfere with any other clients.
 	for {
@@ -183,7 +183,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 			} else if err != nil {
 				// Socket error, nothing we can do now
 				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
+					logger.MediumPriority)
 				return
 			}
 			client.recvSize += bytes
@@ -213,7 +213,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 			copy(newBuf, client.recvData)
 			client.recvData = newBuf
 			msg := fmt.Sprintf("Reallocated buffer to %v bytes", newSize)
-			log.Info(msg, logger.LogPriorityLow)
+			log.Info(msg, logger.LowPriority)
 		}
 
 		// Read in the rest of the packet.
@@ -223,7 +223,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 				client.recvData[client.recvSize : client.recvSize+remaining])
 			if err != nil {
 				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.LogPriorityMedium)
+					logger.MediumPriority)
 				return
 			}
 			client.recvSize += bytes
@@ -236,7 +236,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 				uint32(client.packetSize-BBHeaderSize))
 		}
 		if err := handler(client); err != nil {
-			log.Info(err.Error(), logger.LogPriorityLow)
+			log.Info(err.Error(), logger.LowPriority)
 			break
 		}
 
@@ -261,7 +261,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 		for list.Count() < cfg.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
-				log.Error("Failed to accept connection: "+err.Error(), logger.LogPriorityHigh)
+				log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
 				continue
 			}
 			client, err := newClient(connection)
@@ -301,7 +301,7 @@ func StartServer() {
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.LogPriorityCritical)
+	log.Info("Server Initialized", logger.CriticalPriority)
 
 	loadParameterFiles()
 	loadBaseStats()
