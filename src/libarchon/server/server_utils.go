@@ -42,30 +42,6 @@ type ConnectionList struct {
 	mutex      sync.RWMutex
 }
 
-// Creates a simple Http server on host, listening for requests to the url
-// at path. Responses are dumps from pprof containing the stack traces of
-// all running goroutines.
-func CreateStackTraceServer(host, path string) {
-	http.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-		pprof.Lookup("goroutine").WriteTo(resp, 1)
-	})
-	http.ListenAndServe(host, nil)
-}
-
-// Opens a TCP socket on host:port and returns either an error or
-// a listener socket ready to Accept().
-func OpenSocket(host, port string) (*net.TCPListener, error) {
-	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
-	if err != nil {
-		return nil, errors.New("Error creating socket: " + err.Error())
-	}
-	socket, err := net.ListenTCP("tcp", hostAddress)
-	if err != nil {
-		return nil, errors.New("Error Listening on Socket: " + err.Error())
-	}
-	return socket, nil
-}
-
 // Factory method for creating new ConnectionLists.
 func NewClientList() *ConnectionList {
 	newList := new(ConnectionList)
@@ -113,4 +89,28 @@ func (cl *ConnectionList) Count() int {
 	length := cl.size
 	cl.mutex.RUnlock()
 	return length
+}
+
+// Creates a simple Http server on host, listening for requests to the url
+// at path. Responses are dumps from pprof containing the stack traces of
+// all running goroutines.
+func CreateStackTraceServer(host, path string) {
+	http.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
+		pprof.Lookup("goroutine").WriteTo(resp, 1)
+	})
+	http.ListenAndServe(host, nil)
+}
+
+// Opens a TCP socket on host:port and returns either an error or
+// a listener socket ready to Accept().
+func OpenSocket(host, port string) (*net.TCPListener, error) {
+	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
+	if err != nil {
+		return nil, errors.New("Error creating socket: " + err.Error())
+	}
+	socket, err := net.ListenTCP("tcp", hostAddress)
+	if err != nil {
+		return nil, errors.New("Error Listening on Socket: " + err.Error())
+	}
+	return socket, nil
 }

@@ -1,0 +1,7 @@
+{
+	"Hostname" : "127.0.0.1",
+	"ShipgatePort" : "13000",
+	"Logfile" : "shipgate_server.log",
+	"LogLevel" : 3,
+	"DebugMode" : false
+}
