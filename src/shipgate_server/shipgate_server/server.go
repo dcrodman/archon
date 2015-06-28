@@ -35,8 +35,9 @@ import (
 
 var log *logger.Logger
 var shipgateConnections *server.ConnectionList = server.NewClientList()
+var shipEntries map[string]ShipEntry
 
-// Struct for holding client-specific data.
+// Struct for holding specific data for each connected ship.
 type ShipgateClient struct {
 	conn   *net.TCPConn
 	ipAddr string
@@ -49,6 +50,14 @@ type ShipgateClient struct {
 
 func (lc ShipgateClient) Connection() *net.TCPConn { return lc.conn }
 func (lc ShipgateClient) IPAddr() string           { return lc.ipAddr }
+
+// Ship representation used for responding to requests for the ship list.
+type ShipEntry struct {
+	Shipname   [23]byte
+	Hostname   string
+	Port       string
+	NumPlayers int
+}
 
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*ShipgateClient, error) {
@@ -66,10 +75,14 @@ func newClient(conn *net.TCPConn) (*ShipgateClient, error) {
 	return client, err
 }
 
+// Return a JSON string to the client with the name, hostname, port,
+// and player count.
 func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
-	// TODO: Grab this from a cache instead computing it on the fly.
 	if shipgateConnections.Count() == 0 {
-		w.Write([]byte("{}"))
+		w.Write([]byte("[]"))
+	} else {
+		// TODO: Pull this from a cache
+		w.Write([]byte("[]"))
 	}
 }
 
@@ -220,7 +233,7 @@ func StartServer() {
 		go server.CreateStackTraceServer("127.0.0.1:8082", "/")
 	}
 
-	// Open up our web port for retrieving player counts and the like.
+	// Open up our web port for retrieving player counts.
 	http.HandleFunc("/list", handleShipCountRequest)
 	if http.ListenAndServe(":"+config.WebPort, nil) != nil {
 		fmt.Printf("Failed to open web port on " + config.WebPort)

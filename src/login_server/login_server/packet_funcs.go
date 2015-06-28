@@ -290,7 +290,10 @@ func SendShipList(client *LoginClient, ships []ShipEntry) int {
 	pkt.Unknown2 = 0xFFFFFFF4
 	pkt.Unknown3 = 0x04
 	copy(pkt.ServerName[:], serverName)
+	// Global mutex, what could possibly go wrong?
+	shipListMutex.RLock()
 	pkt.ShipEntries = ships
+	shipListMutex.RUnlock()
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {

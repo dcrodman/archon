@@ -41,10 +41,12 @@ const loginConfigFile = "login_config.json"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
-	Hostname       string
-	LoginPort      string
-	CharacterPort  string
-	WelcomeMessage string
+	Hostname         string
+	LoginPort        string
+	CharacterPort    string
+	ShipgateHostname string
+	ShipgatePort     string
+	WelcomeMessage   string
 
 	MaxConnections int
 	ParametersDir  string
@@ -87,6 +89,8 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
+	config.ShipgateHostname = "127.0.0.1"
+	config.ShipgatePort = "13001"
 	config.WelcomeMessage = "Add a welcome message here"
 	config.MaxConnections = 30000
 	config.ParametersDir = ServerConfigDir + "/parameters"
@@ -169,6 +173,8 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
+		"ShipgateHostname: " + config.ShipgateHostname + "\n" +
+		"ShipgatePort: " + config.ShipgatePort + "\n" +
 		"Database Host: " + config.DBHost + "\n" +
 		"Database Port: " + config.DBPort + "\n" +
 		"Database Name: " + config.DBName + "\n" +

@@ -26,6 +26,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,10 +35,12 @@ import (
 	"libarchon/server"
 	"libarchon/util"
 	"net"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 )
 
 var log *logger.Logger
@@ -46,6 +49,7 @@ var charConnections *server.ConnectionList = server.NewClientList()
 
 var defaultShip ShipEntry
 var shipList []ShipEntry
+var shipListMutex sync.RWMutex
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -73,11 +77,20 @@ type LoginClient struct {
 func (lc LoginClient) Connection() *net.TCPConn { return lc.conn }
 func (lc LoginClient) IPAddr() string           { return lc.ipAddr }
 
+// Struct for representing available ships in the ship selection menu.
 type ShipEntry struct {
 	Unknown  uint16 // Always 0x12
 	Id       uint32
 	Padding  uint16
 	Shipname [23]byte
+}
+
+// A ship entry as defined by the Http response from the shipgate.
+type ShipgateListEntry struct {
+	Shipname   [23]byte
+	Hostname   string
+	Port       string
+	NumPlayers int
 }
 
 type pktHandler func(p *LoginClient) error
@@ -269,7 +282,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 				continue
 			}
 			if list.HasClient(client) {
-				SendClientMessage(client, "This computer is already connected to the server.")
+				SendClientMessage(client, "Client is already connected to the server.")
 				client.conn.Close()
 			} else {
 				list.AddClient(client)
@@ -278,6 +291,55 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 		}
 	}
 	wg.Done()
+}
+
+// Loop for the life of the server, pinging the shipgate every 30
+// seconds to update the list of available ships.
+func fetchShipList() {
+	config := GetConfig()
+	errorInterval, pingInterval := time.Second*5, time.Second*60
+	shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHostname, config.ShipgatePort)
+	for {
+		resp, err := http.Get(shipgateUrl)
+		if err != nil {
+			log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
+			// Sleep for a shorter interval since we want to know as soon
+			// as the shipgate is back online.
+			time.Sleep(errorInterval)
+		} else {
+			ships := make([]ShipgateListEntry, 1)
+			// Extract the Http response and convert it from JSON.
+			shipData := make([]byte, 100)
+			resp.Body.Read(shipData)
+			if err = json.Unmarshal(util.StripPadding(shipData), &ships); err != nil {
+				log.Error("Error parsing JSON response from shipgate: "+err.Error(),
+					logger.MediumPriority)
+				time.Sleep(errorInterval)
+				continue
+			}
+
+			// Taking the easy way out and just reallocating the entire slice
+			// to make the GC do the hard part. If this becomes an issue for
+			// memory footprint then the list should be overwritten in-place.
+			shipListMutex.Lock()
+			if len(ships) < 1 {
+				shipList = []ShipEntry{defaultShip}
+			} else {
+				shipList = make([]ShipEntry, len(shipList))
+				for i := range ships {
+					ship := shipList[i]
+					ship.Unknown = 0x12
+					// TODO: Does this have any actual significance? Will the possibility
+					// of a ship id changing for the same ship break things?
+					ship.Id = uint32(i)
+					ship.Shipname = ships[i].Shipname
+				}
+			}
+			shipListMutex.Unlock()
+			log.Info("Updated ship list", logger.LowPriority)
+			time.Sleep(pingInterval)
+		}
+	}
 }
 
 func StartServer() {
@@ -326,6 +388,9 @@ func StartServer() {
 	if config.DebugMode {
 		go server.CreateStackTraceServer("127.0.0.1:8081", "/")
 	}
+
+	// Set up our loop for updating our ship list from the shipgate.
+	go fetchShipList()
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
