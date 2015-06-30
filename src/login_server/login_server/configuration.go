@@ -173,8 +173,9 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
-		"ShipgateHostname: " + config.ShipgateHostname + "\n" +
-		"ShipgatePort: " + config.ShipgatePort + "\n" +
+		"Shipgate Hostname: " + config.ShipgateHostname + "\n" +
+		"Shipgate Port: " + config.ShipgatePort + "\n" +
+		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Database Host: " + config.DBHost + "\n" +
 		"Database Port: " + config.DBPort + "\n" +
 		"Database Name: " + config.DBName + "\n" +

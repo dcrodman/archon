@@ -144,6 +144,7 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Patch Port: " + config.PatchPort + "\n" +
 		"Data Port: " + config.DataPort + "\n" +
+		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Patch Directory: " + config.PatchDir + "\n" +
 		"Output Logged To: " + config.Logfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +

@@ -42,6 +42,7 @@ type configuration struct {
 	Hostname       string
 	ShipgatePort   string
 	WebPort        string
+	KeyDirectory   string
 	MaxConnections int
 	Logfile        string
 	LogLevel       logger.LogPriority
@@ -77,6 +78,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.ShipgatePort = "13000"
 	config.WebPort = "13001"
+	config.KeyDirectory = "keys"
 	config.MaxConnections = 30000
 	config.Logfile = "Standard Out"
 
@@ -121,6 +123,8 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
+		"Key Directory: " + config.KeyDirectory + "\n" +
+		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Output Logged To: " + config.Logfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
