@@ -210,12 +210,12 @@ func StartServer() {
 	config := GetConfig()
 
 	// Initialize our config singleton from one of two expected file locations.
-	fmt.Printf("Loading config file %v...", loginConfigFile)
-	err := config.InitFromFile(loginConfigFile)
+	fmt.Printf("Loading config file %v...", ShipgateConfigFile)
+	err := config.InitFromFile(ShipgateConfigFile)
 	if err != nil {
 		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+loginConfigFile)
-		err = config.InitFromFile(loginConfigFile)
+		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+ShipgateConfigFile)
+		err = config.InitFromFile(ShipgateConfigFile)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			fmt.Printf("%s\n", err.Error())
@@ -226,12 +226,6 @@ func StartServer() {
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.CriticalPriority)
-
-	// Start our debugging server if needed.
-	if config.DebugMode {
-		go server.CreateStackTraceServer("127.0.0.1:8082", "/")
-	}
 
 	// Open up our web port for retrieving player counts.
 	http.HandleFunc("/list", handleShipCountRequest)
@@ -240,6 +234,12 @@ func StartServer() {
 		os.Exit(-1)
 	}
 
+	// Start our debugging server if needed.
+	if config.DebugMode {
+		go server.CreateStackTraceServer("127.0.0.1:8082", "/")
+	}
+
+	log.Info("Server Initialized", logger.CriticalPriority)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go startWorker(&wg, "SHIP", config.ShipgatePort)

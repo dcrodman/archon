@@ -37,16 +37,16 @@ import (
 )
 
 const ServerConfigDir = "/usr/local/share/archon"
-const loginConfigFile = "login_config.json"
+const LoginConfigFile = "login_config.json"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
-	Hostname         string
-	LoginPort        string
-	CharacterPort    string
-	ShipgateHostname string
-	ShipgatePort     string
-	WelcomeMessage   string
+	Hostname       string
+	LoginPort      string
+	CharacterPort  string
+	ShipgateHost   string
+	ShipgatePort   string
+	WelcomeMessage string
 
 	MaxConnections int
 	ParametersDir  string
@@ -89,7 +89,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
-	config.ShipgateHostname = "127.0.0.1"
+	config.ShipgateHost = "127.0.0.1"
 	config.ShipgatePort = "13001"
 	config.WelcomeMessage = "Add a welcome message here"
 	config.MaxConnections = 30000
@@ -173,7 +173,7 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
-		"Shipgate Hostname: " + config.ShipgateHostname + "\n" +
+		"Shipgate Host: " + config.ShipgateHost + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Database Host: " + config.DBHost + "\n" +

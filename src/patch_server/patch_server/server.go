@@ -459,13 +459,13 @@ func StartServer() {
 		os.Exit(1)
 	}
 
-	// Initialize the logger.
-	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.CriticalPriority)
-
 	if config.DebugMode {
 		go server.CreateStackTraceServer("127.0.0.1:8080", "/")
 	}
+
+	// Initialize the logger.
+	log = logger.New(config.logWriter, config.LogLevel)
+	log.Info("Server Initialized", logger.CriticalPriority)
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

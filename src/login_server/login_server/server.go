@@ -298,7 +298,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 func fetchShipList() {
 	config := GetConfig()
 	errorInterval, pingInterval := time.Second*5, time.Second*60
-	shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHostname, config.ShipgatePort)
+	shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHost, config.ShipgatePort)
 	for {
 		resp, err := http.Get(shipgateUrl)
 		if err != nil {
@@ -347,12 +347,12 @@ func StartServer() {
 	config := GetConfig()
 
 	// Initialize our config singleton from one of two expected file locations.
-	fmt.Printf("Loading config file %v...", loginConfigFile)
-	err := config.InitFromFile(loginConfigFile)
+	fmt.Printf("Loading config file %v...", LoginConfigFile)
+	err := config.InitFromFile(LoginConfigFile)
 	if err != nil {
 		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+loginConfigFile)
-		err = config.InitFromFile(loginConfigFile)
+		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+LoginConfigFile)
+		err = config.InitFromFile(LoginConfigFile)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			fmt.Printf("%s\n", err.Error())
@@ -363,7 +363,6 @@ func StartServer() {
 
 	// Initialize the logger.
 	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.CriticalPriority)
 
 	loadParameterFiles()
 	loadBaseStats()
@@ -392,6 +391,7 @@ func StartServer() {
 	// Set up our loop for updating our ship list from the shipgate.
 	go fetchShipList()
 
+	log.Info("Server Initialized", logger.CriticalPriority)
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(2)

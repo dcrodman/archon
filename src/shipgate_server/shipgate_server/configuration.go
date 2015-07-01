@@ -31,11 +31,10 @@ import (
 	"libarchon/logger"
 	"os"
 	"strconv"
-	"strings"
 )
 
 const ServerConfigDir = "/usr/local/share/archon"
-const loginConfigFile = "shipgate_config.json"
+const ShipgateConfigFile = "shipgate_config.json"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
@@ -48,23 +47,20 @@ type configuration struct {
 	LogLevel       logger.LogPriority
 	DebugMode      bool
 
-	database         *sql.DB
-	logWriter        io.Writer
-	cachedHostBytes  [4]byte
-	cachedWelcomeMsg []byte
-	redirectPort     uint16
+	database  *sql.DB
+	logWriter io.Writer
 }
 
 // Singleton instance.
-var loginConfig *configuration = nil
+var shipgateConfig *configuration = nil
 
 // This function should be used to get access to the server config instead of directly
 // referencing the loginConfig pointer.
 func GetConfig() *configuration {
-	if loginConfig == nil {
-		loginConfig = new(configuration)
+	if shipgateConfig == nil {
+		shipgateConfig = new(configuration)
 	}
-	return loginConfig
+	return shipgateConfig
 }
 
 // Populate config with the contents of a JSON file at path fileName. Config parameters
@@ -89,9 +85,6 @@ func (config *configuration) InitFromFile(fileName string) error {
 		config.LogLevel = logger.CriticalPriority
 	}
 
-	shipgatePort, _ := strconv.ParseUint(config.ShipgatePort, 10, 16)
-	config.redirectPort = uint16(shipgatePort)
-
 	if config.Logfile != "Standard Out" {
 		config.logWriter, err = os.OpenFile(config.Logfile,
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -103,20 +96,6 @@ func (config *configuration) InitFromFile(fileName string) error {
 		config.logWriter = os.Stdout
 	}
 	return nil
-}
-
-// Convert the hostname string into 4 bytes to be used with the redirect packet.
-func (config *configuration) HostnameBytes() [4]byte {
-	// Hacky, but chances are the IP address isn't going to start with 0 and a
-	// fixed-length array can't be null.
-	if config.cachedHostBytes[0] == 0x00 {
-		parts := strings.Split(config.Hostname, ".")
-		for i := 0; i < 4; i++ {
-			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
-			config.cachedHostBytes[i] = uint8(tmp)
-		}
-	}
-	return config.cachedHostBytes
 }
 
 func (config *configuration) String() string {
