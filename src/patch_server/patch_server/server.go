@@ -46,22 +46,12 @@ type pktHandler func(p *PatchClient) error
 
 // Struct for holding client-specific data.
 type PatchClient struct {
-	conn        *net.TCPConn
-	ipAddr      string
-	port        string
-	clientCrypt *encryption.PSOCrypt
-	serverCrypt *encryption.PSOCrypt
-	recvData    []byte
-	recvSize    int
-	packetSize  uint16
-	updateList  []*PatchEntry
+	c          *server.Client
+	updateList []*PatchEntry
 }
 
-func (pc PatchClient) Connection() *net.TCPConn { return pc.conn }
-func (pc PatchClient) IPAddr() string           { return pc.ipAddr }
-func (pc PatchClient) Decrypt(data []byte, size uint32) {
-	pc.clientCrypt.Decrypt(data, size)
-}
+func (pc PatchClient) Client() *server.Client { return pc.c }
+func (pc PatchClient) IPAddr() string         { return pc.c.IpAddr }
 
 // Data for one patch file.
 type PatchEntry struct {
@@ -96,26 +86,29 @@ var patchIndex []*PatchEntry
 
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*PatchClient, error) {
-	client := new(PatchClient)
-	client.conn = conn
-	addr := strings.Split(conn.RemoteAddr().String(), ":")
-	client.ipAddr = addr[0]
-	client.port = addr[1]
+	patchClient := new(PatchClient)
+	client := new(server.Client)
 
-	client.clientCrypt = encryption.NewCrypt()
-	client.serverCrypt = encryption.NewCrypt()
-	client.clientCrypt.CreateKeys()
-	client.serverCrypt.CreateKeys()
+	client.Conn = conn
+	addr := strings.Split(conn.RemoteAddr().String(), ":")
+	client.IpAddr = addr[0]
+	client.Port = addr[1]
+
+	client.ClientCrypt = encryption.NewCrypt()
+	client.ServerCrypt = encryption.NewCrypt()
+	client.ClientCrypt.CreateKeys()
+	client.ServerCrypt.CreateKeys()
 	// The client doesn't send this server very big packets. We can
 	// save some space and keep the buffer small, growing later if needed.
-	client.recvData = make([]byte, 128)
+	client.RecvData = make([]byte, 128)
+	patchClient.c = client
 
 	var err error = nil
-	if SendWelcome(client) != 0 {
-		err = errors.New("Error sending welcome packet to: " + client.ipAddr)
+	if SendWelcome(patchClient) != 0 {
+		err = errors.New("Error sending welcome packet to: " + client.IpAddr)
 		client = nil
 	}
-	return client, err
+	return patchClient, err
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
@@ -137,7 +130,7 @@ func sendFileList(client *PatchClient, node *PatchDir) {
 // is any discrepancy.
 func handleFileStatus(client *PatchClient) {
 	var fileStatus FileStatusPacket
-	util.StructFromBytes(client.recvData[:], &fileStatus)
+	util.StructFromBytes(client.c.RecvData[:], &fileStatus)
 
 	patch := patchIndex[fileStatus.PatchId]
 	if fileStatus.Checksum != patch.checksum || fileStatus.FileSize != patch.fileSize {
@@ -201,11 +194,11 @@ func updateClientFiles(client *PatchClient) error {
 // Handle a packet sent to the PATCH server.
 func processPatchPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.recvData[:PCHeaderSize], &pktHeader)
+	util.StructFromBytes(client.c.RecvData[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
-		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
+		util.PrintPayload(client.c.RecvData, int(pktHeader.Size))
 		fmt.Println()
 	}
 	var err error = nil
@@ -218,7 +211,7 @@ func processPatchPacket(client *PatchClient) error {
 			SendRedirect(client, cfg.RedirectPort(), cfg.HostnameBytes())
 		}
 	default:
-		msg := fmt.Sprintf("Received unknown packet %2x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
 		log.Info(msg, logger.MediumPriority)
 	}
 	return err
@@ -227,11 +220,11 @@ func processPatchPacket(client *PatchClient) error {
 // Handle a packet sent to the DATA server.
 func processDataPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.recvData[:PCHeaderSize], &pktHeader)
+	util.StructFromBytes(client.c.RecvData[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
-		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
+		util.PrintPayload(client.c.RecvData, int(pktHeader.Size))
 		fmt.Println()
 	}
 	var err error = nil
@@ -247,7 +240,8 @@ func processDataPacket(client *PatchClient) error {
 	case ClientListDoneType:
 		err = updateClientFiles(client)
 	default:
-		msg := fmt.Sprintf("Received unknown packet %02x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %02x from %s",
+			pktHeader.Type, client.IPAddr())
 		log.Info(msg, logger.MediumPriority)
 	}
 	return err
@@ -259,88 +253,31 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
-				client.ipAddr, err, debug.Stack())
+				client.IPAddr(), err, debug.Stack())
 			log.Error(errMsg, logger.CriticalPriority)
 		}
-		client.conn.Close()
+		client.c.Conn.Close()
 		patchConnections.RemoveClient(client)
-		log.Info("Disconnected "+desc+" client "+client.ipAddr, logger.MediumPriority)
+		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
 	}()
 
-	log.Info("Accepted "+desc+" connection from "+client.ipAddr, logger.MediumPriority)
-	// We're running inside a goroutine at this point, so we can block on this connection
-	// and not interfere with any other clients.
+	log.Info("Accepted "+desc+" connection from "+client.IPAddr(), logger.MediumPriority)
+	ec := server.Generate(client, PCHeaderSize)
+	var err error
 	for {
-		// Wait for the packet header.
-		for client.recvSize < PCHeaderSize {
-			bytes, err := client.conn.Read(client.recvData[client.recvSize:PCHeaderSize])
-			if bytes == 0 || err == io.EOF {
-				// The client disconnected, we're done.
-				client.conn.Close()
-				return
-			} else if err != nil {
-				// Socket error, nothing we can do now
-				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.MediumPriority)
-				return
-			}
-			client.recvSize += bytes
-
-			if client.recvSize >= PCHeaderSize {
-				// We have our header; decrypt it.
-				client.clientCrypt.Decrypt(client.recvData[:PCHeaderSize], PCHeaderSize)
-				client.packetSize, err = util.GetPacketSize(client.recvData[:2])
-				if err != nil {
-					// Something is seriously wrong if this causes an error. Bail.
-					panic(err.Error())
-				}
-				// PSO likes to occasionally send us packets that are longer than their
-				// declared size. Adjust the expected length just in case in order to
-				// avoid leaving stray bytes in the buffer.
-				for client.packetSize%PCHeaderSize != 0 {
-					client.packetSize++
-				}
-			}
-		}
-		pktSize := int(client.packetSize)
-		// Grow the client's receive buffer if they send us a packet bigger
-		// than its current capacity.
-		if pktSize > cap(client.recvData) {
-			newSize := pktSize + len(client.recvData)
-			newBuf := make([]byte, newSize)
-			copy(newBuf, client.recvData)
-			client.recvData = newBuf
-			msg := fmt.Sprintf("Reallocated buffer to %v bytes", newSize)
-			log.Info(msg, logger.LowPriority)
-		}
-
-		// Read in the rest of the packet.
-		for client.recvSize < pktSize {
-			remaining := pktSize - client.recvSize
-			bytes, err := client.conn.Read(
-				client.recvData[client.recvSize : client.recvSize+remaining])
-			if err != nil {
-				log.Warn("Socket Error ("+client.ipAddr+") "+err.Error(),
-					logger.MediumPriority)
-				return
-			}
-			client.recvSize += bytes
-		}
-
-		// We have the whole thing; decrypt the rest of it if needed and pass it along.
-		if client.packetSize > PCHeaderSize {
-			client.clientCrypt.Decrypt(
-				client.recvData[PCHeaderSize:client.packetSize],
-				uint32(client.packetSize-PCHeaderSize))
-		}
-		if err := handler(client); err != nil {
-			log.Info(err.Error(), logger.LowPriority)
+		if err = <-ec; err == io.EOF {
+			client.c.Conn.Close()
+			break
+		} else if err != nil {
+			// Error communicating with the client.
+			log.Warn(err.Error(), logger.MediumPriority)
 			break
 		}
 
-		// Extra bytes left in the buffer will just be ignored.
-		client.recvSize = 0
-		client.packetSize = 0
+		if err = handler(client); err != nil {
+			log.Info(err.Error(), logger.LowPriority)
+			break
+		}
 	}
 }
 

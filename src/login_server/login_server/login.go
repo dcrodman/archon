@@ -56,11 +56,12 @@ func handleLogin(client *LoginClient) error {
 // taking some brief action.
 func processLoginPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
-	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
+	c := client.Client()
+	util.StructFromBytes(c.RecvData[:BBHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		util.PrintPayload(c.RecvData, int(pktHeader.Size))
 		fmt.Println()
 	}
 
@@ -72,7 +73,7 @@ func processLoginPacket(client *LoginClient) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, c.IpAddr)
 		log.Info(msg, logger.MediumPriority)
 	}
 	return err

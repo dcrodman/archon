@@ -37,9 +37,9 @@ var serverName = util.ConvertToUtf16("Archon")
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
-	_, err := client.conn.Write(pkt[:length])
+	_, err := client.c.Conn.Write(pkt[:length])
 	if err != nil {
-		log.Info("Error sending to client "+client.ipAddr+": "+err.Error(),
+		log.Info("Error sending to client "+client.IPAddr()+": "+err.Error(),
 			logger.MediumPriority)
 		return -1
 	}
@@ -54,7 +54,7 @@ func SendEncrypted(client *LoginClient, data []byte, length uint16) int {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
 	}
-	client.serverCrypt.Encrypt(data, uint32(length))
+	client.c.ServerCrypt.Encrypt(data, uint32(length))
 	return SendPacket(client, data, length)
 }
 
@@ -64,8 +64,8 @@ func SendWelcome(client *LoginClient) int {
 	pkt.Header.Type = WelcomeType
 	pkt.Header.Size = 0xC8
 	copy(pkt.Copyright[:], copyrightBytes)
-	copy(pkt.ClientVector[:], client.clientCrypt.Vector)
-	copy(pkt.ServerVector[:], client.serverCrypt.Vector)
+	copy(pkt.ClientVector[:], client.c.ClientCrypt.Vector)
+	copy(pkt.ServerVector[:], client.c.ServerCrypt.Vector)
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {

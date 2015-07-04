@@ -165,7 +165,7 @@ func handleKeyConfig(client *LoginClient) error {
 // selection with an 0xE4 (also used for an empty slot).
 func handleCharacterSelect(client *LoginClient) error {
 	var pkt CharSelectionPacket
-	util.StructFromBytes(client.recvData[:], &pkt)
+	util.StructFromBytes(client.c.RecvData[:], &pkt)
 	prev := new(CharacterPreview)
 
 	// Character preview request.
@@ -248,7 +248,7 @@ func handleGuildcardDataStart(client *LoginClient) error {
 // Send another chunk of the client's guildcard data.
 func handleGuildcardChunk(client *LoginClient) {
 	var chunkReq GuildcardChunkReqPacket
-	util.StructFromBytes(client.recvData[:], &chunkReq)
+	util.StructFromBytes(client.c.RecvData[:], &chunkReq)
 	if chunkReq.Continue != 0x01 {
 		// Cancelled sending guildcard chunks.
 		return
@@ -260,7 +260,7 @@ func handleGuildcardChunk(client *LoginClient) {
 func handleCharacterUpdate(client *LoginClient) error {
 	var charPkt CharPreviewPacket
 	charPkt.Character = new(CharacterPreview)
-	util.StructFromBytes(client.recvData[:], &charPkt)
+	util.StructFromBytes(client.c.RecvData[:], &charPkt)
 	prev := charPkt.Character
 
 	archonDB := GetConfig().Database()
@@ -334,11 +334,11 @@ func handleMenuSelect(client *LoginClient) {
 // handler or by taking some brief action.
 func processCharacterPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
-	util.StructFromBytes(client.recvData[:BBHeaderSize], &pktHeader)
+	util.StructFromBytes(client.c.RecvData[:BBHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.recvData, int(pktHeader.Size))
+		util.PrintPayload(client.c.RecvData, int(pktHeader.Size))
 		fmt.Println()
 	}
 
@@ -364,18 +364,18 @@ func processCharacterPacket(client *LoginClient) error {
 		SendParameterHeader(client, uint32(len(ParamFiles)), paramHeaderData)
 	case ParameterChunkReqType:
 		var pkt BBPktHeader
-		util.StructFromBytes(client.recvData[:], &pkt)
+		util.StructFromBytes(client.c.RecvData[:], &pkt)
 		SendParameterChunk(client, paramChunkData[int(pkt.Flags)], pkt.Flags)
 	case SetFlagType:
 		var pkt SetFlagPacket
-		util.StructFromBytes(client.recvData[:], &pkt)
+		util.StructFromBytes(client.c.RecvData[:], &pkt)
 		client.flag = pkt.Flag
 	case CharPreviewType:
 		err = handleCharacterUpdate(client)
 	case MenuSelectType:
 		handleMenuSelect(client)
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.ipAddr)
+		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
 		log.Info(msg, logger.MediumPriority)
 	}
 	return err
