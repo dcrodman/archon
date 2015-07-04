@@ -76,7 +76,7 @@ type PatchDir struct {
 
 // File names that should be ignored when searching for patch files. This
 // could also be an array but the map makes it quicker to compare.
-var SkipPaths = map[string]byte{".": 1, "..": 1, ".DS_Store": 1, ".rid": 1}
+var SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
 
 // Each index corresponds to a patch file. This is constructed in the order
 // that the patch tree will be traversed and makes it faster to locate a
@@ -324,7 +324,15 @@ func loadPatches(node *PatchDir, path string) error {
 
 	for _, file := range files {
 		filename := file.Name()
-		if _, ignore := SkipPaths[filename]; ignore {
+		skip := false
+		for _, path := range SkipPaths {
+			if filename == path {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
 			continue
 		} else if file.IsDir() {
 			subdir := new(PatchDir)
