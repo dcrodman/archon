@@ -38,18 +38,20 @@ import (
 
 const ServerConfigDir = "/usr/local/share/archon"
 const LoginConfigFile = "login_config.json"
+const PrivateKeyFile = "shipgate.pem"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
 	Hostname       string
 	LoginPort      string
 	CharacterPort  string
-	ShipgateHost   string
 	ShipgatePort   string
+	WebPort        string
 	WelcomeMessage string
 
 	MaxConnections int
 	ParametersDir  string
+	KeysDir        string
 	DBHost         string
 	DBPort         string
 	DBName         string
@@ -89,11 +91,12 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.LoginPort = "12000"
 	config.CharacterPort = "12001"
-	config.ShipgateHost = "127.0.0.1"
-	config.ShipgatePort = "13001"
+	config.ShipgatePort = "13000"
+	config.WebPort = "13001"
 	config.WelcomeMessage = "Add a welcome message here"
 	config.MaxConnections = 30000
-	config.ParametersDir = ServerConfigDir + "/parameters"
+	config.ParametersDir = "parameters"
+	config.KeysDir = "keys"
 	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 
@@ -173,9 +176,11 @@ func (config *configuration) String() string {
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
-		"Shipgate Host: " + config.ShipgateHost + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
+		"Web Port: " + config.WebPort + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
+		"Parameters Directory: " + config.ParametersDir + "\n" +
+		"Keys Directory: " + config.KeysDir + "\n" +
 		"Database Host: " + config.DBHost + "\n" +
 		"Database Port: " + config.DBPort + "\n" +
 		"Database Name: " + config.DBName + "\n" +

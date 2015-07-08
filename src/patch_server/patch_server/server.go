@@ -31,8 +31,10 @@ import (
 	"libarchon/server"
 	"libarchon/util"
 	"net"
+	"net/http"
 	"os"
 	"runtime/debug"
+	"runtime/pprof"
 	"strings"
 	"sync"
 )
@@ -404,8 +406,13 @@ func StartServer() {
 		os.Exit(1)
 	}
 
+	// If we're in debug mode, spawn off an HTTP server that, when hit, dumps
+	// pprof output containing the stack traces of all running goroutines.
 	if config.DebugMode {
-		go server.CreateStackTraceServer("127.0.0.1:8080", "/")
+		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
+			pprof.Lookup("goroutine").WriteTo(resp, 1)
+		})
+		go http.ListenAndServe("127.0.0.1:8080", nil)
 	}
 
 	// Initialize the logger.

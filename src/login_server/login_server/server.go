@@ -16,20 +16,27 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Starting point for the login server. Initializes the configuration package and takes care of
-* launching the LOGIN and CHARACTER servers. Also provides top-level functions and other code
-* shared between the two (found in login.go and character.go).
+* Starting point for the login server. Initializes the configuration
+* package and sets up the workers listening on the necessary ports.
+* Also provides top-level functions and other code shared between
+* the two (found in login.go and character.go).
  */
 package login_server
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/server"
@@ -38,14 +45,18 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"runtime/pprof"
 	"strings"
 	"sync"
-	"time"
 )
 
 var log *logger.Logger
 var loginConnections *server.ConnectionList = server.NewClientList()
 var charConnections *server.ConnectionList = server.NewClientList()
+var shipConnections *server.ConnectionList = server.NewClientList()
+
+var shipgateKey *rsa.PrivateKey
+var sessionKey *cipher.BlockMode
 
 var defaultShip ShipEntry
 var shipList []ShipEntry
@@ -229,53 +240,80 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 	wg.Done()
 }
 
+// Initialize the server's private PKCS1 key used for registering
+// ships and generate a 16 byte key for an AES cipher to be used
+// for the majority of ship communication.
+func initKeys(dir string) {
+	filename := dir + "/" + PrivateKeyFile
+	fmt.Printf("Loading private key %s...", filename)
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		fmt.Printf("\nError loading private key: %s\n", err.Error())
+		os.Exit(-1)
+	}
+
+	block, _ := pem.Decode(bytes)
+	shipgateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		fmt.Printf("\nError parsing private key: %s\n", err.Error())
+		os.Exit(-1)
+	}
+	fmt.Printf("Done\n")
+
+	bytes = make([]byte, 16)
+	rand.Read(bytes)
+	ac, err := aes.NewCipher(bytes)
+	fmt.Printf("Doing something with aes %v\n", ac)
+	// sessionKey = cipher.NewCBCEncrypter(b, iv)
+}
+
 // Loop for the life of the server, pinging the shipgate every 30
 // seconds to update the list of available ships.
 func fetchShipList() {
-	config := GetConfig()
-	errorInterval, pingInterval := time.Second*5, time.Second*60
-	shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHost, config.ShipgatePort)
-	for {
-		resp, err := http.Get(shipgateUrl)
-		if err != nil {
-			log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
-			// Sleep for a shorter interval since we want to know as soon
-			// as the shipgate is back online.
-			time.Sleep(errorInterval)
-		} else {
-			ships := make([]ShipgateListEntry, 1)
-			// Extract the Http response and convert it from JSON.
-			shipData := make([]byte, 100)
-			resp.Body.Read(shipData)
-			if err = json.Unmarshal(util.StripPadding(shipData), &ships); err != nil {
-				log.Error("Error parsing JSON response from shipgate: "+err.Error(),
-					logger.MediumPriority)
-				time.Sleep(errorInterval)
-				continue
-			}
+	// config := GetConfig()
+	// errorInterval, pingInterval := time.Second*5, time.Second*60
+	// shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHost, config.ShipgatePort)
+	// for {
+	// 	resp, err := http.Get(shipgateUrl)
+	// 	if err != nil {
+	// 		log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
+	// 		// Sleep for a shorter interval since we want to know as soon
+	// 		// as the shipgate is back online.
+	// 		time.Sleep(errorInterval)
+	// 	} else {
+	// 		ships := make([]ShipgateListEntry, 1)
+	// 		// Extract the Http response and convert it from JSON.
+	// 		shipData := make([]byte, 100)
+	// 		resp.Body.Read(shipData)
+	// 		if err = json.Unmarshal(util.StripPadding(shipData), &ships); err != nil {
+	// 			log.Error("Error parsing JSON response from shipgate: "+err.Error(),
+	// 				logger.MediumPriority)
+	// 			time.Sleep(errorInterval)
+	// 			continue
+	// 		}
 
-			// Taking the easy way out and just reallocating the entire slice
-			// to make the GC do the hard part. If this becomes an issue for
-			// memory footprint then the list should be overwritten in-place.
-			shipListMutex.Lock()
-			if len(ships) < 1 {
-				shipList = []ShipEntry{defaultShip}
-			} else {
-				shipList = make([]ShipEntry, len(shipList))
-				for i := range ships {
-					ship := shipList[i]
-					ship.Unknown = 0x12
-					// TODO: Does this have any actual significance? Will the possibility
-					// of a ship id changing for the same ship break things?
-					ship.Id = uint32(i)
-					ship.Shipname = ships[i].Shipname
-				}
-			}
-			shipListMutex.Unlock()
-			log.Info("Updated ship list", logger.LowPriority)
-			time.Sleep(pingInterval)
-		}
-	}
+	// 		// Taking the easy way out and just reallocating the entire slice
+	// 		// to make the GC do the hard part. If this becomes an issue for
+	// 		// memory footprint then the list should be overwritten in-place.
+	// 		shipListMutex.Lock()
+	// 		if len(ships) < 1 {
+	// 			shipList = []ShipEntry{defaultShip}
+	// 		} else {
+	// 			shipList = make([]ShipEntry, len(shipList))
+	// 			for i := range ships {
+	// 				ship := shipList[i]
+	// 				ship.Unknown = 0x12
+	// 				// TODO: Does this have any actual significance? Will the possibility
+	// 				// of a ship id changing for the same ship break things?
+	// 				ship.Id = uint32(i)
+	// 				ship.Shipname = ships[i].Shipname
+	// 			}
+	// 		}
+	// 		shipListMutex.Unlock()
+	// 		log.Info("Updated ship list", logger.LowPriority)
+	// 		time.Sleep(pingInterval)
+	// 	}
+	// }
 }
 
 func StartServer() {
@@ -303,6 +341,8 @@ func StartServer() {
 	loadParameterFiles()
 	loadBaseStats()
 
+	initKeys(config.KeysDir)
+
 	// Create our "No Ships" item to indicate the absence of any ship servers.
 	defaultShip.Unknown = 0x12
 	defaultShip.Id = 1
@@ -320,18 +360,22 @@ func StartServer() {
 	fmt.Println("Done.")
 	defer config.CloseDb()
 
+	// Open up our web port for retrieving player counts. If we're in debug mode, add a path
+	// for dumping pprof output containing the stack traces of all running goroutines.
+	http.HandleFunc("/list", handleShipCountRequest)
 	if config.DebugMode {
-		go server.CreateStackTraceServer("127.0.0.1:8081", "/")
+		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
+			pprof.Lookup("goroutine").WriteTo(resp, 1)
+		})
 	}
-
-	// Set up our loop for updating our ship list from the shipgate.
-	go fetchShipList()
+	go http.ListenAndServe(":"+config.WebPort, nil)
 
 	log.Info("Server Initialized", logger.CriticalPriority)
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go startWorker(&wg, "LOGIN", config.LoginPort, processLoginPacket, loginConnections)
 	go startWorker(&wg, "CHARACTER", config.CharacterPort, processCharacterPacket, charConnections)
+	go startWorker(&wg, "SHIPGATE", config.ShipgatePort, processShipgatePacket, shipConnections)
 	wg.Wait()
 }

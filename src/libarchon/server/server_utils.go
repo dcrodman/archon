@@ -27,8 +27,6 @@ import (
 	"libarchon/encryption"
 	"libarchon/util"
 	"net"
-	"net/http"
-	"runtime/pprof"
 	"sync"
 )
 
@@ -113,16 +111,6 @@ func (cl *ConnectionList) Count() int {
 	length := cl.size
 	cl.mutex.RUnlock()
 	return length
-}
-
-// Creates a simple Http server on host, listening for requests to the url
-// at path. Responses are dumps from pprof containing the stack traces of
-// all running goroutines.
-func CreateStackTraceServer(host, path string) {
-	http.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-		pprof.Lookup("goroutine").WriteTo(resp, 1)
-	})
-	http.ListenAndServe(host, nil)
 }
 
 // Opens a TCP socket on host:port and returns either an error or
