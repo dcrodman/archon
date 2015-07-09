@@ -1,5 +1,5 @@
 /*
-* Archon Login Server
+* Archon Ship Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -20,52 +20,40 @@
 * responsible for establishing a connection to the database to be maintained
 * during execution.
  */
-package login_server
+package ship_server
 
 import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "go-sql-driver"
 	"io"
 	"io/ioutil"
 	"libarchon/logger"
-	"libarchon/util"
 	"os"
 	"strconv"
 	"strings"
 )
 
 const ServerConfigDir = "/usr/local/share/archon"
-const LoginConfigFile = "login_config.json"
-const PrivateKeyFile = "shipgate.pem"
+const ShipConfigFile = "ship_config.json"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
+	Shipname       string
 	Hostname       string
-	LoginPort      string
-	CharacterPort  string
+	ShipgateHost   string
 	ShipgatePort   string
+	BlockPort      string
+	ShipPort       string
+	KeyDirectory   string
 	WebPort        string
-	WelcomeMessage string
-
 	MaxConnections int
-	ParametersDir  string
-	KeysDir        string
-	DBHost         string
-	DBPort         string
-	DBName         string
-	DBUsername     string
-	DBPassword     string
 	Logfile        string
 	LogLevel       logger.LogPriority
 	DebugMode      bool
 
-	database         *sql.DB
-	logWriter        io.Writer
-	cachedHostBytes  [4]byte
-	cachedWelcomeMsg []byte
-	redirectPort     uint16
+	database  *sql.DB
+	logWriter io.Writer
 }
 
 // Singleton instance.
@@ -88,29 +76,23 @@ func (config *configuration) InitFromFile(fileName string) error {
 		return err
 	}
 	// Provide default values for fields that are optional or critical.
+	config.Shipname = "Unconfigured"
 	config.Hostname = "127.0.0.1"
-	config.LoginPort = "12000"
-	config.CharacterPort = "12001"
+	config.ShipgateHost = "127.0.0.1"
 	config.ShipgatePort = "13000"
-	config.WebPort = "14000"
-	config.WelcomeMessage = "Add a welcome message here"
+	config.BlockPort = "14000"
+	config.ShipPort = "14002"
+	config.WebPort = "14001"
+	config.KeyDirectory = "keys"
 	config.MaxConnections = 30000
-	config.ParametersDir = "parameters"
-	config.KeysDir = "keys"
-	config.DBHost = "127.0.0.1"
 	config.Logfile = "Standard Out"
 
 	json.Unmarshal(data, config)
-
-	config.cachedWelcomeMsg = util.ConvertToUtf16(config.WelcomeMessage)
 
 	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
 		// The log level must be at least open to critical messages.
 		config.LogLevel = logger.CriticalPriority
 	}
-
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
-	config.redirectPort = uint16(charPort)
 
 	if config.Logfile != "Standard Out" {
 		config.logWriter, err = os.OpenFile(config.Logfile,
@@ -125,67 +107,17 @@ func (config *configuration) InitFromFile(fileName string) error {
 	return nil
 }
 
-// Establish a connection to the database and ping it to verify.
-func (config *configuration) InitDb() error {
-	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
-		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
-
-	var err error
-	config.database, err = sql.Open("mysql", dbName)
-	if err == nil {
-		err = config.database.Ping()
-	}
-	return err
-}
-
-func (config *configuration) CloseDb() {
-	config.database.Close()
-}
-
-// Use this function to obtain a reference to the database so that it can remain
-// encapsulated and any consistency checks can be centralized.
-func (config *configuration) Database() *sql.DB {
-	if config.database == nil {
-		// Don't implicitly initialize the database - if there's an error or other action that causes
-		// the reference to become nil then we're probably leaking a connection.
-		panic("Attempt to reference uninitialized database")
-	}
-	return config.database
-}
-
-// Convert the hostname string into 4 bytes to be used with the redirect packet.
-func (config *configuration) HostnameBytes() [4]byte {
-	// Hacky, but chances are the IP address isn't going to start with 0 and a
-	// fixed-length array can't be null.
-	if config.cachedHostBytes[0] == 0x00 {
-		parts := strings.Split(config.Hostname, ".")
-		for i := 0; i < 4; i++ {
-			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
-			config.cachedHostBytes[i] = uint8(tmp)
-		}
-	}
-	return config.cachedHostBytes
-}
-
-// Convenience method; returns a uint16 representation of the Character port.
-func (config *configuration) RedirectPort() uint16 {
-	return config.redirectPort
-}
-
 func (config *configuration) String() string {
-	return "Hostname: " + config.Hostname + "\n" +
-		"Login Port: " + config.LoginPort + "\n" +
-		"Character Port: " + config.CharacterPort + "\n" +
+	return "Ship Name: " + config.Shipname + "\n" +
+		"Hostname: " + config.Hostname + "\n" +
+		"Shipgate Host: " + config.ShipgateHost + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
+		"Block Port: " + config.BlockPort + "\n" +
+		"Ship Port: " + config.ShipPort + "\n" +
+		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
+		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
-		"Parameters Directory: " + config.ParametersDir + "\n" +
-		"Keys Directory: " + config.KeysDir + "\n" +
-		"Database Host: " + config.DBHost + "\n" +
-		"Database Port: " + config.DBPort + "\n" +
-		"Database Name: " + config.DBName + "\n" +
-		"Database Username: " + config.DBUsername + "\n" +
-		"Database Password: " + config.DBPassword + "\n" +
 		"Output Logged To: " + config.Logfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)

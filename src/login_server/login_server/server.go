@@ -24,19 +24,12 @@
 package login_server
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/server"
@@ -54,9 +47,6 @@ var log *logger.Logger
 var loginConnections *server.ConnectionList = server.NewClientList()
 var charConnections *server.ConnectionList = server.NewClientList()
 var shipConnections *server.ConnectionList = server.NewClientList()
-
-var shipgateKey *rsa.PrivateKey
-var sessionKey *cipher.BlockMode
 
 var defaultShip ShipEntry
 var shipList []ShipEntry
@@ -240,82 +230,6 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 	wg.Done()
 }
 
-// Initialize the server's private PKCS1 key used for registering
-// ships and generate a 16 byte key for an AES cipher to be used
-// for the majority of ship communication.
-func initKeys(dir string) {
-	filename := dir + "/" + PrivateKeyFile
-	fmt.Printf("Loading private key %s...", filename)
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		fmt.Printf("\nError loading private key: %s\n", err.Error())
-		os.Exit(-1)
-	}
-
-	block, _ := pem.Decode(bytes)
-	shipgateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		fmt.Printf("\nError parsing private key: %s\n", err.Error())
-		os.Exit(-1)
-	}
-	fmt.Printf("Done\n")
-
-	bytes = make([]byte, 16)
-	rand.Read(bytes)
-	ac, err := aes.NewCipher(bytes)
-	fmt.Printf("Doing something with aes %v\n", ac)
-	// sessionKey = cipher.NewCBCEncrypter(b, iv)
-}
-
-// Loop for the life of the server, pinging the shipgate every 30
-// seconds to update the list of available ships.
-func fetchShipList() {
-	// config := GetConfig()
-	// errorInterval, pingInterval := time.Second*5, time.Second*60
-	// shipgateUrl := fmt.Sprintf("http://%s:%s/list", config.ShipgateHost, config.ShipgatePort)
-	// for {
-	// 	resp, err := http.Get(shipgateUrl)
-	// 	if err != nil {
-	// 		log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
-	// 		// Sleep for a shorter interval since we want to know as soon
-	// 		// as the shipgate is back online.
-	// 		time.Sleep(errorInterval)
-	// 	} else {
-	// 		ships := make([]ShipgateListEntry, 1)
-	// 		// Extract the Http response and convert it from JSON.
-	// 		shipData := make([]byte, 100)
-	// 		resp.Body.Read(shipData)
-	// 		if err = json.Unmarshal(util.StripPadding(shipData), &ships); err != nil {
-	// 			log.Error("Error parsing JSON response from shipgate: "+err.Error(),
-	// 				logger.MediumPriority)
-	// 			time.Sleep(errorInterval)
-	// 			continue
-	// 		}
-
-	// 		// Taking the easy way out and just reallocating the entire slice
-	// 		// to make the GC do the hard part. If this becomes an issue for
-	// 		// memory footprint then the list should be overwritten in-place.
-	// 		shipListMutex.Lock()
-	// 		if len(ships) < 1 {
-	// 			shipList = []ShipEntry{defaultShip}
-	// 		} else {
-	// 			shipList = make([]ShipEntry, len(shipList))
-	// 			for i := range ships {
-	// 				ship := shipList[i]
-	// 				ship.Unknown = 0x12
-	// 				// TODO: Does this have any actual significance? Will the possibility
-	// 				// of a ship id changing for the same ship break things?
-	// 				ship.Id = uint32(i)
-	// 				ship.Shipname = ships[i].Shipname
-	// 			}
-	// 		}
-	// 		shipListMutex.Unlock()
-	// 		log.Info("Updated ship list", logger.LowPriority)
-	// 		time.Sleep(pingInterval)
-	// 	}
-	// }
-}
-
 func StartServer() {
 	fmt.Println("Initializing Archon LOGIN and CHARACTER servers...")
 	config := GetConfig()
@@ -340,8 +254,6 @@ func StartServer() {
 
 	loadParameterFiles()
 	loadBaseStats()
-
-	initKeys(config.KeysDir)
 
 	// Create our "No Ships" item to indicate the absence of any ship servers.
 	defaultShip.Unknown = 0x12
@@ -374,8 +286,8 @@ func StartServer() {
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(3)
+	go startShipgate(&wg)
 	go startWorker(&wg, "LOGIN", config.LoginPort, processLoginPacket, loginConnections)
 	go startWorker(&wg, "CHARACTER", config.CharacterPort, processCharacterPacket, charConnections)
-	go startWorker(&wg, "SHIPGATE", config.ShipgatePort, processShipgatePacket, shipConnections)
 	wg.Wait()
 }
