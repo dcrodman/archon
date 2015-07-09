@@ -130,8 +130,7 @@ type FileChunkPacket struct {
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *PatchClient, pkt []byte, length uint16) int {
-	_, err := client.c.Conn.Write(pkt[:length])
-	if err != nil {
+	if err := client.c.Send(pkt[:length]); err != nil {
 		log.Info("Error sending to client "+client.IPAddr()+": "+err.Error(),
 			logger.MediumPriority)
 		return -1
@@ -147,7 +146,7 @@ func SendEncrypted(client *PatchClient, data []byte, length uint16) int {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
 	}
-	client.c.ServerCrypt.Encrypt(data, uint32(length))
+	client.c.Encrypt(data, uint32(length))
 	return SendPacket(client, data, length)
 }
 
@@ -166,8 +165,8 @@ func SendWelcome(client *PatchClient) int {
 	pkt.Header.Type = WelcomeType
 	pkt.Header.Size = 0x4C
 	copy(pkt.Copyright[:], copyrightBytes)
-	copy(pkt.ClientVector[:], client.c.ClientCrypt.Vector)
-	copy(pkt.ServerVector[:], client.c.ServerCrypt.Vector)
+	copy(pkt.ClientVector[:], client.c.ClientVector())
+	copy(pkt.ServerVector[:], client.c.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
 	if GetConfig().DebugMode {

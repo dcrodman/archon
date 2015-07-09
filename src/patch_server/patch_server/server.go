@@ -26,7 +26,6 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
-	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/server"
 	"libarchon/util"
@@ -48,12 +47,13 @@ type pktHandler func(p *PatchClient) error
 
 // Struct for holding client-specific data.
 type PatchClient struct {
-	c          *server.Client
+	c          *server.PSOClient
 	updateList []*PatchEntry
 }
 
-func (pc PatchClient) Client() *server.Client { return pc.c }
-func (pc PatchClient) IPAddr() string         { return pc.c.IpAddr }
+func (pc *PatchClient) IPAddr() string        { return pc.c.IPAddr() }
+func (pc *PatchClient) Client() server.Client { return pc.c }
+func (pc *PatchClient) Data() []byte          { return pc.c.Data() }
 
 // Data for one patch file.
 type PatchEntry struct {
@@ -76,8 +76,7 @@ type PatchDir struct {
 	subdirs []*PatchDir
 }
 
-// File names that should be ignored when searching for patch files. This
-// could also be an array but the map makes it quicker to compare.
+// File names that should be ignored when searching for patch files.
 var SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
 
 // Each index corresponds to a patch file. This is constructed in the order
@@ -88,29 +87,15 @@ var patchIndex []*PatchEntry
 
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*PatchClient, error) {
-	patchClient := new(PatchClient)
-	client := new(server.Client)
-
-	client.Conn = conn
-	addr := strings.Split(conn.RemoteAddr().String(), ":")
-	client.IpAddr = addr[0]
-	client.Port = addr[1]
-
-	client.ClientCrypt = encryption.NewCrypt()
-	client.ServerCrypt = encryption.NewCrypt()
-	client.ClientCrypt.CreateKeys()
-	client.ServerCrypt.CreateKeys()
-	// The client doesn't send this server very big packets. We can
-	// save some space and keep the buffer small, growing later if needed.
-	client.RecvData = make([]byte, 128)
-	patchClient.c = client
+	pc := new(PatchClient)
+	pc.c = server.NewPSOClient(conn, PCHeaderSize)
 
 	var err error = nil
-	if SendWelcome(patchClient) != 0 {
-		err = errors.New("Error sending welcome packet to: " + client.IpAddr)
-		client = nil
+	if SendWelcome(pc) != 0 {
+		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
+		pc = nil
 	}
-	return patchClient, err
+	return pc, err
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
@@ -132,7 +117,7 @@ func sendFileList(client *PatchClient, node *PatchDir) {
 // is any discrepancy.
 func handleFileStatus(client *PatchClient) {
 	var fileStatus FileStatusPacket
-	util.StructFromBytes(client.c.RecvData[:], &fileStatus)
+	util.StructFromBytes(client.Data(), &fileStatus)
 
 	patch := patchIndex[fileStatus.PatchId]
 	if fileStatus.Checksum != patch.checksum || fileStatus.FileSize != patch.fileSize {
@@ -196,11 +181,11 @@ func updateClientFiles(client *PatchClient) error {
 // Handle a packet sent to the PATCH server.
 func processPatchPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.c.RecvData[:PCHeaderSize], &pktHeader)
+	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.c.RecvData, int(pktHeader.Size))
+		util.PrintPayload(client.Data(), int(pktHeader.Size))
 		fmt.Println()
 	}
 	var err error = nil
@@ -222,11 +207,11 @@ func processPatchPacket(client *PatchClient) error {
 // Handle a packet sent to the DATA server.
 func processDataPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.c.RecvData[:PCHeaderSize], &pktHeader)
+	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
 
 	if GetConfig().DebugMode {
 		fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.c.RecvData, int(pktHeader.Size))
+		util.PrintPayload(client.Data(), int(pktHeader.Size))
 		fmt.Println()
 	}
 	var err error = nil
@@ -258,17 +243,15 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 				client.IPAddr(), err, debug.Stack())
 			log.Error(errMsg, logger.CriticalPriority)
 		}
-		client.c.Conn.Close()
+		client.c.Close()
 		patchConnections.RemoveClient(client)
 		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
 	}()
 
 	log.Info("Accepted "+desc+" connection from "+client.IPAddr(), logger.MediumPriority)
-	ec := server.Generate(client, PCHeaderSize)
-	var err error
 	for {
-		if err = <-ec; err == io.EOF {
-			client.c.Conn.Close()
+		err := client.c.Process()
+		if err == io.EOF {
 			break
 		} else if err != nil {
 			// Error communicating with the client.
