@@ -30,7 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"libarchon/encryption"
 	"libarchon/logger"
 	"libarchon/server"
 	"libarchon/util"
@@ -39,7 +38,6 @@ import (
 	"os"
 	"runtime/debug"
 	"runtime/pprof"
-	"strings"
 	"sync"
 )
 
@@ -54,7 +52,7 @@ var shipListMutex sync.RWMutex
 
 // Struct for holding client-specific data.
 type LoginClient struct {
-	c         *server.Client
+	c         *server.PSOClient
 	guildcard uint32
 	teamId    uint32
 	isGm      bool
@@ -65,8 +63,9 @@ type LoginClient struct {
 	flag       uint32
 }
 
-func (lc LoginClient) Client() *server.Client { return lc.c }
-func (lc LoginClient) IPAddr() string         { return lc.c.IpAddr }
+func (lc *LoginClient) IPAddr() string        { return lc.c.IPAddr() }
+func (lc *LoginClient) Client() server.Client { return lc.c }
+func (lc *LoginClient) Data() []byte          { return lc.c.Data() }
 
 // Struct for representing available ships in the ship selection menu.
 type ShipEntry struct {
@@ -89,7 +88,7 @@ type pktHandler func(p *LoginClient) error
 // Handle account verification tasks common to both the login and character servers.
 func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 	var loginPkt LoginPkt
-	util.StructFromBytes(client.c.RecvData, &loginPkt)
+	util.StructFromBytes(client.Data(), &loginPkt)
 
 	// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
 	hasher := sha256.New()
@@ -139,24 +138,11 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*LoginClient, error) {
 	loginClient := new(LoginClient)
-	client := new(server.Client)
-
-	client.Conn = conn
-	addr := strings.Split(conn.RemoteAddr().String(), ":")
-	client.IpAddr = addr[0]
-	client.Port = addr[1]
-
-	client.ClientCrypt = encryption.NewCrypt()
-	client.ServerCrypt = encryption.NewCrypt()
-	client.ClientCrypt.CreateBBKeys()
-	client.ServerCrypt.CreateBBKeys()
-	client.RecvData = make([]byte, 512)
-
-	loginClient.c = client
+	loginClient.c = server.NewPSOClient(conn, BBHeaderSize)
 
 	var err error = nil
 	if SendWelcome(loginClient) != 0 {
-		err = errors.New("Error sending welcome packet to: " + client.IpAddr)
+		err = errors.New("Error sending welcome packet to: " + loginClient.IPAddr())
 		loginClient = nil
 	}
 	return loginClient, err
@@ -171,17 +157,15 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 				client.IPAddr(), err, debug.Stack())
 			log.Error(errMsg, logger.CriticalPriority)
 		}
-		client.c.Conn.Close()
+		client.c.Close()
 		list.RemoveClient(client)
 		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
 	}()
 
 	log.Info("Accepted "+desc+" connection from "+client.IPAddr(), logger.MediumPriority)
-	ec := server.Generate(client, BBHeaderSize)
-	var err error
 	for {
-		if err = <-ec; err == io.EOF {
-			client.c.Conn.Close()
+		err := client.c.Process()
+		if err == io.EOF {
 			break
 		} else if err != nil {
 			// Error communicating with the client.
@@ -220,7 +204,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 			}
 			if list.HasClient(client) {
 				SendClientMessage(client, "Client is already connected to the server.")
-				client.c.Conn.Close()
+				client.c.Close()
 			} else {
 				list.AddClient(client)
 				go handleClient(client, id, handler, list)
