@@ -40,7 +40,7 @@ import (
 	"sync"
 )
 
-type ShipgateClient struct {
+type Ship struct {
 	Conn   *net.TCPConn
 	IpAddr string
 	Port   string
@@ -50,29 +50,10 @@ type ShipgateClient struct {
 	PacketSize uint16
 }
 
-// Ship representation used for responding to requests for the ship list.
-type ShipJsonEntry struct {
-	Shipname   [23]byte
-	Hostname   string
-	Port       string
-	NumPlayers int
-}
-
 const ShipgateHeaderSize = 0x04
 
 var shipgateKey *rsa.PrivateKey
 var sessionKey []byte
-
-// Return a JSON string to the client with the name, hostname, port,
-// and player count.
-func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
-	if shipConnections.Count() == 0 {
-		w.Write([]byte("[]"))
-	} else {
-		// TODO: Pull this from a cache
-		w.Write([]byte("[]"))
-	}
-}
 
 // Loop for the life of the server, pinging the shipgate every 30
 // seconds to update the list of available ships.
@@ -142,7 +123,6 @@ func processShipgatePacket(ship *LoginClient) error {
 // for the majority of ship communication.
 func initKeys(dir string) {
 	filename := dir + "/" + PrivateKeyFile
-	fmt.Printf("Loading private key %s...", filename)
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		fmt.Printf("\nError loading private key: %s\n", err.Error())

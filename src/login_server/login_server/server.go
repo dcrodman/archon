@@ -24,9 +24,6 @@
 package login_server
 
 import (
-	"crypto/sha256"
-	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -40,15 +37,6 @@ import (
 	"runtime/pprof"
 	"sync"
 )
-
-var log *logger.Logger
-var loginConnections *server.ConnectionList = server.NewClientList()
-var charConnections *server.ConnectionList = server.NewClientList()
-var shipConnections *server.ConnectionList = server.NewClientList()
-
-var defaultShip ShipEntry
-var shipList []ShipEntry
-var shipListMutex sync.RWMutex
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -75,64 +63,25 @@ type ShipEntry struct {
 	Shipname [23]byte
 }
 
-// A ship entry as defined by the Http response from the shipgate.
-type ShipgateListEntry struct {
-	Shipname   [23]byte
-	Hostname   string
-	Port       string
-	NumPlayers int
-}
-
 type pktHandler func(p *LoginClient) error
 
-// Handle account verification tasks common to both the login and character servers.
-func verifyAccount(client *LoginClient) (*LoginPkt, error) {
-	var loginPkt LoginPkt
-	util.StructFromBytes(client.Data(), &loginPkt)
+var log *logger.Logger
+var loginConnections *server.ConnectionList = server.NewClientList()
+var shipConnections *server.ConnectionList = server.NewClientList()
 
-	// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
-	hasher := sha256.New()
-	hasher.Write(util.StripPadding(loginPkt.Password[:]))
-	pktUername := string(util.StripPadding(loginPkt.Username[:]))
-	pktPassword := hex.EncodeToString(hasher.Sum(nil)[:])
+var defaultShip ShipEntry
+var shipList []ShipEntry
+var shipListMutex sync.RWMutex
 
-	var username, password string
-	var isBanned, isActive bool
-	row := GetConfig().Database().QueryRow("SELECT username, password, "+
-		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
-		"WHERE username = ? and password = ?", pktUername, pktPassword)
-	err := row.Scan(&username, &password, &client.guildcard,
-		&client.isGm, &isBanned, &isActive, &client.teamId)
-	switch {
-	// Check if we have a valid username/combination.
-	case err == sql.ErrNoRows:
-		// The same error is returned for invalid passwords as attempts to log in
-		// with a nonexistent username as some measure of account security. Note
-		// that if this is changed to query by username and add a password check,
-		// the index on account_data will need to be modified.
-		SendSecurity(client, BBLoginErrorPassword, 0, 0)
-		return nil, errors.New("Account does not exist for username: " + username)
-	// Database error?
-	case err != nil:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-			"database.\n\nPlease contact your server administrator.")
-		log.DBError(err.Error())
-		return nil, err
-	// Is the account banned?
-	case isBanned:
-		SendSecurity(client, BBLoginErrorBanned, 0, 0)
-		return nil, errors.New("Account banned: " + username)
-	// Has the account been activated?
-	case !isActive:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-			"database.\n\nPlease contact your server administrator.")
-		return nil, errors.New("Account must be activated for username: " + username)
+// Return a JSON string to the client with the name, hostname, port,
+// and player count.
+func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
+	if shipConnections.Count() == 0 {
+		w.Write([]byte("[]"))
+	} else {
+		// TODO: Pull this from a cache
+		w.Write([]byte("[]"))
 	}
-	// Copy over the config, which should indicate how far they are in the login flow.
-	util.StructFromBytes(loginPkt.Security[:], &client.config)
-
-	// TODO: Hardware ban check.
-	return &loginPkt, nil
 }
 
 // Create and initialize a new struct to hold client information.
@@ -150,7 +99,7 @@ func newClient(conn *net.TCPConn) (*LoginClient, error) {
 
 // Handle communication with a particular client until the connection is
 // closed or an error is encountered.
-func handleClient(client *LoginClient, desc string, handler pktHandler, list *server.ConnectionList) {
+func handleClient(client *LoginClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
 			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
@@ -158,7 +107,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 			log.Error(errMsg, logger.CriticalPriority)
 		}
 		client.c.Close()
-		list.RemoveClient(client)
+		loginConnections.RemoveClient(client)
 		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
 	}()
 
@@ -182,7 +131,7 @@ func handleClient(client *LoginClient, desc string, handler pktHandler, list *se
 
 // Creates the socket and starts listening for connections on the specified
 // port, spawning off goroutines to handle communications for each client.
-func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *server.ConnectionList) {
+func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 	cfg := GetConfig()
 	socket, err := server.OpenSocket(cfg.Hostname, port)
 	if err != nil {
@@ -192,7 +141,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
 	for {
 		// Poll until we can accept more clients.
-		for list.Count() < cfg.MaxConnections {
+		for loginConnections.Count() < cfg.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
 				log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
@@ -202,12 +151,12 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler, list *
 			if err != nil {
 				continue
 			}
-			if list.HasClient(client) {
+			if loginConnections.HasClient(client) {
 				SendClientMessage(client, "Client is already connected to the server.")
 				client.c.Close()
 			} else {
-				list.AddClient(client)
-				go handleClient(client, id, handler, list)
+				loginConnections.AddClient(client)
+				go handleClient(client, id, handler)
 			}
 		}
 	}
@@ -271,7 +220,7 @@ func StartServer() {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go startShipgate(&wg)
-	go startWorker(&wg, "LOGIN", config.LoginPort, processLoginPacket, loginConnections)
-	go startWorker(&wg, "CHARACTER", config.CharacterPort, processCharacterPacket, charConnections)
+	go startWorker(&wg, "LOGIN", config.LoginPort, processLoginPacket)
+	go startWorker(&wg, "CHARACTER", config.CharacterPort, processCharacterPacket)
 	wg.Wait()
 }

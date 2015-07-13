@@ -22,6 +22,9 @@
 package login_server
 
 import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"libarchon/logger"
@@ -29,6 +32,56 @@ import (
 )
 
 const ClientVersionString = "TethVer12510"
+
+// Handle account verification tasks common to both the login and character servers.
+func verifyAccount(client *LoginClient) (*LoginPkt, error) {
+	var loginPkt LoginPkt
+	util.StructFromBytes(client.Data(), &loginPkt)
+
+	// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
+	hasher := sha256.New()
+	hasher.Write(util.StripPadding(loginPkt.Password[:]))
+	pktUername := string(util.StripPadding(loginPkt.Username[:]))
+	pktPassword := hex.EncodeToString(hasher.Sum(nil)[:])
+
+	var username, password string
+	var isBanned, isActive bool
+	row := GetConfig().Database().QueryRow("SELECT username, password, "+
+		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
+		"WHERE username = ? and password = ?", pktUername, pktPassword)
+	err := row.Scan(&username, &password, &client.guildcard,
+		&client.isGm, &isBanned, &isActive, &client.teamId)
+	switch {
+	// Check if we have a valid username/combination.
+	case err == sql.ErrNoRows:
+		// The same error is returned for invalid passwords as attempts to log in
+		// with a nonexistent username as some measure of account security. Note
+		// that if this is changed to query by username and add a password check,
+		// the index on account_data will need to be modified.
+		SendSecurity(client, BBLoginErrorPassword, 0, 0)
+		return nil, errors.New("Account does not exist for username: " + username)
+	// Database error?
+	case err != nil:
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
+		log.DBError(err.Error())
+		return nil, err
+	// Is the account banned?
+	case isBanned:
+		SendSecurity(client, BBLoginErrorBanned, 0, 0)
+		return nil, errors.New("Account banned: " + username)
+	// Has the account been activated?
+	case !isActive:
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
+		return nil, errors.New("Account must be activated for username: " + username)
+	}
+	// Copy over the config, which should indicate how far they are in the login flow.
+	util.StructFromBytes(loginPkt.Security[:], &client.config)
+
+	// TODO: Hardware ban check.
+	return &loginPkt, nil
+}
 
 func handleLogin(client *LoginClient) error {
 	loginPkt, err := verifyAccount(client)
