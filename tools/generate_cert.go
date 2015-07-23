@@ -91,7 +91,7 @@ func main() {
 		log.Fatalf(err.Error())
 	}
 
-	certOut, err := os.Create("cert.pem")
+	certOut, err := os.Create("certificate.pem")
 	if err != nil {
 		log.Fatalf("failed to open cert.pem for writing: %s", err)
 	}

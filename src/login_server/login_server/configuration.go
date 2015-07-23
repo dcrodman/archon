@@ -34,9 +34,12 @@ import (
 	"strings"
 )
 
-const ServerConfigDir = "/usr/local/share/archon"
-const LoginConfigFile = "login_config.json"
-const PrivateKeyFile = "shipgate.pem"
+const (
+	ServerConfigDir = "/usr/local/share/archon"
+	LoginConfigFile = "login_config.json"
+	CertificateFile = "certificate.pem"
+	KeyFile         = "key.pem"
+)
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {

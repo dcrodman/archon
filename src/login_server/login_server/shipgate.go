@@ -23,14 +23,12 @@
 package login_server
 
 import (
-	// "crypto/rsa"
 	"crypto/tls"
 	// "errors"
 	"fmt"
 	// "io/ioutil"
-	"libarchon/logger"
 	// "libarchon/server"
-	"libarchon/util"
+	// "libarchon/util"
 	"net"
 	"os"
 	// "runtime/debug"
@@ -103,68 +101,45 @@ func processShipgatePacket(ship *LoginClient) error {
 }
 
 // Per-ship connection loop.
-func handleShipConnection(conn *net.Conn) {
-	// ship, err := authenticate(conn)
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		errMsg := fmt.Sprintf("Error in ship communication: %s: %s\n%s\n",
-	// 			ship.IPAddr(), err, debug.Stack())
-	// 		log.Error(errMsg, logger.CriticalPriority)
-	// 	}
-	// 	conn.Close()
-	// 	log.Info("Disconnected ship "+ship.IPAddr(), logger.CriticalPriority)
-	// 	// TODO: Remove from ship list
-	// }()
-	// if err != nil {
-	// 	log.Warn("Failed to authenticate ship: "+err.Error(), logger.CriticalPriority)
-	// 	return
-	// }
-	// // sessionKey, err := aes.NewCipher(bytes)
-	// // sessionKey = cipher.NewCBCEncrypter(b, iv)
-}
-
-// Wait for ship connections and spin off goroutines to handle them.
-func handleShipgateConnections(cfg *configuration) {
-	for {
-		connection, err := socket.Accept()
-		if err != nil {
-			log.Warn("Failed to accept connection: %s", err.Error())
-			continue
-		}
-		// TODO: Add to ship list
-		data := make([]byte, 50)
-		b, err := connection.Read(data)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(-1)
-		}
-		fmt.Println(b)
-		fmt.Println(connection.RemoteAddr())
-		util.PrintPayload(data, b)
-
-		connection.Close()
-	}
+func handleShipConnection(conn net.Conn) {
+	defer func() {
+		// if err := recover(); err != nil {
+		// 	log.Error("Error in ship communication: %s: %s\n%s\n",
+		// 		ship.IPAddr(), err, debug.Stack())
+		// }
+		conn.Close()
+		// log.Info("Disconnected ship %s", ship.IPAddr())
+		// TODO: Remove from ship list
+	}()
 }
 
 func startShipgate(wg *sync.WaitGroup) {
 	cfg := GetConfig()
-
-	cert, err := tls.LoadX509KeyPair("cert.pem", "key.pem")
+	cert, err := tls.LoadX509KeyPair(CertificateFile, KeyFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
-	tlsCfg := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}
+	tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+
 	socket, err := tls.Listen("tcp", cfg.Hostname+":"+cfg.ShipgatePort, tlsCfg)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for SHIPGATE connections on %s:%s...\n",
+	log.Important("Waiting for SHIPGATE connections on %s:%s...\n",
 		cfg.Hostname, cfg.ShipgatePort)
 
-	handleShipgateConnections(cfg)
+	// Wait for ship connections and spin off goroutines to handle them.
+	for {
+		conn, err := socket.Accept()
+		if err != nil {
+			log.Warn("Failed to accept connection: %s", err.Error())
+			continue
+		}
+		// TODO: Add to ship list
+		go handleShipConnection(conn)
+	}
+
 	wg.Done()
 }

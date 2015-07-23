@@ -25,19 +25,18 @@ package ship_server
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"libarchon/logger"
-	"os"
 	"strconv"
 )
 
-const ServerConfigDir = "/usr/local/share/archon"
-const ShipConfigFile = "ship_config.json"
+const (
+	ServerConfigDir = "/usr/local/share/archon"
+	ShipConfigFile  = "ship_config.json"
 
-const ShipKeyFile = "ship.pem"
-const ShipgateKeyFile = "shipgate.pub"
+	CertificateFile = "certificate.pem"
+)
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {
