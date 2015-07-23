@@ -31,11 +31,13 @@ import (
 	"libarchon/logger"
 	"os"
 	"strconv"
-	"strings"
 )
 
 const ServerConfigDir = "/usr/local/share/archon"
 const ShipConfigFile = "ship_config.json"
+
+const ShipKeyFile = "ship.pem"
+const ShipgateKeyFile = "shipgate.pub"
 
 // Configuration structure that can be shared between the Login and Character servers.
 type configuration struct {

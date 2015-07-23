@@ -20,7 +20,8 @@
  */
 package login_server
 
-const BBHeaderSize = 0x08
+const BBHeaderSize = 8
+const ShipgateHeaderSize = 8
 const bbCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
 
 // Packet types for packets sent to and from the login and character servers.
@@ -254,4 +255,26 @@ type ScrollMessagePacket struct {
 	Header  BBPktHeader
 	Padding [2]uint32
 	Message []byte
+}
+
+type ShipgateHeader struct {
+	Size uint16
+	Type uint16
+	Id   int
+}
+
+// Initial auth request sent to the shipgate.
+type ShipgateAuthPkt struct {
+	header ShipgateHeader
+	name   []byte
+}
+
+// Contains the symmetric key from the shipgate.
+type ShipgateKeyPkt struct {
+	header ShipgateHeader
+}
+
+// Acknowldge that we got the key.
+type ShipgateKeyAckPkt struct {
+	header ShipgateHeader
 }

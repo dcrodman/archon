@@ -23,20 +23,17 @@
 package login_server
 
 import (
-	// "crypto/aes"
-	// "crypto/cipher"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
+	// "crypto/rsa"
+	"crypto/tls"
+	// "errors"
 	"fmt"
-	"io/ioutil"
-	// "libarchon/logger"
+	// "io/ioutil"
+	"libarchon/logger"
 	// "libarchon/server"
+	"libarchon/util"
 	"net"
-	"net/http"
 	"os"
-	"strconv"
+	// "runtime/debug"
 	"sync"
 )
 
@@ -50,10 +47,7 @@ type Ship struct {
 	PacketSize uint16
 }
 
-const ShipgateHeaderSize = 0x04
-
-var shipgateKey *rsa.PrivateKey
-var sessionKey []byte
+func (s *Ship) IPAddr() string { return s.IpAddr }
 
 // Loop for the life of the server, pinging the shipgate every 30
 // seconds to update the list of available ships.
@@ -104,85 +98,73 @@ func fetchShipList() {
 	// }
 }
 
-// Distributing a shared symmetric key is insecure, so in order to
-// allow symmetric encryption an initial handshake is performed
-// using PKCS1 and known keys. The shipgate keeps all ship public
-// keys (along with its private key) locally and assumes that
-// connecting ships in turn have its public key. This doubles as a
-// registration mechanism since we only allow ships whose public keys
-// we have stored to connect.
-func authenticateClient(c *net.TCPConn) {
-}
-
 func processShipgatePacket(ship *LoginClient) error {
 	return nil
 }
 
-// Initialize the server's private PKCS1 key used for registering
-// ships and generate a 16 byte key for an AES cipher to be used
-// for the majority of ship communication.
-func initKeys(dir string) {
-	filename := dir + "/" + PrivateKeyFile
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		fmt.Printf("\nError loading private key: %s\n", err.Error())
-		os.Exit(-1)
-	}
-
-	block, _ := pem.Decode(bytes)
-	shipgateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		fmt.Printf("\nError parsing private key: %s\n", err.Error())
-		os.Exit(-1)
-	}
-	fmt.Printf("Done\n")
-
-	sessionKey = make([]byte, 16)
-	rand.Read(sessionKey)
-}
-
-// Silently spin off a registration port for ships in the background.
-// Ships connect to this port to authenticate and obtain the symmetric
-// key that's used for encrypted comms via the SHIPGATE port.
-func handleShipRegistration(port string) {
-	// socket, err := server.OpenSocket(cfg.Hostname, port)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(-1)
-	// }
-	// for {
-	// 	conn, err := socket.Accept()
-	// 	if err != nil {
-	// 		log.Warn("Failed to accept ship connection", logger.HighPriority)
+// Per-ship connection loop.
+func handleShipConnection(conn *net.Conn) {
+	// ship, err := authenticate(conn)
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		errMsg := fmt.Sprintf("Error in ship communication: %s: %s\n%s\n",
+	// 			ship.IPAddr(), err, debug.Stack())
+	// 		log.Error(errMsg, logger.CriticalPriority)
 	// 	}
-	// 	go authenticateClient(conn)
+	// 	conn.Close()
+	// 	log.Info("Disconnected ship "+ship.IPAddr(), logger.CriticalPriority)
+	// 	// TODO: Remove from ship list
+	// }()
+	// if err != nil {
+	// 	log.Warn("Failed to authenticate ship: "+err.Error(), logger.CriticalPriority)
+	// 	return
 	// }
-	// socket.Close()
+	// // sessionKey, err := aes.NewCipher(bytes)
+	// // sessionKey = cipher.NewCBCEncrypter(b, iv)
 }
 
+// Wait for ship connections and spin off goroutines to handle them.
 func handleShipgateConnections(cfg *configuration) {
-	// socket, err := server.OpenSocket(cfg.Hostname, cfg.ShipgatePort)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(-1)
-	// }
-	// fmt.Printf("Waiting for SHIPGATE connections on %s:%s...\n", cfg.Hostname, cfg.ShipgatePort)
-	// connection, err := socket.AcceptTCP()
-	// if err != nil {
-	// 	log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
-	// 	continue
-	// }
-	// 	sessionKey, err := aes.NewCipher(bytes)
-	// sessionKey = cipher.NewCBCEncrypter(b, iv)
+	for {
+		connection, err := socket.Accept()
+		if err != nil {
+			log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
+			continue
+		}
+		// TODO: Add to ship list
+		data := make([]byte, 50)
+		b, err := connection.Read(data)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+		fmt.Println(b)
+		fmt.Println(connection.RemoteAddr())
+		util.PrintPayload(data, b)
+
+		connection.Close()
+	}
 }
 
 func startShipgate(wg *sync.WaitGroup) {
 	cfg := GetConfig()
-	initKeys(cfg.KeysDir)
 
-	// The registration port is always the shipgate port + 1.
-	regPort, _ := strconv.ParseInt(cfg.ShipgatePort, 10, 0)
-	go handleShipRegistration(strconv.FormatInt(regPort+1, 10))
+	cert, err := tls.LoadX509KeyPair("cert.pem", "key.pem")
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+	socket, err := tls.Listen("tcp", cfg.Hostname+":"+cfg.ShipgatePort, tlsCfg)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+	fmt.Printf("Waiting for SHIPGATE connections on %s:%s...\n",
+		cfg.Hostname, cfg.ShipgatePort)
+
 	handleShipgateConnections(cfg)
 	wg.Done()
 }

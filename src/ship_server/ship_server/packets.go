@@ -18,29 +18,26 @@
  */
 package ship_server
 
-import (
-	"fmt"
-	"os"
-)
+const ShipgateHeaderSize = 8
 
-func StartServer() {
-	fmt.Println("Initializing Archon Ship server...")
-	config := GetConfig()
+type ShipgateHeader struct {
+	Size uint16
+	Type uint16
+	Id   int
+}
 
-	// Initialize our config singleton from one of two expected file locations.
-	fmt.Printf("Loading config file %v...", ShipConfigFile)
-	err := config.InitFromFile(ShipConfigFile)
-	if err != nil {
-		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+ShipConfigFile)
-		err = config.InitFromFile(ShipConfigFile)
-		if err != nil {
-			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
-			fmt.Printf("%s\n", err.Error())
-			os.Exit(-1)
-		}
-	}
-	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
+// Initial auth request sent to the shipgate.
+type ShipgateAuthPkt struct {
+	header ShipgateHeader
+	name   []byte
+}
 
-	InitShipgate()
+// Contains the symmetric key from the shipgate.
+type ShipgateKeyPkt struct {
+	header ShipgateHeader
+}
+
+// Acknowldge that we got the key.
+type ShipgateKeyAckPkt struct {
+	header ShipgateHeader
 }
