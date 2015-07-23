@@ -128,7 +128,7 @@ func handleShipgateConnections(cfg *configuration) {
 	for {
 		connection, err := socket.Accept()
 		if err != nil {
-			log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
+			log.Warn("Failed to accept connection: %s", err.Error())
 			continue
 		}
 		// TODO: Add to ship list

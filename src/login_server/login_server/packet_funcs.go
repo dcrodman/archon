@@ -23,7 +23,6 @@ package login_server
 
 import (
 	"fmt"
-	"libarchon/logger"
 	"libarchon/util"
 	"syscall"
 	"time"
@@ -38,8 +37,7 @@ var serverName = util.ConvertToUtf16("Archon")
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
 	if err := client.c.Send(pkt[:length]); err != nil {
-		log.Info("Error sending to client "+client.IPAddr()+": "+err.Error(),
-			logger.MediumPriority)
+		log.Warn("Error sending to client %v: %s", client.IPAddr(), err.Error())
 		return -1
 	}
 	return 0

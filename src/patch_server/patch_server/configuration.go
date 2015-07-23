@@ -26,12 +26,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"io/ioutil"
 	"libarchon/logger"
 	"libarchon/util"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -52,7 +49,6 @@ type configuration struct {
 	DebugMode      bool
 
 	database        *sql.DB
-	logWriter       io.Writer
 	cachedHostBytes [4]byte
 	redirectPort    uint16
 	MessageBytes    []byte
@@ -82,7 +78,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.Hostname = "127.0.0.1"
 	config.PatchPort = "11000"
 	config.DataPort = "11001"
-	config.Logfile = "Standard Out"
+	config.Logfile = ""
 	config.PatchDir = "patches/"
 	config.MaxConnections = 30000
 	config.WelcomeMessage = "Unconfigured Welcome Message"
@@ -100,24 +96,14 @@ func (config *configuration) InitFromFile(fileName string) error {
 	}
 	config.MessageSize = uint16(msgLen)
 
-	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
+	if config.LogLevel < logger.High || config.LogLevel > logger.Low {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.CriticalPriority
+		config.LogLevel = logger.High
 	}
 	// Convert the data port to a BE uint for the redirect packet.
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
 	config.redirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 
-	if config.Logfile != "Standard Out" {
-		config.logWriter, err = os.OpenFile(config.Logfile,
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("\nWARNING: Failed to open log file %s: %s\n",
-				config.Logfile, err.Error())
-		}
-	} else {
-		config.logWriter = os.Stdout
-	}
 	return nil
 }
 
@@ -141,12 +127,16 @@ func (config *configuration) RedirectPort() uint16 {
 }
 
 func (config *configuration) String() string {
+	outfile := config.Logfile
+	if outfile == "" {
+		outfile = "Standard Out"
+	}
 	return "Hostname: " + config.Hostname + "\n" +
 		"Patch Port: " + config.PatchPort + "\n" +
 		"Data Port: " + config.DataPort + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Patch Directory: " + config.PatchDir + "\n" +
-		"Output Logged To: " + config.Logfile + "\n" +
+		"Output Logged To: " + outfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode) + "\n" +
 		"Welcome Message: " + config.WelcomeMessage

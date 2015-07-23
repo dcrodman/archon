@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"fmt"
 	"hash/crc32"
-	"libarchon/logger"
 	"libarchon/util"
 )
 
@@ -153,7 +152,7 @@ func handleKeyConfig(client *LoginClient) error {
 			" VALUES (?, ?)", client.guildcard, optionData[:420])
 	}
 	if err != nil {
-		log.DBError(err.Error())
+		log.Error(err.Error())
 		return err
 	}
 	SendOptions(client, optionData)
@@ -189,7 +188,7 @@ func handleCharacterSelect(client *LoginClient) error {
 		SendCharacterAck(client, pkt.Slot, 2)
 		return nil
 	} else if err != nil {
-		log.DBError(err.Error())
+		log.Error(err.Error())
 		return err
 	}
 
@@ -217,7 +216,7 @@ func handleGuildcardDataStart(client *LoginClient) error {
 			"section_id, char_class, comment FROM guildcard_entries "+
 			"WHERE guildcard = ?", client.guildcard)
 	if err != nil {
-		log.DBError(err.Error())
+		log.Error(err.Error())
 		return err
 	}
 	defer rows.Close()
@@ -232,7 +231,7 @@ func handleGuildcardDataStart(client *LoginClient) error {
 		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc,
 			&entry.Language, &entry.SectionID, &entry.CharClass, &comment)
 		if err != nil {
-			log.DBError(err.Error())
+			log.Error(err.Error())
 			return err
 		}
 	}
@@ -276,7 +275,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 			prev.HairGreen, prev.HairBlue, prev.Name[:], prev.PropX, prev.PropY,
 			client.guildcard, charPkt.Slot)
 		if err != nil {
-			log.DBError(err.Error())
+			log.Error(err.Error())
 			return err
 		}
 	} else {
@@ -284,7 +283,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 		_, err := archonDB.Exec("DELETE FROM characters WHERE "+
 			"guildcard = ? AND slot_num = ?", client.guildcard, charPkt.Slot)
 		if err != nil {
-			log.DBError(err.Error())
+			log.Error(err.Error())
 			return err
 		}
 		// Grab our base stats for this character class.
@@ -310,7 +309,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 			stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
 			stats.LCK, meseta)
 		if err != nil {
-			log.DBError(err.Error())
+			log.Error(err.Error())
 			return err
 		}
 	}
@@ -375,8 +374,7 @@ func processCharacterPacket(client *LoginClient) error {
 	case MenuSelectType:
 		handleMenuSelect(client)
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
-		log.Info(msg, logger.MediumPriority)
+		log.Info("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
 	}
 	return err
 }

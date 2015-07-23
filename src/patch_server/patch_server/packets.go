@@ -22,7 +22,6 @@ package patch_server
 import (
 	"errors"
 	"fmt"
-	"libarchon/logger"
 	"libarchon/util"
 )
 
@@ -131,8 +130,7 @@ type FileChunkPacket struct {
 // Note: Packets sent to BB Clients must have a length divisible by 8.
 func SendPacket(client *PatchClient, pkt []byte, length uint16) int {
 	if err := client.c.Send(pkt[:length]); err != nil {
-		log.Info("Error sending to client "+client.IPAddr()+": "+err.Error(),
-			logger.MediumPriority)
+		log.Info("Error sending to client %v: %s", client.IPAddr(), err.Error())
 		return -1
 	}
 	return 0
@@ -298,10 +296,9 @@ func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
 // Send a chunk of file data.
 func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []byte) int {
 	if chunkSize > MaxChunkSize {
+		log.Error("Attempted to send %v byte chunk; max is %v",
+			string(chunkSize), string(MaxChunkSize))
 		panic(errors.New("File chunk size exceeds maximum"))
-		log.Error("Attempted to send "+string(chunkSize)+
-			" byte chunk; max is "+string(MaxChunkSize),
-			logger.CriticalPriority)
 	}
 	pkt := new(FileChunkPacket)
 	pkt.Header.Type = FileChunkType

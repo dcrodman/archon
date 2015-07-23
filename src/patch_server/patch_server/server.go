@@ -38,7 +38,7 @@ import (
 	"sync"
 )
 
-var log *logger.Logger
+var log *logger.ServerLogger
 var patchConnections *server.ConnectionList = server.NewClientList()
 
 const MaxChunkSize = 24576
@@ -154,7 +154,7 @@ func updateClientFiles(client *PatchClient) error {
 			file, err := os.Open(patch.relativePath)
 			if err != nil {
 				// Critical since this is most likely a filesystem error.
-				log.Error(err.Error(), logger.CriticalPriority)
+				log.Error(err.Error())
 				return err
 			}
 			for i := 0; i < chunks; i++ {
@@ -198,8 +198,7 @@ func processPatchPacket(client *PatchClient) error {
 			SendRedirect(client, cfg.RedirectPort(), cfg.HostnameBytes())
 		}
 	default:
-		msg := fmt.Sprintf("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
-		log.Info(msg, logger.MediumPriority)
+		log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
 	}
 	return err
 }
@@ -227,9 +226,7 @@ func processDataPacket(client *PatchClient) error {
 	case ClientListDoneType:
 		err = updateClientFiles(client)
 	default:
-		msg := fmt.Sprintf("Received unknown packet %02x from %s",
-			pktHeader.Type, client.IPAddr())
-		log.Info(msg, logger.MediumPriority)
+		log.Info("Received unknown packet %02x from %s", pktHeader.Type, client.IPAddr())
 	}
 	return err
 }
@@ -239,28 +236,27 @@ func processDataPacket(client *PatchClient) error {
 func handleClient(client *PatchClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
-			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
+			log.Error("Error in client communication: %s: %s\n%s\n",
 				client.IPAddr(), err, debug.Stack())
-			log.Error(errMsg, logger.CriticalPriority)
 		}
 		client.c.Close()
 		patchConnections.RemoveClient(client)
-		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
+		log.Info("Disconnected %s client %s", desc, client.IPAddr())
 	}()
 
-	log.Info("Accepted "+desc+" connection from "+client.IPAddr(), logger.MediumPriority)
+	log.Info("Accepted %s connection from %s", desc, client.IPAddr())
 	for {
 		err := client.c.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			// Error communicating with the client.
-			log.Warn(err.Error(), logger.MediumPriority)
+			log.Warn(err.Error())
 			break
 		}
 
 		if err = handler(client); err != nil {
-			log.Info(err.Error(), logger.LowPriority)
+			log.Warn(err.Error())
 			break
 		}
 	}
@@ -275,13 +271,13 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
+	log.Important("Waiting for %s connections on %s:%s...", id, cfg.Hostname, port)
 	for {
 		// Poll until we can accept more clients.
 		for patchConnections.Count() < cfg.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
-				log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
+				log.Warn("Failed to accept connection: %v", err.Error())
 				continue
 			}
 			client, err := newClient(connection)
@@ -399,8 +395,12 @@ func StartServer() {
 	}
 
 	// Initialize the logger.
-	log = logger.New(config.logWriter, config.LogLevel)
-	log.Info("Server Initialized", logger.CriticalPriority)
+	log, err = logger.New(config.Logfile, config.LogLevel)
+	if err != nil {
+		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
+		os.Exit(1)
+	}
+	log.Important("Server Initialized")
 
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup

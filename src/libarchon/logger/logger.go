@@ -16,74 +16,83 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Logging utility.
+* Lightweight wrapper class around Go's threadsafe logging library
+* in order to allow a little more flexibility with Archon's logging.
  */
 
 package logger
 
 import (
-	"fmt"
 	"io"
-	"time"
+	"log"
+	"os"
 )
 
-// Constants for the configurable log level that control the amount of information
-// written to the server logs. The higher the number, the lower the priority.
+// Constants for the configurable log level that control the amount
+// of information written to the server logs. The higher the number,
+// the greater the verbosity.
 type LogPriority byte
 
 const (
-	CriticalPriority LogPriority = 1
-	HighPriority                 = 2
-	MediumPriority               = 3
-	LowPriority                  = 4
+	High   LogPriority = 1
+	Medium             = 2
+	Low                = 3
 )
 
-type Logger struct {
-	out io.Writer
+type ServerLogger struct {
+	logger *log.Logger
 	// Minimum priority for messages. Logs with a priority below
 	// this level will not be written by the logger.
 	minLevel LogPriority
 }
 
-func New(writer io.Writer, level LogPriority) *Logger {
-	return &Logger{out: writer, minLevel: level}
-}
-
-func (logger *Logger) Info(msg string, priority LogPriority) {
-	if logger.minLevel < priority {
-		return
+// Creates a new writer with all output written to the file located
+// at filename with any logs with a priority lower than level silently
+// ignored. Passing "" for filename will cause logs to be written to stdout.
+func New(filename string, level LogPriority) (*ServerLogger, error) {
+	var w io.Writer
+	var err error
+	if filename != "" {
+		w, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		w = os.Stdout
 	}
-	logger.logMsg(fmt.Sprintf("[INFO] %s\n", msg))
+
+	l := log.New(w, "", log.Ldate|log.Ltime)
+	return &ServerLogger{logger: l, minLevel: level}, nil
 }
 
-func (logger *Logger) Warn(msg string, priority LogPriority) {
-	if logger.minLevel < priority {
-		return
+// Lower priority server information.
+func (l *ServerLogger) Info(format string, v ...interface{}) {
+	if l.minLevel >= Low {
+		l.logger.Printf("[INFO] "+format, v...)
 	}
-	logger.logMsg(fmt.Sprintf("[WARNING] %s\n", msg))
 }
 
-func (logger *Logger) Error(msg string, priority LogPriority) {
-	if logger.minLevel < priority {
-		return
+// Warnings from internal operations.
+func (l *ServerLogger) Warn(format string, v ...interface{}) {
+	if l.minLevel >= Medium {
+		l.logger.Printf("[WARN] "+format, v...)
 	}
-	logger.logMsg(fmt.Sprintf("[ERROR] %s\n", msg))
 }
 
-// DB errors are considered critical, but may not be worth stopping the server.
-// Log both to stdout and the log file for max visibility.
-func (logger *Logger) DBError(msg string) {
-	errMsg := fmt.Sprintf("[SQL ERROR] %s", msg)
-	fmt.Println(errMsg)
-	logger.Error(msg, CriticalPriority)
-}
-
-// Logs a message to either the user's configured logfile or to standard out. Only messages
-// equal to or greater than the user's specified priority will be written.
-func (logger *Logger) logMsg(msg string) {
-	timestamp := time.Now().Format("06-01-02 15:04:05")
-	_, err := logger.out.Write([]byte(fmt.Sprintf("%s %s", timestamp, msg)))
-	if err != nil {
-		fmt.Printf("WARNING: Error encountered writing to log: %s\n", err.Error())
+// Errors require admin attention.
+func (l *ServerLogger) Error(format string, v ...interface{}) {
+	if l.minLevel >= High {
+		l.logger.Printf("[ERROR] "+format, v...)
 	}
+}
+
+// Important messages ignore the user's logging preferences
+// as they're essential to the operations of the server.
+func (l *ServerLogger) Important(format string, v ...interface{}) {
+	l.logger.Printf(format, v...)
+}
+
+// Print a message and exit; the server can't continue to function.
+func (l *ServerLogger) Fatal(format string, v ...interface{}) {
+	l.logger.Fatalf(format, v)
 }

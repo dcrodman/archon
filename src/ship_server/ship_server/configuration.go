@@ -91,25 +91,19 @@ func (config *configuration) InitFromFile(fileName string) error {
 
 	json.Unmarshal(data, config)
 
-	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
+	if config.LogLevel < logger.High || config.LogLevel > logger.Low {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.CriticalPriority
+		config.LogLevel = logger.High
 	}
 
-	if config.Logfile != "Standard Out" {
-		config.logWriter, err = os.OpenFile(config.Logfile,
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("\nWARNING: Failed to open log file %s: %s\n",
-				config.Logfile, err.Error())
-		}
-	} else {
-		config.logWriter = os.Stdout
-	}
 	return nil
 }
 
 func (config *configuration) String() string {
+	outfile := config.Logfile
+	if outfile == "" {
+		outfile = "Standard Out"
+	}
 	return "Ship Name: " + config.Shipname + "\n" +
 		"Hostname: " + config.Hostname + "\n" +
 		"Shipgate Host: " + config.ShipgateHost + "\n" +
@@ -120,7 +114,7 @@ func (config *configuration) String() string {
 		"Web Port: " + config.WebPort + "\n" +
 		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
-		"Output Logged To: " + config.Logfile + "\n" +
+		"Output Logged To: " + outfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
 }

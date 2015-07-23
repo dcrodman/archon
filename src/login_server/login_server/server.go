@@ -65,13 +65,15 @@ type ShipEntry struct {
 
 type pktHandler func(p *LoginClient) error
 
-var log *logger.Logger
-var loginConnections *server.ConnectionList = server.NewClientList()
-var shipConnections *server.ConnectionList = server.NewClientList()
+var (
+	log              *logger.ServerLogger
+	loginConnections *server.ConnectionList = server.NewClientList()
+	shipConnections  *server.ConnectionList = server.NewClientList()
 
-var defaultShip ShipEntry
-var shipList []ShipEntry
-var shipListMutex sync.RWMutex
+	defaultShip   ShipEntry
+	shipList      []ShipEntry
+	shipListMutex sync.RWMutex
+)
 
 // Return a JSON string to the client with the name, hostname, port,
 // and player count.
@@ -102,28 +104,27 @@ func newClient(conn *net.TCPConn) (*LoginClient, error) {
 func handleClient(client *LoginClient, desc string, handler pktHandler) {
 	defer func() {
 		if err := recover(); err != nil {
-			errMsg := fmt.Sprintf("Error in client communication: %s: %s\n%s\n",
+			log.Error("Error in client communication: %s: %s\n%s\n",
 				client.IPAddr(), err, debug.Stack())
-			log.Error(errMsg, logger.CriticalPriority)
 		}
 		client.c.Close()
 		loginConnections.RemoveClient(client)
-		log.Info("Disconnected "+desc+" client "+client.IPAddr(), logger.MediumPriority)
+		log.Info("Disconnected %s client %s", desc, client.IPAddr())
 	}()
 
-	log.Info("Accepted "+desc+" connection from "+client.IPAddr(), logger.MediumPriority)
+	log.Info("Accepted %s connection from %s", desc, client.IPAddr())
 	for {
 		err := client.c.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			// Error communicating with the client.
-			log.Warn(err.Error(), logger.MediumPriority)
+			log.Warn(err.Error())
 			break
 		}
 
 		if err = handler(client); err != nil {
-			log.Info(err.Error(), logger.LowPriority)
+			log.Warn(err.Error())
 			break
 		}
 	}
@@ -144,7 +145,7 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 		for loginConnections.Count() < cfg.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
-				log.Error("Failed to accept connection: "+err.Error(), logger.HighPriority)
+				log.Warn("Failed to accept connection: %s", err.Error())
 				continue
 			}
 			client, err := newClient(connection)
@@ -183,7 +184,11 @@ func StartServer() {
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
 	// Initialize the logger.
-	log = logger.New(config.logWriter, config.LogLevel)
+	log, err = logger.New(config.Logfile, config.LogLevel)
+	if err != nil {
+		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
+		os.Exit(1)
+	}
 
 	loadParameterFiles()
 	loadBaseStats()
@@ -215,7 +220,7 @@ func StartServer() {
 	}
 	go http.ListenAndServe(":"+config.WebPort, nil)
 
-	log.Info("Server Initialized", logger.CriticalPriority)
+	log.Important("Server Initialized")
 	// Create a WaitGroup so that main won't exit until the server threads have exited.
 	var wg sync.WaitGroup
 	wg.Add(3)

@@ -27,7 +27,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"libarchon/logger"
 	"libarchon/util"
 )
 
@@ -64,7 +63,7 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 	case err != nil:
 		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
 			"database.\n\nPlease contact your server administrator.")
-		log.DBError(err.Error())
+		log.Error(err.Error())
 		return nil, err
 	// Is the account banned?
 	case isBanned:
@@ -126,8 +125,7 @@ func processLoginPacket(client *LoginClient) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		msg := fmt.Sprintf("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
-		log.Info(msg, logger.MediumPriority)
+		log.Info("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
 	}
 	return err
 }

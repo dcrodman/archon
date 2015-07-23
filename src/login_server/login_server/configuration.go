@@ -27,11 +27,9 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "go-sql-driver"
-	"io"
 	"io/ioutil"
 	"libarchon/logger"
 	"libarchon/util"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -62,7 +60,6 @@ type configuration struct {
 	DebugMode      bool
 
 	database         *sql.DB
-	logWriter        io.Writer
 	cachedHostBytes  [4]byte
 	cachedWelcomeMsg []byte
 	redirectPort     uint16
@@ -104,24 +101,14 @@ func (config *configuration) InitFromFile(fileName string) error {
 
 	config.cachedWelcomeMsg = util.ConvertToUtf16(config.WelcomeMessage)
 
-	if config.LogLevel < logger.CriticalPriority || config.LogLevel > logger.LowPriority {
+	if config.LogLevel < logger.High || config.LogLevel > logger.Low {
 		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.CriticalPriority
+		config.LogLevel = logger.High
 	}
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	config.redirectPort = uint16(charPort)
 
-	if config.Logfile != "Standard Out" {
-		config.logWriter, err = os.OpenFile(config.Logfile,
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("\nWARNING: Failed to open log file %s: %s\n",
-				config.Logfile, err.Error())
-		}
-	} else {
-		config.logWriter = os.Stdout
-	}
 	return nil
 }
 
@@ -173,6 +160,10 @@ func (config *configuration) RedirectPort() uint16 {
 }
 
 func (config *configuration) String() string {
+	outfile := config.Logfile
+	if outfile == "" {
+		outfile = "Standard Out"
+	}
 	return "Hostname: " + config.Hostname + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
@@ -186,7 +177,7 @@ func (config *configuration) String() string {
 		"Database Name: " + config.DBName + "\n" +
 		"Database Username: " + config.DBUsername + "\n" +
 		"Database Password: " + config.DBPassword + "\n" +
-		"Output Logged To: " + config.Logfile + "\n" +
+		"Output Logged To: " + outfile + "\n" +
 		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
 }

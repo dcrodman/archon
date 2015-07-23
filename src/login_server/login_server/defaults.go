@@ -26,7 +26,6 @@ import (
 	// "fmt"
 	"hash/crc32"
 	"io/ioutil"
-	"libarchon/logger"
 	"libarchon/prs"
 	"libarchon/util"
 	"os"
@@ -174,9 +173,7 @@ func loadParameterFiles() {
 	for _, paramFile := range ParamFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
-			log.Error("Error reading parameter file: "+err.Error(),
-				logger.CriticalPriority)
-			os.Exit(1)
+			log.Fatal("Error reading parameter file: %v", err.Error())
 		}
 		fileSize := len(data)
 
@@ -217,8 +214,7 @@ func loadBaseStats() {
 	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
-		log.Error("Error reading stats file: "+err.Error(), logger.CriticalPriority)
-		os.Exit(1)
+		log.Fatal("Error reading stats file: %v", err.Error())
 	}
 	decompressedSize := prs.DecompressSize(compressed)
 	decompressed := make([]byte, decompressedSize)
