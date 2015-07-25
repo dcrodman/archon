@@ -19,53 +19,53 @@
 package ship_server
 
 import (
-	"crypto"
 	"crypto/tls"
-	"crypto/x509"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"libarchon/util"
 	"net"
 	"os"
 )
 
 type Shipgate struct {
-	ip        *net.TCPAddr
-	conn      *net.TCPConn
-	publicKey *crypto.PublicKey
-}
-
-func InitShipgate() (*Shipgate, error) {
-	cfg := GetConfig()
-
-	pool := x509.NewCertPool()
-	certData, err := ioutil.ReadFile("cert.pem")
-	pool.AppendCertsFromPEM(certData)
-	tlsCfg := &tls.Config{RootCAs: pool}
-
-	conn, err := tls.Dial("tcp", cfg.ShipgateHost+":"+cfg.ShipgatePort, tlsCfg)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
-	b, err := conn.Write([]byte("oh herrow"))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
-	fmt.Println(b)
-
-	shipgate := new(Shipgate)
-
-	return shipgate, nil
+	conn   *net.TCPConn
+	tlsCfg *tls.Config
 }
 
 func (s *Shipgate) Connect() error {
-	// var err error
-	// s.conn, err = net.DialTCP("tcp", cfg.ShipgateHost+":"+cfg.ShipgatePort, nil)
-	// if err != nil {
-	// 	return errors.New("Error connecting to shipgate: " + err.Error())
-	// }
-	// Authenticate and load symmetric key
+	cfg := GetConfig()
+
+	conn, err := tls.Dial("tcp", cfg.ShipgateHost+":"+cfg.ShipgatePort, s.tlsCfg)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+
+	authPkt := &ShipgateAuthPkt{
+		Header: ShipgateHeader{
+			Type: ShipgateAuthType,
+			Size: 0x20,
+			Id:   0x00,
+		},
+	}
+	copy(authPkt.Name[:], cfg.Shipname)
+
+	pkt, _ := util.BytesFromStruct(authPkt)
+	if _, err = conn.Write(pkt); err != nil {
+		log.Important("Failed to connect to shipgate: ", err.Error())
+		return err
+	}
+	ack := make([]byte, 8)
+	if _, err = conn.Read(ack); err != nil {
+		log.Important("Shipgate connection error: ", err.Error())
+		return err
+	}
+	var ackPkt ShipgateHeader
+	util.StructFromBytes(ack, &ackPkt)
+	if ackPkt.Type != ShipgateAuthAck {
+		log.Important("Shipgate authentication failed")
+		return errors.New("Auth failed")
+	}
 	return nil
 }
 

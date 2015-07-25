@@ -19,8 +19,17 @@
 package ship_server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
+	"libarchon/logger"
 	"os"
+)
+
+var (
+	log      *logger.ServerLogger
+	shipgate *Shipgate
 )
 
 func StartServer() {
@@ -42,5 +51,17 @@ func StartServer() {
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
-	InitShipgate()
+	// Initialize the logger.
+	log, err = logger.New(config.Logfile, config.LogLevel)
+	if err != nil {
+		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
+		os.Exit(1)
+	}
+
+	// Open a connection to the shipgate.
+	pool := x509.NewCertPool()
+	certData, err := ioutil.ReadFile(CertificateFile)
+	pool.AppendCertsFromPEM(certData)
+	shipgate = &Shipgate{tlsCfg: &tls.Config{RootCAs: pool}}
+	shipgate.Connect()
 }

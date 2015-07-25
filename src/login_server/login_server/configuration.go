@@ -98,7 +98,7 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.ParametersDir = "parameters"
 	config.KeysDir = "keys"
 	config.DBHost = "127.0.0.1"
-	config.Logfile = "Standard Out"
+	config.Logfile = ""
 
 	json.Unmarshal(data, config)
 

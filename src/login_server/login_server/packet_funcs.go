@@ -30,8 +30,10 @@ import (
 
 const TimeFmt = "2006:01:02: 15:05:05"
 
-var copyrightBytes []byte = make([]byte, 96)
-var serverName = util.ConvertToUtf16("Archon")
+var (
+	copyrightBytes []byte = make([]byte, 96)
+	serverName            = util.ConvertToUtf16("Archon")
+)
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -311,6 +313,17 @@ func SendScrollMessage(client *LoginClient) int {
 		fmt.Println("Sending Scroll Message Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
+}
+
+func ShipgateSendAck(ship *Ship) {
+	pkt := &ShipgateHeader{
+		Size: ShipgateHeaderSize,
+		Type: ShipgateAuthAck,
+		Id:   0,
+	}
+	// TODO: This is temporary
+	b, _ := util.BytesFromStruct(pkt)
+	ship.conn.Write(b)
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two

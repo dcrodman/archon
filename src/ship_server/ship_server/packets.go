@@ -18,26 +18,22 @@
  */
 package ship_server
 
-const ShipgateHeaderSize = 8
+// Packet types for the shipgate. These can overlap since they aren't
+// processed by the same set of handlers as the client ones.
+const (
+	ShipgateHeaderSize = 8
+	ShipgateAuthType   = 0x01
+	ShipgateAuthAck    = 0x02
+)
 
 type ShipgateHeader struct {
 	Size uint16
 	Type uint16
-	Id   int
+	Id   uint32
 }
 
 // Initial auth request sent to the shipgate.
 type ShipgateAuthPkt struct {
-	header ShipgateHeader
-	name   []byte
-}
-
-// Contains the symmetric key from the shipgate.
-type ShipgateKeyPkt struct {
-	header ShipgateHeader
-}
-
-// Acknowldge that we got the key.
-type ShipgateKeyAckPkt struct {
-	header ShipgateHeader
+	Header ShipgateHeader
+	Name   [24]byte
 }

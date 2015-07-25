@@ -38,6 +38,16 @@ import (
 	"sync"
 )
 
+var (
+	log              *logger.ServerLogger
+	loginConnections *server.ConnectionList = server.NewClientList()
+	shipConnections  *server.ConnectionList = server.NewClientList()
+
+	defaultShip   ShipEntry
+	shipList      []ShipEntry
+	shipListMutex sync.RWMutex
+)
+
 // Struct for holding client-specific data.
 type LoginClient struct {
 	c         *server.PSOClient
@@ -64,16 +74,6 @@ type ShipEntry struct {
 }
 
 type pktHandler func(p *LoginClient) error
-
-var (
-	log              *logger.ServerLogger
-	loginConnections *server.ConnectionList = server.NewClientList()
-	shipConnections  *server.ConnectionList = server.NewClientList()
-
-	defaultShip   ShipEntry
-	shipList      []ShipEntry
-	shipListMutex sync.RWMutex
-)
 
 // Return a JSON string to the client with the name, hostname, port,
 // and player count.

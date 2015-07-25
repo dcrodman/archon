@@ -28,8 +28,10 @@ import (
 )
 
 // Cached parameter data to avoid computing it every time.
-var paramHeaderData []byte
-var paramChunkData map[int][]byte
+var (
+	paramHeaderData []byte
+	paramChunkData  map[int][]byte
+)
 
 // Possible character classes as defined by the game.
 type CharClass uint8

@@ -93,11 +93,11 @@ func main() {
 
 	certOut, err := os.Create("certificate.pem")
 	if err != nil {
-		log.Fatalf("failed to open cert.pem for writing: %s", err)
+		log.Fatalf("failed to open certitifcate.pem for writing: %s", err)
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
 	certOut.Close()
-	log.Print("written cert.pem\n")
+	log.Print("written certificate.pem\n")
 
 	keyOut, err := os.OpenFile("key.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -107,4 +107,7 @@ func main() {
 	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 	keyOut.Close()
 	log.Print("written key.pem\n")
+
+	log.Printf("Place the cert and key in the config folder of the shipgate\n" +
+		"and distrubute the certificate to connecting ships\n")
 }

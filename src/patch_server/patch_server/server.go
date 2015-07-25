@@ -38,8 +38,19 @@ import (
 	"sync"
 )
 
-var log *logger.ServerLogger
-var patchConnections *server.ConnectionList = server.NewClientList()
+var (
+	log              *logger.ServerLogger
+	patchConnections *server.ConnectionList = server.NewClientList()
+
+	// File names that should be ignored when searching for patch files.
+	SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
+
+	// Each index corresponds to a patch file. This is constructed in the order
+	// that the patch tree will be traversed and makes it faster to locate a
+	// patch entry when the client sends us an index in the FileStatusPacket.
+	patchTree  PatchDir
+	patchIndex []*PatchEntry
+)
 
 const MaxChunkSize = 24576
 
@@ -75,15 +86,6 @@ type PatchDir struct {
 	patches []*PatchEntry
 	subdirs []*PatchDir
 }
-
-// File names that should be ignored when searching for patch files.
-var SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
-
-// Each index corresponds to a patch file. This is constructed in the order
-// that the patch tree will be traversed and makes it faster to locate a
-// patch entry when the client sends us an index in the FileStatusPacket.
-var patchTree PatchDir
-var patchIndex []*PatchEntry
 
 // Create and initialize a new struct to hold client information.
 func newClient(conn *net.TCPConn) (*PatchClient, error) {
@@ -324,12 +326,13 @@ func loadPatches(node *PatchDir, path string) error {
 			if err != nil {
 				return err
 			}
-			patch := new(PatchEntry)
-			patch.filename = filename
-			patch.relativePath = path + "/" + filename
-			patch.pathDirs = dirs
-			patch.fileSize = uint32(file.Size())
-			patch.checksum = crc32.ChecksumIEEE(data)
+			patch := &PatchEntry{
+				filename:     filename,
+				relativePath: path + "/" + filename,
+				pathDirs:     dirs,
+				fileSize:     uint32(file.Size()),
+				checksum:     crc32.ChecksumIEEE(data),
+			}
 
 			node.patches = append(node.patches, patch)
 			fmt.Printf("%s (%d bytes, checksum: %v)\n",

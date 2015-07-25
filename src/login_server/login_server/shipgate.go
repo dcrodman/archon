@@ -24,28 +24,85 @@ package login_server
 
 import (
 	"crypto/tls"
-	// "errors"
+	"errors"
 	"fmt"
-	// "io/ioutil"
-	// "libarchon/server"
-	// "libarchon/util"
+	"io"
+	"libarchon/server"
+	"libarchon/util"
 	"net"
 	"os"
-	// "runtime/debug"
+	"runtime/debug"
+	"strings"
 	"sync"
 )
 
 type Ship struct {
-	Conn   *net.TCPConn
-	IpAddr string
-	Port   string
+	// We aren't communicating with a PSO client, but the
+	// basic connection logic is the same for ship communication.
+	conn net.Conn
+	name string
 
-	RecvData   []byte
-	RecvSize   int
-	PacketSize uint16
+	ipAddr string
+	port   string
+
+	recvSize   int
+	packetSize uint16
+	buffer     []byte
 }
 
-func (s *Ship) IPAddr() string { return s.IpAddr }
+func (s *Ship) Client() server.Client { return s }
+func (s *Ship) IPAddr() string        { return s.ipAddr }
+func (s *Ship) Data() []byte          { return s.buffer[:s.packetSize] }
+func (s *Ship) Close()                { s.conn.Close() }
+
+// Encryption/decryption is handled by the TLS connection.
+func (s *Ship) Encrypt(data []byte, size uint32) {}
+func (s *Ship) Decrypt(data []byte, size uint32) {}
+
+func (s *Ship) Send(data []byte) error {
+	return nil
+}
+
+func (s *Ship) Process() error {
+	s.recvSize = 0
+	s.packetSize = 0
+
+	// Wait for the packet header.
+	for s.recvSize < ShipgateHeaderSize {
+		bytes, err := s.conn.Read(s.buffer[s.recvSize:ShipgateHeaderSize])
+		if bytes == 0 || err == io.EOF {
+			// The client disconnected, we're done.
+			return err
+		} else if err != nil {
+			fmt.Println("Sockt error")
+			// Socket error, nothing we can do now
+			return errors.New("Socket Error (" + s.ipAddr + ") " + err.Error())
+		}
+		s.recvSize += bytes
+		s.packetSize, _ = util.GetPacketSize(s.buffer[:2])
+	}
+	pktSize := int(s.packetSize)
+
+	// Grow the client's receive buffer if they send us a packet bigger
+	// than its current capacity.
+	if pktSize > cap(s.buffer) {
+		newSize := pktSize + len(s.buffer)
+		newBuf := make([]byte, newSize)
+		copy(newBuf, s.buffer)
+		s.buffer = newBuf
+	}
+
+	// Read in the rest of the packet.
+	for s.recvSize < pktSize {
+		remaining := pktSize - s.recvSize
+		bytes, err := s.conn.Read(s.buffer[s.recvSize : s.recvSize+remaining])
+		if err != nil {
+			return errors.New("Socket Error (" + s.ipAddr + ") " + err.Error())
+		}
+		s.recvSize += bytes
+	}
+	return nil
+}
 
 // Loop for the life of the server, pinging the shipgate every 30
 // seconds to update the list of available ships.
@@ -96,25 +153,67 @@ func fetchShipList() {
 	// }
 }
 
-func processShipgatePacket(ship *LoginClient) error {
-	return nil
+func processShipgatePacket(ship *Ship) error {
+	var hdr ShipgateHeader
+	util.StructFromBytes(ship.Data()[:ShipgateHeaderSize], &hdr)
+
+	var err error = nil
+	switch hdr.Type {
+	case ShipgateAuthType:
+		var pkt ShipgateAuthPkt
+		util.StructFromBytes(ship.Data(), &pkt)
+		ship.name = string(pkt.Name[:])
+		log.Info("Registered ship: %v", ship.name)
+	default:
+		log.Info("Received unknown packet %x from %s", hdr.Type, ship.IPAddr())
+	}
+
+	return err
 }
 
 // Per-ship connection loop.
 func handleShipConnection(conn net.Conn) {
+	addr := strings.Split(conn.RemoteAddr().String(), ":")
+	ship := &Ship{
+		conn:   conn,
+		ipAddr: addr[0],
+		port:   addr[1],
+		buffer: make([]byte, 512),
+	}
+	shipConnections.AddClient(ship)
+	log.Info("Accepted ship connection from %v", ship.IPAddr())
+
 	defer func() {
-		// if err := recover(); err != nil {
-		// 	log.Error("Error in ship communication: %s: %s\n%s\n",
-		// 		ship.IPAddr(), err, debug.Stack())
-		// }
+		if err := recover(); err != nil {
+			log.Error("Error in ship communication: %s: %s\n%s\n",
+				ship.IPAddr(), err, debug.Stack())
+		}
 		conn.Close()
-		// log.Info("Disconnected ship %s", ship.IPAddr())
-		// TODO: Remove from ship list
+		log.Info("Disconnected ship: %s", ship.name)
+		shipConnections.RemoveClient(ship)
 	}()
+
+	for {
+		err := ship.Process()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			// Error communicating with the client.
+			log.Warn(err.Error())
+			break
+		}
+
+		if err = processShipgatePacket(ship); err != nil {
+			log.Warn(err.Error())
+			break
+		}
+	}
 }
 
 func startShipgate(wg *sync.WaitGroup) {
 	cfg := GetConfig()
+
+	// Load our certificate file ship auth.
 	cert, err := tls.LoadX509KeyPair(CertificateFile, KeyFile)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -127,7 +226,8 @@ func startShipgate(wg *sync.WaitGroup) {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
-	log.Important("Waiting for SHIPGATE connections on %s:%s...\n",
+
+	fmt.Printf("Waiting for SHIPGATE connections on %s:%s...\n",
 		cfg.Hostname, cfg.ShipgatePort)
 
 	// Wait for ship connections and spin off goroutines to handle them.
@@ -137,7 +237,6 @@ func startShipgate(wg *sync.WaitGroup) {
 			log.Warn("Failed to accept connection: %s", err.Error())
 			continue
 		}
-		// TODO: Add to ship list
 		go handleShipConnection(conn)
 	}
 
