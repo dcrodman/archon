@@ -20,7 +20,7 @@
 * responsible for establishing a connection to the database to be maintained
 * during execution.
  */
-package ship_server
+package ship
 
 import (
 	"database/sql"
@@ -46,8 +46,8 @@ type configuration struct {
 	ShipgatePort   string
 	BlockPort      string
 	ShipPort       string
-	KeyDirectory   string
 	WebPort        string
+	KeyDirectory   string
 	MaxConnections int
 	Logfile        string
 	LogLevel       logger.LogPriority
@@ -82,8 +82,8 @@ func (config *configuration) InitFromFile(fileName string) error {
 	config.ShipgateHost = "127.0.0.1"
 	config.ShipgatePort = "13000"
 	config.BlockPort = "14000"
-	config.ShipPort = "14002"
-	config.WebPort = "14001"
+	config.ShipPort = "14001"
+	config.WebPort = "14002"
 	config.KeyDirectory = "keys"
 	config.MaxConnections = 30000
 	config.Logfile = "Standard Out"
@@ -109,8 +109,8 @@ func (config *configuration) String() string {
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Block Port: " + config.BlockPort + "\n" +
 		"Ship Port: " + config.ShipPort + "\n" +
-		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
+		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Key Directory: " + config.KeyDirectory + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Output Logged To: " + outfile + "\n" +

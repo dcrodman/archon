@@ -552,17 +552,6 @@ func SendScrollMessage(client *LoginClient) int {
 	return SendEncrypted(client, data, uint16(size))
 }
 
-func ShipgateSendAck(ship *Ship) {
-	pkt := &ShipgateHeader{
-		Size: ShipgateHeaderSize,
-		Type: ShipgateAuthAck,
-		Id:   0,
-	}
-	// TODO: This is temporary
-	b, _ := util.BytesFromStruct(pkt)
-	ship.conn.Write(b)
-}
-
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
 func fixLength(data []byte, length uint16) uint16 {

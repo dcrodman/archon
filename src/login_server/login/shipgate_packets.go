@@ -21,12 +21,18 @@
  */
 package login
 
+import (
+	"fmt"
+	"libarchon/util"
+)
+
 // Packet types for the shipgate. These can overlap since they aren't
 // processed by the same set of handlers as the client ones.
 const (
-	ShipgateHeaderSize = 8
-	ShipgateAuthType   = 0x01
-	ShipgateAuthAck    = 0x02
+	ShipgateHeaderSize  = 8
+	ShipgateAuthType    = 0x01
+	ShipgateAuthAckType = 0x02
+	ShipgatePingType    = 0x03
 )
 
 type ShipgateHeader struct {
@@ -40,4 +46,45 @@ type ShipgateHeader struct {
 type ShipgateAuthPkt struct {
 	Header ShipgateHeader
 	Name   [24]byte
+}
+
+// Send the packet serialized (or otherwise contained) in pkt to a ship.
+func SendShipPacket(ship *Ship, pkt []byte, length uint16) int {
+	if err := ship.Send(pkt[:length]); err != nil {
+		log.Warn("Error sending to ship %v: %s", ship.IPAddr(), err.Error())
+		return -1
+	}
+	return 0
+}
+
+// Ship name acknowledgement.
+func SendAuthAck(ship *Ship) int {
+	pkt := &ShipgateHeader{
+		Size: ShipgateHeaderSize,
+		Type: ShipgateAuthAckType,
+		Id:   0,
+	}
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Auth Ack")
+		util.PrintPayload(data, size)
+		fmt.Println()
+	}
+	return SendShipPacket(ship, data, uint16(size))
+}
+
+// Liveliness check.
+func SendPing(ship *Ship) int {
+	pkt := &ShipgateHeader{
+		Size: ShipgateHeaderSize,
+		Type: ShipgatePingType,
+		Id:   0,
+	}
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Ping")
+		util.PrintPayload(data, size)
+		fmt.Println()
+	}
+	return SendShipPacket(ship, data, uint16(size))
 }

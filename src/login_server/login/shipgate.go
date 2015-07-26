@@ -34,11 +34,10 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Ship struct {
-	// We aren't communicating with a PSO client, but the
-	// basic connection logic is the same for ship communication.
 	conn net.Conn
 	name string
 
@@ -60,7 +59,8 @@ func (s *Ship) Encrypt(data []byte, size uint32) {}
 func (s *Ship) Decrypt(data []byte, size uint32) {}
 
 func (s *Ship) Send(data []byte) error {
-	return nil
+	_, err := s.conn.Write(data)
+	return err
 }
 
 func (s *Ship) Process() error {
@@ -102,6 +102,15 @@ func (s *Ship) Process() error {
 		s.recvSize += bytes
 	}
 	return nil
+}
+
+// Wraps Process() in a channel that can be used for timeouts.
+func (s *Ship) Read() <-chan error {
+	c := make(chan error)
+	go func() {
+		c <- s.Process()
+	}()
+	return c
 }
 
 // Loop for the life of the server, pinging the shipgate every 30
@@ -153,26 +162,34 @@ func fetchShipList() {
 	// }
 }
 
-func processShipgatePacket(ship *Ship) error {
+func processShipgatePacket(ship *Ship) {
 	var hdr ShipgateHeader
 	util.StructFromBytes(ship.Data()[:ShipgateHeaderSize], &hdr)
 
-	var err error = nil
+	var err error
 	switch hdr.Type {
 	case ShipgateAuthType:
 		var pkt ShipgateAuthPkt
 		util.StructFromBytes(ship.Data(), &pkt)
 		ship.name = string(pkt.Name[:])
+		SendAuthAck(ship)
 		log.Info("Registered ship: %v", ship.name)
-
 	default:
 		log.Info("Received unknown packet %x from %s", hdr.Type, ship.IPAddr())
 	}
 
-	return err
+	// Just log the error and let the handlers above do any cleanup. We don't
+	// want to close the connection here like we would for a game client
+	// in order to prevent one packet error from causing a reconnect.
+	if err != nil {
+		log.Warn(err.Error())
+	}
 }
 
-// Per-ship connection loop.
+// Per-ship connection loop. Unlike the other servers where each client
+// gets their own goroutine, each individual packet from the shipgate gets
+// its own goroutine and the ship handles mapping the responses to the
+// initiating client.
 func handleShipConnection(conn net.Conn) {
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
 	ship := &Ship{
@@ -194,8 +211,17 @@ func handleShipConnection(conn net.Conn) {
 		shipConnections.RemoveClient(ship)
 	}()
 
+	var err error
 	for {
-		err := ship.Process()
+		select {
+		// If we don't hear from a ship for 60 seconds, ping it to
+		// make sure it's still alive.
+		case <-time.After(time.Second * 60):
+			// TODO: Ping the ship
+			continue
+		case err = <-ship.Read():
+		}
+
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -203,11 +229,7 @@ func handleShipConnection(conn net.Conn) {
 			log.Warn(err.Error())
 			break
 		}
-
-		if err = processShipgatePacket(ship); err != nil {
-			log.Warn(err.Error())
-			break
-		}
+		go processShipgatePacket(ship)
 	}
 }
 

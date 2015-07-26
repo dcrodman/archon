@@ -16,7 +16,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
  */
-package ship_server
+package ship
 
 // Packet types for the shipgate. These can overlap since they aren't
 // processed by the same set of handlers as the client ones.

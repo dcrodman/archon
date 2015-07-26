@@ -16,7 +16,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
  */
-package ship_server
+package ship
 
 import (
 	"crypto/tls"
@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"libarchon/logger"
+	"net/http"
 	"os"
+	"runtime/pprof"
 )
 
 var (
@@ -57,6 +59,13 @@ func StartServer() {
 		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
 		os.Exit(1)
 	}
+
+	if config.DebugMode {
+		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
+			pprof.Lookup("goroutine").WriteTo(resp, 1)
+		})
+	}
+	go http.ListenAndServe(":"+config.WebPort, nil)
 
 	// Open a connection to the shipgate.
 	pool := x509.NewCertPool()

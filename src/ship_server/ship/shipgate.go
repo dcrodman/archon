@@ -16,7 +16,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
  */
-package ship_server
+package ship
 
 import (
 	"crypto/tls"

@@ -20,7 +20,7 @@ package main
 
 import (
 	"fmt"
-	"ship_server/ship_server"
+	"ship_server/ship"
 )
 
 func main() {
@@ -31,5 +31,5 @@ func main() {
 		"published by the Free Software Foundation, either version 3 of\n" +
 		"the License, or (at your option) any later version.")
 	fmt.Println("This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
-	ship_server.StartServer()
+	ship.StartServer()
 }
