@@ -16,11 +16,11 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Singleton package for handling the login and character server configuration. Also
-* responsible for establishing a connection to the database to be maintained
+* Singleton package for handling the login and character server configuration.
+* Also responsible for establishing a connection to the database to be maintained
 * during execution.
  */
-package login_server
+package login
 
 import (
 	"database/sql"
@@ -69,16 +69,7 @@ type configuration struct {
 }
 
 // Singleton instance.
-var loginConfig *configuration = nil
-
-// This function should be used to get access to the server config instead of directly
-// referencing the loginConfig pointer.
-func GetConfig() *configuration {
-	if loginConfig == nil {
-		loginConfig = new(configuration)
-	}
-	return loginConfig
-}
+var config *configuration = new(configuration)
 
 // Populate config with the contents of a JSON file at path fileName. Config parameters
 // in the file must match the above fields exactly in order to be read.

@@ -1,5 +1,5 @@
 /*
-* Archon Patch Server
+* Archon Login Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,29 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
+*
+* Packet constants and structures for the packets exchanged between
+* the central shipgate server and connected ships.
  */
-package main
+package login
 
-import (
-	"fmt"
-	"patch_server/patch"
+// Packet types for the shipgate. These can overlap since they aren't
+// processed by the same set of handlers as the client ones.
+const (
+	ShipgateHeaderSize = 8
+	ShipgateAuthType   = 0x01
+	ShipgateAuthAck    = 0x02
 )
 
-func main() {
-	fmt.Println("Archon Patch Server, Copyright (C) 2014 Andrew Rodman")
-	fmt.Println("=====================================================")
-	fmt.Println("This program is free software: you can redistribute it and/or\n" +
-		"modify it under the terms of the GNU General Public License as\n" +
-		"published by the Free Software Foundation, either version 3 of\n" +
-		"the License, or (at your option) any later version.")
-	fmt.Println("This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
-	patch.StartServer()
+type ShipgateHeader struct {
+	Size uint16
+	Type uint16
+	// Used to distinguish between requests.
+	Id uint32
+}
+
+// Initial auth request sent to the shipgate.
+type ShipgateAuthPkt struct {
+	Header ShipgateHeader
+	Name   [24]byte
 }

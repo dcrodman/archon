@@ -19,7 +19,7 @@
 * Responsible for initializing default data for players and accounts.
  */
 
-package login_server
+package login
 
 import (
 	// "encoding/json"
@@ -33,7 +33,7 @@ import (
 
 // Parameter files we're expecting. I still don't really know what they're
 // for yet, so emulating what I've seen others do.
-var ParamFiles = [...]string{
+var paramFiles = [...]string{
 	"ItemMagEdit.prs",
 	"ItemPMT.prs",
 	"BattleParamEntry.dat",
@@ -47,7 +47,7 @@ var ParamFiles = [...]string{
 
 // Default keyboard/joystick configuration used for players who are logging
 // in for the first time.
-var BaseKeyConfig = [420]byte{
+var baseKeyConfig = [420]byte{
 	0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -77,7 +77,7 @@ var BaseKeyConfig = [420]byte{
 	0x01, 0x00, 0x00, 0x00,
 }
 
-var BaseSymbolChats = [1248]byte{
+var baseSymbolChats = [1248]byte{
 	0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x45, 0x00, 0x48, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x6c, 0x00,
 	0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00,
@@ -161,7 +161,7 @@ var BaseSymbolChats = [1248]byte{
 // Starting stats for any new character. This global should be considered immutable
 // and is populated by LoadBaseStats. The CharClass constants can be used to index
 // into this array to obtain the base stats for each class.
-var BaseStats [12]CharacterStats
+var baseStats [12]CharacterStats
 
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
@@ -169,8 +169,8 @@ func loadParameterFiles() {
 	offset := 0
 	var tmpChunkData []byte
 
-	paramDir := GetConfig().ParametersDir
-	for _, paramFile := range ParamFiles {
+	paramDir := config.ParametersDir
+	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
 			log.Fatal("Error reading parameter file: %v", err.Error())
@@ -196,15 +196,15 @@ func loadParameterFiles() {
 	// Offset should at this point be the total size of the files to send - break
 	// it all up into indexable chunks.
 	paramChunkData = make(map[int][]byte)
-	chunks := offset / MAX_CHUNK_SIZE
+	chunks := offset / MaxChunkSize
 	for i := 0; i < chunks; i++ {
-		dataOff := i * MAX_CHUNK_SIZE
-		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MAX_CHUNK_SIZE]
-		offset -= MAX_CHUNK_SIZE
+		dataOff := i * MaxChunkSize
+		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
+		offset -= MaxChunkSize
 	}
 	// Add any remaining data
 	if offset > 0 {
-		paramChunkData[chunks] = tmpChunkData[chunks*MAX_CHUNK_SIZE:]
+		paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
 	}
 }
 
@@ -236,7 +236,7 @@ func loadBaseStats() {
 	// }
 
 	for i := 0; i < 12; i++ {
-		util.StructFromBytes(decompressed[i*14:], &BaseStats[i])
+		util.StructFromBytes(decompressed[i*14:], &baseStats[i])
 		// j, err := json.Marshal(BaseStats[i])
 		// fmt.Printf("\"%s\" : %s,\n", chars[i], j)
 	}

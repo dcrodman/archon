@@ -20,7 +20,7 @@
 * responsible for establishing a connection to the database to be maintained
 * during execution.
  */
-package patch_server
+package patch
 
 import (
 	"database/sql"
@@ -33,8 +33,10 @@ import (
 	"strings"
 )
 
-const ServerConfigDir = "/usr/local/share/archon"
-const patchConfigFile = "patch_config.json"
+const (
+	ServerConfigDir = "/usr/local/share/archon"
+	PatchConfigFile = "patch_config.json"
+)
 
 // Configuration structure that can be shared between the Patch and Data servers.
 type configuration struct {
@@ -56,16 +58,7 @@ type configuration struct {
 }
 
 // Singleton instance.
-var loginConfig *configuration = nil
-
-// This function should be used to get access to the server config instead of directly
-// referencing the loginConfig pointer.
-func GetConfig() *configuration {
-	if loginConfig == nil {
-		loginConfig = new(configuration)
-	}
-	return loginConfig
-}
+var config *configuration = new(configuration)
 
 // Populate config with the contents of a JSON file at path fileName. Config parameters
 // in the file must match the above fields exactly in order to be read.

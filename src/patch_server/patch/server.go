@@ -18,7 +18,7 @@
 * The PATCH and DATA server logic. Both are included here since they're
 * neither are particularly complicated.
  */
-package patch_server
+package patch
 
 import (
 	"errors"
@@ -92,7 +92,7 @@ func newClient(conn *net.TCPConn) (*PatchClient, error) {
 	pc := new(PatchClient)
 	pc.c = server.NewPSOClient(conn, PCHeaderSize)
 
-	var err error = nil
+	var err error
 	if SendWelcome(pc) != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
@@ -185,19 +185,18 @@ func processPatchPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
 	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
 
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
 		util.PrintPayload(client.Data(), int(pktHeader.Size))
 		fmt.Println()
 	}
-	var err error = nil
+	var err error
 	switch pktHeader.Type {
 	case WelcomeType:
 		SendWelcomeAck(client)
 	case LoginType:
-		cfg := GetConfig()
 		if SendWelcomeMessage(client) == 0 {
-			SendRedirect(client, cfg.RedirectPort(), cfg.HostnameBytes())
+			SendRedirect(client, config.RedirectPort(), config.HostnameBytes())
 		}
 	default:
 		log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
@@ -210,12 +209,12 @@ func processDataPacket(client *PatchClient) error {
 	var pktHeader PCPktHeader
 	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
 
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
 		util.PrintPayload(client.Data(), int(pktHeader.Size))
 		fmt.Println()
 	}
-	var err error = nil
+	var err error
 	switch pktHeader.Type {
 	case WelcomeType:
 		SendWelcomeAck(client)
@@ -267,16 +266,15 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 // Creates the socket and starts listening for connections on the specified
 // port, spawning off goroutines to handle communications for each client.
 func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
-	cfg := GetConfig()
-	socket, err := server.OpenSocket(cfg.Hostname, port)
+	socket, err := server.OpenSocket(config.Hostname, port)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	log.Important("Waiting for %s connections on %s:%s...", id, cfg.Hostname, port)
+	log.Important("Waiting for %s connections on %s:%s...", id, config.Hostname, port)
 	for {
 		// Poll until we can accept more clients.
-		for patchConnections.Count() < cfg.MaxConnections {
+		for patchConnections.Count() < config.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
 				log.Warn("Failed to accept connection: %v", err.Error())
@@ -356,16 +354,13 @@ func buildPatchIndex(node *PatchDir) {
 }
 
 func StartServer() {
-	fmt.Println("Initializing Archon PATCH and DATA servers...")
-
 	// Initialize our config singleton from one of two expected file locations.
-	config := GetConfig()
-	fmt.Printf("Loading config file %v...", patchConfigFile)
-	err := config.InitFromFile(patchConfigFile)
+	fmt.Printf("Loading config file %v...", PatchConfigFile)
+	err := config.InitFromFile(PatchConfigFile)
 	if err != nil {
 		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+patchConfigFile)
-		err = config.InitFromFile(patchConfigFile)
+		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+PatchConfigFile)
+		err = config.InitFromFile(PatchConfigFile)
 		if err != nil {
 			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
 			fmt.Printf("%s\n", err.Error())

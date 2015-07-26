@@ -16,10 +16,10 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Packet handlers. All functions return 0 on success, negative int on
-* db error, and a positive int for any other errors.
+* Packet constants and structures. All functions return 0 on success,
+* negative int on db error, and a positive int for any other errors.
  */
-package login_server
+package login
 
 import (
 	"fmt"
@@ -28,12 +28,249 @@ import (
 	"time"
 )
 
-const TimeFmt = "2006:01:02: 15:05:05"
+const (
+	bbCopyright  = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
+	MaxChunkSize = 0x6800
+	// Format for the timestamp sent to the client.
+	timeFmt = "2006:01:02: 15:05:05"
+)
 
 var (
-	copyrightBytes []byte = make([]byte, 96)
-	serverName            = util.ConvertToUtf16("Archon")
+	copyrightBytes = make([]byte, 96)
+	serverName     = util.ConvertToUtf16("Archon")
 )
+
+// Packet types for packets sent to and from the login and character servers.
+const (
+	BBHeaderSize           = 8
+	WelcomeType            = 0x03
+	DisconnectType         = 0x05
+	LoginType              = 0x93
+	SecurityType           = 0xE6
+	RedirectType           = 0x19
+	ClientMessageType      = 0x1A
+	OptionsRequestType     = 0xE0
+	OptionsType            = 0xE2
+	CharPreviewReqType     = 0xE3
+	CharAckType            = 0xE4
+	CharPreviewType        = 0xE5
+	ChecksumType           = 0x01E8
+	ChecksumAckType        = 0x02E8
+	GuildcardReqType       = 0x03E8
+	GuildcardHeaderType    = 0x01DC
+	GuildcardChunkType     = 0x02DC
+	GuildcardChunkReqType  = 0x03DC
+	ParameterHeaderType    = 0x01EB
+	ParameterChunkType     = 0x02EB
+	ParameterChunkReqType  = 0x03EB
+	ParameterHeaderReqType = 0x04EB
+	SetFlagType            = 0xEC
+	TimestampType          = 0xB1
+	ShipListType           = 0xA0
+	ScrollMessageType      = 0xEE
+	MenuSelectType         = 0x10
+)
+
+// Error code types used for packet E6.
+type BBLoginError uint32
+
+const (
+	BBLoginErrorNone         = 0x0
+	BBLoginErrorUnknown      = 0x1
+	BBLoginErrorPassword     = 0x2
+	BBLoginErrorPassword2    = 0x3 // Same as password
+	BBLoginErrorMaintenance  = 0x4
+	BBLoginErrorUserInUse    = 0x5
+	BBLoginErrorBanned       = 0x6
+	BBLoginErrorBanned2      = 0x7 // Same as banned
+	BBLoginErrorUnregistered = 0x8
+	BBLoginErrorExpiredSub   = 0x9
+	BBLoginErrorLocked       = 0xA
+	BBLoginErrorPatch        = 0xB
+	BBLoginErrorDisconnect   = 0xC
+)
+
+// Packet header for every packet sent between the server and BlueBurst clients.
+type BBPktHeader struct {
+	Size  uint16
+	Type  uint16
+	Flags uint32
+}
+
+// Welcome packet with encryption vectors sent to the client upon initial connection.
+type WelcomePkt struct {
+	Header       BBPktHeader
+	Copyright    [96]byte
+	ServerVector [48]byte
+	ClientVector [48]byte
+}
+
+// Login Packet (0x93) sent to both the login and character servers.
+type LoginPkt struct {
+	Header        BBPktHeader
+	Unknown       [8]byte
+	ClientVersion uint16
+	Unknown2      [6]byte
+	TeamId        uint32
+	Username      [16]byte
+	Padding       [32]byte
+	Password      [16]byte
+	Unknown3      [40]byte
+	HardwareInfo  [8]byte
+	Security      [40]byte
+}
+
+// Represent the client's progression through the login process.
+type ClientConfig struct {
+	Magic        uint32 // Must be set to 0x48615467
+	CharSelected uint8  // Has a character been selected?
+	SlotNum      uint8  // Slot number of selected Character
+	Flags        uint16
+	Ports        [4]uint16
+	Unused       [4]uint32
+	Unused2      [2]uint32
+}
+
+// Security packet (0xE6) sent to the client to indicate the state of client login.
+type SecurityPacket struct {
+	Header       BBPktHeader
+	ErrorCode    uint32
+	PlayerTag    uint32
+	Guildcard    uint32
+	TeamId       uint32
+	Config       *ClientConfig
+	Capabilities uint32
+}
+
+// The address of the next server; in this case, the character server.
+type RedirectPacket struct {
+	Header  BBPktHeader
+	IPAddr  [4]uint8
+	Port    uint16
+	Padding uint16
+}
+
+// Based on the key config structure from sylverant and newserv. KeyConfig
+// and JoystickConfig are saved in the database.
+type KeyTeamConfig struct {
+	Unknown            [0x114]uint8
+	KeyConfig          [0x16C]uint8
+	JoystickConfig     [0x38]uint8
+	Guildcard          uint32
+	TeamId             uint32
+	TeamInfo           [2]uint32
+	TeamPrivilegeLevel uint16
+	Reserved           uint16
+	Teamname           [0x10]uint16
+	TeamFlag           [0x0800]uint8
+	TeamRewards        [2]uint32
+}
+
+// Option packet containing keyboard and joystick config, team options, etc.
+type OptionsPacket struct {
+	Header          BBPktHeader
+	PlayerKeyConfig KeyTeamConfig
+}
+
+//
+type CharSelectionPacket struct {
+	Header    BBPktHeader
+	Slot      uint32
+	Selecting uint32
+}
+
+// Acknowledge a character selection from the client or indicate an error.
+type CharAckPacket struct {
+	Header BBPktHeader
+	Slot   uint32
+	Flag   uint32
+}
+
+// Sent in response to 0x01E8 to acknowledge a checksum (really it's just ignored).
+type ChecksumAckPacket struct {
+	Header BBPktHeader
+	Ack    uint32
+}
+
+// Chunk header with info about the guildcard data we're about to send.
+type GuildcardHeaderPacket struct {
+	Header   BBPktHeader
+	Unknown  uint32
+	Length   uint16
+	Padding  uint16
+	Checksum uint32
+}
+
+// Received from the client to request a guildcard data chunk.
+type GuildcardChunkReqPacket struct {
+	Header         BBPktHeader
+	Unknown        uint32
+	ChunkRequested uint32
+	Continue       uint32
+}
+
+type GuildcardChunkPacket struct {
+	Header  BBPktHeader
+	Unknown uint32
+	Chunk   uint32
+	Data    []uint8
+}
+
+// Parameter header containing details about the param files we're about to send.
+type ParameterHeaderPacket struct {
+	Header  BBPktHeader
+	Entries []byte
+}
+
+type ParameterChunkPacket struct {
+	Header BBPktHeader
+	Chunk  uint32
+	Data   []byte
+}
+
+// Used by the client to indicate whether a character should be recreated or updated.
+type SetFlagPacket struct {
+	Header BBPktHeader
+	Flag   uint32
+}
+
+// Sent to the client for the selection menu and received for updating a character.
+type CharPreviewPacket struct {
+	Header    BBPktHeader
+	Slot      uint32
+	Character *CharacterPreview
+}
+
+// Message in a large text box, usually sent right before a disconnect.
+type ClientMessagePacket struct {
+	Header   BBPktHeader
+	Language uint32
+	Message  []byte
+}
+
+// Indicate the server's current time.
+type TimestampPacket struct {
+	Header    BBPktHeader
+	Timestamp [28]byte
+}
+
+// The list of menu items to display to the client.
+type ShipListPacket struct {
+	Header      BBPktHeader
+	Padding     uint16
+	Unknown     uint16 // set to 0xFFFFFFF4
+	Unknown2    uint32 // set to 0x02
+	Unknown3    uint16 // set to 0x04
+	ServerName  [36]byte
+	ShipEntries []ShipEntry
+}
+
+// Scroll message the client should display on the ship select screen.
+type ScrollMessagePacket struct {
+	Header  BBPktHeader
+	Padding [2]uint32
+	Message []byte
+}
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -49,7 +286,7 @@ func SendPacket(client *LoginClient, pkt []byte, length uint16) int {
 // encrypting it with the client's server ciper.
 func SendEncrypted(client *LoginClient, data []byte, length uint16) int {
 	length = fixLength(data, length)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
 	}
@@ -67,7 +304,7 @@ func SendWelcome(client *LoginClient) int {
 	copy(pkt.ServerVector[:], client.c.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Welcome Packet")
 		util.PrintPayload(data, size)
 		fmt.Println()
@@ -90,7 +327,7 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, guildcard uint32,
 	pkt.Capabilities = 0x00000102
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Security Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -104,7 +341,7 @@ func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	pkt.Port = port
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Redirect Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -128,7 +365,7 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Key Config Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -144,7 +381,7 @@ func SendCharacterAck(client *LoginClient, slotNum uint32, flag uint32) int {
 	pkt.Flag = flag
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Character Ack Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -159,7 +396,7 @@ func SendCharacterPreview(client *LoginClient, charPreview *CharacterPreview) in
 	pkt.Character = charPreview
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Character Preview Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -173,7 +410,7 @@ func SendChecksumAck(client *LoginClient, ack uint32) int {
 	pkt.Ack = ack
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Checksum Ack Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -188,7 +425,7 @@ func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint16) i
 	pkt.Checksum = checksum
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Guildcard Header Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -201,16 +438,16 @@ func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 	pkt.Chunk = chunkNum
 
 	// The client will only accept 0x6800 bytes of a chunk per packet.
-	offset := uint16(chunkNum) * MAX_CHUNK_SIZE
+	offset := uint16(chunkNum) * MaxChunkSize
 	remaining := client.gcDataSize - offset
-	if remaining > MAX_CHUNK_SIZE {
-		pkt.Data = client.gcData[offset : offset+MAX_CHUNK_SIZE]
+	if remaining > MaxChunkSize {
+		pkt.Data = client.gcData[offset : offset+MaxChunkSize]
 	} else {
 		pkt.Data = client.gcData[offset:]
 	}
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Guildcard Chunk Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -224,7 +461,7 @@ func SendParameterHeader(client *LoginClient, numEntries uint32, entries []byte)
 	pkt.Entries = entries
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Parameter Header Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -239,7 +476,7 @@ func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int
 	pkt.Data = chunkData
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Parameter Chunk Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -254,7 +491,7 @@ func SendClientMessage(client *LoginClient, message string) int {
 	pkt.Message = util.ConvertToUtf16(message)
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Client Message Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -267,12 +504,12 @@ func SendTimestamp(client *LoginClient) int {
 
 	var tv syscall.Timeval
 	syscall.Gettimeofday(&tv)
-	t := time.Now().Format(TimeFmt)
+	t := time.Now().Format(timeFmt)
 	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Timestamp Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -295,7 +532,7 @@ func SendShipList(client *LoginClient, ships []ShipEntry) int {
 	shipListMutex.RUnlock()
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Ship List Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -306,10 +543,10 @@ func SendShipList(client *LoginClient, ships []ShipEntry) int {
 func SendScrollMessage(client *LoginClient) int {
 	pkt := new(ScrollMessagePacket)
 	pkt.Header.Type = ScrollMessageType
-	pkt.Message = GetConfig().cachedWelcomeMsg
+	pkt.Message = config.cachedWelcomeMsg
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Scroll Message Packet")
 	}
 	return SendEncrypted(client, data, uint16(size))

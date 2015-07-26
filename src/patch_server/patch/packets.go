@@ -17,7 +17,7 @@
 * ---------------------------------------------------------------------
 * Packet types, defintitions, and sending functions.
  */
-package patch_server
+package patch
 
 import (
 	"errors"
@@ -140,7 +140,7 @@ func SendPacket(client *PatchClient, pkt []byte, length uint16) int {
 // encrypting it with the client's server ciper.
 func SendEncrypted(client *PatchClient, data []byte, length uint16) int {
 	length = fixLength(data, length)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
 	}
@@ -167,7 +167,7 @@ func SendWelcome(client *PatchClient) int {
 	copy(pkt.ServerVector[:], client.c.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Welcome Packet")
 		util.PrintPayload(data, size)
 		fmt.Println()
@@ -180,21 +180,21 @@ func SendWelcomeAck(client *PatchClient) int {
 	pkt.Size = 0x04
 	pkt.Type = WelcomeAckType
 	data, _ := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Welcome Ack")
 	}
 	return SendEncrypted(client, data, 0x0004)
 }
 
 func SendWelcomeMessage(client *PatchClient) int {
-	cfg := GetConfig()
+	cfg := config
 	pkt := new(WelcomeMessage)
 	pkt.Header.Type = MessageType
 	pkt.Header.Size = PCHeaderSize + cfg.MessageSize
 	pkt.Message = cfg.MessageBytes
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Welcome Message")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -208,7 +208,7 @@ func SendRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
 	pkt.Port = port
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Redirect")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -216,7 +216,7 @@ func SendRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
 
 // Acknowledgement sent after the DATA connection handshake.
 func SendDataAck(client *PatchClient) int {
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Data Ack")
 	}
 	return SendHeader(client, DataAckType)
@@ -224,7 +224,7 @@ func SendDataAck(client *PatchClient) int {
 
 // Tell the client to change to one directory above.
 func SendDirAbove(client *PatchClient) int {
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Dir Above")
 	}
 	return SendHeader(client, SetDirAboveType)
@@ -237,7 +237,7 @@ func SendChangeDir(client *PatchClient, dir string) int {
 	copy(pkt.Dirname[:], dir)
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Change Directory")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -251,7 +251,7 @@ func SendCheckFile(client *PatchClient, index uint32, filename string) int {
 	copy(pkt.Filename[:], filename)
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Check File")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -259,7 +259,7 @@ func SendCheckFile(client *PatchClient, index uint32, filename string) int {
 
 // Inform the client that we've finished sending the patch list.
 func SendFileListDone(client *PatchClient) int {
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending List Done")
 	}
 	return SendHeader(client, FileListDoneType)
@@ -273,7 +273,7 @@ func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
 	pkt.TotalSize = totalSize
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending Update Files")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -287,7 +287,7 @@ func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
 	copy(pkt.Filename[:], patch.filename)
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending File Header")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -308,7 +308,7 @@ func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []
 	pkt.Data = fdata[:chunkSize]
 
 	data, size := util.BytesFromStruct(pkt)
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending File Chunk")
 	}
 	return SendEncrypted(client, data, uint16(size))
@@ -316,7 +316,7 @@ func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []
 
 // Finished sending a particular file.
 func SendFileComplete(client *PatchClient) int {
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending File Complete")
 	}
 	return SendHeader(client, FileCompleteType)
@@ -324,7 +324,7 @@ func SendFileComplete(client *PatchClient) int {
 
 // We've finished updating files.
 func SendUpdateComplete(client *PatchClient) int {
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Println("Sending File Update Done")
 	}
 	return SendHeader(client, UpdateCompleteType)

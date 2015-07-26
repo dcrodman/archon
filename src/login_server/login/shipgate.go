@@ -20,7 +20,7 @@
 * ships. This module handles all of its own connection logic since the
 * shipgate protocol differs from the way game clients are processed.
  */
-package login_server
+package login
 
 import (
 	"crypto/tls"
@@ -164,6 +164,7 @@ func processShipgatePacket(ship *Ship) error {
 		util.StructFromBytes(ship.Data(), &pkt)
 		ship.name = string(pkt.Name[:])
 		log.Info("Registered ship: %v", ship.name)
+
 	default:
 		log.Info("Received unknown packet %x from %s", hdr.Type, ship.IPAddr())
 	}
@@ -211,8 +212,6 @@ func handleShipConnection(conn net.Conn) {
 }
 
 func startShipgate(wg *sync.WaitGroup) {
-	cfg := GetConfig()
-
 	// Load our certificate file ship auth.
 	cert, err := tls.LoadX509KeyPair(CertificateFile, KeyFile)
 	if err != nil {
@@ -221,14 +220,14 @@ func startShipgate(wg *sync.WaitGroup) {
 	}
 	tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 
-	socket, err := tls.Listen("tcp", cfg.Hostname+":"+cfg.ShipgatePort, tlsCfg)
+	socket, err := tls.Listen("tcp", config.Hostname+":"+config.ShipgatePort, tlsCfg)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
 
 	fmt.Printf("Waiting for SHIPGATE connections on %s:%s...\n",
-		cfg.Hostname, cfg.ShipgatePort)
+		config.Hostname, config.ShipgatePort)
 
 	// Wait for ship connections and spin off goroutines to handle them.
 	for {

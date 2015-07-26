@@ -21,7 +21,7 @@
 * Also provides top-level functions and other code shared between
 * the two (found in login.go and character.go).
  */
-package login_server
+package login
 
 import (
 	"errors"
@@ -40,8 +40,8 @@ import (
 
 var (
 	log              *logger.ServerLogger
-	loginConnections *server.ConnectionList = server.NewClientList()
-	shipConnections  *server.ConnectionList = server.NewClientList()
+	loginConnections = server.NewClientList()
+	shipConnections  = server.NewClientList()
 
 	defaultShip   ShipEntry
 	shipList      []ShipEntry
@@ -91,7 +91,7 @@ func newClient(conn *net.TCPConn) (*LoginClient, error) {
 	loginClient := new(LoginClient)
 	loginClient.c = server.NewPSOClient(conn, BBHeaderSize)
 
-	var err error = nil
+	var err error
 	if SendWelcome(loginClient) != 0 {
 		err = errors.New("Error sending welcome packet to: " + loginClient.IPAddr())
 		loginClient = nil
@@ -133,16 +133,15 @@ func handleClient(client *LoginClient, desc string, handler pktHandler) {
 // Creates the socket and starts listening for connections on the specified
 // port, spawning off goroutines to handle communications for each client.
 func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
-	cfg := GetConfig()
-	socket, err := server.OpenSocket(cfg.Hostname, port)
+	socket, err := server.OpenSocket(config.Hostname, port)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, cfg.Hostname, port)
+	fmt.Printf("Waiting for %s connections on %s:%s...\n", id, config.Hostname, port)
 	for {
 		// Poll until we can accept more clients.
-		for loginConnections.Count() < cfg.MaxConnections {
+		for loginConnections.Count() < config.MaxConnections {
 			connection, err := socket.AcceptTCP()
 			if err != nil {
 				log.Warn("Failed to accept connection: %s", err.Error())
@@ -165,9 +164,6 @@ func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
 }
 
 func StartServer() {
-	fmt.Println("Initializing Archon LOGIN and CHARACTER servers...")
-	config := GetConfig()
-
 	// Initialize our config singleton from one of two expected file locations.
 	fmt.Printf("Loading config file %v...", LoginConfigFile)
 	err := config.InitFromFile(LoginConfigFile)

@@ -16,16 +16,22 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* CHARACTER server logic.
+* Login and Character server logic.
  */
-package login_server
+
+package login
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"libarchon/util"
 )
+
+const ClientVersionString = "TethVer12510"
 
 // Cached parameter data to avoid computing it every time.
 var (
@@ -123,7 +129,29 @@ type CharacterStats struct {
 	LCK uint16
 }
 
-// Handle initial login - verify the account and send security data.
+// Handle the initial login sent to the Login port.
+func handleLogin(client *LoginClient) error {
+	loginPkt, err := verifyAccount(client)
+	if err != nil {
+		return err
+	}
+	// The first time we receive this packet the client will have included the
+	// version string in the security data; check it.
+	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
+		SendSecurity(client, BBLoginErrorPatch, 0, 0)
+		return errors.New("Incorrect version string")
+	}
+	// Newserv sets this field when the client first connects. I think this is
+	// used to indicate that the client has made it through the LOGIN server,
+	// but for now we'll just set it and leave it alone.
+	client.config.Magic = 0x48615467
+
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+	SendRedirect(client, uint16(config.RedirectPort()), config.HostnameBytes())
+	return nil
+}
+
+// Handle initial login sent to the character port.
 func handleCharLogin(client *LoginClient) error {
 	_, err := verifyAccount(client)
 	if err != nil {
@@ -138,18 +166,68 @@ func handleCharLogin(client *LoginClient) error {
 	return nil
 }
 
+// Handle account verification tasks common to both the login and character servers.
+func verifyAccount(client *LoginClient) (*LoginPkt, error) {
+	var loginPkt LoginPkt
+	util.StructFromBytes(client.Data(), &loginPkt)
+
+	// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
+	hasher := sha256.New()
+	hasher.Write(util.StripPadding(loginPkt.Password[:]))
+	pktUername := string(util.StripPadding(loginPkt.Username[:]))
+	pktPassword := hex.EncodeToString(hasher.Sum(nil)[:])
+
+	var username, password string
+	var isBanned, isActive bool
+	row := config.Database().QueryRow("SELECT username, password, "+
+		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
+		"WHERE username = ? and password = ?", pktUername, pktPassword)
+	err := row.Scan(&username, &password, &client.guildcard,
+		&client.isGm, &isBanned, &isActive, &client.teamId)
+	switch {
+	// Check if we have a valid username/combination.
+	case err == sql.ErrNoRows:
+		// The same error is returned for invalid passwords as attempts to log in
+		// with a nonexistent username as some measure of account security. Note
+		// that if this is changed to query by username and add a password check,
+		// the index on account_data will need to be modified.
+		SendSecurity(client, BBLoginErrorPassword, 0, 0)
+		return nil, errors.New("Account does not exist for username: " + username)
+	// Database error?
+	case err != nil:
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
+		log.Error(err.Error())
+		return nil, err
+	// Is the account banned?
+	case isBanned:
+		SendSecurity(client, BBLoginErrorBanned, 0, 0)
+		return nil, errors.New("Account banned: " + username)
+	// Has the account been activated?
+	case !isActive:
+		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+			"database.\n\nPlease contact your server administrator.")
+		return nil, errors.New("Account must be activated for username: " + username)
+	}
+	// Copy over the config, which should indicate how far they are in the login flow.
+	util.StructFromBytes(loginPkt.Security[:], &client.config)
+
+	// TODO: Hardware ban check.
+	return &loginPkt, nil
+}
+
 // Handle the options request - load key config and other option data from the
 // datebase or provide defaults for new accounts.
 func handleKeyConfig(client *LoginClient) error {
 	optionData := make([]byte, 420)
-	archondb := GetConfig().Database()
+	archondb := config.Database()
 
 	row := archondb.QueryRow(
 		"SELECT key_config from player_options where guildcard = ?", client.guildcard)
 	err := row.Scan(&optionData)
 	if err == sql.ErrNoRows {
 		// We don't have any saved key config - give them the defaults.
-		copy(optionData[:420], BaseKeyConfig[:])
+		copy(optionData[:420], baseKeyConfig[:])
 		_, err = archondb.Exec("INSERT INTO player_options (guildcard, key_config) "+
 			" VALUES (?, ?)", client.guildcard, optionData[:420])
 	}
@@ -170,7 +248,7 @@ func handleCharacterSelect(client *LoginClient) error {
 	prev := new(CharacterPreview)
 
 	// Character preview request.
-	archondb := GetConfig().Database()
+	archondb := config.Database()
 	var gc, name []uint8
 	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
 		" name_color, name_color_chksm, model, section_id, char_class, "+
@@ -212,7 +290,7 @@ func handleCharacterSelect(client *LoginClient) error {
 // Load the player's saved guildcards, build the chunk data, and
 // send the chunk header.
 func handleGuildcardDataStart(client *LoginClient) error {
-	archondb := GetConfig().Database()
+	archondb := config.Database()
 	rows, err := archondb.Query(
 		"SELECT friend_gc, name, team_name, description, language, "+
 			"section_id, char_class, comment FROM guildcard_entries "+
@@ -264,7 +342,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 	util.StructFromBytes(client.Data(), &charPkt)
 	prev := charPkt.Character
 
-	archonDB := GetConfig().Database()
+	archonDB := config.Database()
 	if client.flag == 0x02 {
 		// Player is using the dressing room; update the character. Messy
 		// query, but unavoidable if we don't want to be stuck with blobs.
@@ -289,7 +367,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 			return err
 		}
 		// Grab our base stats for this character class.
-		stats := BaseStats[prev.Class]
+		stats := baseStats[prev.Class]
 
 		// TODO: Set up the default inventory and techniques.
 		meseta := 300
@@ -331,19 +409,45 @@ func handleMenuSelect(client *LoginClient) {
 
 }
 
+// Process packets sent to the LOGIN port by sending them off to another handler or by
+// taking some brief action.
+func processLoginPacket(client *LoginClient) error {
+	var pktHeader BBPktHeader
+	c := client.Client()
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &pktHeader)
+
+	if config.DebugMode {
+		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+		util.PrintPayload(client.Data(), int(pktHeader.Size))
+		fmt.Println()
+	}
+
+	var err error
+	switch pktHeader.Type {
+	case LoginType:
+		err = handleLogin(client)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c.
+		break
+	default:
+		log.Info("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
+	}
+	return err
+}
+
 // Process packets sent to the CHARACTER port by sending them off to another
 // handler or by taking some brief action.
 func processCharacterPacket(client *LoginClient) error {
 	var pktHeader BBPktHeader
 	util.StructFromBytes(client.Data(), &pktHeader)
 
-	if GetConfig().DebugMode {
+	if config.DebugMode {
 		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
 		util.PrintPayload(client.Data(), int(pktHeader.Size))
 		fmt.Println()
 	}
 
-	var err error = nil
+	var err error
 	switch pktHeader.Type {
 	case LoginType:
 		err = handleCharLogin(client)
@@ -362,7 +466,7 @@ func processCharacterPacket(client *LoginClient) error {
 	case GuildcardChunkReqType:
 		handleGuildcardChunk(client)
 	case ParameterHeaderReqType:
-		SendParameterHeader(client, uint32(len(ParamFiles)), paramHeaderData)
+		SendParameterHeader(client, uint32(len(paramFiles)), paramHeaderData)
 	case ParameterChunkReqType:
 		var pkt BBPktHeader
 		util.StructFromBytes(client.Data(), &pkt)
