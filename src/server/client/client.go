@@ -89,15 +89,17 @@ type PSOClient struct {
 }
 
 func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
-	c := new(PSOClient)
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
-	c.conn = conn
-	c.ipAddr = addr[0]
-	c.port = addr[1]
-	c.hdrSize = hdrSize
+	c := &PSOClient{
+		conn:        conn,
+		ipAddr:      addr[0],
+		port:        addr[1],
+		HdrSize:     hdrSize,
+		clientCrypt: encryption.NewCrypt(),
+		serverCrypt: encryption.NewCrypt(),
+		buffer:      make([]byte, 512),
+	}
 
-	c.clientCrypt = encryption.NewCrypt()
-	c.serverCrypt = encryption.NewCrypt()
 	// Hacky, but we know that BB packets must be of length 8.
 	if hdrSize >= 8 {
 		c.clientCrypt.CreateBBKeys()
@@ -106,8 +108,6 @@ func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
 		c.clientCrypt.CreateKeys()
 		c.serverCrypt.CreateKeys()
 	}
-	c.buffer = make([]byte, 512)
-
 	return c
 }
 
@@ -135,11 +135,11 @@ func (c *PSOClient) Process() error {
 	// Extra bytes left in the buffer will just be ignored.
 	c.recvSize = 0
 	c.packetSize = 0
-	hdr16 := uint16(c.hdrSize)
+	hdr16 := uint16(c.HdrSize)
 
 	// Wait for the packet header.
-	for c.recvSize < c.hdrSize {
-		bytes, err := c.conn.Read(c.buffer[c.recvSize:c.hdrSize])
+	for c.recvSize < c.HdrSize {
+		bytes, err := c.conn.Read(c.buffer[c.recvSize:c.HdrSize])
 		if bytes == 0 || err == io.EOF {
 			// The client disconnected, we're done.
 			return err
@@ -150,9 +150,9 @@ func (c *PSOClient) Process() error {
 		}
 		c.recvSize += bytes
 
-		if c.recvSize >= c.hdrSize {
+		if c.recvSize >= c.HdrSize {
 			// We have our header; decrypt it.
-			c.Decrypt(c.buffer[:c.hdrSize], uint32(c.hdrSize))
+			c.Decrypt(c.buffer[:c.HdrSize], uint32(c.HdrSize))
 			c.packetSize, err = util.GetPacketSize(c.buffer[:2])
 			if err != nil {
 				// Something is seriously wrong if this causes an error. Bail.

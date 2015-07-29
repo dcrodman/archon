@@ -37,7 +37,7 @@ func NewList() *ConnList {
 }
 
 // Appends a client to the end of the connection list.
-func (cl *ConnList) Add(c ClientWrapper) {
+func (cl *ConnList) Add(c Client) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
 	cl.size++
@@ -46,12 +46,12 @@ func (cl *ConnList) Add(c ClientWrapper) {
 
 // Returns true if the list has a Client matching the IP address of c.
 // Note that this comparison is by IP address, not element value.
-func (cl *ConnList) Has(c ClientWrapper) bool {
+func (cl *ConnList) Has(c Client) bool {
 	found := false
-	clAddr := c.Client().IPAddr()
+	clAddr := c.IPAddr()
 	cl.mutex.RLock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
-		if client.Value.(ClientWrapper).Client().IPAddr() == clAddr {
+		if c.IPAddr() == clAddr {
 			found = true
 			break
 		}
@@ -60,7 +60,7 @@ func (cl *ConnList) Has(c ClientWrapper) bool {
 	return found
 }
 
-func (cl *ConnList) Remove(c ClientWrapper) {
+func (cl *ConnList) Remove(c Client) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
