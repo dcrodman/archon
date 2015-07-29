@@ -17,114 +17,29 @@
 * ---------------------------------------------------------------------
 * Packet types, defintitions, and sending functions.
  */
-package patch
+package main
 
 import (
 	"errors"
 	"fmt"
-	"libarchon/util"
+	"server/util"
 )
 
-const PCHeaderSize = 0x04
-const bbCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
-
-var copyrightBytes []byte
-
-// Packet types for packets sent to and from the login and character servers.
 const (
-	WelcomeType        = 0x02
-	WelcomeAckType     = 0x04 // sent
-	LoginType          = 0x04 // received
-	MessageType        = 0x13
-	RedirectType       = 0x14
-	DataAckType        = 0x0B
-	SetDirAboveType    = 0x0A
-	ChangeDirType      = 0x09
-	CheckFileType      = 0x0C
-	FileListDoneType   = 0x0D
-	FileStatusType     = 0x0F
-	ClientListDoneType = 0x10
-	UpdateFilesType    = 0x11
-	FileHeaderType     = 0x06
-	FileChunkType      = 0x07
-	FileCompleteType   = 0x08
-	UpdateCompleteType = 0x12
+	// Copyright messages the client expects.
+	patchCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
+	loginCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
+	// Maximum size of a block of guildcard data.
+	MaxGCChunkSize = 0x6800
+	// Format for the timestamp sent to the client.
+	timeFmt = "2006:01:02: 15:05:05"
 )
 
-// Blueburst, PC, and Gamecube clients all use a 4 byte header to communicate with the
-// patch server instead of the 8 byte one used by Blueburst for the other servers.
-type PCPktHeader struct {
-	Size uint16
-	Type uint16
-}
-
-// Welcome packet with encryption vectors sent to the client upon initial connection.
-type WelcomePkt struct {
-	Header       PCPktHeader
-	Copyright    [44]byte
-	Padding      [20]byte
-	ServerVector [4]byte
-	ClientVector [4]byte
-}
-
-// Packet containing the patch server welcome message.
-type WelcomeMessage struct {
-	Header  PCPktHeader
-	Message []byte
-}
-
-// The address of the next server; in this case, the character server.
-type RedirectPacket struct {
-	Header  PCPktHeader
-	IPAddr  [4]uint8
-	Port    uint16
-	Padding uint16
-}
-
-// Instruct the client to chdir into Dirname (one level below).
-type ChangeDirPacket struct {
-	Header  PCPktHeader
-	Dirname [64]byte
-}
-
-// Request a check on a file in the client's working directory.
-type CheckFilePacket struct {
-	Header   PCPktHeader
-	PatchId  uint32
-	Filename [32]byte
-}
-
-// Response to CheckFilePacket from the client with the properties of a file.
-type FileStatusPacket struct {
-	Header   PCPktHeader
-	PatchId  uint32
-	Checksum uint32
-	FileSize uint32
-}
-
-// Size and number of files that need to be updated.
-type UpdateFilesPacket struct {
-	Header    PCPktHeader
-	TotalSize uint32
-	NumFiles  uint32
-}
-
-// File header for a series of file chunks.
-type FileHeaderPacket struct {
-	Header   PCPktHeader
-	Padding  uint32
-	FileSize uint32
-	Filename [48]byte
-}
-
-// Chunk of data from a file.
-type FileChunkPacket struct {
-	Header   PCPktHeader
-	Chunk    uint32
-	Checksum uint32
-	Size     uint32
-	Data     []byte
-}
+var (
+	patchCopyrightBytes []byte
+	loginCopyrightBytes []byte
+	serverName          = util.ConvertToUtf16("Archon")
+)
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
@@ -149,20 +64,24 @@ func SendEncrypted(client *PatchClient, data []byte, length uint16) int {
 }
 
 // Send a simple 4-byte header packet.
-func SendHeader(client *PatchClient, pktType uint16) int {
-	pkt := new(PCPktHeader)
-	pkt.Type = pktType
-	pkt.Size = 0x04
+func SendPCHeader(client *PatchClient, pktType uint16) int {
+	pkt := &PCPktHeader{
+		Type: pktType,
+		Size: 0x04,
+	}
 	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		util.PrintPayload()
+	}
 	return SendEncrypted(client, data, uint16(size))
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendWelcome(client *PatchClient) int {
+func SendPatchWelcome(client *PatchClient) int {
 	pkt := new(WelcomePkt)
-	pkt.Header.Type = WelcomeType
+	pkt.Header.Type = PatchWelcomeType
 	pkt.Header.Size = 0x4C
-	copy(pkt.Copyright[:], copyrightBytes)
+	copy(pkt.Copyright[:], patchCopyrightBytes)
 	copy(pkt.ClientVector[:], client.c.ClientVector())
 	copy(pkt.ServerVector[:], client.c.ServerVector())
 
@@ -176,9 +95,10 @@ func SendWelcome(client *PatchClient) int {
 }
 
 func SendWelcomeAck(client *PatchClient) int {
-	pkt := new(PCPktHeader)
-	pkt.Size = 0x04
-	pkt.Type = WelcomeAckType
+	pkt := &PCPktHeader{
+		Size: 0x04,
+		Type: PatchLoginType, // treated as an ack
+	}
 	data, _ := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Welcome Ack")
@@ -189,7 +109,7 @@ func SendWelcomeAck(client *PatchClient) int {
 func SendWelcomeMessage(client *PatchClient) int {
 	cfg := config
 	pkt := new(WelcomeMessage)
-	pkt.Header.Type = MessageType
+	pkt.Header.Type = PatchMessageType
 	pkt.Header.Size = PCHeaderSize + cfg.MessageSize
 	pkt.Message = cfg.MessageBytes
 
@@ -203,7 +123,7 @@ func SendWelcomeMessage(client *PatchClient) int {
 // Send the redirect packet, providing the IP and port of the next server.
 func SendRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
-	pkt.Header.Type = RedirectType
+	pkt.Header.Type = PatchRedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
 	pkt.Port = port
 
@@ -219,7 +139,7 @@ func SendDataAck(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Data Ack")
 	}
-	return SendHeader(client, DataAckType)
+	return SendHeader(client, PatchDataAckType)
 }
 
 // Tell the client to change to one directory above.
@@ -227,13 +147,13 @@ func SendDirAbove(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Dir Above")
 	}
-	return SendHeader(client, SetDirAboveType)
+	return SendHeader(client, PatchDirAboveType)
 }
 
 // Tell the client to change to some directory within its file tree.
 func SendChangeDir(client *PatchClient, dir string) int {
 	pkt := new(ChangeDirPacket)
-	pkt.Header.Type = ChangeDirType
+	pkt.Header.Type = PatchChangeDirType
 	copy(pkt.Dirname[:], dir)
 
 	data, size := util.BytesFromStruct(pkt)
@@ -246,7 +166,7 @@ func SendChangeDir(client *PatchClient, dir string) int {
 // Tell the client to check a file in its current working directory.
 func SendCheckFile(client *PatchClient, index uint32, filename string) int {
 	pkt := new(CheckFilePacket)
-	pkt.Header.Type = CheckFileType
+	pkt.Header.Type = PatchCheckFileType
 	pkt.PatchId = index
 	copy(pkt.Filename[:], filename)
 
@@ -262,13 +182,13 @@ func SendFileListDone(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending List Done")
 	}
-	return SendHeader(client, FileListDoneType)
+	return SendHeader(client, PatchFileListDoneType)
 }
 
 // Send the total number and cumulative size of files that need updating.
 func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
 	pkt := new(UpdateFilesPacket)
-	pkt.Header.Type = UpdateFilesType
+	pkt.Header.Type = PatchUpdateFilesType
 	pkt.NumFiles = num
 	pkt.TotalSize = totalSize
 
@@ -282,7 +202,7 @@ func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
 // Send the header for a file we're about to update.
 func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
 	pkt := new(FileHeaderPacket)
-	pkt.Header.Type = FileHeaderType
+	pkt.Header.Type = PatchFileHeaderType
 	pkt.FileSize = patch.fileSize
 	copy(pkt.Filename[:], patch.filename)
 
@@ -301,7 +221,7 @@ func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []
 		panic(errors.New("File chunk size exceeds maximum"))
 	}
 	pkt := new(FileChunkPacket)
-	pkt.Header.Type = FileChunkType
+	pkt.Header.Type = PatchFileChunkType
 	pkt.Chunk = chunk
 	pkt.Checksum = chksm
 	pkt.Size = chunkSize
@@ -319,7 +239,7 @@ func SendFileComplete(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending File Complete")
 	}
-	return SendHeader(client, FileCompleteType)
+	return SendHeader(client, PatchFileCompleteType)
 }
 
 // We've finished updating files.
@@ -343,5 +263,6 @@ func fixLength(data []byte, length uint16) uint16 {
 }
 
 func init() {
-	copyrightBytes = []byte(bbCopyright)
+	patchCopyrightBytes = []byte(patchCopyright)
+	loginCopyrightBytes = []byte(loginCopyright)
 }

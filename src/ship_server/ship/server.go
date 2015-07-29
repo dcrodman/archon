@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	log      *logger.ServerLogger
+	log      *logging.ServerLogger
 	shipgate *Shipgate
 )
 

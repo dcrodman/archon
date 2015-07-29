@@ -19,11 +19,11 @@
 * Packet constants and structures for the packets exchanged between
 * the central shipgate server and connected ships.
  */
-package login
+package main
 
 import (
 	"fmt"
-	"libarchon/util"
+	"server/util"
 )
 
 // Packet types for the shipgate. These can overlap since they aren't

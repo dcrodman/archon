@@ -16,98 +16,136 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Singleton package for handling the login and character server configuration.
-* Also responsible for establishing a connection to the database to be maintained
-* during execution.
+* Singleton package for handling the global server configuration.
+* Also responsible for establishing a connection to the database
+* to be maintained during execution.
  */
-package login
+package configuration
 
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	_ "go-sql-driver"
 	"io/ioutil"
-	"libarchon/logger"
-	"libarchon/util"
+	"server/logging"
+	"server/util"
 	"strconv"
 	"strings"
 )
 
 const (
-	ServerConfigDir = "/usr/local/share/archon"
-	LoginConfigFile = "login_config.json"
-	CertificateFile = "certificate.pem"
-	KeyFile         = "key.pem"
+	ServerConfigDir  = "/usr/local/share/archon"
+	ServerConfigFile = "server_config.json"
+	CertificateFile  = "certificate.pem"
+	KeyFile          = "key.pem"
 )
 
-// Configuration structure that can be shared between the Login and Character servers.
-type configuration struct {
-	Hostname       string
-	LoginPort      string
-	CharacterPort  string
+// Configuration structure that can be shared between the Login and
+// Character servers. The fields are intentionally exported to cut
+// down on verbosity with the intent that they be considered immutable.
+type Config struct {
+	Hostname string
+	// Patch ports.
+	PatchPort string
+	DataPort  string
+	// Login ports.
+	LoginPort     string
+	CharacterPort string
+	// Shipgate ports.
 	ShipgatePort   string
 	WebPort        string
-	WelcomeMessage string
-
 	MaxConnections int
-	ParametersDir  string
-	KeysDir        string
-	DBHost         string
-	DBPort         string
-	DBName         string
-	DBUsername     string
-	DBPassword     string
-	Logfile        string
-	LogLevel       logger.LogPriority
-	DebugMode      bool
 
-	database         *sql.DB
+	// Patch server welcome message.
+	WelcomeMessage string
+	// Scrolling message on ship select.
+	ScrollMessage string
+	MessageBytes  []byte
+	MessageSize   uint16
+
+	PatchDir      string
+	ParametersDir string
+	KeysDir       string
+
+	// Database parameters.
+	database   *sql.DB
+	DBHost     string
+	DBPort     string
+	DBName     string
+	DBUsername string
+	DBPassword string
+
+	Logfile   string
+	LogLevel  logging.Priority
+	DebugMode bool
+
 	cachedHostBytes  [4]byte
 	cachedWelcomeMsg []byte
-	redirectPort     uint16
 }
 
-// Singleton instance.
-var config *configuration = new(configuration)
+// Singleton instance. Provides reasonable default values so
+// that some configurations can remain simpler.
+var config *Config = &Config{
+	Hostname:       "127.0.0.1",
+	PatchPort:      "11000",
+	DataPort:       "11001",
+	LoginPort:      "12000",
+	CharacterPort:  "12001",
+	ShipgatePort:   "13000",
+	WebPort:        "14000",
+	MaxConnections: 30000,
+
+	WelcomeMessage: "Unconfigured Welcome Message",
+	ScrollMessage:  "Add a welcome message here",
+
+	PatchDir:      "patches/",
+	ParametersDir: "parameters",
+	KeysDir:       "keys",
+
+	DBHost: "127.0.0.1",
+	DBPort: "3306",
+	DBName: "archondb",
+
+	Logfile:   "",
+	LogLevel:  logging.Medium,
+	DebugMode: false,
+}
+
+func GetConfig() *Config { return config }
 
 // Populate config with the contents of a JSON file at path fileName. Config parameters
 // in the file must match the above fields exactly in order to be read.
-func (config *configuration) InitFromFile(fileName string) error {
+func (config *Config) InitFromFile(fileName string) error {
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return err
 	}
-	// Provide default values for fields that are optional or critical.
-	config.Hostname = "127.0.0.1"
-	config.LoginPort = "12000"
-	config.CharacterPort = "12001"
-	config.ShipgatePort = "13000"
-	config.WebPort = "14000"
-	config.WelcomeMessage = "Add a welcome message here"
-	config.MaxConnections = 30000
-	config.ParametersDir = "parameters"
-	config.KeysDir = "keys"
-	config.DBHost = "127.0.0.1"
-	config.Logfile = ""
-
 	json.Unmarshal(data, config)
 
-	config.cachedWelcomeMsg = util.ConvertToUtf16(config.WelcomeMessage)
-
-	if config.LogLevel < logger.High || config.LogLevel > logger.Low {
-		// The log level must be at least open to critical messages.
-		config.LogLevel = logger.High
+	// Convert the welcome message to UTF-16LE and cache it.
+	config.MessageBytes = util.ConvertToUtf16(config.WelcomeMessage)
+	// PSOBB expects this prefix to the message, not completely sure why...
+	config.MessageBytes = append([]byte{0xFF, 0xFE}, config.MessageBytes...)
+	msgLen := len(config.MessageBytes)
+	if msgLen > (1 << 16) {
+		return errors.New("Message length must be less than 65,000 characters")
 	}
+	config.MessageSize = uint16(msgLen)
 
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
-	config.redirectPort = uint16(charPort)
+	config.cachedWelcomeMsg = util.ConvertToUtf16(config.ScrollMessage)
+
+	if config.LogLevel < logging.High || config.LogLevel > logging.Low {
+		// The log level must be at least open to critical messages.
+		config.LogLevel = logging.High
+	}
 
 	return nil
 }
 
 // Establish a connection to the database and ping it to verify.
-func (config *configuration) InitDb() error {
+func (config *Config) InitDb() error {
 	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
 		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
 
@@ -119,13 +157,13 @@ func (config *configuration) InitDb() error {
 	return err
 }
 
-func (config *configuration) CloseDb() {
+func (config *Config) CloseDB() {
 	config.database.Close()
 }
 
-// Use this function to obtain a reference to the database so that it can remain
+// Returns a reference to the database so that it can remain
 // encapsulated and any consistency checks can be centralized.
-func (config *configuration) Database() *sql.DB {
+func (config *Config) DB() *sql.DB {
 	if config.database == nil {
 		// Don't implicitly initialize the database - if there's an error or other action that causes
 		// the reference to become nil then we're probably leaking a connection.
@@ -135,7 +173,7 @@ func (config *configuration) Database() *sql.DB {
 }
 
 // Convert the hostname string into 4 bytes to be used with the redirect packet.
-func (config *configuration) HostnameBytes() [4]byte {
+func (config *Config) HostnameBytes() [4]byte {
 	// Hacky, but chances are the IP address isn't going to start with 0 and a
 	// fixed-length array can't be null.
 	if config.cachedHostBytes[0] == 0x00 {
@@ -148,23 +186,22 @@ func (config *configuration) HostnameBytes() [4]byte {
 	return config.cachedHostBytes
 }
 
-// Convenience method; returns a uint16 representation of the Character port.
-func (config *configuration) RedirectPort() uint16 {
-	return config.redirectPort
-}
-
-func (config *configuration) String() string {
+func (config *Config) String() string {
 	outfile := config.Logfile
 	if outfile == "" {
 		outfile = "Standard Out"
 	}
 	return "Hostname: " + config.Hostname + "\n" +
+		"Patch Port: " + config.PatchPort + "\n" +
+		"Data Port: " + config.DataPort + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
 		"Character Port: " + config.CharacterPort + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
+		"Welcome Message: " + config.WelcomeMessage + "\n" +
 		"Parameters Directory: " + config.ParametersDir + "\n" +
+		"Patch Directory: " + config.PatchDir + "\n" +
 		"Keys Directory: " + config.KeysDir + "\n" +
 		"Database Host: " + config.DBHost + "\n" +
 		"Database Port: " + config.DBPort + "\n" +

@@ -14,12 +14,10 @@
 *
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-* ---------------------------------------------------------------------
-*
-* Login and Character server logic.
  */
 
-package login
+// Login and Character server logic.
+package main
 
 import (
 	"crypto/sha256"
@@ -28,13 +26,21 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"libarchon/util"
+	"server/util"
 )
 
 const ClientVersionString = "TethVer12510"
 
 // Cached parameter data to avoid computing it every time.
 var (
+	log              *logging.ServerLogger
+	loginConnections = server.NewClientList()
+	shipConnections  = server.NewClientList()
+
+	defaultShip   ShipEntry
+	shipList      []ShipEntry
+	shipListMutex sync.RWMutex
+
 	paramHeaderData []byte
 	paramChunkData  map[int][]byte
 )
@@ -127,6 +133,31 @@ type CharacterStats struct {
 	DFP uint16
 	ATA uint16
 	LCK uint16
+}
+
+// Struct for holding client-specific data.
+type LoginClient struct {
+	c         *server.PSOClient
+	guildcard uint32
+	teamId    uint32
+	isGm      bool
+
+	gcData     []byte
+	gcDataSize uint16
+	config     ClientConfig
+	flag       uint32
+}
+
+func (lc *LoginClient) IPAddr() string        { return lc.c.IPAddr() }
+func (lc *LoginClient) Client() server.Client { return lc.c }
+func (lc *LoginClient) Data() []byte          { return lc.c.Data() }
+
+// Struct for representing available ships in the ship selection menu.
+type ShipEntry struct {
+	Unknown  uint16 // Always 0x12
+	Id       uint32
+	Padding  uint16
+	Shipname [23]byte
 }
 
 // Handle the initial login sent to the Login port.
@@ -409,6 +440,30 @@ func handleMenuSelect(client *LoginClient) {
 
 }
 
+// Create and initialize a new struct to hold client information.
+func newLoginClient(conn *net.TCPConn) (*LoginClient, error) {
+	loginClient := new(LoginClient)
+	loginClient.c = server.NewPSOClient(conn, BBHeaderSize)
+
+	var err error
+	if SendWelcome(loginClient) != 0 {
+		err = errors.New("Error sending welcome packet to: " + loginClient.IPAddr())
+		loginClient = nil
+	}
+	return loginClient, err
+}
+
+// Return a JSON string to the client with the name, hostname, port,
+// and player count.
+func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
+	if shipConnections.Count() == 0 {
+		w.Write([]byte("[]"))
+	} else {
+		// TODO: Pull this from a cache
+		w.Write([]byte("[]"))
+	}
+}
+
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
 func processLoginPacket(client *LoginClient) error {
@@ -483,4 +538,25 @@ func processCharacterPacket(client *LoginClient) error {
 		log.Info("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
 	}
 	return err
+}
+
+func InitLogin() {
+	loadParameterFiles()
+	loadBaseStats()
+
+	// Create our "No Ships" item to indicate the absence of any ship servers.
+	defaultShip.Unknown = 0x12
+	defaultShip.Id = 1
+	copy(defaultShip.Shipname[:], util.ConvertToUtf16("No Ships"))
+	shipList = append(shipList, defaultShip)
+
+	// Open up our web port for retrieving player counts. If we're in debug mode, add a path
+	// for dumping pprof output containing the stack traces of all running goroutines.
+	http.HandleFunc("/list", handleShipCountRequest)
+	if config.DebugMode {
+		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
+			pprof.Lookup("goroutine").WriteTo(resp, 1)
+		})
+	}
+	go http.ListenAndServe(":"+config.WebPort, nil)
 }

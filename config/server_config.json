@@ -1,0 +1,20 @@
+{ 
+	"Hostname" : "127.0.0.1",
+	"PatchPort" : "11000",
+	"DataPort" : "11001",
+	"LoginPort" : "12000",
+	"CharacterPort" : "12001",
+	"ShipgatePort" : "13000",
+
+	"PatchDir" : "/usr/local/share/archon/patches",
+	"WelcomeMessage" : "Unconfigured",
+	"ScrollMessage" : "Add a welcome message...",
+	"DBHost" : "127.0.0.1",
+	"DBPort" : "3306",
+	"DBName" : "archondb",
+	"DBUsername" : "archonadmin",
+	"DBPassword" : "psoadminpassword",
+	"Logfile" : "server.log",
+	"LogLevel" : 3,
+	"DebugMode" : false
+}

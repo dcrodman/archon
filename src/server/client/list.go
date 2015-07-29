@@ -17,30 +17,27 @@
 * ---------------------------------------------------------------------
 * Debugging utilities for server admins.
  */
-package server
+package client
 
 import (
 	"container/list"
-	"errors"
-	"net"
 	"sync"
 )
 
 // Synchronized list for maintaining a list of connected clients.
-type ConnectionList struct {
+type ConnList struct {
 	clientList *list.List
 	size       int
 	mutex      sync.RWMutex
 }
 
-// Factory method for creating new ConnectionLists.
-func NewClientList() *ConnectionList {
-	newList := new(ConnectionList)
-	newList.clientList = list.New()
-	return newList
+// Factory method for creating lists of connected clients.
+func NewList() *ConnList {
+	return &ConnList{clientList: list.New()}
 }
 
-func (cl *ConnectionList) AddClient(c ClientWrapper) {
+// Appends a client to the end of the connection list.
+func (cl *ConnList) Add(c ClientWrapper) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
 	cl.size++
@@ -49,7 +46,7 @@ func (cl *ConnectionList) AddClient(c ClientWrapper) {
 
 // Returns true if the list has a Client matching the IP address of c.
 // Note that this comparison is by IP address, not element value.
-func (cl *ConnectionList) HasClient(c ClientWrapper) bool {
+func (cl *ConnList) Has(c ClientWrapper) bool {
 	found := false
 	clAddr := c.Client().IPAddr()
 	cl.mutex.RLock()
@@ -63,7 +60,7 @@ func (cl *ConnectionList) HasClient(c ClientWrapper) bool {
 	return found
 }
 
-func (cl *ConnectionList) RemoveClient(c ClientWrapper) {
+func (cl *ConnList) Remove(c ClientWrapper) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
@@ -75,23 +72,9 @@ func (cl *ConnectionList) RemoveClient(c ClientWrapper) {
 	cl.mutex.Unlock()
 }
 
-func (cl *ConnectionList) Count() int {
+func (cl *ConnList) Count() int {
 	cl.mutex.RLock()
 	length := cl.size
 	cl.mutex.RUnlock()
 	return length
-}
-
-// Opens a TCP socket on host:port and returns either an error or
-// a listener socket ready to Accept().
-func OpenSocket(host, port string) (*net.TCPListener, error) {
-	hostAddress, err := net.ResolveTCPAddr("tcp", host+":"+port)
-	if err != nil {
-		return nil, errors.New("Error creating socket: " + err.Error())
-	}
-	socket, err := net.ListenTCP("tcp", hostAddress)
-	if err != nil {
-		return nil, errors.New("Error Listening on Socket: " + err.Error())
-	}
-	return socket, nil
 }

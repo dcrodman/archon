@@ -17,15 +17,15 @@
 * ---------------------------------------------------------------------
 * Client definition for generic handling of connections.
  */
-package server
+package client
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"libarchon/encryption"
-	"libarchon/util"
 	"net"
+	"server/encryption"
+	"server/util"
 	"strings"
 )
 
@@ -78,7 +78,8 @@ type PSOClient struct {
 	ipAddr string
 	port   string
 
-	hdrSize    int
+	// Exported so that callers can change this if needed.
+	HdrSize    int
 	recvSize   int
 	packetSize uint16
 	buffer     []byte

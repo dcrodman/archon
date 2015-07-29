@@ -20,18 +20,18 @@
 * ships. This module handles all of its own connection logic since the
 * shipgate protocol differs from the way game clients are processed.
  */
-package login
+package main
 
 import (
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
-	"libarchon/server"
-	"libarchon/util"
 	"net"
 	"os"
 	"runtime/debug"
+	"server/client"
+	"server/util"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +49,7 @@ type Ship struct {
 	buffer     []byte
 }
 
-func (s *Ship) Client() server.Client { return s }
+func (s *Ship) Client() client.Client { return s }
 func (s *Ship) IPAddr() string        { return s.ipAddr }
 func (s *Ship) Data() []byte          { return s.buffer[:s.packetSize] }
 func (s *Ship) Close()                { s.conn.Close() }

@@ -20,7 +20,7 @@
 * in order to allow a little more flexibility with Archon's logging.
  */
 
-package logger
+package logging
 
 import (
 	"io"
@@ -31,25 +31,25 @@ import (
 // Constants for the configurable log level that control the amount
 // of information written to the server logs. The higher the number,
 // the greater the verbosity.
-type LogPriority byte
+type Priority byte
 
 const (
-	High   LogPriority = 1
-	Medium             = 2
-	Low                = 3
+	High   Priority = 1
+	Medium          = 2
+	Low             = 3
 )
 
 type ServerLogger struct {
 	logger *log.Logger
 	// Minimum priority for messages. Logs with a priority below
 	// this level will not be written by the logger.
-	minLevel LogPriority
+	minLevel Priority
 }
 
 // Creates a new writer with all output written to the file located
 // at filename with any logs with a priority lower than level silently
 // ignored. Passing "" for filename will cause logs to be written to stdout.
-func New(filename string, level LogPriority) (*ServerLogger, error) {
+func New(filename string, level Priority) (*ServerLogger, error) {
 	var w io.Writer
 	var err error
 	if filename != "" {

@@ -18,7 +18,7 @@
 * The PATCH and DATA server logic. Both are included here since they're
 * neither are particularly complicated.
  */
-package patch
+package main
 
 import (
 	"errors"
@@ -26,21 +26,20 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
-	"libarchon/logger"
-	"libarchon/server"
-	"libarchon/util"
 	"net"
-	"net/http"
 	"os"
 	"runtime/debug"
-	"runtime/pprof"
+	"server/client"
+	"server/configuration"
+	"server/util"
+	"strconv"
 	"strings"
-	"sync"
 )
 
 var (
-	log              *logger.ServerLogger
-	patchConnections *server.ConnectionList = server.NewClientList()
+	patchConnections *client.ConnList      = client.NewList()
+	config           *configuration.Config = configuration.GetConfig()
+	redirectPort     uint16
 
 	// File names that should be ignored when searching for patch files.
 	SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
@@ -52,18 +51,16 @@ var (
 	patchIndex []*PatchEntry
 )
 
-const MaxChunkSize = 24576
-
-type pktHandler func(p *PatchClient) error
+const MaxFileChunkSize = 24576
 
 // Struct for holding client-specific data.
 type PatchClient struct {
-	c          *server.PSOClient
+	c          *client.PSOClient
 	updateList []*PatchEntry
 }
 
 func (pc *PatchClient) IPAddr() string        { return pc.c.IPAddr() }
-func (pc *PatchClient) Client() server.Client { return pc.c }
+func (pc *PatchClient) Client() client.Client { return pc.c }
 func (pc *PatchClient) Data() []byte          { return pc.c.Data() }
 
 // Data for one patch file.
@@ -88,11 +85,11 @@ type PatchDir struct {
 }
 
 // Create and initialize a new struct to hold client information.
-func newClient(conn *net.TCPConn) (*PatchClient, error) {
-	pc := new(PatchClient)
-	pc.c = server.NewPSOClient(conn, PCHeaderSize)
-
+func newPatchClient(c *client.PSOClient) (*PatchClient, error) {
 	var err error
+	// Override the packet size since patch packets use 4 byte headers.
+	c.HdrSize = PCHeaderSize
+	pc := &PatchClient{c: c}
 	if SendWelcome(pc) != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
@@ -140,7 +137,7 @@ func updateClientFiles(client *PatchClient) error {
 	if numFiles > 0 {
 		SendUpdateFiles(client, numFiles, totalSize)
 		SendChangeDir(client, ".")
-		chunkBuf := make([]byte, MaxChunkSize)
+		chunkBuf := make([]byte, MaxFileChunkSize)
 
 		for _, patch := range client.updateList {
 			// Descend into the correct directory if needed.
@@ -152,7 +149,7 @@ func updateClientFiles(client *PatchClient) error {
 			SendFileHeader(client, patch)
 
 			// Divide the file into chunks and send each one.
-			chunks := int((patch.fileSize / MaxChunkSize) + 1)
+			chunks := int((patch.fileSize / MaxFileChunkSize) + 1)
 			file, err := os.Open(patch.relativePath)
 			if err != nil {
 				// Critical since this is most likely a filesystem error.
@@ -160,7 +157,7 @@ func updateClientFiles(client *PatchClient) error {
 				return err
 			}
 			for i := 0; i < chunks; i++ {
-				bytes, err := file.ReadAt(chunkBuf, int64(MaxChunkSize*i))
+				bytes, err := file.ReadAt(chunkBuf, int64(MaxFileChunkSize*i))
 				if err != nil && err != io.EOF {
 					return err
 				}
@@ -180,72 +177,60 @@ func updateClientFiles(client *PatchClient) error {
 	return nil
 }
 
-// Handle a packet sent to the PATCH server.
-func processPatchPacket(client *PatchClient) error {
-	var pktHeader PCPktHeader
-	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
+// Handle communication with a DATA client until the connection
+// is closed or an error is encountered.
+func DataHandler(c *PatchClient) {
+	pclient, err := newPatchClient(conn)
+	if err != nil {
+		log.Warn(err.Error())
+		return
+	}
 
-	if config.DebugMode {
-		fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.Data(), int(pktHeader.Size))
-		fmt.Println()
-	}
-	var err error
-	switch pktHeader.Type {
-	case WelcomeType:
-		SendWelcomeAck(client)
-	case LoginType:
-		if SendWelcomeMessage(client) == 0 {
-			SendRedirect(client, config.RedirectPort(), config.HostnameBytes())
+	var pktHeader PCPktHeader
+	for {
+		err := c.Process()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			// Error communicating with the client.
+			log.Warn(err.Error())
+			break
 		}
-	default:
-		log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
+
+		util.StructFromBytes(pclient.Data()[:PCHeaderSize], &pktHeader)
+		if config.DebugMode {
+			fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
+			util.PrintPayload(pclient.Data(), int(pktHeader.Size))
+			fmt.Println()
+		}
+
+		switch pktHeader.Type {
+		case PatchWelcomeType:
+			SendWelcomeAck(pclient)
+		case LoginType:
+			SendDataAck(pclient)
+			sendFileList(pclient, &patchTree)
+			SendFileListDone(pclient)
+		case FileStatusType:
+			handleFileStatus(pclient)
+		case ClientListDoneType:
+			err = updateClientFiles(pclient)
+		default:
+			log.Info("Received unknown packet %02x from %s", pktHeader.Type, client.IPAddr())
+		}
 	}
-	return err
 }
 
-// Handle a packet sent to the DATA server.
-func processDataPacket(client *PatchClient) error {
+// Handle communication with a PATCH client until the connection
+// is closed or an error is encountered.
+func PatchHandler(c *client.Client) {
+	client, err := newPatchClient(conn)
+	if err != nil {
+		log.Warn(err.Error())
+		return
+	}
+
 	var pktHeader PCPktHeader
-	util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
-
-	if config.DebugMode {
-		fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.Data(), int(pktHeader.Size))
-		fmt.Println()
-	}
-	var err error
-	switch pktHeader.Type {
-	case WelcomeType:
-		SendWelcomeAck(client)
-	case LoginType:
-		SendDataAck(client)
-		sendFileList(client, &patchTree)
-		SendFileListDone(client)
-	case FileStatusType:
-		handleFileStatus(client)
-	case ClientListDoneType:
-		err = updateClientFiles(client)
-	default:
-		log.Info("Received unknown packet %02x from %s", pktHeader.Type, client.IPAddr())
-	}
-	return err
-}
-
-// Handle communication with a particular client until the connection is
-// closed or an error is encountered.
-func handleClient(client *PatchClient, desc string, handler pktHandler) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Error("Error in client communication: %s: %s\n%s\n",
-				client.IPAddr(), err, debug.Stack())
-		}
-		client.c.Close()
-		patchConnections.RemoveClient(client)
-		log.Info("Disconnected %s client %s", desc, client.IPAddr())
-	}()
-
-	log.Info("Accepted %s connection from %s", desc, client.IPAddr())
 	for {
 		err := client.c.Process()
 		if err == io.EOF {
@@ -256,39 +241,29 @@ func handleClient(client *PatchClient, desc string, handler pktHandler) {
 			break
 		}
 
-		if err = handler(client); err != nil {
+		util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
+		if config.DebugMode {
+			fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
+			util.PrintPayload(client.Data(), int(pktHeader.Size))
+			fmt.Println()
+		}
+
+		switch pktHeader.Type {
+		case PatchWelcomeType:
+			SendWelcomeAck(client)
+		case PatchLoginType:
+			if SendWelcomeMessage(client) == 0 {
+				SendRedirect(client, redirectPort, config.HostnameBytes())
+			}
+		default:
+			log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
+		}
+
+		if err != nil {
 			log.Warn(err.Error())
 			break
 		}
 	}
-}
-
-// Creates the socket and starts listening for connections on the specified
-// port, spawning off goroutines to handle communications for each client.
-func startWorker(wg *sync.WaitGroup, id, port string, handler pktHandler) {
-	socket, err := server.OpenSocket(config.Hostname, port)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-	log.Important("Waiting for %s connections on %s:%s...", id, config.Hostname, port)
-	for {
-		// Poll until we can accept more clients.
-		for patchConnections.Count() < config.MaxConnections {
-			connection, err := socket.AcceptTCP()
-			if err != nil {
-				log.Warn("Failed to accept connection: %v", err.Error())
-				continue
-			}
-			client, err := newClient(connection)
-			if err != nil {
-				continue
-			}
-			patchConnections.AddClient(client)
-			go handleClient(client, id, handler)
-		}
-	}
-	wg.Done()
 }
 
 // Recursively build the list of patch files present in the patch directory
@@ -353,22 +328,7 @@ func buildPatchIndex(node *PatchDir) {
 	}
 }
 
-func StartServer() {
-	// Initialize our config singleton from one of two expected file locations.
-	fmt.Printf("Loading config file %v...", PatchConfigFile)
-	err := config.InitFromFile(PatchConfigFile)
-	if err != nil {
-		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+PatchConfigFile)
-		err = config.InitFromFile(PatchConfigFile)
-		if err != nil {
-			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
-			fmt.Printf("%s\n", err.Error())
-			os.Exit(1)
-		}
-	}
-	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
-
+func InitPatch() {
 	// Construct our patch tree from the specified directory.
 	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
 	os.Chdir(config.PatchDir)
@@ -383,27 +343,7 @@ func StartServer() {
 		os.Exit(1)
 	}
 
-	// If we're in debug mode, spawn off an HTTP server that, when hit, dumps
-	// pprof output containing the stack traces of all running goroutines.
-	if config.DebugMode {
-		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
-			pprof.Lookup("goroutine").WriteTo(resp, 1)
-		})
-		go http.ListenAndServe("127.0.0.1:8080", nil)
-	}
-
-	// Initialize the logger.
-	log, err = logger.New(config.Logfile, config.LogLevel)
-	if err != nil {
-		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
-		os.Exit(1)
-	}
-	log.Important("Server Initialized")
-
-	// Create a WaitGroup so that main won't exit until the server threads have exited.
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go startWorker(&wg, "PATCH", config.PatchPort, processPatchPacket)
-	go startWorker(&wg, "DATA", config.DataPort, processDataPacket)
-	wg.Wait()
+	// Pre-compute our character port so that we don't have to do it every time.
+	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	redirectPort = uint16(charPort)
 }

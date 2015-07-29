@@ -15,20 +15,19 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
-*
-* Responsible for initializing default data for players and accounts.
  */
 
-package login
+// Responsible for initializing default data for players and accounts.
+package main
 
 import (
 	// "encoding/json"
 	// "fmt"
 	"hash/crc32"
 	"io/ioutil"
-	"libarchon/prs"
-	"libarchon/util"
 	"os"
+	"server/prs"
+	"server/util"
 )
 
 // Parameter files we're expecting. I still don't really know what they're
