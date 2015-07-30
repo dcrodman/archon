@@ -1,5 +1,5 @@
 /*
-* Archon Login Server
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -124,7 +124,7 @@ type PatchWelcomePkt struct {
 }
 
 // Packet containing the patch server welcome message.
-type WelcomeMessage struct {
+type PatchWelcomeMessage struct {
 	Header  PCPktHeader
 	Message []byte
 }

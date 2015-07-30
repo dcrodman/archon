@@ -1,5 +1,5 @@
 /*
-* Archon Server Library
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -17,9 +17,10 @@
 * ---------------------------------------------------------------------
 * Client definition for generic handling of connections.
  */
-package client
+package main
 
 import (
+	"container/list"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ import (
 	"server/encryption"
 	"server/util"
 	"strings"
+	"sync"
 )
 
 type Client interface {
@@ -53,12 +55,9 @@ type Client interface {
 	Decrypt(data []byte, size uint32)
 
 	// Returns a slice of the underlying array containing the packet data.
-	// This is not copied in order to try and keep the memory usage low.
 	Data() []byte
 
-	// Send the block pointed to by data to the client. Since the
-	// entire slice is written, sending only part of the buffer can
-	// be accomplished via slicing by the caller.
+	// Send the block pointed to by data to the client.
 	Send(data []byte) error
 
 	// Close the underlying socket and stop processing packets.
@@ -79,7 +78,7 @@ type PSOClient struct {
 	port   string
 
 	// Exported so that callers can change this if needed.
-	HdrSize    int
+	hdrSize    int
 	recvSize   int
 	packetSize uint16
 	buffer     []byte
@@ -94,7 +93,7 @@ func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
 		conn:        conn,
 		ipAddr:      addr[0],
 		port:        addr[1],
-		HdrSize:     hdrSize,
+		hdrSize:     hdrSize,
 		clientCrypt: encryption.NewCrypt(),
 		serverCrypt: encryption.NewCrypt(),
 		buffer:      make([]byte, 512),
@@ -135,11 +134,11 @@ func (c *PSOClient) Process() error {
 	// Extra bytes left in the buffer will just be ignored.
 	c.recvSize = 0
 	c.packetSize = 0
-	hdr16 := uint16(c.HdrSize)
+	hdr16 := uint16(c.hdrSize)
 
 	// Wait for the packet header.
-	for c.recvSize < c.HdrSize {
-		bytes, err := c.conn.Read(c.buffer[c.recvSize:c.HdrSize])
+	for c.recvSize < c.hdrSize {
+		bytes, err := c.conn.Read(c.buffer[c.recvSize:c.hdrSize])
 		if bytes == 0 || err == io.EOF {
 			// The client disconnected, we're done.
 			return err
@@ -150,9 +149,9 @@ func (c *PSOClient) Process() error {
 		}
 		c.recvSize += bytes
 
-		if c.recvSize >= c.HdrSize {
+		if c.recvSize >= c.hdrSize {
 			// We have our header; decrypt it.
-			c.Decrypt(c.buffer[:c.HdrSize], uint32(c.HdrSize))
+			c.Decrypt(c.buffer[:c.hdrSize], uint32(c.hdrSize))
 			c.packetSize, err = util.GetPacketSize(c.buffer[:2])
 			if err != nil {
 				// Something is seriously wrong if this causes an error. Bail.
@@ -205,4 +204,58 @@ func (c *PSOClient) Send(data []byte) error {
 
 func (c *PSOClient) Close() {
 	c.conn.Close()
+}
+
+// Synchronized list for maintaining a list of connected clients.
+type ConnList struct {
+	clientList *list.List
+	size       int
+	mutex      sync.RWMutex
+}
+
+func NewClientList() *ConnList {
+	return &ConnList{clientList: list.New()}
+}
+
+// Appends a client to the end of the connection list.
+func (cl *ConnList) Add(c Client) {
+	cl.mutex.Lock()
+	cl.clientList.PushBack(c)
+	cl.size++
+	cl.mutex.Unlock()
+}
+
+// Returns true if the list has a Client matching the IP address of c.
+// Note that this comparison is by IP address, not element value.
+func (cl *ConnList) Has(c Client) bool {
+	found := false
+	clAddr := c.IPAddr()
+	cl.mutex.RLock()
+	for client := cl.clientList.Front(); client != nil; client = client.Next() {
+		if c.IPAddr() == clAddr {
+			found = true
+			break
+		}
+	}
+	cl.mutex.RUnlock()
+	return found
+}
+
+func (cl *ConnList) Remove(c Client) {
+	cl.mutex.Lock()
+	for client := cl.clientList.Front(); client != nil; client = client.Next() {
+		if client.Value == c {
+			cl.clientList.Remove(client)
+			cl.size--
+			break
+		}
+	}
+	cl.mutex.Unlock()
+}
+
+func (cl *ConnList) Count() int {
+	cl.mutex.RLock()
+	length := cl.size
+	cl.mutex.RUnlock()
+	return length
 }

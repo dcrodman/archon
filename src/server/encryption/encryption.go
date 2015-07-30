@@ -4,7 +4,7 @@ package encryption
 import "C"
 
 /*
-* Archon Server Library
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify

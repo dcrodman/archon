@@ -1,5 +1,5 @@
 /*
-* Archon Patch Server
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -22,7 +22,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"server/client"
 	"server/util"
 	"syscall"
 	"time"
@@ -44,7 +43,7 @@ var (
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
-func SendPacket(c client.Client, pkt []byte, length uint16) int {
+func SendPacket(c Client, pkt []byte, length uint16) int {
 	if err := c.Send(pkt[:length]); err != nil {
 		log.Info("Error sending to client %v: %s", c.IPAddr(), err.Error())
 		return -1
@@ -54,7 +53,7 @@ func SendPacket(c client.Client, pkt []byte, length uint16) int {
 
 // Send data to client after padding it to a length disible by 8 and
 // encrypting it with the client's server ciper.
-func SendEncrypted(cw client.ClientWrapper, data []byte, length uint16) int {
+func SendEncrypted(cw ClientWrapper, data []byte, length uint16) int {
 	c := cw.Client()
 	length = fixLength(data, length)
 	if config.DebugMode {
@@ -120,12 +119,12 @@ func SendWelcomeAck(client *PatchClient) int {
 	return SendEncrypted(client, data, 0x0004)
 }
 
+// Message displayed on the patch download screen.
 func SendWelcomeMessage(client *PatchClient) int {
-	cfg := config
-	pkt := new(WelcomeMessage)
+	pkt := new(PatchWelcomeMessage)
 	pkt.Header.Type = PatchMessageType
-	pkt.Header.Size = PCHeaderSize + cfg.MessageSize
-	pkt.Message = cfg.MessageBytes
+	pkt.Header.Size = PCHeaderSize + config.MessageSize
+	pkt.Message = config.MessageBytes
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {

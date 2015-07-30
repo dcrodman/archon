@@ -1,5 +1,5 @@
 /*
-* Archon Patch Server
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -26,17 +26,16 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
-	"server/client"
 	"server/util"
 	"strconv"
 	"strings"
 )
 
 var (
-	patchConnections *client.ConnList = client.NewList()
 	// Parsed representation of the login port.
-	loginRedirectPort uint16
+	dataRedirectPort uint16
 
 	// File names that should be ignored when searching for patch files.
 	SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
@@ -52,13 +51,13 @@ const MaxFileChunkSize = 24576
 
 // Struct for holding client-specific data.
 type PatchClient struct {
-	c          *client.PSOClient
+	c          *PSOClient
 	updateList []*PatchEntry
 }
 
-func (pc *PatchClient) IPAddr() string        { return pc.c.IPAddr() }
-func (pc *PatchClient) Client() client.Client { return pc.c }
-func (pc *PatchClient) Data() []byte          { return pc.c.Data() }
+func (pc PatchClient) IPAddr() string { return pc.c.IPAddr() }
+func (pc PatchClient) Client() Client { return pc.c }
+func (pc PatchClient) Data() []byte   { return pc.c.Data() }
 
 // Data for one patch file.
 type PatchEntry struct {
@@ -82,16 +81,14 @@ type PatchDir struct {
 }
 
 // Create and initialize a new struct to hold client information.
-func newPatchClient(c *client.PSOClient) (*PatchClient, error) {
+func NewPatchClient(conn *net.TCPConn) (ClientWrapper, error) {
 	var err error
-	// Override the packet size since patch packets use 4 byte headers.
-	c.HdrSize = PCHeaderSize
-	pc := &PatchClient{c: c}
+	pc := &PatchClient{c: NewPSOClient(conn, PCHeaderSize)}
 	if SendPatchWelcome(pc) != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
 	}
-	return pc, err
+	return *pc, err
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
@@ -176,16 +173,11 @@ func updateClientFiles(client *PatchClient) error {
 
 // Handle communication with a DATA client until the connection
 // is closed or an error is encountered.
-func DataHandler(c client.Client) {
-	pclient, err := newPatchClient(c.(*client.PSOClient))
-	if err != nil {
-		log.Warn(err.Error())
-		return
-	}
-
+func DataHandler(cw ClientWrapper) {
+	pc := cw.(PatchClient)
 	var pktHeader PCPktHeader
 	for {
-		err := c.Process()
+		err := pc.c.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -194,42 +186,37 @@ func DataHandler(c client.Client) {
 			break
 		}
 
-		util.StructFromBytes(pclient.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pclient.Data(), int(pktHeader.Size))
+			util.PrintPayload(pc.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
 
 		switch pktHeader.Type {
 		case PatchWelcomeType:
-			SendWelcomeAck(pclient)
+			SendWelcomeAck(&pc)
 		case PatchLoginType:
-			SendDataAck(pclient)
-			sendFileList(pclient, &patchTree)
-			SendFileListDone(pclient)
+			SendDataAck(&pc)
+			sendFileList(&pc, &patchTree)
+			SendFileListDone(&pc)
 		case PatchFileStatusType:
-			handleFileStatus(pclient)
+			handleFileStatus(&pc)
 		case PatchClientListDoneType:
-			err = updateClientFiles(pclient)
+			err = updateClientFiles(&pc)
 		default:
-			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pclient.IPAddr())
+			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pc.c.IPAddr())
 		}
 	}
 }
 
 // Handle communication with a PATCH client until the connection
 // is closed or an error is encountered.
-func PatchHandler(c client.Client) {
-	client, err := newPatchClient(c.(*client.PSOClient))
-	if err != nil {
-		log.Warn(err.Error())
-		return
-	}
-
+func PatchHandler(cw ClientWrapper) {
+	pc := cw.(PatchClient)
 	var pktHeader PCPktHeader
 	for {
-		err := c.Process()
+		err := pc.c.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -238,22 +225,22 @@ func PatchHandler(c client.Client) {
 			break
 		}
 
-		util.StructFromBytes(client.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(client.Data(), int(pktHeader.Size))
+			util.PrintPayload(pc.c.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
 
 		switch pktHeader.Type {
 		case PatchWelcomeType:
-			SendWelcomeAck(client)
+			SendWelcomeAck(&pc)
 		case PatchLoginType:
-			if SendWelcomeMessage(client) == 0 {
-				SendPatchRedirect(client, loginRedirectPort, config.HostnameBytes())
+			if SendWelcomeMessage(&pc) == 0 {
+				SendPatchRedirect(&pc, dataRedirectPort, config.HostnameBytes())
 			}
 		default:
-			log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
+			log.Info("Received unknown packet %2x from %s", pktHeader.Type, pc.c.IPAddr())
 		}
 
 		if err != nil {
@@ -340,7 +327,7 @@ func InitPatch() {
 		os.Exit(1)
 	}
 
-	// Pre-compute our login port so that we don't have to do it every time.
-	loginPort, _ := strconv.ParseUint(config.LoginPort, 10, 16)
-	loginRedirectPort = uint16(loginPort)
+	// Convert the data port to a BE uint for the redirect packet.
+	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
+	dataRedirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 }

@@ -1,5 +1,5 @@
 /*
-* Archon Login Server
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"net/http"
-	"server/client"
 	"server/util"
 	"strconv"
 )
@@ -139,7 +138,7 @@ type CharacterStats struct {
 
 // Struct for holding client-specific data.
 type LoginClient struct {
-	c         *client.PSOClient
+	c         *PSOClient
 	guildcard uint32
 	teamId    uint32
 	isGm      bool
@@ -150,9 +149,9 @@ type LoginClient struct {
 	flag       uint32
 }
 
-func (lc *LoginClient) IPAddr() string        { return lc.c.IPAddr() }
-func (lc *LoginClient) Client() client.Client { return lc.c }
-func (lc *LoginClient) Data() []byte          { return lc.c.Data() }
+func (lc *LoginClient) IPAddr() string { return lc.c.IPAddr() }
+func (lc *LoginClient) Client() Client { return lc.c }
+func (lc *LoginClient) Data() []byte   { return lc.c.Data() }
 
 // Struct for representing available ships in the ship selection menu.
 type ShipEntry struct {
@@ -443,7 +442,7 @@ func handleMenuSelect(client *LoginClient) {
 }
 
 // Create and initialize a new struct to hold client information.
-func newLoginClient(c *client.PSOClient) (*LoginClient, error) {
+func newLoginClient(c *PSOClient) (*LoginClient, error) {
 	var err error
 	loginClient := &LoginClient{c: c}
 	if SendLoginWelcome(loginClient) != 0 {
@@ -462,27 +461,28 @@ func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
 func processLoginPacket(client *LoginClient) error {
-	var pktHeader BBPktHeader
-	c := client.Client()
-	util.StructFromBytes(c.Data()[:BBHeaderSize], &pktHeader)
+	// var pktHeader BBPktHeader
+	// c := Client()
+	// util.StructFromBytes(c.Data()[:BBHeaderSize], &pktHeader)
 
-	if config.DebugMode {
-		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.Data(), int(pktHeader.Size))
-		fmt.Println()
-	}
+	// if config.DebugMode {
+	// 	fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+	// 	util.PrintPayload(client.Data(), int(pktHeader.Size))
+	// 	fmt.Println()
+	// }
 
-	var err error
-	switch pktHeader.Type {
-	case LoginType:
-		err = handleLogin(client)
-	case DisconnectType:
-		// Just wait until we recv 0 from the client to d/c.
-		break
-	default:
-		log.Info("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
-	}
-	return err
+	// var err error
+	// switch pktHeader.Type {
+	// case LoginType:
+	// 	err = handleLogin(client)
+	// case DisconnectType:
+	// 	// Just wait until we recv 0 from the client to d/c.
+	// 	break
+	// default:
+	// 	log.Info("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
+	// }
+	// return err
+	return nil
 }
 
 // Process packets sent to the CHARACTER port by sending them off to another

@@ -1,5 +1,5 @@
 /*
-* Archon Login Server
+* Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
 *
 * This program is free software: you can redistribute it and/or modify
@@ -25,17 +25,9 @@ import (
 	"os"
 	"runtime/debug"
 	"runtime/pprof"
-	"server/client"
 	"server/configuration"
 	"server/logging"
 	"sync"
-)
-
-var (
-	// Our global connection list.
-	conns  *client.ConnList = client.NewList()
-	log    *logging.ServerLogger
-	config *configuration.Config = configuration.GetConfig()
 )
 
 const (
@@ -45,44 +37,43 @@ const (
 	KeyFile          = "key.pem"
 )
 
-type handler func(c client.Client)
+var (
+	// Our global connection list.
+	conns  *ConnList             = NewClientList()
+	config *configuration.Config = configuration.GetConfig()
+	log    *logging.ServerLogger
+	host   string
+	// Register all of the server handlers and their corresponding ports.
+	servers = []Server{
+		Server{"PATCH", config.PatchPort, NewPatchClient, PatchHandler},
+		Server{"DATA", config.DataPort, NewPatchClient, DataHandler},
+	}
+)
 
-func dispatch(desc string, c *client.PSOClient, connHandler handler) {
-	// Defer so that we catch any panics, d/c the client, and
-	// remove them from the list regardless of the connection state.
-	defer func() {
-		if err := recover(); err != nil {
-			log.Error("Error in client communication: %s: %s\n%s\n",
-				c.IPAddr(), err, debug.Stack())
-		}
-		c.Close()
-		conns.Remove(c)
-		log.Info("Disconnected %s client %s", desc, c.IPAddr())
-	}()
-	conns.Add(c)
-	// Pass along the connection handling to the registered server.
-	connHandler(c)
+type Server struct {
+	name string
+	port string
+	// Allow each server to define their client structures.
+	newClient func(conn *net.TCPConn) (ClientWrapper, error)
+	handler   func(cw ClientWrapper)
 }
 
-// Creates the socket and starts listening for connections on the specified
-// port, spawning off goroutines for calls to the packet handler argument
-// to handle communications for each client. There will be one worker
-// routine created for each server.
-func worker(host, port, desc string, connHandler handler, wg *sync.WaitGroup) {
-	// Open our server socket.
-	hostAddr, err := net.ResolveTCPAddr("tcp", host+":"+port)
+func (s Server) Start(wg *sync.WaitGroup) {
+	// Open our server socket. All sockets must be open for the server
+	// to launch correctly, so errors are terminal.
+	hostAddr, err := net.ResolveTCPAddr("tcp", config.Hostname+":"+s.port)
 	if err != nil {
 		fmt.Println("Error creating socket: " + err.Error())
 		os.Exit(1)
 	}
 	socket, err := net.ListenTCP("tcp", hostAddr)
 	if err != nil {
-		fmt.Println("Error Listening on Socket: " + err.Error())
+		fmt.Println("Error listening on socket: " + err.Error())
 		os.Exit(1)
 	}
 
-	fmt.Printf("Waiting for %s connections on %v:%v\n", desc, host, port)
-	for {
+	go func() {
+		fmt.Printf("Waiting for %s connections on %v:%v\n", s.name, host, s.port)
 		// Poll until we can accept more clients.
 		for conns.Count() < config.MaxConnections {
 			connection, err := socket.AcceptTCP()
@@ -90,15 +81,47 @@ func worker(host, port, desc string, connHandler handler, wg *sync.WaitGroup) {
 				log.Warn("Failed to accept connection: %v", err.Error())
 				continue
 			}
-			c := client.NewPSOClient(connection, BBHeaderSize)
-			log.Info("Accepted %s connection from %s", desc, c.IPAddr())
-			go dispatch(desc, c, connHandler)
+			c, err := s.newClient(connection)
+			if err != nil {
+				log.Warn(err.Error())
+			} else {
+				log.Info("Accepted %s connection from %s", s.name, c.Client().IPAddr())
+				s.dispatch(c)
+			}
 		}
-	}
-	wg.Done()
+		wg.Done()
+	}()
 }
 
-func initialize() {
+func (s Server) dispatch(cw ClientWrapper) {
+	c := cw.Client()
+	go func() {
+		// Defer so that we catch any panics, d/c the client, and
+		// remove them from the list regardless of the connection state.
+		defer func() {
+			if err := recover(); err != nil {
+				log.Error("Error in client communication: %s: %s\n%s\n",
+					c.IPAddr(), err, debug.Stack())
+			}
+			c.Close()
+			conns.Remove(c)
+			log.Info("Disconnected %s client %s", s.name, c.IPAddr())
+		}()
+		conns.Add(c)
+		// Pass along the connection handling to the registered server.
+		s.handler(cw)
+	}()
+}
+
+func main() {
+	fmt.Println("Archon PSO Server, Copyright (C) 2014 Andrew Rodman\n" +
+		"=====================================================\n" +
+		"This program is free software: you can redistribute it and/or\n" +
+		"modify it under the terms of the GNU General Public License as\n" +
+		"published by the Free Software Foundation, either version 3 of\n" +
+		"the License, or (at your option) any later version.\n" +
+		"This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
+
 	// Initialize our config singleton from one of two expected file locations.
 	fmt.Printf("Loading config file %v...", ServerConfigFile)
 	err := config.InitFromFile(ServerConfigFile)
@@ -113,6 +136,7 @@ func initialize() {
 		}
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
+	host = config.Hostname
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
@@ -140,38 +164,16 @@ func initialize() {
 		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
 		os.Exit(1)
 	}
-	log.Important("Server Initialized")
-}
 
-func main() {
-	fmt.Println("Archon Login Server, Copyright (C) 2014 Andrew Rodman\n" +
-		"=====================================================\n" +
-		"This program is free software: you can redistribute it and/or\n" +
-		"modify it under the terms of the GNU General Public License as\n" +
-		"published by the Free Software Foundation, either version 3 of\n" +
-		"the License, or (at your option) any later version.\n" +
-		"This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
-
-	initialize()
+	// Initialize the remaining servers and spin off our top-level goroutines.
 	InitPatch()
 	InitLogin()
 
-	type Server struct {
-		name       string
-		port       string
-		pktHandler handler
-	}
-	// Register all of the server handlers and their corresponding ports.
-	listeners := []Server{
-		Server{"PATCH", config.PatchPort, PatchHandler},
-		Server{"DATA", config.DataPort, DataHandler},
-	}
-
-	// Spin off a goroutine for each top-level handler.
 	var wg sync.WaitGroup
-	for _, entry := range listeners {
+	for _, server := range servers {
 		wg.Add(1)
-		go worker(config.Hostname, entry.port, entry.name, entry.pktHandler, &wg)
+		server.Start(&wg)
 	}
+	log.Important("Server Initialized")
 	wg.Wait()
 }
