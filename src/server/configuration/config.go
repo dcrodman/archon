@@ -29,6 +29,7 @@ import (
 	"fmt"
 	_ "go-sql-driver"
 	"io/ioutil"
+	"path/filepath"
 	"server/logging"
 	"server/util"
 	"strconv"
@@ -128,6 +129,11 @@ func (config *Config) InitFromFile(fileName string) error {
 	config.MessageSize = uint16(msgLen)
 
 	config.cachedScrollMsg = util.ConvertToUtf16(config.ScrollMessage)
+
+	// Strip the trailing slash if needed.
+	if strings.HasSuffix(config.PatchDir, "/") {
+		config.PatchDir = filepath.Dir(config.PatchDir)
+	}
 
 	if config.LogLevel < logging.High || config.LogLevel > logging.Low {
 		// The log level must be at least open to critical messages.

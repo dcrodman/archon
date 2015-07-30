@@ -203,7 +203,9 @@ func DataHandler(cw ClientWrapper) {
 		case PatchFileStatusType:
 			handleFileStatus(&pc)
 		case PatchClientListDoneType:
-			err = updateClientFiles(&pc)
+			if updateClientFiles(&pc) != nil {
+				return
+			}
 		default:
 			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pc.c.IPAddr())
 		}
@@ -285,7 +287,7 @@ func loadPatches(node *PatchDir, path string) error {
 			}
 			patch := &PatchEntry{
 				filename:     filename,
-				relativePath: path + "/" + filename,
+				relativePath: config.PatchDir + "/" + path + "/" + filename,
 				pathDirs:     dirs,
 				fileSize:     uint32(file.Size()),
 				checksum:     crc32.ChecksumIEEE(data),
@@ -313,10 +315,12 @@ func buildPatchIndex(node *PatchDir) {
 }
 
 func InitPatch() {
+	wd, _ := os.Getwd()
+	os.Chdir(config.PatchDir)
+
 	// Construct our patch tree from the specified directory.
 	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
-	// os.Chdir(config.PatchDir)
-	if err := loadPatches(&patchTree, config.PatchDir); err != nil {
+	if err := loadPatches(&patchTree, "."); err != nil {
 		fmt.Printf("Failed to load patches: %s\n", err.Error())
 		os.Exit(1)
 	}
@@ -326,6 +330,7 @@ func InitPatch() {
 		fmt.Println("Failed: At least one patch file must be present.")
 		os.Exit(1)
 	}
+	os.Chdir(wd)
 
 	// Convert the data port to a BE uint for the redirect packet.
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
