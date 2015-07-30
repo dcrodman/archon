@@ -26,20 +26,17 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
-	"runtime/debug"
 	"server/client"
-	"server/configuration"
 	"server/util"
 	"strconv"
 	"strings"
 )
 
 var (
-	patchConnections *client.ConnList      = client.NewList()
-	config           *configuration.Config = configuration.GetConfig()
-	redirectPort     uint16
+	patchConnections *client.ConnList = client.NewList()
+	// Parsed representation of the login port.
+	loginRedirectPort uint16
 
 	// File names that should be ignored when searching for patch files.
 	SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
@@ -90,7 +87,7 @@ func newPatchClient(c *client.PSOClient) (*PatchClient, error) {
 	// Override the packet size since patch packets use 4 byte headers.
 	c.HdrSize = PCHeaderSize
 	pc := &PatchClient{c: c}
-	if SendWelcome(pc) != 0 {
+	if SendPatchWelcome(pc) != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
 	}
@@ -133,7 +130,7 @@ func updateClientFiles(client *PatchClient) error {
 		totalSize += patch.fileSize
 	}
 
-	// If we have any files to send, do it now.
+	// Send files, if we have any.
 	if numFiles > 0 {
 		SendUpdateFiles(client, numFiles, totalSize)
 		SendChangeDir(client, ".")
@@ -179,8 +176,8 @@ func updateClientFiles(client *PatchClient) error {
 
 // Handle communication with a DATA client until the connection
 // is closed or an error is encountered.
-func DataHandler(c *PatchClient) {
-	pclient, err := newPatchClient(conn)
+func DataHandler(c client.Client) {
+	pclient, err := newPatchClient(c.(*client.PSOClient))
 	if err != nil {
 		log.Warn(err.Error())
 		return
@@ -207,24 +204,24 @@ func DataHandler(c *PatchClient) {
 		switch pktHeader.Type {
 		case PatchWelcomeType:
 			SendWelcomeAck(pclient)
-		case LoginType:
+		case PatchLoginType:
 			SendDataAck(pclient)
 			sendFileList(pclient, &patchTree)
 			SendFileListDone(pclient)
-		case FileStatusType:
+		case PatchFileStatusType:
 			handleFileStatus(pclient)
-		case ClientListDoneType:
+		case PatchClientListDoneType:
 			err = updateClientFiles(pclient)
 		default:
-			log.Info("Received unknown packet %02x from %s", pktHeader.Type, client.IPAddr())
+			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pclient.IPAddr())
 		}
 	}
 }
 
 // Handle communication with a PATCH client until the connection
 // is closed or an error is encountered.
-func PatchHandler(c *client.Client) {
-	client, err := newPatchClient(conn)
+func PatchHandler(c client.Client) {
+	client, err := newPatchClient(c.(*client.PSOClient))
 	if err != nil {
 		log.Warn(err.Error())
 		return
@@ -232,7 +229,7 @@ func PatchHandler(c *client.Client) {
 
 	var pktHeader PCPktHeader
 	for {
-		err := client.c.Process()
+		err := c.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -253,7 +250,7 @@ func PatchHandler(c *client.Client) {
 			SendWelcomeAck(client)
 		case PatchLoginType:
 			if SendWelcomeMessage(client) == 0 {
-				SendRedirect(client, redirectPort, config.HostnameBytes())
+				SendPatchRedirect(client, loginRedirectPort, config.HostnameBytes())
 			}
 		default:
 			log.Info("Received unknown packet %2x from %s", pktHeader.Type, client.IPAddr())
@@ -331,8 +328,8 @@ func buildPatchIndex(node *PatchDir) {
 func InitPatch() {
 	// Construct our patch tree from the specified directory.
 	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
-	os.Chdir(config.PatchDir)
-	if err := loadPatches(&patchTree, "."); err != nil {
+	// os.Chdir(config.PatchDir)
+	if err := loadPatches(&patchTree, config.PatchDir); err != nil {
 		fmt.Printf("Failed to load patches: %s\n", err.Error())
 		os.Exit(1)
 	}
@@ -343,7 +340,7 @@ func InitPatch() {
 		os.Exit(1)
 	}
 
-	// Pre-compute our character port so that we don't have to do it every time.
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
-	redirectPort = uint16(charPort)
+	// Pre-compute our login port so that we don't have to do it every time.
+	loginPort, _ := strconv.ParseUint(config.LoginPort, 10, 16)
+	loginRedirectPort = uint16(loginPort)
 }

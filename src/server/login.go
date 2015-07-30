@@ -26,21 +26,23 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"net/http"
+	"server/client"
 	"server/util"
+	"strconv"
 )
 
 const ClientVersionString = "TethVer12510"
 
-// Cached parameter data to avoid computing it every time.
 var (
-	log              *logging.ServerLogger
-	loginConnections = server.NewClientList()
-	shipConnections  = server.NewClientList()
+	// Cached and parsed representation of the character port.
+	charRedirectPort uint16
 
-	defaultShip   ShipEntry
-	shipList      []ShipEntry
-	shipListMutex sync.RWMutex
+	defaultShip ShipEntry
+	shipList    []ShipEntry
+	// shipListMutex sync.RWMutex
 
+	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
 	paramChunkData  map[int][]byte
 )
@@ -137,7 +139,7 @@ type CharacterStats struct {
 
 // Struct for holding client-specific data.
 type LoginClient struct {
-	c         *server.PSOClient
+	c         *client.PSOClient
 	guildcard uint32
 	teamId    uint32
 	isGm      bool
@@ -149,7 +151,7 @@ type LoginClient struct {
 }
 
 func (lc *LoginClient) IPAddr() string        { return lc.c.IPAddr() }
-func (lc *LoginClient) Client() server.Client { return lc.c }
+func (lc *LoginClient) Client() client.Client { return lc.c }
 func (lc *LoginClient) Data() []byte          { return lc.c.Data() }
 
 // Struct for representing available ships in the ship selection menu.
@@ -178,7 +180,7 @@ func handleLogin(client *LoginClient) error {
 	client.config.Magic = 0x48615467
 
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-	SendRedirect(client, uint16(config.RedirectPort()), config.HostnameBytes())
+	SendRedirect(client, charRedirectPort, config.HostnameBytes())
 	return nil
 }
 
@@ -210,7 +212,7 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 
 	var username, password string
 	var isBanned, isActive bool
-	row := config.Database().QueryRow("SELECT username, password, "+
+	row := config.DB().QueryRow("SELECT username, password, "+
 		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
 		"WHERE username = ? and password = ?", pktUername, pktPassword)
 	err := row.Scan(&username, &password, &client.guildcard,
@@ -251,7 +253,7 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 // datebase or provide defaults for new accounts.
 func handleKeyConfig(client *LoginClient) error {
 	optionData := make([]byte, 420)
-	archondb := config.Database()
+	archondb := config.DB()
 
 	row := archondb.QueryRow(
 		"SELECT key_config from player_options where guildcard = ?", client.guildcard)
@@ -279,7 +281,7 @@ func handleCharacterSelect(client *LoginClient) error {
 	prev := new(CharacterPreview)
 
 	// Character preview request.
-	archondb := config.Database()
+	archondb := config.DB()
 	var gc, name []uint8
 	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
 		" name_color, name_color_chksm, model, section_id, char_class, "+
@@ -321,7 +323,7 @@ func handleCharacterSelect(client *LoginClient) error {
 // Load the player's saved guildcards, build the chunk data, and
 // send the chunk header.
 func handleGuildcardDataStart(client *LoginClient) error {
-	archondb := config.Database()
+	archondb := config.DB()
 	rows, err := archondb.Query(
 		"SELECT friend_gc, name, team_name, description, language, "+
 			"section_id, char_class, comment FROM guildcard_entries "+
@@ -373,7 +375,7 @@ func handleCharacterUpdate(client *LoginClient) error {
 	util.StructFromBytes(client.Data(), &charPkt)
 	prev := charPkt.Character
 
-	archonDB := config.Database()
+	archonDB := config.DB()
 	if client.flag == 0x02 {
 		// Player is using the dressing room; update the character. Messy
 		// query, but unavoidable if we don't want to be stuck with blobs.
@@ -441,12 +443,10 @@ func handleMenuSelect(client *LoginClient) {
 }
 
 // Create and initialize a new struct to hold client information.
-func newLoginClient(conn *net.TCPConn) (*LoginClient, error) {
-	loginClient := new(LoginClient)
-	loginClient.c = server.NewPSOClient(conn, BBHeaderSize)
-
+func newLoginClient(c *client.PSOClient) (*LoginClient, error) {
 	var err error
-	if SendWelcome(loginClient) != 0 {
+	loginClient := &LoginClient{c: c}
+	if SendLoginWelcome(loginClient) != 0 {
 		err = errors.New("Error sending welcome packet to: " + loginClient.IPAddr())
 		loginClient = nil
 	}
@@ -456,12 +456,7 @@ func newLoginClient(conn *net.TCPConn) (*LoginClient, error) {
 // Return a JSON string to the client with the name, hostname, port,
 // and player count.
 func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
-	if shipConnections.Count() == 0 {
-		w.Write([]byte("[]"))
-	} else {
-		// TODO: Pull this from a cache
-		w.Write([]byte("[]"))
-	}
+
 }
 
 // Process packets sent to the LOGIN port by sending them off to another handler or by
@@ -509,30 +504,30 @@ func processCharacterPacket(client *LoginClient) error {
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
-	case OptionsRequestType:
+	case LoginOptionsRequestType:
 		err = handleKeyConfig(client)
-	case CharPreviewReqType:
+	case LoginCharPreviewReqType:
 		err = handleCharacterSelect(client)
-	case ChecksumType:
+	case LoginChecksumType:
 		// Everybody else seems to ignore this, so...
 		SendChecksumAck(client, 1)
-	case GuildcardReqType:
+	case LoginGuildcardReqType:
 		err = handleGuildcardDataStart(client)
-	case GuildcardChunkReqType:
+	case LoginGuildcardChunkReqType:
 		handleGuildcardChunk(client)
-	case ParameterHeaderReqType:
+	case LoginParameterHeaderReqType:
 		SendParameterHeader(client, uint32(len(paramFiles)), paramHeaderData)
-	case ParameterChunkReqType:
+	case LoginParameterChunkReqType:
 		var pkt BBPktHeader
 		util.StructFromBytes(client.Data(), &pkt)
 		SendParameterChunk(client, paramChunkData[int(pkt.Flags)], pkt.Flags)
-	case SetFlagType:
+	case LoginSetFlagType:
 		var pkt SetFlagPacket
 		util.StructFromBytes(client.Data(), &pkt)
 		client.flag = pkt.Flag
-	case CharPreviewType:
+	case LoginCharPreviewType:
 		err = handleCharacterUpdate(client)
-	case MenuSelectType:
+	case LoginMenuSelectType:
 		handleMenuSelect(client)
 	default:
 		log.Info("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
@@ -552,11 +547,10 @@ func InitLogin() {
 
 	// Open up our web port for retrieving player counts. If we're in debug mode, add a path
 	// for dumping pprof output containing the stack traces of all running goroutines.
+	// TODO: Move this
 	http.HandleFunc("/list", handleShipCountRequest)
-	if config.DebugMode {
-		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
-			pprof.Lookup("goroutine").WriteTo(resp, 1)
-		})
-	}
 	go http.ListenAndServe(":"+config.WebPort, nil)
+
+	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	charRedirectPort = uint16(charPort)
 }

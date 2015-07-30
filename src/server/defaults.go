@@ -22,13 +22,16 @@ package main
 
 import (
 	// "encoding/json"
-	// "fmt"
+	"fmt"
 	"hash/crc32"
 	"io/ioutil"
 	"os"
 	"server/prs"
 	"server/util"
 )
+
+// Maximum size of a block of parameter or guildcard data.
+const MaxChunkSize = 0x6800
 
 // Parameter files we're expecting. I still don't really know what they're
 // for yet, so emulating what I've seen others do.
@@ -172,7 +175,8 @@ func loadParameterFiles() {
 	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
-			log.Fatal("Error reading parameter file: %v", err.Error())
+			fmt.Println("Error reading parameter file: " + err.Error())
+			os.Exit(1)
 		}
 		fileSize := len(data)
 
@@ -213,7 +217,8 @@ func loadBaseStats() {
 	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
-		log.Fatal("Error reading stats file: %v", err.Error())
+		fmt.Println("Error reading stats file: " + err.Error())
+		os.Exit(1)
 	}
 	decompressedSize := prs.DecompressSize(compressed)
 	decompressed := make([]byte, decompressedSize)

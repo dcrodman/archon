@@ -35,13 +35,6 @@ import (
 	"strings"
 )
 
-const (
-	ServerConfigDir  = "/usr/local/share/archon"
-	ServerConfigFile = "server_config.json"
-	CertificateFile  = "certificate.pem"
-	KeyFile          = "key.pem"
-)
-
 // Configuration structure that can be shared between the Login and
 // Character servers. The fields are intentionally exported to cut
 // down on verbosity with the intent that they be considered immutable.
@@ -81,8 +74,8 @@ type Config struct {
 	LogLevel  logging.Priority
 	DebugMode bool
 
-	cachedHostBytes  [4]byte
-	cachedWelcomeMsg []byte
+	cachedHostBytes [4]byte
+	cachedScrollMsg []byte
 }
 
 // Singleton instance. Provides reasonable default values so
@@ -101,8 +94,8 @@ var config *Config = &Config{
 	ScrollMessage:  "Add a welcome message here",
 
 	PatchDir:      "patches/",
-	ParametersDir: "parameters",
-	KeysDir:       "keys",
+	ParametersDir: "parameters/",
+	KeysDir:       "keys/",
 
 	DBHost: "127.0.0.1",
 	DBPort: "3306",
@@ -134,7 +127,7 @@ func (config *Config) InitFromFile(fileName string) error {
 	}
 	config.MessageSize = uint16(msgLen)
 
-	config.cachedWelcomeMsg = util.ConvertToUtf16(config.ScrollMessage)
+	config.cachedScrollMsg = util.ConvertToUtf16(config.ScrollMessage)
 
 	if config.LogLevel < logging.High || config.LogLevel > logging.Low {
 		// The log level must be at least open to critical messages.
@@ -184,6 +177,11 @@ func (config *Config) HostnameBytes() [4]byte {
 		}
 	}
 	return config.cachedHostBytes
+}
+
+// Returns the configured scroll message for the login server.
+func (config *Config) ScrollMessageBytes() []byte {
+	return config.cachedHostBytes[:]
 }
 
 func (config *Config) String() string {

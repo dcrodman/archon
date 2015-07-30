@@ -6,7 +6,10 @@
 	"CharacterPort" : "12001",
 	"ShipgatePort" : "13000",
 
-	"PatchDir" : "/usr/local/share/archon/patches",
+	"PatchDir" : "patches",
+	"ParametersDir" : "parameters",
+	"KeysDir" : "keys",
+	
 	"WelcomeMessage" : "Unconfigured",
 	"ScrollMessage" : "Add a welcome message...",
 	"DBHost" : "127.0.0.1",
