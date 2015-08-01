@@ -43,7 +43,7 @@ var (
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
-func SendPacket(c Client, pkt []byte, length uint16) int {
+func sendPacket(c Client, pkt []byte, length uint16) int {
 	if err := c.Send(pkt[:length]); err != nil {
 		log.Info("Error sending to client %v: %s", c.IPAddr(), err.Error())
 		return -1
@@ -53,23 +53,23 @@ func SendPacket(c Client, pkt []byte, length uint16) int {
 
 // Send data to client after padding it to a length disible by 8 and
 // encrypting it with the client's server ciper.
-func SendEncrypted(cw ClientWrapper, data []byte, length uint16) int {
+func sendEncrypted(cw ClientWrapper, data []byte, length uint16) int {
 	c := cw.Client()
-	length = fixLength(data, length)
+	length = fixLength(data, length, cw.HeaderSize())
 	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
 	}
 	c.Encrypt(data, uint32(length))
-	return SendPacket(c, data, length)
+	return sendPacket(c, data, length)
 }
 
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
-func fixLength(data []byte, length uint16) uint16 {
-	for length%PCHeaderSize != 0 {
+func fixLength(data []byte, length uint16, hdrSize uint16) uint16 {
+	for length%hdrSize != 0 {
 		length++
-		_ = append(data, 0)
+		data = append(data, 0)
 	}
 	data[0] = byte(length & 0xFF)
 	data[1] = byte((length & 0xFF00) >> 8)
@@ -77,7 +77,7 @@ func fixLength(data []byte, length uint16) uint16 {
 }
 
 // Send a simple 4-byte header packet.
-func SendPCHeader(client *PatchClient, pktType uint16) int {
+func (client *PatchClient) sendPCHeader(pktType uint16) int {
 	pkt := &PCPktHeader{
 		Type: pktType,
 		Size: 0x04,
@@ -86,11 +86,11 @@ func SendPCHeader(client *PatchClient, pktType uint16) int {
 	if config.DebugMode {
 		util.PrintPayload(data, size)
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendPatchWelcome(client *PatchClient) int {
+func (client *PatchClient) SendWelcome() int {
 	pkt := new(PatchWelcomePkt)
 	pkt.Header.Type = PatchWelcomeType
 	pkt.Header.Size = 0x4C
@@ -104,10 +104,10 @@ func SendPatchWelcome(client *PatchClient) int {
 		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return SendPacket(client.c, data, uint16(size))
+	return sendPacket(client.c, data, uint16(size))
 }
 
-func SendWelcomeAck(client *PatchClient) int {
+func (client *PatchClient) SendWelcomeAck() int {
 	pkt := &PCPktHeader{
 		Size: 0x04,
 		Type: PatchLoginType, // treated as an ack
@@ -116,11 +116,11 @@ func SendWelcomeAck(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Welcome Ack")
 	}
-	return SendEncrypted(client, data, 0x0004)
+	return sendEncrypted(client, data, 0x0004)
 }
 
 // Message displayed on the patch download screen.
-func SendWelcomeMessage(client *PatchClient) int {
+func (client *PatchClient) SendWelcomeMessage() int {
 	pkt := new(PatchWelcomeMessage)
 	pkt.Header.Type = PatchMessageType
 	pkt.Header.Size = PCHeaderSize + config.MessageSize
@@ -130,11 +130,11 @@ func SendWelcomeMessage(client *PatchClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Welcome Message")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the redirect packet, providing the IP and port of the next server.
-func SendPatchRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
+func (client *PatchClient) SendRedirect(port uint16, ipAddr [4]byte) int {
 	pkt := new(PatchRedirectPacket)
 	pkt.Header.Type = PatchRedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
@@ -144,27 +144,27 @@ func SendPatchRedirect(client *PatchClient, port uint16, ipAddr [4]byte) int {
 	if config.DebugMode {
 		fmt.Println("Sending Redirect")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Acknowledgement sent after the DATA connection handshake.
-func SendDataAck(client *PatchClient) int {
+func (client *PatchClient) SendDataAck() int {
 	if config.DebugMode {
 		fmt.Println("Sending Data Ack")
 	}
-	return SendPCHeader(client, PatchDataAckType)
+	return client.sendPCHeader(PatchDataAckType)
 }
 
 // Tell the client to change to one directory above.
-func SendDirAbove(client *PatchClient) int {
+func (client *PatchClient) SendDirAbove() int {
 	if config.DebugMode {
 		fmt.Println("Sending Dir Above")
 	}
-	return SendPCHeader(client, PatchDirAboveType)
+	return client.sendPCHeader(PatchDirAboveType)
 }
 
 // Tell the client to change to some directory within its file tree.
-func SendChangeDir(client *PatchClient, dir string) int {
+func (client *PatchClient) SendChangeDir(dir string) int {
 	pkt := new(ChangeDirPacket)
 	pkt.Header.Type = PatchChangeDirType
 	copy(pkt.Dirname[:], dir)
@@ -173,11 +173,11 @@ func SendChangeDir(client *PatchClient, dir string) int {
 	if config.DebugMode {
 		fmt.Println("Sending Change Directory")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Tell the client to check a file in its current working directory.
-func SendCheckFile(client *PatchClient, index uint32, filename string) int {
+func (client *PatchClient) SendCheckFile(index uint32, filename string) int {
 	pkt := new(CheckFilePacket)
 	pkt.Header.Type = PatchCheckFileType
 	pkt.PatchId = index
@@ -187,19 +187,19 @@ func SendCheckFile(client *PatchClient, index uint32, filename string) int {
 	if config.DebugMode {
 		fmt.Println("Sending Check File")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Inform the client that we've finished sending the patch list.
-func SendFileListDone(client *PatchClient) int {
+func (client *PatchClient) SendFileListDone() int {
 	if config.DebugMode {
 		fmt.Println("Sending List Done")
 	}
-	return SendPCHeader(client, PatchFileListDoneType)
+	return client.sendPCHeader(PatchFileListDoneType)
 }
 
 // Send the total number and cumulative size of files that need updating.
-func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
+func (client *PatchClient) SendUpdateFiles(num, totalSize uint32) int {
 	pkt := new(UpdateFilesPacket)
 	pkt.Header.Type = PatchUpdateFilesType
 	pkt.NumFiles = num
@@ -209,11 +209,11 @@ func SendUpdateFiles(client *PatchClient, num, totalSize uint32) int {
 	if config.DebugMode {
 		fmt.Println("Sending Update Files")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the header for a file we're about to update.
-func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
+func (client *PatchClient) SendFileHeader(patch *PatchEntry) int {
 	pkt := new(FileHeaderPacket)
 	pkt.Header.Type = PatchFileHeaderType
 	pkt.FileSize = patch.fileSize
@@ -223,11 +223,11 @@ func SendFileHeader(client *PatchClient, patch *PatchEntry) int {
 	if config.DebugMode {
 		fmt.Println("Sending File Header")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send a chunk of file data.
-func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []byte) int {
+func (client *PatchClient) SendFileChunk(chunk, chksm, chunkSize uint32, fdata []byte) int {
 	if chunkSize > MaxFileChunkSize {
 		log.Error("Attempted to send %v byte chunk; max is %v",
 			string(chunkSize), string(MaxFileChunkSize))
@@ -244,27 +244,27 @@ func SendFileChunk(client *PatchClient, chunk, chksm, chunkSize uint32, fdata []
 	if config.DebugMode {
 		fmt.Println("Sending File Chunk")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Finished sending a particular file.
-func SendFileComplete(client *PatchClient) int {
+func (client *PatchClient) SendFileComplete() int {
 	if config.DebugMode {
 		fmt.Println("Sending File Complete")
 	}
-	return SendPCHeader(client, PatchFileCompleteType)
+	return client.sendPCHeader(PatchFileCompleteType)
 }
 
 // We've finished updating files.
-func SendUpdateComplete(client *PatchClient) int {
+func (client *PatchClient) SendUpdateComplete() int {
 	if config.DebugMode {
 		fmt.Println("Sending File Update Done")
 	}
-	return SendPCHeader(client, PatchUpdateCompleteType)
+	return client.sendPCHeader(PatchUpdateCompleteType)
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendLoginWelcome(client *LoginClient) int {
+func (client *LoginClient) SendWelcome() int {
 	pkt := new(WelcomePkt)
 	pkt.Header.Type = LoginWelcomeType
 	pkt.Header.Size = 0xC8
@@ -278,12 +278,14 @@ func SendLoginWelcome(client *LoginClient) int {
 		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return SendPacket(client.c, data, uint16(size))
+	return sendPacket(client.c, data, uint16(size))
 }
 
 // Send the security initialization packet with information about the user's
 // authentication status.
-func SendSecurity(client *LoginClient, errorCode BBLoginError, guildcard uint32, teamId uint32) int {
+func (client *LoginClient) SendSecurity(errorCode BBLoginError,
+	guildcard uint32, teamId uint32) int {
+
 	pkt := new(SecurityPacket)
 	pkt.Header.Type = LoginSecurityType
 
@@ -299,11 +301,11 @@ func SendSecurity(client *LoginClient, errorCode BBLoginError, guildcard uint32,
 	if config.DebugMode {
 		fmt.Println("Sending Security Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the redirect packet, providing the IP and port of the next server.
-func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
+func (client *LoginClient) SendRedirect(port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = LoginRedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
@@ -313,12 +315,12 @@ func SendRedirect(client *LoginClient, port uint16, ipAddr [4]byte) int {
 	if config.DebugMode {
 		fmt.Println("Sending Redirect Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the client's configuration options. keyConfig should be 420 bytes long and either
 // point to the default keys array or loaded from the database.
-func SendOptions(client *LoginClient, keyConfig []byte) int {
+func (client *LoginClient) SendOptions(keyConfig []byte) int {
 	if len(keyConfig) != 420 {
 		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
 	}
@@ -337,13 +339,13 @@ func SendOptions(client *LoginClient, keyConfig []byte) int {
 	if config.DebugMode {
 		fmt.Println("Sending Key Config Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
 // ack'ing a selected character, and 2 indicates that a character doesn't exist
 // in the slot requested via preview request.
-func SendCharacterAck(client *LoginClient, slotNum uint32, flag uint32) int {
+func (client *LoginClient) SendCharacterAck(slotNum uint32, flag uint32) int {
 	pkt := new(CharAckPacket)
 	pkt.Header.Type = LoginCharAckType
 	pkt.Slot = slotNum
@@ -353,12 +355,12 @@ func SendCharacterAck(client *LoginClient, slotNum uint32, flag uint32) int {
 	if config.DebugMode {
 		fmt.Println("Sending Character Ack Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the preview packet containing basic details about a character in
 // the selected slot.
-func SendCharacterPreview(client *LoginClient, charPreview *CharacterPreview) int {
+func (client *LoginClient) SendCharacterPreview(charPreview *CharacterPreview) int {
 	pkt := new(CharPreviewPacket)
 	pkt.Header.Type = LoginCharPreviewType
 	pkt.Slot = 0
@@ -368,12 +370,12 @@ func SendCharacterPreview(client *LoginClient, charPreview *CharacterPreview) in
 	if config.DebugMode {
 		fmt.Println("Sending Character Preview Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Acknowledge the checksum the client sent us. We don't actually do
 // anything with it but the client won't proceed otherwise.
-func SendChecksumAck(client *LoginClient, ack uint32) int {
+func (client *LoginClient) SendChecksumAck(ack uint32) int {
 	pkt := new(ChecksumAckPacket)
 	pkt.Header.Type = LoginChecksumAckType
 	pkt.Ack = ack
@@ -382,11 +384,11 @@ func SendChecksumAck(client *LoginClient, ack uint32) int {
 	if config.DebugMode {
 		fmt.Println("Sending Checksum Ack Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the guildcard chunk header.
-func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint16) int {
+func (client *LoginClient) SendGuildcardHeader(checksum uint32, dataLen uint16) int {
 	pkt := new(GuildcardHeaderPacket)
 	pkt.Header.Type = LoginGuildcardHeaderType
 	pkt.Unknown = 0x00000001
@@ -397,11 +399,11 @@ func SendGuildcardHeader(client *LoginClient, checksum uint32, dataLen uint16) i
 	if config.DebugMode {
 		fmt.Println("Sending Guildcard Header Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the next chunk of guildcard data.
-func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
+func (client *LoginClient) SendGuildcardChunk(chunkNum uint32) int {
 	pkt := new(GuildcardChunkPacket)
 	pkt.Header.Type = LoginGuildcardChunkType
 	pkt.Chunk = chunkNum
@@ -419,11 +421,11 @@ func SendGuildcardChunk(client *LoginClient, chunkNum uint32) int {
 	if config.DebugMode {
 		fmt.Println("Sending Guildcard Chunk Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the header for the parameter files we're about to start sending.
-func SendParameterHeader(client *LoginClient, numEntries uint32, entries []byte) int {
+func (client *LoginClient) SendParameterHeader(numEntries uint32, entries []byte) int {
 	pkt := new(ParameterHeaderPacket)
 	pkt.Header.Type = LoginParameterHeaderType
 	pkt.Header.Flags = numEntries
@@ -433,11 +435,11 @@ func SendParameterHeader(client *LoginClient, numEntries uint32, entries []byte)
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Header Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Index into chunkData and send the specified chunk of parameter data.
-func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int {
+func (client *LoginClient) SendParameterChunk(chunkData []byte, chunk uint32) int {
 	pkt := new(ParameterChunkPacket)
 	pkt.Header.Type = LoginParameterChunkType
 	pkt.Chunk = chunk
@@ -448,11 +450,11 @@ func SendParameterChunk(client *LoginClient, chunkData []byte, chunk uint32) int
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Chunk Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send an error message to the client, usually used before disconnecting.
-func SendClientMessage(client *LoginClient, message string) int {
+func (client *LoginClient) SendClientMessage(message string) int {
 	pkt := new(ClientMessagePacket)
 	pkt.Header.Type = LoginClientMessageType
 	// English? Tethealla sets this.
@@ -463,11 +465,11 @@ func SendClientMessage(client *LoginClient, message string) int {
 	if config.DebugMode {
 		fmt.Println("Sending Client Message Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send a timestamp packet in order to indicate the server's current time.
-func SendTimestamp(client *LoginClient) int {
+func (client *LoginClient) SendTimestamp() int {
 	pkt := new(TimestampPacket)
 	pkt.Header.Type = LoginTimestampType
 
@@ -481,12 +483,12 @@ func SendTimestamp(client *LoginClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Timestamp Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the menu items for the ship select screen. ships must always
 // contain at least one entry, the default being "No Ships".
-func SendShipList(client *LoginClient, ships []ShipEntry) int {
+func (client *LoginClient) SendShipList(ships []ShipEntry) int {
 	pkt := new(ShipListPacket)
 	pkt.Header.Type = LoginShipListType
 
@@ -504,12 +506,12 @@ func SendShipList(client *LoginClient, ships []ShipEntry) int {
 	if config.DebugMode {
 		fmt.Println("Sending Ship List Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send whatever scrolling message was set in the config file and
 // converted to UTF-16LE when the server started up.
-func SendScrollMessage(client *LoginClient) int {
+func (client *LoginClient) SendScrollMessage() int {
 	pkt := new(ScrollMessagePacket)
 	pkt.Header.Type = LoginScrollMessageType
 	pkt.Message = config.ScrollMessageBytes()
@@ -518,7 +520,7 @@ func SendScrollMessage(client *LoginClient) int {
 	if config.DebugMode {
 		fmt.Println("Sending Scroll Message Packet")
 	}
-	return SendEncrypted(client, data, uint16(size))
+	return sendEncrypted(client, data, uint16(size))
 }
 
 func init() {

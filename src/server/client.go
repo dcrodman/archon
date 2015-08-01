@@ -35,15 +35,7 @@ type Client interface {
 	// Returns the IP address of the underlying connection.
 	IPAddr() string
 
-	// Spins off a generator to handle incoming packets from the
-	// underlying connection. Errors will cause the generator to
-	// exit and the error responsible will be written to the channel
-	// before the connection is closed. Successful reads are indicated
-	// by writing nil on the channel, at which point the underlying
-	// buffer accessible via Data() will contain the result of the read.
-	// This function will not manage the client connection; i.e., the
-	// caller needs to open and close the connection as necessary
-	// (namely on EOF, which is written to the channel as io.EOF).
+	// Process the next incoming packet and store it in the buffer.
 	Process() error
 
 	// Encrypts a block of data in-place with the server key so that
@@ -67,6 +59,8 @@ type Client interface {
 // Interface for passing around the individual server types.
 type ClientWrapper interface {
 	Client() Client
+	// Header size used by this server.
+	HeaderSize() uint16
 }
 
 // Client struct intended to be included as part of the client definitions
@@ -77,7 +71,6 @@ type PSOClient struct {
 	ipAddr string
 	port   string
 
-	// Exported so that callers can change this if needed.
 	hdrSize    int
 	recvSize   int
 	packetSize uint16
@@ -110,8 +103,19 @@ func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
 	return c
 }
 
-func (c *PSOClient) IPAddr() string {
-	return c.ipAddr
+func (c *PSOClient) IPAddr() string { return c.ipAddr }
+
+func (c *PSOClient) ClientVector() []uint8 { return c.clientCrypt.Vector }
+
+func (c *PSOClient) ServerVector() []uint8 { return c.serverCrypt.Vector }
+
+func (c *PSOClient) Data() []byte { return c.buffer }
+
+func (c *PSOClient) Close() { c.conn.Close() }
+
+func (c *PSOClient) Send(data []byte) error {
+	_, err := c.conn.Write(data)
+	return err
 }
 
 func (c *PSOClient) Encrypt(data []byte, size uint32) {
@@ -120,14 +124,6 @@ func (c *PSOClient) Encrypt(data []byte, size uint32) {
 
 func (c *PSOClient) Decrypt(data []byte, size uint32) {
 	c.clientCrypt.Decrypt(data, size)
-}
-
-func (c *PSOClient) ClientVector() []uint8 {
-	return c.clientCrypt.Vector
-}
-
-func (c *PSOClient) ServerVector() []uint8 {
-	return c.serverCrypt.Vector
 }
 
 func (c *PSOClient) Process() error {
@@ -191,19 +187,6 @@ func (c *PSOClient) Process() error {
 		c.Decrypt(c.buffer[hdr16:c.packetSize], uint32(c.packetSize-hdr16))
 	}
 	return nil
-}
-
-func (c *PSOClient) Data() []byte {
-	return c.buffer
-}
-
-func (c *PSOClient) Send(data []byte) error {
-	_, err := c.conn.Write(data)
-	return err
-}
-
-func (c *PSOClient) Close() {
-	c.conn.Close()
 }
 
 // Synchronized list for maintaining a list of connected clients.

@@ -26,6 +26,8 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"io"
+	"net"
 	"net/http"
 	"server/util"
 	"strconv"
@@ -149,9 +151,10 @@ type LoginClient struct {
 	flag       uint32
 }
 
-func (lc *LoginClient) IPAddr() string { return lc.c.IPAddr() }
-func (lc *LoginClient) Client() Client { return lc.c }
-func (lc *LoginClient) Data() []byte   { return lc.c.Data() }
+func (lc *LoginClient) IPAddr() string    { return lc.c.IPAddr() }
+func (lc LoginClient) Client() Client     { return lc.c }
+func (lc *LoginClient) Data() []byte      { return lc.c.Data() }
+func (lc LoginClient) HeaderSize() uint16 { return BBHeaderSize }
 
 // Struct for representing available ships in the ship selection menu.
 type ShipEntry struct {
@@ -170,7 +173,7 @@ func handleLogin(client *LoginClient) error {
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
 	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
-		SendSecurity(client, BBLoginErrorPatch, 0, 0)
+		client.SendSecurity(BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
 	}
 	// Newserv sets this field when the client first connects. I think this is
@@ -178,8 +181,8 @@ func handleLogin(client *LoginClient) error {
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
-	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-	SendRedirect(client, charRedirectPort, config.HostnameBytes())
+	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
+	client.SendRedirect(charRedirectPort, config.HostnameBytes())
 	return nil
 }
 
@@ -189,11 +192,11 @@ func handleCharLogin(client *LoginClient) error {
 	if err != nil {
 		return err
 	}
-	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
 	if client.config.CharSelected == 1 {
-		SendTimestamp(client)
-		SendShipList(client, shipList)
-		SendScrollMessage(client)
+		client.SendTimestamp()
+		client.SendShipList(shipList)
+		client.SendScrollMessage()
 	}
 	return nil
 }
@@ -223,21 +226,21 @@ func verifyAccount(client *LoginClient) (*LoginPkt, error) {
 		// with a nonexistent username as some measure of account security. Note
 		// that if this is changed to query by username and add a password check,
 		// the index on account_data will need to be modified.
-		SendSecurity(client, BBLoginErrorPassword, 0, 0)
+		client.SendSecurity(BBLoginErrorPassword, 0, 0)
 		return nil, errors.New("Account does not exist for username: " + username)
 	// Database error?
 	case err != nil:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+		client.SendClientMessage("Encountered an unexpected error while accessing the " +
 			"database.\n\nPlease contact your server administrator.")
 		log.Error(err.Error())
 		return nil, err
 	// Is the account banned?
 	case isBanned:
-		SendSecurity(client, BBLoginErrorBanned, 0, 0)
+		client.SendSecurity(BBLoginErrorBanned, 0, 0)
 		return nil, errors.New("Account banned: " + username)
 	// Has the account been activated?
 	case !isActive:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+		client.SendClientMessage("Encountered an unexpected error while accessing the " +
 			"database.\n\nPlease contact your server administrator.")
 		return nil, errors.New("Account must be activated for username: " + username)
 	}
@@ -267,7 +270,7 @@ func handleKeyConfig(client *LoginClient) error {
 		log.Error(err.Error())
 		return err
 	}
-	SendOptions(client, optionData)
+	client.SendOptions(optionData)
 	return nil
 }
 
@@ -297,7 +300,7 @@ func handleCharacterSelect(client *LoginClient) error {
 
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot.
-		SendCharacterAck(client, pkt.Slot, 2)
+		client.SendCharacterAck(pkt.Slot, 2)
 		return nil
 	} else if err != nil {
 		log.Error(err.Error())
@@ -308,13 +311,13 @@ func handleCharacterSelect(client *LoginClient) error {
 		// They've selected a character from the menu.
 		client.config.CharSelected = 1
 		client.config.SlotNum = uint8(pkt.Slot)
-		SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-		SendCharacterAck(client, pkt.Slot, 1)
+		client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
+		client.SendCharacterAck(pkt.Slot, 1)
 	} else {
 		// They have a character in that slot; send the character preview.
 		copy(prev.GuildcardStr[:], gc[:])
 		copy(prev.Name[:], name[:])
-		SendCharacterPreview(client, prev)
+		client.SendCharacterPreview(prev)
 	}
 	return nil
 }
@@ -352,7 +355,7 @@ func handleGuildcardDataStart(client *LoginClient) error {
 	checksum := crc32.ChecksumIEEE(client.gcData)
 	client.gcDataSize = uint16(size)
 
-	SendGuildcardHeader(client, checksum, client.gcDataSize)
+	client.SendGuildcardHeader(checksum, client.gcDataSize)
 	return nil
 }
 
@@ -364,7 +367,7 @@ func handleGuildcardChunk(client *LoginClient) {
 		// Cancelled sending guildcard chunks.
 		return
 	}
-	SendGuildcardChunk(client, chunkReq.ChunkRequested)
+	client.SendGuildcardChunk(chunkReq.ChunkRequested)
 }
 
 // Create or update a character in a slot.
@@ -430,9 +433,8 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// we know a character has been selected.
 	client.config.CharSelected = 1
 	client.config.SlotNum = uint8(charPkt.Slot)
-	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-
-	SendCharacterAck(client, charPkt.Slot, 0)
+	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
+	client.SendCharacterAck(charPkt.Slot, 0)
 	return nil
 }
 
@@ -441,98 +443,125 @@ func handleMenuSelect(client *LoginClient) {
 
 }
 
-// Create and initialize a new struct to hold client information.
-func newLoginClient(c *PSOClient) (*LoginClient, error) {
-	var err error
-	loginClient := &LoginClient{c: c}
-	if SendLoginWelcome(loginClient) != 0 {
-		err = errors.New("Error sending welcome packet to: " + loginClient.IPAddr())
-		loginClient = nil
-	}
-	return loginClient, err
-}
-
 // Return a JSON string to the client with the name, hostname, port,
 // and player count.
 func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
 
 }
 
+// Create and initialize a new struct to hold client information.
+func NewLoginClient(conn *net.TCPConn) (ClientWrapper, error) {
+	var err error
+	lc := &LoginClient{c: NewPSOClient(conn, BBHeaderSize)}
+	if lc.SendWelcome() != 0 {
+		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
+		lc = nil
+	}
+	return *lc, err
+}
+
 // Process packets sent to the LOGIN port by sending them off to another handler or by
 // taking some brief action.
-func processLoginPacket(client *LoginClient) error {
-	// var pktHeader BBPktHeader
-	// c := Client()
-	// util.StructFromBytes(c.Data()[:BBHeaderSize], &pktHeader)
+func LoginHandler(cw ClientWrapper) {
+	lc := cw.(LoginClient)
+	for {
+		err := lc.c.Process()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			// Error communicating with the client.
+			log.Warn(err.Error())
+			break
+		}
 
-	// if config.DebugMode {
-	// 	fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-	// 	util.PrintPayload(client.Data(), int(pktHeader.Size))
-	// 	fmt.Println()
-	// }
+		var pktHeader BBPktHeader
+		util.StructFromBytes(lc.c.Data()[:BBHeaderSize], &pktHeader)
 
-	// var err error
-	// switch pktHeader.Type {
-	// case LoginType:
-	// 	err = handleLogin(client)
-	// case DisconnectType:
-	// 	// Just wait until we recv 0 from the client to d/c.
-	// 	break
-	// default:
-	// 	log.Info("Received unknown packet %x from %s", pktHeader.Type, c.IPAddr())
-	// }
-	// return err
-	return nil
+		if config.DebugMode {
+			fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+			util.PrintPayload(lc.c.Data(), int(pktHeader.Size))
+			fmt.Println()
+		}
+
+		switch pktHeader.Type {
+		case LoginType:
+			err = handleLogin(&lc)
+		case DisconnectType:
+			// Just wait until we recv 0 from the client to d/c.
+			break
+		default:
+			log.Info("Received unknown packet %x from %s", pktHeader.Type, lc.c.IPAddr())
+		}
+		if err != nil {
+			log.Warn("Error in client communication: " + err.Error())
+			return
+		}
+	}
 }
 
 // Process packets sent to the CHARACTER port by sending them off to another
 // handler or by taking some brief action.
-func processCharacterPacket(client *LoginClient) error {
-	var pktHeader BBPktHeader
-	util.StructFromBytes(client.Data(), &pktHeader)
+func CharacterHandler(cw ClientWrapper) {
+	lc := cw.(LoginClient)
+	for {
+		err := lc.c.Process()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			// Error communicating with the client.
+			log.Warn(err.Error())
+			break
+		}
 
-	if config.DebugMode {
-		fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
-		util.PrintPayload(client.Data(), int(pktHeader.Size))
-		fmt.Println()
-	}
+		var pktHeader BBPktHeader
+		util.StructFromBytes(lc.Data(), &pktHeader)
 
-	var err error
-	switch pktHeader.Type {
-	case LoginType:
-		err = handleCharLogin(client)
-	case DisconnectType:
-		// Just wait until we recv 0 from the client to d/c.
-		break
-	case LoginOptionsRequestType:
-		err = handleKeyConfig(client)
-	case LoginCharPreviewReqType:
-		err = handleCharacterSelect(client)
-	case LoginChecksumType:
-		// Everybody else seems to ignore this, so...
-		SendChecksumAck(client, 1)
-	case LoginGuildcardReqType:
-		err = handleGuildcardDataStart(client)
-	case LoginGuildcardChunkReqType:
-		handleGuildcardChunk(client)
-	case LoginParameterHeaderReqType:
-		SendParameterHeader(client, uint32(len(paramFiles)), paramHeaderData)
-	case LoginParameterChunkReqType:
-		var pkt BBPktHeader
-		util.StructFromBytes(client.Data(), &pkt)
-		SendParameterChunk(client, paramChunkData[int(pkt.Flags)], pkt.Flags)
-	case LoginSetFlagType:
-		var pkt SetFlagPacket
-		util.StructFromBytes(client.Data(), &pkt)
-		client.flag = pkt.Flag
-	case LoginCharPreviewType:
-		err = handleCharacterUpdate(client)
-	case LoginMenuSelectType:
-		handleMenuSelect(client)
-	default:
-		log.Info("Received unknown packet %x from %s", pktHeader.Type, client.IPAddr())
+		if config.DebugMode {
+			fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+			util.PrintPayload(lc.Data(), int(pktHeader.Size))
+			fmt.Println()
+		}
+
+		switch pktHeader.Type {
+		case LoginType:
+			err = handleCharLogin(&lc)
+		case DisconnectType:
+			// Just wait until we recv 0 from the client to d/c.
+			break
+		case LoginOptionsRequestType:
+			err = handleKeyConfig(&lc)
+		case LoginCharPreviewReqType:
+			err = handleCharacterSelect(&lc)
+		case LoginChecksumType:
+			// Everybody else seems to ignore this, so...
+			lc.SendChecksumAck(1)
+		case LoginGuildcardReqType:
+			err = handleGuildcardDataStart(&lc)
+		case LoginGuildcardChunkReqType:
+			handleGuildcardChunk(&lc)
+		case LoginParameterHeaderReqType:
+			lc.SendParameterHeader(uint32(len(paramFiles)), paramHeaderData)
+		case LoginParameterChunkReqType:
+			var pkt BBPktHeader
+			util.StructFromBytes(lc.Data(), &pkt)
+			lc.SendParameterChunk(paramChunkData[int(pkt.Flags)], pkt.Flags)
+		case LoginSetFlagType:
+			var pkt SetFlagPacket
+			util.StructFromBytes(lc.Data(), &pkt)
+			lc.flag = pkt.Flag
+		case LoginCharPreviewType:
+			err = handleCharacterUpdate(&lc)
+		case LoginMenuSelectType:
+			handleMenuSelect(&lc)
+		default:
+			log.Info("Received unknown packet %x from %s", pktHeader.Type, lc.IPAddr())
+		}
+
+		if err != nil {
+			log.Warn("Error in client communication: " + err.Error())
+			return
+		}
 	}
-	return err
 }
 
 func InitLogin() {

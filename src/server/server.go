@@ -47,6 +47,8 @@ var (
 	servers = []Server{
 		Server{"PATCH", config.PatchPort, NewPatchClient, PatchHandler},
 		Server{"DATA", config.DataPort, NewPatchClient, DataHandler},
+		Server{"LOGIN", config.LoginPort, NewLoginClient, LoginHandler},
+		Server{"CHARACTER", config.CharacterPort, NewLoginClient, CharacterHandler},
 	}
 )
 
