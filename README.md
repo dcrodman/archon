@@ -29,6 +29,6 @@ With Go (and Git) installed, you should be able to run the following:
     mkdir pkg bin
     export GOPATH=$(pwd)
 
-and then *go install* whichever server packages you want to run. For example:
+Server setups with one ship can just use a single binary:
 
-    go install login_server
+    go install server
