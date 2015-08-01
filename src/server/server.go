@@ -49,6 +49,8 @@ var (
 		Server{"DATA", config.DataPort, NewPatchClient, DataHandler},
 		Server{"LOGIN", config.LoginPort, NewLoginClient, LoginHandler},
 		Server{"CHARACTER", config.CharacterPort, NewLoginClient, CharacterHandler},
+		Server{"BLOCK", config.BlockPort, NewShipClient, BlockHandler},
+		Server{"SHIP", config.ShipPort, NewShipClient, ShipHandler},
 	}
 )
 
@@ -148,7 +150,7 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("Done.")
+	fmt.Println("Done.\n")
 	defer config.CloseDB()
 
 	// If we're in debug mode, spawn off an HTTP server that, when hit, dumps
@@ -167,9 +169,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize the remaining servers and spin off our top-level goroutines.
+	// Initialize the remaining servers and spin off our top-level
+	// goroutines to listen on each port.
 	InitPatch()
+	fmt.Println()
 	InitLogin()
+	fmt.Println()
 
 	var wg sync.WaitGroup
 	for _, server := range servers {

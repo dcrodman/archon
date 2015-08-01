@@ -48,8 +48,12 @@ type Config struct {
 	LoginPort     string
 	CharacterPort string
 	// Shipgate ports.
-	ShipgatePort   string
-	WebPort        string
+	ShipgatePort string
+	WebPort      string
+	// Ship ports.
+	BlockPort string
+	ShipPort  string
+
 	MaxConnections int
 
 	// Patch server welcome message.
@@ -75,6 +79,9 @@ type Config struct {
 	LogLevel  logging.Priority
 	DebugMode bool
 
+	// Ship server config.
+	ShipName string
+
 	cachedHostBytes [4]byte
 	cachedScrollMsg []byte
 }
@@ -89,8 +96,11 @@ var config *Config = &Config{
 	CharacterPort:  "12001",
 	ShipgatePort:   "13000",
 	WebPort:        "14000",
+	BlockPort:      "15000",
+	ShipPort:       "15001",
 	MaxConnections: 30000,
 
+	ShipName:       "Unconfigured",
 	WelcomeMessage: "Unconfigured Welcome Message",
 	ScrollMessage:  "Add a welcome message here",
 
@@ -202,7 +212,10 @@ func (config *Config) String() string {
 		"Character Port: " + config.CharacterPort + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
+		"Block Port: " + config.BlockPort + "\n" +
+		"Ship Port: " + config.ShipPort + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
+		"Ship Name: " + config.ShipName + "\n" +
 		"Welcome Message: " + config.WelcomeMessage + "\n" +
 		"Parameters Directory: " + config.ParametersDir + "\n" +
 		"Patch Directory: " + config.PatchDir + "\n" +

@@ -41,102 +41,11 @@ var (
 
 	defaultShip ShipEntry
 	shipList    []ShipEntry
-	// shipListMutex sync.RWMutex
 
 	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
 	paramChunkData  map[int][]byte
 )
-
-// Possible character classes as defined by the game.
-type CharClass uint8
-
-const (
-	Humar     CharClass = 0x00
-	Hunewearl           = 0x01
-	Hucast              = 0x02
-	Ramar               = 0x03
-	Racast              = 0x04
-	Racaseal            = 0x05
-	Fomarl              = 0x06
-	Fonewm              = 0x07
-	Fonewearl           = 0x08
-	Hucaseal            = 0x09
-	Fomar               = 0x0A
-	Ramarl              = 0x0B
-)
-
-// Struct for caching the parameter chunk data and header so
-// that the param files aren't re-read every time.
-type parameterEntry struct {
-	Size     uint32
-	Checksum uint32
-	Offset   uint32
-	Filename [0x40]uint8
-}
-
-// Per-player friend guildcard entries.
-type GuildcardEntry struct {
-	Guildcard   uint32
-	Name        [24]uint16
-	TeamName    [16]uint16
-	Description [88]uint16
-	Reserved    uint8
-	Language    uint8
-	SectionID   uint8
-	CharClass   uint8
-	padding     uint32
-	Comment     [88]uint16
-}
-
-// Per-player guildcard data chunk.
-type GuildcardData struct {
-	Unknown  [0x114]uint8
-	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
-	Unknown2 [0x78]uint8
-	Entries  [104]GuildcardEntry
-	Unknown3 [0x1BC]uint8
-}
-
-// Struct used by Character Info packet.
-type CharacterPreview struct {
-	Experience     uint32
-	Level          uint32
-	GuildcardStr   [16]byte
-	Unknown        [2]uint32
-	NameColor      uint32
-	Model          byte
-	Padding        [15]byte
-	NameColorChksm uint32
-	SectionId      byte
-	Class          byte
-	V2flags        byte
-	Version        byte
-	V1Flags        uint32
-	Costume        uint16
-	Skin           uint16
-	Face           uint16
-	Head           uint16
-	Hair           uint16
-	HairRed        uint16
-	HairGreen      uint16
-	HairBlue       uint16
-	PropX          float32
-	PropY          float32
-	Name           [24]uint8
-	Playtime       uint32
-}
-
-// Per-character stats.
-type CharacterStats struct {
-	ATP uint16
-	MST uint16
-	EVP uint16
-	HP  uint16
-	DFP uint16
-	ATA uint16
-	LCK uint16
-}
 
 // Struct for holding client-specific data.
 type LoginClient struct {
@@ -478,7 +387,7 @@ func LoginHandler(cw ClientWrapper) {
 		util.StructFromBytes(lc.c.Data()[:BBHeaderSize], &pktHeader)
 
 		if config.DebugMode {
-			fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+			fmt.Printf("LOGIN: Got %v bytes from client:\n", pktHeader.Size)
 			util.PrintPayload(lc.c.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
@@ -517,7 +426,7 @@ func CharacterHandler(cw ClientWrapper) {
 		util.StructFromBytes(lc.Data(), &pktHeader)
 
 		if config.DebugMode {
-			fmt.Printf("Got %v bytes from client:\n", pktHeader.Size)
+			fmt.Printf("CHAR: Got %v bytes from client:\n", pktHeader.Size)
 			util.PrintPayload(lc.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
@@ -567,12 +476,6 @@ func CharacterHandler(cw ClientWrapper) {
 func InitLogin() {
 	loadParameterFiles()
 	loadBaseStats()
-
-	// Create our "No Ships" item to indicate the absence of any ship servers.
-	defaultShip.Unknown = 0x12
-	defaultShip.Id = 1
-	copy(defaultShip.Shipname[:], util.ConvertToUtf16("No Ships"))
-	shipList = append(shipList, defaultShip)
 
 	// Open up our web port for retrieving player counts. If we're in debug mode, add a path
 	// for dumping pprof output containing the stack traces of all running goroutines.

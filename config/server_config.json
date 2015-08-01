@@ -5,6 +5,7 @@
 	"LoginPort" : "12000",
 	"CharacterPort" : "12001",
 	"ShipgatePort" : "13000",
+	"WebPort" : "14000",
 
 	"PatchDir" : "patches",
 	"ParametersDir" : "parameters",
@@ -18,6 +19,10 @@
 	"DBUsername" : "archonadmin",
 	"DBPassword" : "psoadminpassword",
 	"Logfile" : "server.log",
-	"LogLevel" : 3,
-	"DebugMode" : false
+	"LogLevel" : 2,
+	"DebugMode" : false,
+
+	"BlockPort": "15000",
+	"ShipPort": "15001",
+	"ShipName": "Unconfigured"
 }

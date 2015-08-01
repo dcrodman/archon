@@ -325,7 +325,6 @@ func InitPatch() {
 		fmt.Printf("Failed to load patches: %s\n", err.Error())
 		os.Exit(1)
 	}
-	fmt.Println()
 	buildPatchIndex(&patchTree)
 	if len(patchIndex) < 1 {
 		fmt.Println("Failed: At least one patch file must be present.")

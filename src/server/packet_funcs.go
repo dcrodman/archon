@@ -489,18 +489,18 @@ func (client *LoginClient) SendTimestamp() int {
 // Send the menu items for the ship select screen. ships must always
 // contain at least one entry, the default being "No Ships".
 func (client *LoginClient) SendShipList(ships []ShipEntry) int {
-	pkt := new(ShipListPacket)
-	pkt.Header.Type = LoginShipListType
-
-	pkt.Header.Flags = 0x01
-	pkt.Unknown = 0x02
-	pkt.Unknown2 = 0xFFFFFFF4
-	pkt.Unknown3 = 0x04
+	pkt := &ShipListPacket{
+		Header: BBPktHeader{
+			Type:  LoginShipListType,
+			Flags: 0x01,
+		},
+		Unknown:  0x02,
+		Unknown2: 0xFFFFFFF4,
+		Unknown3: 0x04,
+		// TODO: Will eventually need a mutex for read.
+		ShipEntries: ships,
+	}
 	copy(pkt.ServerName[:], serverName)
-	// Global mutex, what could possibly go wrong?
-	// shipListMutex.RLock()
-	pkt.ShipEntries = ships
-	// shipListMutex.RUnlock()
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {

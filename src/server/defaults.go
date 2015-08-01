@@ -33,9 +33,18 @@ import (
 // Maximum size of a block of parameter or guildcard data.
 const MaxChunkSize = 0x6800
 
+// Struct for caching the parameter chunk data and header so
+// that the param files aren't re-read every time.
+type parameterEntry struct {
+	Size     uint32
+	Checksum uint32
+	Offset   uint32
+	Filename [0x40]uint8
+}
+
 // Parameter files we're expecting. I still don't really know what they're
 // for yet, so emulating what I've seen others do.
-var paramFiles = [...]string{
+var paramFiles = []string{
 	"ItemMagEdit.prs",
 	"ItemPMT.prs",
 	"BattleParamEntry.dat",
@@ -46,6 +55,11 @@ var paramFiles = [...]string{
 	"BattleParamEntry_ep4_on.dat",
 	"PlyLevelTbl.prs",
 }
+
+// Starting stats for any new character. This global should be considered immutable
+// and is populated by LoadBaseStats. The CharClass constants can be used to index
+// into this array to obtain the base stats for each class.
+var baseStats [12]CharacterStats
 
 // Default keyboard/joystick configuration used for players who are logging
 // in for the first time.
@@ -160,11 +174,6 @@ var baseSymbolChats = [1248]byte{
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 }
 
-// Starting stats for any new character. This global should be considered immutable
-// and is populated by LoadBaseStats. The CharClass constants can be used to index
-// into this array to obtain the base stats for each class.
-var baseStats [12]CharacterStats
-
 // Load the PSOBB parameter files, build the parameter header, and init/cache
 // the param file chunks for the EB packets.
 func loadParameterFiles() {
@@ -172,6 +181,7 @@ func loadParameterFiles() {
 	var tmpChunkData []byte
 
 	paramDir := config.ParametersDir
+	fmt.Printf("Loading parameters from %s...\n", paramDir)
 	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
@@ -194,6 +204,7 @@ func loadParameterFiles() {
 		paramHeaderData = append(paramHeaderData, bytes...)
 
 		tmpChunkData = append(tmpChunkData, data...)
+		fmt.Printf("%s (%v bytes, checksum: %v\n", paramFile, fileSize, entry.Checksum)
 	}
 
 	// Offset should at this point be the total size of the files to send - break
