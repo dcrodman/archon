@@ -27,11 +27,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "go-sql-driver"
+	"github.com/dcrodman/archon/server/logging"
+	"github.com/dcrodman/archon/server/util"
+	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	"path/filepath"
-	"server/logging"
-	"server/util"
 	"strconv"
 	"strings"
 )
@@ -197,7 +197,7 @@ func (config *Config) HostnameBytes() [4]byte {
 
 // Returns the configured scroll message for the login server.
 func (config *Config) ScrollMessageBytes() []byte {
-	return config.cachedHostBytes[:]
+	return config.cachedScrollMsg[:]
 }
 
 func (config *Config) String() string {

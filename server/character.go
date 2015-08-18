@@ -17,7 +17,7 @@
  */
 
 // Constants and structs associated with character data.
-package main
+package server
 
 // Possible character classes as defined by the game.
 type CharClass uint8

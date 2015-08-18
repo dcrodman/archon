@@ -18,16 +18,16 @@
  */
 
 // Responsible for initializing default data for players and accounts.
-package main
+package server
 
 import (
 	// "encoding/json"
 	"fmt"
+	"github.com/dcrodman/archon/server/prs"
+	"github.com/dcrodman/archon/server/util"
 	"hash/crc32"
 	"io/ioutil"
 	"os"
-	"server/prs"
-	"server/util"
 )
 
 // Maximum size of a block of parameter or guildcard data.

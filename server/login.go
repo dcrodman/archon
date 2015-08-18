@@ -17,7 +17,7 @@
  */
 
 // Login and Character server logic.
-package main
+package server
 
 import (
 	"crypto/sha256"
@@ -25,11 +25,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/server/util"
 	"hash/crc32"
 	"io"
 	"net"
 	"net/http"
-	"server/util"
 	"strconv"
 )
 

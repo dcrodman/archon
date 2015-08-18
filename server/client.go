@@ -17,16 +17,16 @@
 * ---------------------------------------------------------------------
 * Client definition for generic handling of connections.
  */
-package main
+package server
 
 import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/server/encryption"
+	"github.com/dcrodman/archon/server/util"
 	"io"
 	"net"
-	"server/encryption"
-	"server/util"
 	"strings"
 	"sync"
 )

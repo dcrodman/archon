@@ -17,13 +17,13 @@
 * ---------------------------------------------------------------------
 * The BLOCK and SHIP server logic.
  */
-package main
+package server
 
 import (
 	"fmt"
+	"github.com/dcrodman/archon/server/util"
 	"io"
 	"net"
-	"server/util"
 )
 
 type ShipClient struct {
@@ -95,5 +95,5 @@ func InitShip() {
 	defaultShip.Unknown = 0x12
 	defaultShip.Id = 1
 	copy(defaultShip.Shipname[:], util.ConvertToUtf16(config.ShipName))
-	shipList = append(shipList, defaultShip)
+	shipList = []ShipEntry{defaultShip}
 }

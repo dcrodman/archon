@@ -20,17 +20,17 @@
 * ships. This module handles all of its own connection logic since the
 * shipgate protocol differs from the way game clients are processed.
  */
-package main
+package server
 
 import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/server/util"
 	"io"
 	"net"
 	"os"
 	"runtime/debug"
-	"server/util"
 	"strings"
 	"sync"
 	"time"

@@ -18,17 +18,17 @@
 * The PATCH and DATA server logic. Both are included here since they're
 * neither are particularly complicated.
  */
-package main
+package server
 
 import (
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/server/util"
 	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"server/util"
 	"strconv"
 	"strings"
 )
