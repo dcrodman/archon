@@ -517,6 +517,11 @@ func (client *LoginClient) SendScrollMessage() int {
 	pkt.Message = config.ScrollMessageBytes()
 
 	data, size := util.BytesFromStruct(pkt)
+	// The end of the message appears to be garbled unless
+	// there is a block of extra bytes on the end; add an extra
+	// and let fixLength add the rest.
+	data = append(data, 0x00)
+	size += 1
 	if config.DebugMode {
 		fmt.Println("Sending Scroll Message Packet")
 	}
