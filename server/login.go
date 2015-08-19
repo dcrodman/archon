@@ -342,7 +342,6 @@ func handleCharacterUpdate(client *LoginClient) error {
 	// we know a character has been selected.
 	client.config.CharSelected = 1
 	client.config.SlotNum = uint8(charPkt.Slot)
-	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
 	client.SendCharacterAck(charPkt.Slot, 0)
 	return nil
 }
