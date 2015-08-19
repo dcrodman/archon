@@ -29,7 +29,6 @@ import (
 	"hash/crc32"
 	"io"
 	"net"
-	"net/http"
 	"strconv"
 )
 
@@ -39,8 +38,9 @@ var (
 	// Cached and parsed representation of the character port.
 	charRedirectPort uint16
 
-	defaultShip ShipEntry
-	shipList    []ShipEntry
+	// Connected ships. Each Ship's id corresponds to its position
+	// in the array - 1.
+	shipList []Ship = make([]Ship, 1)
 
 	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
@@ -67,7 +67,7 @@ func (lc LoginClient) HeaderSize() uint16 { return BBHeaderSize }
 
 // Struct for representing available ships in the ship selection menu.
 type ShipEntry struct {
-	Unknown  uint16 // Always 0x12
+	Unknown  uint16
 	Id       uint32
 	Padding  uint16
 	Shipname [23]byte
@@ -348,13 +348,10 @@ func handleCharacterUpdate(client *LoginClient) error {
 
 // Player selected one of the items on the ship select screen.
 func handleMenuSelect(client *LoginClient) {
-
-}
-
-// Return a JSON string to the client with the name, hostname, port,
-// and player count.
-func handleShipCountRequest(w http.ResponseWriter, req *http.Request) {
-
+	var pkt ShipMenuSelectionPacket
+	util.StructFromBytes(client.Data(), &pkt)
+	s := &shipList[pkt.Item-1]
+	client.SendRedirect(s.port, s.ipAddr)
 }
 
 // Create and initialize a new struct to hold client information.
@@ -476,12 +473,15 @@ func InitLogin() {
 	loadParameterFiles()
 	loadBaseStats()
 
-	// Open up our web port for retrieving player counts. If we're in debug mode, add a path
-	// for dumping pprof output containing the stack traces of all running goroutines.
-	// TODO: Move this
-	http.HandleFunc("/list", handleShipCountRequest)
-	go http.ListenAndServe(":"+config.WebPort, nil)
-
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	charRedirectPort = uint16(charPort)
+
+	// Create our ship entry for the built-in ship server. Any other connected
+	// ships will be added to this list by the shipgate, if it's enabled.
+	s := &shipList[0]
+	s.id = 1
+	s.ipAddr = config.HostnameBytes()
+	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
+	s.port = uint16(port)
+	copy(s.name[:], util.ConvertToUtf16(config.ShipName))
 }

@@ -486,21 +486,27 @@ func (client *LoginClient) SendTimestamp() int {
 	return sendEncrypted(client, data, uint16(size))
 }
 
-// Send the menu items for the ship select screen. ships must always
-// contain at least one entry, the default being "No Ships".
-func (client *LoginClient) SendShipList(ships []ShipEntry) int {
+// Send the menu items for the ship select screen.
+func (client *LoginClient) SendShipList(ships []Ship) int {
 	pkt := &ShipListPacket{
 		Header: BBPktHeader{
 			Type:  LoginShipListType,
 			Flags: 0x01,
 		},
-		Unknown:  0x02,
-		Unknown2: 0xFFFFFFF4,
-		Unknown3: 0x04,
-		// TODO: Will eventually need a mutex for read.
-		ShipEntries: ships,
+		Unknown:     0x02,
+		Unknown2:    0xFFFFFFF4,
+		Unknown3:    0x04,
+		ShipEntries: make([]ShipEntry, len(ships)),
 	}
 	copy(pkt.ServerName[:], serverName)
+
+	// TODO: Will eventually need a mutex for read.
+	for i, ship := range ships {
+		item := &pkt.ShipEntries[i]
+		item.Unknown = 0x12
+		item.Id = ship.id
+		copy(item.Shipname[:], ship.name[:])
+	}
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {

@@ -91,9 +91,5 @@ func ShipHandler(cw ClientWrapper) {
 }
 
 func InitShip() {
-	// Create our ship entry for the built-in ship server.
-	defaultShip.Unknown = 0x12
-	defaultShip.Id = 1
-	copy(defaultShip.Shipname[:], util.ConvertToUtf16(config.ShipName))
-	shipList = []ShipEntry{defaultShip}
+
 }

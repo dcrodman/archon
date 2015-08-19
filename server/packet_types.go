@@ -356,3 +356,10 @@ type ScrollMessagePacket struct {
 	Padding [2]uint32
 	Message []byte
 }
+
+// Client's selection from the ship list menu.
+type ShipMenuSelectionPacket struct {
+	Header BBPktHeader
+	Id     uint32
+	Item   uint32
+}
