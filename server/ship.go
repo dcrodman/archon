@@ -20,31 +20,43 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dcrodman/archon/server/util"
 	"io"
 	"net"
 )
 
-type ShipClient struct {
-	c *PSOClient
+func NewShipClient(conn *net.TCPConn) (*Client, error) {
+	sc := NewClient(conn, BBHeaderSize)
+	err := error(nil)
+	if sc.SendWelcome() != 0 {
+		err = errors.New("Error sending welcome packet to: " + sc.IPAddr())
+		sc = nil
+	}
+	return sc, err
 }
 
-func (sc ShipClient) IPAddr() string     { return sc.c.IPAddr() }
-func (sc ShipClient) Client() Client     { return sc.c }
-func (sc ShipClient) Data() []byte       { return sc.c.Data() }
-func (sc ShipClient) HeaderSize() uint16 { return BBHeaderSize }
-
-func NewShipClient(conn *net.TCPConn) (ClientWrapper, error) {
-	sc := &ShipClient{c: NewPSOClient(conn, BBHeaderSize)}
-	return *sc, nil
+func verifyAccount(c *Client) error {
+	// TODO: Check for bans based on the login info
+	if _, err := VerifyAccount(c); err != nil {
+		return err
+	}
+	return nil
 }
 
-func BlockHandler(cw ClientWrapper) {
-	pc := cw.(ShipClient)
+func handleShipLogin(c *Client) error {
+	if err := verifyAccount(c); err != nil {
+		return err
+	}
+	c.SendSecurity(BBLoginErrorNone, c.guildcard, c.teamId)
+	return nil
+}
+
+func BlockHandler(sc *Client) {
 	var pktHeader PCPktHeader
 	for {
-		err := pc.c.Process()
+		err := sc.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -53,10 +65,10 @@ func BlockHandler(cw ClientWrapper) {
 			break
 		}
 
-		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(sc.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("BLOCK: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pc.c.Data(), int(pktHeader.Size))
+			util.PrintPayload(sc.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
 
@@ -65,11 +77,10 @@ func BlockHandler(cw ClientWrapper) {
 	}
 }
 
-func ShipHandler(cw ClientWrapper) {
-	pc := cw.(ShipClient)
+func ShipHandler(sc *Client) {
 	var pktHeader PCPktHeader
 	for {
-		err := pc.c.Process()
+		err := sc.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -78,14 +89,21 @@ func ShipHandler(cw ClientWrapper) {
 			break
 		}
 
-		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(sc.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("SHIP: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pc.c.Data(), int(pktHeader.Size))
+			util.PrintPayload(sc.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
 
 		switch pktHeader.Type {
+		case LoginType:
+			err = handleShipLogin(sc)
+		}
+
+		if err != nil {
+			log.Warn("Error in client communication: " + err.Error())
+			return
 		}
 	}
 }

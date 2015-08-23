@@ -43,7 +43,7 @@ var (
 
 // Send the packet serialized (or otherwise contained) in pkt to a client.
 // Note: Packets sent to BB Clients must have a length divisible by 8.
-func sendPacket(c Client, pkt []byte, length uint16) int {
+func sendPacket(c *Client, pkt []byte, length uint16) int {
 	if err := c.Send(pkt[:length]); err != nil {
 		log.Info("Error sending to client %v: %s", c.IPAddr(), err.Error())
 		return -1
@@ -53,9 +53,8 @@ func sendPacket(c Client, pkt []byte, length uint16) int {
 
 // Send data to client after padding it to a length disible by 8 and
 // encrypting it with the client's server ciper.
-func sendEncrypted(cw ClientWrapper, data []byte, length uint16) int {
-	c := cw.Client()
-	length = fixLength(data, length, cw.HeaderSize())
+func sendEncrypted(c *Client, data []byte, length uint16) int {
+	length = fixLength(data, length, c.hdrSize)
 	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
@@ -77,7 +76,7 @@ func fixLength(data []byte, length uint16, hdrSize uint16) uint16 {
 }
 
 // Send a simple 4-byte header packet.
-func (client *PatchClient) sendPCHeader(pktType uint16) int {
+func (client *Client) sendPCHeader(pktType uint16) int {
 	pkt := &PCPktHeader{
 		Type: pktType,
 		Size: 0x04,
@@ -90,13 +89,13 @@ func (client *PatchClient) sendPCHeader(pktType uint16) int {
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func (client *PatchClient) SendWelcome() int {
+func (client *Client) SendPCWelcome() int {
 	pkt := new(PatchWelcomePkt)
 	pkt.Header.Type = PatchWelcomeType
 	pkt.Header.Size = 0x4C
 	copy(pkt.Copyright[:], patchCopyrightBytes)
-	copy(pkt.ClientVector[:], client.c.ClientVector())
-	copy(pkt.ServerVector[:], client.c.ServerVector())
+	copy(pkt.ClientVector[:], client.ClientVector())
+	copy(pkt.ServerVector[:], client.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
@@ -104,10 +103,10 @@ func (client *PatchClient) SendWelcome() int {
 		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return sendPacket(client.c, data, uint16(size))
+	return sendPacket(client, data, uint16(size))
 }
 
-func (client *PatchClient) SendWelcomeAck() int {
+func (client *Client) SendWelcomeAck() int {
 	pkt := &PCPktHeader{
 		Size: 0x04,
 		Type: PatchLoginType, // treated as an ack
@@ -120,7 +119,7 @@ func (client *PatchClient) SendWelcomeAck() int {
 }
 
 // Message displayed on the patch download screen.
-func (client *PatchClient) SendWelcomeMessage() int {
+func (client *Client) SendWelcomeMessage() int {
 	pkt := new(PatchWelcomeMessage)
 	pkt.Header.Type = PatchMessageType
 	pkt.Header.Size = PCHeaderSize + config.MessageSize
@@ -134,7 +133,7 @@ func (client *PatchClient) SendWelcomeMessage() int {
 }
 
 // Send the redirect packet, providing the IP and port of the next server.
-func (client *PatchClient) SendRedirect(port uint16, ipAddr [4]byte) int {
+func (client *Client) SendPatchRedirect(port uint16, ipAddr [4]byte) int {
 	pkt := new(PatchRedirectPacket)
 	pkt.Header.Type = PatchRedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
@@ -148,7 +147,7 @@ func (client *PatchClient) SendRedirect(port uint16, ipAddr [4]byte) int {
 }
 
 // Acknowledgement sent after the DATA connection handshake.
-func (client *PatchClient) SendDataAck() int {
+func (client *Client) SendDataAck() int {
 	if config.DebugMode {
 		fmt.Println("Sending Data Ack")
 	}
@@ -156,7 +155,7 @@ func (client *PatchClient) SendDataAck() int {
 }
 
 // Tell the client to change to one directory above.
-func (client *PatchClient) SendDirAbove() int {
+func (client *Client) SendDirAbove() int {
 	if config.DebugMode {
 		fmt.Println("Sending Dir Above")
 	}
@@ -164,7 +163,7 @@ func (client *PatchClient) SendDirAbove() int {
 }
 
 // Tell the client to change to some directory within its file tree.
-func (client *PatchClient) SendChangeDir(dir string) int {
+func (client *Client) SendChangeDir(dir string) int {
 	pkt := new(ChangeDirPacket)
 	pkt.Header.Type = PatchChangeDirType
 	copy(pkt.Dirname[:], dir)
@@ -177,7 +176,7 @@ func (client *PatchClient) SendChangeDir(dir string) int {
 }
 
 // Tell the client to check a file in its current working directory.
-func (client *PatchClient) SendCheckFile(index uint32, filename string) int {
+func (client *Client) SendCheckFile(index uint32, filename string) int {
 	pkt := new(CheckFilePacket)
 	pkt.Header.Type = PatchCheckFileType
 	pkt.PatchId = index
@@ -191,7 +190,7 @@ func (client *PatchClient) SendCheckFile(index uint32, filename string) int {
 }
 
 // Inform the client that we've finished sending the patch list.
-func (client *PatchClient) SendFileListDone() int {
+func (client *Client) SendFileListDone() int {
 	if config.DebugMode {
 		fmt.Println("Sending List Done")
 	}
@@ -199,7 +198,7 @@ func (client *PatchClient) SendFileListDone() int {
 }
 
 // Send the total number and cumulative size of files that need updating.
-func (client *PatchClient) SendUpdateFiles(num, totalSize uint32) int {
+func (client *Client) SendUpdateFiles(num, totalSize uint32) int {
 	pkt := new(UpdateFilesPacket)
 	pkt.Header.Type = PatchUpdateFilesType
 	pkt.NumFiles = num
@@ -213,7 +212,7 @@ func (client *PatchClient) SendUpdateFiles(num, totalSize uint32) int {
 }
 
 // Send the header for a file we're about to update.
-func (client *PatchClient) SendFileHeader(patch *PatchEntry) int {
+func (client *Client) SendFileHeader(patch *PatchEntry) int {
 	pkt := new(FileHeaderPacket)
 	pkt.Header.Type = PatchFileHeaderType
 	pkt.FileSize = patch.fileSize
@@ -227,7 +226,7 @@ func (client *PatchClient) SendFileHeader(patch *PatchEntry) int {
 }
 
 // Send a chunk of file data.
-func (client *PatchClient) SendFileChunk(chunk, chksm, chunkSize uint32, fdata []byte) int {
+func (client *Client) SendFileChunk(chunk, chksm, chunkSize uint32, fdata []byte) int {
 	if chunkSize > MaxFileChunkSize {
 		log.Error("Attempted to send %v byte chunk; max is %v",
 			string(chunkSize), string(MaxFileChunkSize))
@@ -248,7 +247,7 @@ func (client *PatchClient) SendFileChunk(chunk, chksm, chunkSize uint32, fdata [
 }
 
 // Finished sending a particular file.
-func (client *PatchClient) SendFileComplete() int {
+func (client *Client) SendFileComplete() int {
 	if config.DebugMode {
 		fmt.Println("Sending File Complete")
 	}
@@ -256,7 +255,7 @@ func (client *PatchClient) SendFileComplete() int {
 }
 
 // We've finished updating files.
-func (client *PatchClient) SendUpdateComplete() int {
+func (client *Client) SendUpdateComplete() int {
 	if config.DebugMode {
 		fmt.Println("Sending File Update Done")
 	}
@@ -264,13 +263,13 @@ func (client *PatchClient) SendUpdateComplete() int {
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func (client *LoginClient) SendWelcome() int {
+func (client *Client) SendWelcome() int {
 	pkt := new(WelcomePkt)
 	pkt.Header.Type = LoginWelcomeType
 	pkt.Header.Size = 0xC8
 	copy(pkt.Copyright[:], loginCopyrightBytes)
-	copy(pkt.ClientVector[:], client.c.ClientVector())
-	copy(pkt.ServerVector[:], client.c.ServerVector())
+	copy(pkt.ClientVector[:], client.ClientVector())
+	copy(pkt.ServerVector[:], client.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
@@ -278,12 +277,12 @@ func (client *LoginClient) SendWelcome() int {
 		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return sendPacket(client.c, data, uint16(size))
+	return sendPacket(client, data, uint16(size))
 }
 
 // Send the security initialization packet with information about the user's
 // authentication status.
-func (client *LoginClient) SendSecurity(errorCode BBLoginError,
+func (client *Client) SendSecurity(errorCode BBLoginError,
 	guildcard uint32, teamId uint32) int {
 
 	pkt := new(SecurityPacket)
@@ -305,7 +304,7 @@ func (client *LoginClient) SendSecurity(errorCode BBLoginError,
 }
 
 // Send the redirect packet, providing the IP and port of the next server.
-func (client *LoginClient) SendRedirect(port uint16, ipAddr [4]byte) int {
+func (client *Client) SendRedirect(port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = LoginRedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
@@ -320,7 +319,7 @@ func (client *LoginClient) SendRedirect(port uint16, ipAddr [4]byte) int {
 
 // Send the client's configuration options. keyConfig should be 420 bytes long and either
 // point to the default keys array or loaded from the database.
-func (client *LoginClient) SendOptions(keyConfig []byte) int {
+func (client *Client) SendOptions(keyConfig []byte) int {
 	if len(keyConfig) != 420 {
 		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
 	}
@@ -345,7 +344,7 @@ func (client *LoginClient) SendOptions(keyConfig []byte) int {
 // Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
 // ack'ing a selected character, and 2 indicates that a character doesn't exist
 // in the slot requested via preview request.
-func (client *LoginClient) SendCharacterAck(slotNum uint32, flag uint32) int {
+func (client *Client) SendCharacterAck(slotNum uint32, flag uint32) int {
 	pkt := new(CharAckPacket)
 	pkt.Header.Type = LoginCharAckType
 	pkt.Slot = slotNum
@@ -360,7 +359,7 @@ func (client *LoginClient) SendCharacterAck(slotNum uint32, flag uint32) int {
 
 // Send the preview packet containing basic details about a character in
 // the selected slot.
-func (client *LoginClient) SendCharacterPreview(charPreview *CharacterPreview) int {
+func (client *Client) SendCharacterPreview(charPreview *CharacterPreview) int {
 	pkt := new(CharPreviewPacket)
 	pkt.Header.Type = LoginCharPreviewType
 	pkt.Slot = 0
@@ -375,7 +374,7 @@ func (client *LoginClient) SendCharacterPreview(charPreview *CharacterPreview) i
 
 // Acknowledge the checksum the client sent us. We don't actually do
 // anything with it but the client won't proceed otherwise.
-func (client *LoginClient) SendChecksumAck(ack uint32) int {
+func (client *Client) SendChecksumAck(ack uint32) int {
 	pkt := new(ChecksumAckPacket)
 	pkt.Header.Type = LoginChecksumAckType
 	pkt.Ack = ack
@@ -388,7 +387,7 @@ func (client *LoginClient) SendChecksumAck(ack uint32) int {
 }
 
 // Send the guildcard chunk header.
-func (client *LoginClient) SendGuildcardHeader(checksum uint32, dataLen uint16) int {
+func (client *Client) SendGuildcardHeader(checksum uint32, dataLen uint16) int {
 	pkt := new(GuildcardHeaderPacket)
 	pkt.Header.Type = LoginGuildcardHeaderType
 	pkt.Unknown = 0x00000001
@@ -403,7 +402,7 @@ func (client *LoginClient) SendGuildcardHeader(checksum uint32, dataLen uint16) 
 }
 
 // Send the next chunk of guildcard data.
-func (client *LoginClient) SendGuildcardChunk(chunkNum uint32) int {
+func (client *Client) SendGuildcardChunk(chunkNum uint32) int {
 	pkt := new(GuildcardChunkPacket)
 	pkt.Header.Type = LoginGuildcardChunkType
 	pkt.Chunk = chunkNum
@@ -425,7 +424,7 @@ func (client *LoginClient) SendGuildcardChunk(chunkNum uint32) int {
 }
 
 // Send the header for the parameter files we're about to start sending.
-func (client *LoginClient) SendParameterHeader(numEntries uint32, entries []byte) int {
+func (client *Client) SendParameterHeader(numEntries uint32, entries []byte) int {
 	pkt := new(ParameterHeaderPacket)
 	pkt.Header.Type = LoginParameterHeaderType
 	pkt.Header.Flags = numEntries
@@ -439,7 +438,7 @@ func (client *LoginClient) SendParameterHeader(numEntries uint32, entries []byte
 }
 
 // Index into chunkData and send the specified chunk of parameter data.
-func (client *LoginClient) SendParameterChunk(chunkData []byte, chunk uint32) int {
+func (client *Client) SendParameterChunk(chunkData []byte, chunk uint32) int {
 	pkt := new(ParameterChunkPacket)
 	pkt.Header.Type = LoginParameterChunkType
 	pkt.Chunk = chunk
@@ -454,8 +453,8 @@ func (client *LoginClient) SendParameterChunk(chunkData []byte, chunk uint32) in
 }
 
 // Send an error message to the client, usually used before disconnecting.
-func (client *LoginClient) SendClientMessage(message string) int {
-	pkt := new(ClientMessagePacket)
+func (client *Client) SendClientMessage(message string) int {
+	pkt := new(LoginClientMessagePacket)
 	pkt.Header.Type = LoginClientMessageType
 	// English? Tethealla sets this.
 	pkt.Language = 0x00450009
@@ -469,7 +468,7 @@ func (client *LoginClient) SendClientMessage(message string) int {
 }
 
 // Send a timestamp packet in order to indicate the server's current time.
-func (client *LoginClient) SendTimestamp() int {
+func (client *Client) SendTimestamp() int {
 	pkt := new(TimestampPacket)
 	pkt.Header.Type = LoginTimestampType
 
@@ -487,7 +486,7 @@ func (client *LoginClient) SendTimestamp() int {
 }
 
 // Send the menu items for the ship select screen.
-func (client *LoginClient) SendShipList(ships []Ship) int {
+func (client *Client) SendShipList(ships []Ship) int {
 	pkt := &ShipListPacket{
 		Header: BBPktHeader{
 			Type:  LoginShipListType,
@@ -517,7 +516,7 @@ func (client *LoginClient) SendShipList(ships []Ship) int {
 
 // Send whatever scrolling message was set in the config file and
 // converted to UTF-16LE when the server started up.
-func (client *LoginClient) SendScrollMessage() int {
+func (client *Client) SendScrollMessage() int {
 	pkt := new(ScrollMessagePacket)
 	pkt.Header.Type = LoginScrollMessageType
 	pkt.Message = config.ScrollMessageBytes()

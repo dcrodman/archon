@@ -31,58 +31,39 @@ import (
 	"sync"
 )
 
-type Client interface {
-	// Returns the IP address of the underlying connection.
-	IPAddr() string
-
-	// Process the next incoming packet and store it in the buffer.
-	Process() error
-
-	// Encrypts a block of data in-place with the server key so that
-	// it can be sent to the client.
-	Encrypt(data []byte, size uint32)
-
-	// Decrypts a block of data from the client in-place in order for
-	// it to be processed by the server.
-	Decrypt(data []byte, size uint32)
-
-	// Returns a slice of the underlying array containing the packet data.
-	Data() []byte
-
-	// Send the block pointed to by data to the client.
-	Send(data []byte) error
-
-	// Close the underlying socket and stop processing packets.
-	Close()
-}
-
-// Interface for passing around the individual server types.
-type ClientWrapper interface {
-	Client() Client
-	// Header size used by this server.
-	HeaderSize() uint16
-}
-
 // Client struct intended to be included as part of the client definitions
 // in each of the servers. This struct wraps the connection handling logic
 // used by the generator below to handle receiving packets.
-type PSOClient struct {
+type Client struct {
 	conn   *net.TCPConn
 	ipAddr string
 	port   string
 
-	hdrSize    int
+	hdrSize    uint16
 	recvSize   int
 	packetSize uint16
 	buffer     []byte
 
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
+
+	// Patch server; list of files that need update.
+	updateList []*PatchEntry
+
+	// Login server
+	guildcard uint32
+	teamId    uint32
+	isGm      bool
+
+	gcData     []byte
+	gcDataSize uint16
+	config     ClientConfig
+	flag       uint32
 }
 
-func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
+func NewClient(conn *net.TCPConn, hdrSize uint16) *Client {
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
-	c := &PSOClient{
+	c := &Client{
 		conn:        conn,
 		ipAddr:      addr[0],
 		port:        addr[1],
@@ -103,37 +84,37 @@ func NewPSOClient(conn *net.TCPConn, hdrSize int) *PSOClient {
 	return c
 }
 
-func (c *PSOClient) IPAddr() string { return c.ipAddr }
+func (c *Client) IPAddr() string { return c.ipAddr }
 
-func (c *PSOClient) ClientVector() []uint8 { return c.clientCrypt.Vector }
+func (c *Client) ClientVector() []uint8 { return c.clientCrypt.Vector }
 
-func (c *PSOClient) ServerVector() []uint8 { return c.serverCrypt.Vector }
+func (c *Client) ServerVector() []uint8 { return c.serverCrypt.Vector }
 
-func (c *PSOClient) Data() []byte { return c.buffer }
+func (c *Client) Data() []byte { return c.buffer }
 
-func (c *PSOClient) Close() { c.conn.Close() }
+func (c *Client) Close() { c.conn.Close() }
 
-func (c *PSOClient) Send(data []byte) error {
+func (c *Client) Send(data []byte) error {
 	_, err := c.conn.Write(data)
 	return err
 }
 
-func (c *PSOClient) Encrypt(data []byte, size uint32) {
+func (c *Client) Encrypt(data []byte, size uint32) {
 	c.serverCrypt.Encrypt(data, size)
 }
 
-func (c *PSOClient) Decrypt(data []byte, size uint32) {
+func (c *Client) Decrypt(data []byte, size uint32) {
 	c.clientCrypt.Decrypt(data, size)
 }
 
-func (c *PSOClient) Process() error {
+func (c *Client) Process() error {
 	// Extra bytes left in the buffer will just be ignored.
 	c.recvSize = 0
 	c.packetSize = 0
-	hdr16 := uint16(c.hdrSize)
+	hdrint := int(c.hdrSize)
 
 	// Wait for the packet header.
-	for c.recvSize < c.hdrSize {
+	for c.recvSize < hdrint {
 		bytes, err := c.conn.Read(c.buffer[c.recvSize:c.hdrSize])
 		if bytes == 0 || err == io.EOF {
 			// The client disconnected, we're done.
@@ -145,7 +126,7 @@ func (c *PSOClient) Process() error {
 		}
 		c.recvSize += bytes
 
-		if c.recvSize >= c.hdrSize {
+		if c.recvSize >= hdrint {
 			// We have our header; decrypt it.
 			c.Decrypt(c.buffer[:c.hdrSize], uint32(c.hdrSize))
 			c.packetSize, err = util.GetPacketSize(c.buffer[:2])
@@ -156,7 +137,7 @@ func (c *PSOClient) Process() error {
 			// PSO likes to occasionally send us packets that are longer
 			// than their declared size. Adjust the expected length just
 			// in case in order to avoid leaving stray bytes in the buffer.
-			for c.packetSize%hdr16 != 0 {
+			for c.packetSize%c.hdrSize != 0 {
 				c.packetSize++
 			}
 		}
@@ -183,8 +164,8 @@ func (c *PSOClient) Process() error {
 	}
 
 	// We have the whole thing; decrypt the rest of it.
-	if c.packetSize > hdr16 {
-		c.Decrypt(c.buffer[hdr16:c.packetSize], uint32(c.packetSize-hdr16))
+	if c.packetSize > c.hdrSize {
+		c.Decrypt(c.buffer[c.hdrSize:c.packetSize], uint32(c.packetSize-c.hdrSize))
 	}
 	return nil
 }
@@ -201,7 +182,7 @@ func NewClientList() *ConnList {
 }
 
 // Appends a client to the end of the connection list.
-func (cl *ConnList) Add(c Client) {
+func (cl *ConnList) Add(c *Client) {
 	cl.mutex.Lock()
 	cl.clientList.PushBack(c)
 	cl.size++
@@ -210,7 +191,7 @@ func (cl *ConnList) Add(c Client) {
 
 // Returns true if the list has a Client matching the IP address of c.
 // Note that this comparison is by IP address, not element value.
-func (cl *ConnList) Has(c Client) bool {
+func (cl *ConnList) Has(c *Client) bool {
 	found := false
 	clAddr := c.IPAddr()
 	cl.mutex.RLock()
@@ -224,7 +205,7 @@ func (cl *ConnList) Has(c Client) bool {
 	return found
 }
 
-func (cl *ConnList) Remove(c Client) {
+func (cl *ConnList) Remove(c *Client) {
 	cl.mutex.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {

@@ -327,7 +327,7 @@ type CharPreviewPacket struct {
 }
 
 // Message in a large text box, usually sent right before a disconnect.
-type ClientMessagePacket struct {
+type LoginClientMessagePacket struct {
 	Header   BBPktHeader
 	Language uint32
 	Message  []byte

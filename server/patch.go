@@ -49,17 +49,6 @@ var (
 
 const MaxFileChunkSize = 24576
 
-// Struct for holding client-specific data.
-type PatchClient struct {
-	c          *PSOClient
-	updateList []*PatchEntry
-}
-
-func (pc PatchClient) IPAddr() string     { return pc.c.IPAddr() }
-func (pc PatchClient) Client() Client     { return pc.c }
-func (pc PatchClient) Data() []byte       { return pc.c.Data() }
-func (pc PatchClient) HeaderSize() uint16 { return PCHeaderSize }
-
 // Data for one patch file.
 type PatchEntry struct {
 	filename string
@@ -82,7 +71,7 @@ type PatchDir struct {
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
-func sendFileList(client *PatchClient, node *PatchDir) {
+func sendFileList(client *Client, node *PatchDir) {
 	// Step into the next directory.
 	client.SendChangeDir(node.dirname)
 	for _, subdir := range node.subdirs {
@@ -98,7 +87,7 @@ func sendFileList(client *PatchClient, node *PatchDir) {
 // The client sent us a checksum for one of the patch files. Compare it
 // to what we have and add it to the list of files to update if there
 // is any discrepancy.
-func handleFileStatus(client *PatchClient) {
+func handleFileStatus(client *Client) {
 	var fileStatus FileStatusPacket
 	util.StructFromBytes(client.Data(), &fileStatus)
 
@@ -110,7 +99,7 @@ func handleFileStatus(client *PatchClient) {
 
 // The client finished sending all of the file check packets. If they have
 // any files that need updating, now's the time to do it.
-func updateClientFiles(client *PatchClient) error {
+func updateClientFiles(client *Client) error {
 	var numFiles, totalSize uint32 = 0, 0
 	for _, patch := range client.updateList {
 		numFiles++
@@ -162,23 +151,22 @@ func updateClientFiles(client *PatchClient) error {
 }
 
 // Create and initialize a new struct to hold client information.
-func NewPatchClient(conn *net.TCPConn) (ClientWrapper, error) {
+func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 	var err error
-	pc := &PatchClient{c: NewPSOClient(conn, PCHeaderSize)}
-	if pc.SendWelcome() != 0 {
+	pc := NewClient(conn, PCHeaderSize)
+	if pc.SendPCWelcome() != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
 	}
-	return *pc, err
+	return pc, err
 }
 
 // Handle communication with a PATCH client until the connection
 // is closed or an error is encountered.
-func PatchHandler(cw ClientWrapper) {
-	pc := cw.(PatchClient)
+func PatchHandler(pc *Client) {
 	var pktHeader PCPktHeader
 	for {
-		err := pc.c.Process()
+		err := pc.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -187,10 +175,10 @@ func PatchHandler(cw ClientWrapper) {
 			break
 		}
 
-		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(pc.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pc.c.Data(), int(pktHeader.Size))
+			util.PrintPayload(pc.Data(), int(pktHeader.Size))
 			fmt.Println()
 		}
 
@@ -199,10 +187,10 @@ func PatchHandler(cw ClientWrapper) {
 			pc.SendWelcomeAck()
 		case PatchLoginType:
 			if pc.SendWelcomeMessage() == 0 {
-				pc.SendRedirect(dataRedirectPort, config.HostnameBytes())
+				pc.SendPatchRedirect(dataRedirectPort, config.HostnameBytes())
 			}
 		default:
-			log.Info("Received unknown packet %2x from %s", pktHeader.Type, pc.c.IPAddr())
+			log.Info("Received unknown packet %2x from %s", pktHeader.Type, pc.IPAddr())
 		}
 
 		if err != nil {
@@ -214,11 +202,10 @@ func PatchHandler(cw ClientWrapper) {
 
 // Handle communication with a DATA client until the connection
 // is closed or an error is encountered.
-func DataHandler(cw ClientWrapper) {
-	pc := cw.(PatchClient)
+func DataHandler(pc *Client) {
 	var pktHeader PCPktHeader
 	for {
-		err := pc.c.Process()
+		err := pc.Process()
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -227,7 +214,7 @@ func DataHandler(cw ClientWrapper) {
 			break
 		}
 
-		util.StructFromBytes(pc.c.Data()[:PCHeaderSize], &pktHeader)
+		util.StructFromBytes(pc.Data()[:PCHeaderSize], &pktHeader)
 		if config.DebugMode {
 			fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
 			util.PrintPayload(pc.Data(), int(pktHeader.Size))
@@ -239,16 +226,16 @@ func DataHandler(cw ClientWrapper) {
 			pc.SendWelcomeAck()
 		case PatchLoginType:
 			pc.SendDataAck()
-			sendFileList(&pc, &patchTree)
+			sendFileList(pc, &patchTree)
 			pc.SendFileListDone()
 		case PatchFileStatusType:
-			handleFileStatus(&pc)
+			handleFileStatus(pc)
 		case PatchClientListDoneType:
-			if updateClientFiles(&pc) != nil {
+			if updateClientFiles(pc) != nil {
 				return
 			}
 		default:
-			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pc.c.IPAddr())
+			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pc.IPAddr())
 		}
 	}
 }

@@ -58,8 +58,8 @@ type Server struct {
 	name string
 	port string
 	// Allow each server to define their client structures.
-	newClient func(conn *net.TCPConn) (ClientWrapper, error)
-	handler   func(cw ClientWrapper)
+	newClient func(conn *net.TCPConn) (*Client, error)
+	handler   func(c *Client)
 }
 
 func (s Server) Start(wg *sync.WaitGroup) {
@@ -89,7 +89,7 @@ func (s Server) Start(wg *sync.WaitGroup) {
 			if err != nil {
 				log.Warn(err.Error())
 			} else {
-				log.Info("Accepted %s connection from %s", s.name, c.Client().IPAddr())
+				log.Info("Accepted %s connection from %s", s.name, c.IPAddr())
 				s.dispatch(c)
 			}
 		}
@@ -97,8 +97,7 @@ func (s Server) Start(wg *sync.WaitGroup) {
 	}()
 }
 
-func (s Server) dispatch(cw ClientWrapper) {
-	c := cw.Client()
+func (s Server) dispatch(c *Client) {
 	go func() {
 		// Defer so that we catch any panics, d/c the client, and
 		// remove them from the list regardless of the connection state.
@@ -113,7 +112,7 @@ func (s Server) dispatch(cw ClientWrapper) {
 		}()
 		conns.Add(c)
 		// Pass along the connection handling to the registered server.
-		s.handler(cw)
+		s.handler(c)
 	}()
 }
 
