@@ -102,13 +102,13 @@ const (
 // Blueburst, PC, and Gamecube clients all use a 4 byte header to
 // communicate with the patch server instead of the 8 byte one used
 // by Blueburst for the other servers.
-type PCPktHeader struct {
+type PCHeader struct {
 	Size uint16
 	Type uint16
 }
 
 // Packet header for every packet sent between the server and BlueBurst clients.
-type BBPktHeader struct {
+type BBHeader struct {
 	Size  uint16
 	Type  uint16
 	Flags uint32
@@ -116,7 +116,7 @@ type BBPktHeader struct {
 
 // Welcome packet with encryption vectors sent to the client upon initial connection.
 type PatchWelcomePkt struct {
-	Header       PCPktHeader
+	Header       PCHeader
 	Copyright    [44]byte
 	Padding      [20]byte
 	ServerVector [4]byte
@@ -125,13 +125,13 @@ type PatchWelcomePkt struct {
 
 // Packet containing the patch server welcome message.
 type PatchWelcomeMessage struct {
-	Header  PCPktHeader
+	Header  PCHeader
 	Message []byte
 }
 
 // Redirect packet for patch to send character server IP.
 type PatchRedirectPacket struct {
-	Header  PCPktHeader
+	Header  PCHeader
 	IPAddr  [4]uint8
 	Port    uint16
 	Padding uint16
@@ -139,20 +139,20 @@ type PatchRedirectPacket struct {
 
 // Instruct the client to chdir into Dirname (one level below).
 type ChangeDirPacket struct {
-	Header  PCPktHeader
+	Header  PCHeader
 	Dirname [64]byte
 }
 
 // Request a check on a file in the client's working directory.
 type CheckFilePacket struct {
-	Header   PCPktHeader
+	Header   PCHeader
 	PatchId  uint32
 	Filename [32]byte
 }
 
 // Response to CheckFilePacket from the client with the properties of a file.
 type FileStatusPacket struct {
-	Header   PCPktHeader
+	Header   PCHeader
 	PatchId  uint32
 	Checksum uint32
 	FileSize uint32
@@ -160,14 +160,14 @@ type FileStatusPacket struct {
 
 // Size and number of files that need to be updated.
 type UpdateFilesPacket struct {
-	Header    PCPktHeader
+	Header    PCHeader
 	TotalSize uint32
 	NumFiles  uint32
 }
 
 // File header for a series of file chunks.
 type FileHeaderPacket struct {
-	Header   PCPktHeader
+	Header   PCHeader
 	Padding  uint32
 	FileSize uint32
 	Filename [48]byte
@@ -175,7 +175,7 @@ type FileHeaderPacket struct {
 
 // Chunk of data from a file.
 type FileChunkPacket struct {
-	Header   PCPktHeader
+	Header   PCHeader
 	Chunk    uint32
 	Checksum uint32
 	Size     uint32
@@ -184,7 +184,7 @@ type FileChunkPacket struct {
 
 // Welcome packet with encryption vectors sent to the client upon initial connection.
 type WelcomePkt struct {
-	Header       BBPktHeader
+	Header       BBHeader
 	Copyright    [96]byte
 	ServerVector [48]byte
 	ClientVector [48]byte
@@ -192,7 +192,7 @@ type WelcomePkt struct {
 
 // Login Packet (0x93) sent to both the login and character servers.
 type LoginPkt struct {
-	Header        BBPktHeader
+	Header        BBHeader
 	Unknown       [8]byte
 	ClientVersion uint16
 	Unknown2      [6]byte
@@ -218,7 +218,7 @@ type ClientConfig struct {
 
 // Security packet (0xE6) sent to the client to indicate the state of client login.
 type SecurityPacket struct {
-	Header       BBPktHeader
+	Header       BBHeader
 	ErrorCode    uint32
 	PlayerTag    uint32
 	Guildcard    uint32
@@ -229,7 +229,7 @@ type SecurityPacket struct {
 
 // The address of the next server; in this case, the character server.
 type RedirectPacket struct {
-	Header  BBPktHeader
+	Header  BBHeader
 	IPAddr  [4]uint8
 	Port    uint16
 	Padding uint16
@@ -253,33 +253,33 @@ type KeyTeamConfig struct {
 
 // Option packet containing keyboard and joystick config, team options, etc.
 type OptionsPacket struct {
-	Header          BBPktHeader
+	Header          BBHeader
 	PlayerKeyConfig KeyTeamConfig
 }
 
 //
 type CharSelectionPacket struct {
-	Header    BBPktHeader
+	Header    BBHeader
 	Slot      uint32
 	Selecting uint32
 }
 
 // Acknowledge a character selection from the client or indicate an error.
 type CharAckPacket struct {
-	Header BBPktHeader
+	Header BBHeader
 	Slot   uint32
 	Flag   uint32
 }
 
 // Sent in response to 0x01E8 to acknowledge a checksum (really it's just ignored).
 type ChecksumAckPacket struct {
-	Header BBPktHeader
+	Header BBHeader
 	Ack    uint32
 }
 
 // Chunk header with info about the guildcard data we're about to send.
 type GuildcardHeaderPacket struct {
-	Header   BBPktHeader
+	Header   BBHeader
 	Unknown  uint32
 	Length   uint16
 	Padding  uint16
@@ -288,14 +288,14 @@ type GuildcardHeaderPacket struct {
 
 // Received from the client to request a guildcard data chunk.
 type GuildcardChunkReqPacket struct {
-	Header         BBPktHeader
+	Header         BBHeader
 	Unknown        uint32
 	ChunkRequested uint32
 	Continue       uint32
 }
 
 type GuildcardChunkPacket struct {
-	Header  BBPktHeader
+	Header  BBHeader
 	Unknown uint32
 	Chunk   uint32
 	Data    []uint8
@@ -303,45 +303,45 @@ type GuildcardChunkPacket struct {
 
 // Parameter header containing details about the param files we're about to send.
 type ParameterHeaderPacket struct {
-	Header  BBPktHeader
+	Header  BBHeader
 	Entries []byte
 }
 
 type ParameterChunkPacket struct {
-	Header BBPktHeader
+	Header BBHeader
 	Chunk  uint32
 	Data   []byte
 }
 
 // Used by the client to indicate whether a character should be recreated or updated.
 type SetFlagPacket struct {
-	Header BBPktHeader
+	Header BBHeader
 	Flag   uint32
 }
 
 // Sent to the client for the selection menu and received for updating a character.
 type CharPreviewPacket struct {
-	Header    BBPktHeader
+	Header    BBHeader
 	Slot      uint32
 	Character *CharacterPreview
 }
 
 // Message in a large text box, usually sent right before a disconnect.
 type LoginClientMessagePacket struct {
-	Header   BBPktHeader
+	Header   BBHeader
 	Language uint32
 	Message  []byte
 }
 
 // Indicate the server's current time.
 type TimestampPacket struct {
-	Header    BBPktHeader
+	Header    BBHeader
 	Timestamp [28]byte
 }
 
 // The list of menu items to display to the client.
 type ShipListPacket struct {
-	Header      BBPktHeader
+	Header      BBHeader
 	Padding     uint16
 	Unknown     uint16 // set to 0xFFFFFFF4
 	Unknown2    uint32 // set to 0x02
@@ -352,14 +352,14 @@ type ShipListPacket struct {
 
 // Scroll message the client should display on the ship select screen.
 type ScrollMessagePacket struct {
-	Header  BBPktHeader
+	Header  BBHeader
 	Padding [2]uint32
 	Message []byte
 }
 
 // Client's selection from the ship list menu.
 type ShipMenuSelectionPacket struct {
-	Header BBPktHeader
+	Header BBHeader
 	Id     uint32
 	Item   uint32
 }

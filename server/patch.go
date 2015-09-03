@@ -164,7 +164,7 @@ func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 // Handle communication with a PATCH client until the connection
 // is closed or an error is encountered.
 func PatchHandler(pc *Client) {
-	var pktHeader PCPktHeader
+	var pktHeader PCHeader
 	for {
 		err := pc.Process()
 		if err == io.EOF {
@@ -203,7 +203,7 @@ func PatchHandler(pc *Client) {
 // Handle communication with a DATA client until the connection
 // is closed or an error is encountered.
 func DataHandler(pc *Client) {
-	var pktHeader PCPktHeader
+	var pktHeader PCHeader
 	for {
 		err := pc.Process()
 		if err == io.EOF {

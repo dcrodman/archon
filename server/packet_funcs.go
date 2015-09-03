@@ -77,7 +77,7 @@ func fixLength(data []byte, length uint16, hdrSize uint16) uint16 {
 
 // Send a simple 4-byte header packet.
 func (client *Client) sendPCHeader(pktType uint16) int {
-	pkt := &PCPktHeader{
+	pkt := &PCHeader{
 		Type: pktType,
 		Size: 0x04,
 	}
@@ -107,7 +107,7 @@ func (client *Client) SendPCWelcome() int {
 }
 
 func (client *Client) SendWelcomeAck() int {
-	pkt := &PCPktHeader{
+	pkt := &PCHeader{
 		Size: 0x04,
 		Type: PatchLoginType, // treated as an ack
 	}
@@ -121,8 +121,7 @@ func (client *Client) SendWelcomeAck() int {
 // Message displayed on the patch download screen.
 func (client *Client) SendWelcomeMessage() int {
 	pkt := new(PatchWelcomeMessage)
-	pkt.Header.Type = PatchMessageType
-	pkt.Header.Size = PCHeaderSize + config.MessageSize
+	pkt.Header = PCHeader{Size: PCHeaderSize + config.MessageSize, Type: PatchMessageType}
 	pkt.Message = config.MessageBytes
 
 	data, size := util.BytesFromStruct(pkt)
@@ -232,12 +231,13 @@ func (client *Client) SendFileChunk(chunk, chksm, chunkSize uint32, fdata []byte
 			string(chunkSize), string(MaxFileChunkSize))
 		panic(errors.New("File chunk size exceeds maximum"))
 	}
-	pkt := new(FileChunkPacket)
-	pkt.Header.Type = PatchFileChunkType
-	pkt.Chunk = chunk
-	pkt.Checksum = chksm
-	pkt.Size = chunkSize
-	pkt.Data = fdata[:chunkSize]
+	pkt := &FileChunkPacket{
+		Header:   PCHeader{Type: PatchFileChunkType},
+		Chunk:    chunk,
+		Checksum: chksm,
+		Size:     chunkSize,
+		Data:     fdata[:chunkSize],
+	}
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
@@ -285,16 +285,16 @@ func (client *Client) SendWelcome() int {
 func (client *Client) SendSecurity(errorCode BBLoginError,
 	guildcard uint32, teamId uint32) int {
 
-	pkt := new(SecurityPacket)
-	pkt.Header.Type = LoginSecurityType
-
 	// Constants set according to how Newserv does it.
-	pkt.ErrorCode = uint32(errorCode)
-	pkt.PlayerTag = 0x00010000
-	pkt.Guildcard = guildcard
-	pkt.TeamId = teamId
-	pkt.Config = &client.config
-	pkt.Capabilities = 0x00000102
+	pkt := &SecurityPacket{
+		Header:       BBHeader{Type: LoginSecurityType},
+		ErrorCode:    uint32(errorCode),
+		PlayerTag:    0x00010000,
+		Guildcard:    guildcard,
+		TeamId:       teamId,
+		Config:       &client.config,
+		Capabilities: 0x00000102,
+	}
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
@@ -345,11 +345,11 @@ func (client *Client) SendOptions(keyConfig []byte) int {
 // ack'ing a selected character, and 2 indicates that a character doesn't exist
 // in the slot requested via preview request.
 func (client *Client) SendCharacterAck(slotNum uint32, flag uint32) int {
-	pkt := new(CharAckPacket)
-	pkt.Header.Type = LoginCharAckType
-	pkt.Slot = slotNum
-	pkt.Flag = flag
-
+	pkt := &CharAckPacket{
+		Header: BBHeader{Type: LoginCharAckType},
+		Slot:   slotNum,
+		Flag:   flag,
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Character Ack Packet")
@@ -360,11 +360,11 @@ func (client *Client) SendCharacterAck(slotNum uint32, flag uint32) int {
 // Send the preview packet containing basic details about a character in
 // the selected slot.
 func (client *Client) SendCharacterPreview(charPreview *CharacterPreview) int {
-	pkt := new(CharPreviewPacket)
-	pkt.Header.Type = LoginCharPreviewType
-	pkt.Slot = 0
-	pkt.Character = charPreview
-
+	pkt := &CharPreviewPacket{
+		Header:    BBHeader{Type: LoginCharPreviewType},
+		Slot:      0,
+		Character: charPreview,
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Character Preview Packet")
@@ -388,12 +388,12 @@ func (client *Client) SendChecksumAck(ack uint32) int {
 
 // Send the guildcard chunk header.
 func (client *Client) SendGuildcardHeader(checksum uint32, dataLen uint16) int {
-	pkt := new(GuildcardHeaderPacket)
-	pkt.Header.Type = LoginGuildcardHeaderType
-	pkt.Unknown = 0x00000001
-	pkt.Length = dataLen
-	pkt.Checksum = checksum
-
+	pkt := &GuildcardHeaderPacket{
+		Header:   BBHeader{Type: LoginGuildcardHeaderType},
+		Unknown:  0x00000001,
+		Length:   dataLen,
+		Checksum: checksum,
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Guildcard Header Packet")
@@ -425,11 +425,10 @@ func (client *Client) SendGuildcardChunk(chunkNum uint32) int {
 
 // Send the header for the parameter files we're about to start sending.
 func (client *Client) SendParameterHeader(numEntries uint32, entries []byte) int {
-	pkt := new(ParameterHeaderPacket)
-	pkt.Header.Type = LoginParameterHeaderType
-	pkt.Header.Flags = numEntries
-	pkt.Entries = entries
-
+	pkt := &ParameterHeaderPacket{
+		Header:  BBHeader{Type: LoginParameterHeaderType, Flags: numEntries},
+		Entries: entries,
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Header Packet")
@@ -439,12 +438,11 @@ func (client *Client) SendParameterHeader(numEntries uint32, entries []byte) int
 
 // Index into chunkData and send the specified chunk of parameter data.
 func (client *Client) SendParameterChunk(chunkData []byte, chunk uint32) int {
-	pkt := new(ParameterChunkPacket)
-	pkt.Header.Type = LoginParameterChunkType
-	pkt.Chunk = chunk
-
-	pkt.Data = chunkData
-
+	pkt := &ParameterChunkPacket{
+		Header: BBHeader{Type: LoginParameterChunkType},
+		Chunk:  chunk,
+		Data:   chunkData,
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Chunk Packet")
@@ -454,12 +452,12 @@ func (client *Client) SendParameterChunk(chunkData []byte, chunk uint32) int {
 
 // Send an error message to the client, usually used before disconnecting.
 func (client *Client) SendClientMessage(message string) int {
-	pkt := new(LoginClientMessagePacket)
-	pkt.Header.Type = LoginClientMessageType
-	// English? Tethealla sets this.
-	pkt.Language = 0x00450009
-	pkt.Message = util.ConvertToUtf16(message)
-
+	pkt := &LoginClientMessagePacket{
+		Header: BBHeader{Type: LoginClientMessageType},
+		// English? Tethealla sets this.
+		Language: 0x00450009,
+		Message:  util.ConvertToUtf16(message),
+	}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Client Message Packet")
@@ -488,10 +486,7 @@ func (client *Client) SendTimestamp() int {
 // Send the menu items for the ship select screen.
 func (client *Client) SendShipList(ships []Ship) int {
 	pkt := &ShipListPacket{
-		Header: BBPktHeader{
-			Type:  LoginShipListType,
-			Flags: 0x01,
-		},
+		Header:      BBHeader{Type: LoginShipListType, Flags: 0x01},
 		Unknown:     0x02,
 		Unknown2:    0xFFFFFFF4,
 		Unknown3:    0x04,
@@ -517,10 +512,10 @@ func (client *Client) SendShipList(ships []Ship) int {
 // Send whatever scrolling message was set in the config file and
 // converted to UTF-16LE when the server started up.
 func (client *Client) SendScrollMessage() int {
-	pkt := new(ScrollMessagePacket)
-	pkt.Header.Type = LoginScrollMessageType
-	pkt.Message = config.ScrollMessageBytes()
-
+	pkt := &ScrollMessagePacket{
+		Header:  BBHeader{Type: LoginScrollMessageType},
+		Message: config.ScrollMessageBytes(),
+	}
 	data, size := util.BytesFromStruct(pkt)
 	// The end of the message appears to be garbled unless
 	// there is a block of extra bytes on the end; add an extra

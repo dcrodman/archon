@@ -43,6 +43,7 @@ var (
 	config *configuration.Config = configuration.GetConfig()
 	log    *logging.ServerLogger
 	host   string
+
 	// Register all of the server handlers and their corresponding ports.
 	servers = []Server{
 		Server{"PATCH", config.PatchPort, NewPatchClient, PatchHandler},

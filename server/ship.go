@@ -54,7 +54,7 @@ func handleShipLogin(c *Client) error {
 }
 
 func BlockHandler(sc *Client) {
-	var pktHeader PCPktHeader
+	var pktHeader BBHeader
 	for {
 		err := sc.Process()
 		if err == io.EOF {
@@ -78,7 +78,7 @@ func BlockHandler(sc *Client) {
 }
 
 func ShipHandler(sc *Client) {
-	var pktHeader PCPktHeader
+	var pktHeader BBHeader
 	for {
 		err := sc.Process()
 		if err == io.EOF {

@@ -360,7 +360,7 @@ func LoginHandler(lc *Client) {
 			break
 		}
 
-		var pktHeader BBPktHeader
+		var pktHeader BBHeader
 		util.StructFromBytes(lc.Data()[:BBHeaderSize], &pktHeader)
 
 		if config.DebugMode {
@@ -398,7 +398,7 @@ func CharacterHandler(lc *Client) {
 			break
 		}
 
-		var pktHeader BBPktHeader
+		var pktHeader BBHeader
 		util.StructFromBytes(lc.Data(), &pktHeader)
 
 		if config.DebugMode {
@@ -427,7 +427,7 @@ func CharacterHandler(lc *Client) {
 		case LoginParameterHeaderReqType:
 			lc.SendParameterHeader(uint32(len(paramFiles)), paramHeaderData)
 		case LoginParameterChunkReqType:
-			var pkt BBPktHeader
+			var pkt BBHeader
 			util.StructFromBytes(lc.Data(), &pkt)
 			lc.SendParameterChunk(paramChunkData[int(pkt.Flags)], pkt.Flags)
 		case LoginSetFlagType:
