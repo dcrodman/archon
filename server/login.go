@@ -101,7 +101,7 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 	// Copy over the config, which should indicate how far they are in the login flow.
 	util.StructFromBytes(loginPkt.Security[:], &client.config)
 
-	// TODO: Hardware ban check.
+	// TODO: Account, hardware, and IP ban checks.
 	return &loginPkt, nil
 }
 
@@ -455,13 +455,5 @@ func InitLogin() {
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	charRedirectPort = uint16(charPort)
-
-	// Create our ship entry for the built-in ship server. Any other connected
-	// ships will be added to this list by the shipgate, if it's enabled.
-	s := &shipList[0]
-	s.id = 1
-	s.ipAddr = config.HostnameBytes()
-	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
-	s.port = uint16(port)
-	copy(s.name[:], util.ConvertToUtf16(config.ShipName))
+	fmt.Println()
 }

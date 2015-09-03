@@ -172,9 +172,9 @@ func StartServer() {
 	// Initialize the remaining servers and spin off our top-level
 	// goroutines to listen on each port.
 	InitPatch()
-	fmt.Println()
 	InitLogin()
-	fmt.Println()
+	InitShipgate()
+	InitShip()
 
 	var wg sync.WaitGroup
 	for _, server := range servers {

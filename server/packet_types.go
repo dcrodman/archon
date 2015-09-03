@@ -26,7 +26,7 @@ const (
 	BBHeaderSize = 0x08
 )
 
-// Packet types handled by the patch and data servers..
+// Packet types handled by the patch and data servers.
 const (
 	PatchWelcomeType        = 0x02
 	PatchLoginType          = 0x04
@@ -73,6 +73,11 @@ const (
 	LoginShipListType           = 0xA0
 	LoginScrollMessageType      = 0xEE
 	LoginMenuSelectType         = 0x10
+)
+
+// Packet types for packets sent to and from the ship and block servers.
+const (
+	BlockListType = 0x07
 )
 
 // Packet types common to all servers.
@@ -362,4 +367,13 @@ type ShipMenuSelectionPacket struct {
 	Header BBHeader
 	Id     uint32
 	Item   uint32
+}
+
+// List containing the available blocks on a ship.
+type BlockListPacket struct {
+	Header   BBHeader
+	Padding  [10]byte
+	ShipName [32]byte
+	Unknown  uint32
+	Blocks   []Block
 }

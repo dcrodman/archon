@@ -54,6 +54,8 @@ type Config struct {
 	BlockPort string
 	ShipPort  string
 
+	// Number of blocks to open on the ship server.
+	NumBlocks      int
 	MaxConnections int
 
 	// Patch server welcome message.
@@ -98,6 +100,7 @@ var config *Config = &Config{
 	WebPort:        "14000",
 	BlockPort:      "15000",
 	ShipPort:       "15001",
+	NumBlocks:      2,
 	MaxConnections: 30000,
 
 	ShipName:       "Unconfigured",
@@ -214,6 +217,7 @@ func (config *Config) String() string {
 		"Web Port: " + config.WebPort + "\n" +
 		"Block Port: " + config.BlockPort + "\n" +
 		"Ship Port: " + config.ShipPort + "\n" +
+		"Num Ship Blocks: " + strconv.FormatInt(int64(config.NumBlocks), 10) + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
 		"Ship Name: " + config.ShipName + "\n" +
 		"Welcome Message: " + config.WelcomeMessage + "\n" +

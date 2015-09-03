@@ -22,19 +22,19 @@
  */
 package server
 
-// import (
-// 	"crypto/tls"
-// 	"errors"
-// 	"fmt"
-// 	"github.com/dcrodman/archon/server/util"
-// 	"io"
-// 	"net"
-// 	"os"
-// 	"runtime/debug"
-// 	"strings"
-// 	"sync"
-// 	"time"
-// )
+import (
+	// 	"crypto/tls"
+	// 	"errors"
+	"fmt"
+	// 	"io"
+	// 	"net"
+	// 	"os"
+	// 	"runtime/debug"
+	// 	"strings"
+	// 	"sync"
+	// 	"time"
+	"strconv"
+)
 
 type Ship struct {
 	name [23]byte
@@ -326,3 +326,14 @@ type Ship struct {
 
 // 	wg.Done()
 // }
+
+func InitShipgate() {
+	// Create our ship entry for the built-in ship server. Any other connected
+	// ships will be added to this list by the shipgate, if it's enabled.
+	s := &shipList[0]
+	s.id = 1
+	s.ipAddr = config.HostnameBytes()
+	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
+	s.port = uint16(port)
+	copy(s.name[:], config.ShipName)
+}

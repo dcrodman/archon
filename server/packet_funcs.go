@@ -77,10 +77,7 @@ func fixLength(data []byte, length uint16, hdrSize uint16) uint16 {
 
 // Send a simple 4-byte header packet.
 func (client *Client) sendPCHeader(pktType uint16) int {
-	pkt := &PCHeader{
-		Type: pktType,
-		Size: 0x04,
-	}
+	pkt := &PCHeader{Type: pktType, Size: 0x04}
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		util.PrintPayload(data, size)
@@ -499,7 +496,7 @@ func (client *Client) SendShipList(ships []Ship) int {
 		item := &pkt.ShipEntries[i]
 		item.Unknown = 0x12
 		item.Id = ship.id
-		copy(item.Shipname[:], ship.name[:])
+		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
 	data, size := util.BytesFromStruct(pkt)
@@ -524,6 +521,15 @@ func (client *Client) SendScrollMessage() int {
 	size += 1
 	if config.DebugMode {
 		fmt.Println("Sending Scroll Message Packet")
+	}
+	return sendEncrypted(client, data, uint16(size))
+}
+
+// Send the client the block list on the selection screen.
+func (client *Client) SendBlockList(pkt *BlockListPacket) int {
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Block Packet")
 	}
 	return sendEncrypted(client, data, uint16(size))
 }

@@ -322,4 +322,5 @@ func InitPatch() {
 	// Convert the data port to a BE uint for the redirect packet.
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
 	dataRedirectPort = uint16((dataPort >> 8) | (dataPort << 8))
+	fmt.Println()
 }
