@@ -17,12 +17,12 @@
 * ---------------------------------------------------------------------
 * Packet types, defintitions, and sending functions.
  */
-package server
+package main
 
 import (
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/server/util"
+	"github.com/dcrodman/archon/util"
 	"syscall"
 	"time"
 )

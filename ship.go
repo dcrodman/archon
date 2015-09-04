@@ -17,12 +17,12 @@
 * ---------------------------------------------------------------------
 * The BLOCK and SHIP server logic.
  */
-package server
+package main
 
 import (
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/server/util"
+	"github.com/dcrodman/archon/util"
 	"io"
 	"net"
 )

@@ -18,13 +18,13 @@
  */
 
 // Responsible for initializing default data for players and accounts.
-package server
+package main
 
 import (
 	// "encoding/json"
 	"fmt"
-	"github.com/dcrodman/archon/server/prs"
-	"github.com/dcrodman/archon/server/util"
+	"github.com/dcrodman/archon/prs"
+	"github.com/dcrodman/archon/util"
 	"hash/crc32"
 	"io/ioutil"
 	"os"

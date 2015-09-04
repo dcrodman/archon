@@ -19,7 +19,7 @@
 * Packet constants and structures. All functions return 0 on success,
 * negative int on db error, and a positive int for any other errors.
  */
-package server
+package main
 
 const (
 	PCHeaderSize = 0x04

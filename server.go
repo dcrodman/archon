@@ -16,12 +16,12 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
  */
-package server
+package main
 
 import (
 	"fmt"
-	"github.com/dcrodman/archon/server/configuration"
-	"github.com/dcrodman/archon/server/logging"
+	"github.com/dcrodman/archon/configuration"
+	"github.com/dcrodman/archon/logging"
 	"net"
 	"net/http"
 	"os"
@@ -117,7 +117,7 @@ func (s Server) dispatch(c *Client) {
 	}()
 }
 
-func StartServer() {
+func main() {
 	fmt.Println("Archon PSO Server, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
 		"This program is free software: you can redistribute it and/or\n" +

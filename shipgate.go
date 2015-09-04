@@ -20,12 +20,12 @@
 * ships. This module handles all of its own connection logic since the
 * shipgate protocol differs from the way game clients are processed.
  */
-package server
+package main
 
 import (
 	// 	"crypto/tls"
 	// 	"errors"
-	"fmt"
+	// "fmt"
 	// 	"io"
 	// 	"net"
 	// 	"os"
