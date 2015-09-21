@@ -51,7 +51,6 @@ const (
 	LoginWelcomeType            = 0x03
 	LoginType                   = 0x93
 	LoginSecurityType           = 0xE6
-	LoginRedirectType           = 0x19
 	LoginClientMessageType      = 0x1A
 	LoginOptionsRequestType     = 0xE0
 	LoginOptionsType            = 0xE2
@@ -77,12 +76,14 @@ const (
 
 // Packet types for packets sent to and from the ship and block servers.
 const (
-	BlockListType = 0x07
+	BlockListType  = 0x07
+	MenuSelectType = 0x10
 )
 
 // Packet types common to all servers.
 const (
 	DisconnectType = 0x05
+	RedirectType   = 0x19
 )
 
 // Error code types used for packet E6.
@@ -376,4 +377,10 @@ type BlockListPacket struct {
 	ShipName [32]byte
 	Unknown  uint32
 	Blocks   []Block
+}
+
+type MenuSelectionPacket struct {
+	Header BBHeader
+	MenuId uint32
+	ItemId uint32
 }

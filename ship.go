@@ -25,6 +25,7 @@ import (
 	"github.com/dcrodman/archon/util"
 	"io"
 	"net"
+	"strconv"
 )
 
 const BlockName = "Block"
@@ -41,12 +42,26 @@ type Block struct {
 	BlockName [36]byte
 }
 
-func handleShipLogin(c *Client) error {
-	if _, err := VerifyAccount(c); err != nil {
+func handleShipLogin(sc *Client) error {
+	if _, err := VerifyAccount(sc); err != nil {
 		return err
 	}
-	c.SendSecurity(BBLoginErrorNone, c.guildcard, c.teamId)
-	c.SendBlockList(blockPkt)
+	sc.SendSecurity(BBLoginErrorNone, sc.guildcard, sc.teamId)
+	return nil
+}
+
+func handleBlockSelection(sc *Client) error {
+	var pkt MenuSelectionPacket
+	util.StructFromBytes(sc.Data(), &pkt)
+
+	// Grab the chosen block and redirect them to the selected block server.
+	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
+	selectedBlock := pkt.ItemId
+	if int(selectedBlock) > config.NumBlocks {
+		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
+	}
+	fmt.Printf("Redirecting to port: %v\n", uint16(port)+uint16(selectedBlock))
+	sc.SendRedirect(uint16(uint32(port)+selectedBlock), config.HostnameBytes())
 	return nil
 }
 
@@ -82,6 +97,9 @@ func ShipHandler(sc *Client) {
 		switch pktHeader.Type {
 		case LoginType:
 			err = handleShipLogin(sc)
+			sc.SendBlockList(blockPkt)
+		case MenuSelectType:
+			err = handleBlockSelection(sc)
 		}
 
 		if err != nil {
@@ -111,29 +129,37 @@ func BlockHandler(sc *Client) {
 		}
 
 		switch pktHeader.Type {
+		case LoginType:
+			err := handleShipLogin(sc)
+			// TODO: Send lobby data
+		}
+
+		if err != nil {
+			log.Warn("Error in client communication: " + err.Error())
+			return
 		}
 	}
 }
 
 func InitShip() {
-	// TODO: How does this need to work for multiple ships?
+	// Precompute the block list packet since it's not going to change.
 	numBlocks := config.NumBlocks
 	ship := shipList[0]
-	sn := fmt.Sprintf("%d:%s", ship.id, ship.name)
 
 	blockPkt = &BlockListPacket{
 		Header:  BBHeader{Type: BlockListType, Flags: uint32(numBlocks)},
 		Unknown: 0x08,
 		Blocks:  make([]Block, numBlocks),
 	}
-	copy(blockPkt.ShipName[:], util.ConvertToUtf16(sn))
+	shipName := fmt.Sprintf("%d:%s", ship.id, ship.name)
+	copy(blockPkt.ShipName[:], util.ConvertToUtf16(shipName))
 
 	for i := 0; i < numBlocks; i++ {
 		b := &blockPkt.Blocks[i]
 		b.Unknown = 0x12
-		// TODO: Teth sets this to 0xFFFFFFFF - block num?
+		// TODO: Teth sets this to (0xEFFFFFFF - block num)?
 		b.BlockId = uint32(i + 1)
-		bn := fmt.Sprintf("BLOCK %02d", i+1)
-		copy(b.BlockName[:], util.ConvertToUtf16(bn))
+		blockName := fmt.Sprintf("BLOCK %02d", i+1)
+		copy(b.BlockName[:], util.ConvertToUtf16(blockName))
 	}
 }

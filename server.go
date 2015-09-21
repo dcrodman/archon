@@ -27,6 +27,7 @@ import (
 	"os"
 	"runtime/debug"
 	"runtime/pprof"
+	"strconv"
 	"sync"
 )
 
@@ -174,6 +175,18 @@ func main() {
 	InitLogin()
 	InitShipgate()
 	InitShip()
+
+	// The available block ports will depend on how the server is configured,
+	// so once we've read the config then add the server entries on the fly.
+	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
+	for i := 1; i <= config.NumBlocks; i++ {
+		servers = append(servers, Server{
+			fmt.Sprintf("BLOCK%d", i),
+			strconv.FormatInt(shipPort+int64(i), 10),
+			NewShipClient,
+			BlockHandler,
+		})
+	}
 
 	var wg sync.WaitGroup
 	for _, server := range servers {

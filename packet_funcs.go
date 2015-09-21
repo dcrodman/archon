@@ -303,7 +303,7 @@ func (client *Client) SendSecurity(errorCode BBLoginError,
 // Send the redirect packet, providing the IP and port of the next server.
 func (client *Client) SendRedirect(port uint16, ipAddr [4]byte) int {
 	pkt := new(RedirectPacket)
-	pkt.Header.Type = LoginRedirectType
+	pkt.Header.Type = RedirectType
 	copy(pkt.IPAddr[:], ipAddr[:])
 	pkt.Port = port
 

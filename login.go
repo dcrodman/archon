@@ -329,7 +329,7 @@ func handleCharacterUpdate(client *Client) error {
 }
 
 // Player selected one of the items on the ship select screen.
-func handleMenuSelect(client *Client) {
+func handleShipSelection(client *Client) {
 	var pkt ShipMenuSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
 	s := &shipList[pkt.Item-1]
@@ -437,7 +437,7 @@ func CharacterHandler(lc *Client) {
 		case LoginCharPreviewType:
 			err = handleCharacterUpdate(lc)
 		case LoginMenuSelectType:
-			handleMenuSelect(lc)
+			handleShipSelection(lc)
 		default:
 			log.Info("Received unknown packet %x from %s", pktHeader.Type, lc.IPAddr())
 		}
