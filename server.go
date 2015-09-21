@@ -50,7 +50,6 @@ var (
 		Server{"DATA", config.DataPort, NewPatchClient, DataHandler},
 		Server{"LOGIN", config.LoginPort, NewLoginClient, LoginHandler},
 		Server{"CHARACTER", config.CharacterPort, NewLoginClient, CharacterHandler},
-		Server{"BLOCK", config.BlockPort, NewShipClient, BlockHandler},
 		Server{"SHIP", config.ShipPort, NewShipClient, ShipHandler},
 	}
 )

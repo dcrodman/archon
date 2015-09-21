@@ -51,8 +51,7 @@ type Config struct {
 	ShipgatePort string
 	WebPort      string
 	// Ship ports.
-	BlockPort string
-	ShipPort  string
+	ShipPort string
 
 	// Number of blocks to open on the ship server.
 	NumBlocks      int
@@ -98,8 +97,7 @@ var config *Config = &Config{
 	CharacterPort:  "12001",
 	ShipgatePort:   "13000",
 	WebPort:        "14000",
-	BlockPort:      "15000",
-	ShipPort:       "15001",
+	ShipPort:       "15000",
 	NumBlocks:      2,
 	MaxConnections: 30000,
 
@@ -215,7 +213,6 @@ func (config *Config) String() string {
 		"Character Port: " + config.CharacterPort + "\n" +
 		"Shipgate Port: " + config.ShipgatePort + "\n" +
 		"Web Port: " + config.WebPort + "\n" +
-		"Block Port: " + config.BlockPort + "\n" +
 		"Ship Port: " + config.ShipPort + "\n" +
 		"Num Ship Blocks: " + strconv.FormatInt(int64(config.NumBlocks), 10) + "\n" +
 		"Max Connections: " + strconv.FormatInt(int64(config.MaxConnections), 10) + "\n" +
