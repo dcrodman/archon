@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon/util"
 	"hash/crc32"
-	"io"
 	"net"
 	"strconv"
 )
@@ -336,7 +335,8 @@ func handleShipSelection(client *Client) {
 	client.SendRedirect(s.port, s.ipAddr)
 }
 
-// Create and initialize a new struct to hold client information.
+// Create and initialize a new Login client so long as we're able
+// to send the welcome packet to begin encryption.
 func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 	var err error
 	lc := NewClient(conn, BBHeaderSize)
@@ -347,113 +347,94 @@ func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 	return lc, err
 }
 
-// Process packets sent to the LOGIN port by sending them off to another handler or by
-// taking some brief action.
-func LoginHandler(lc *Client) {
-	for {
-		err := lc.Process()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			// Error communicating with the client.
-			log.Warn(err.Error())
-			break
-		}
+// Login sub-server definition.
+type LoginServer struct{}
 
-		var pktHeader BBHeader
-		util.StructFromBytes(lc.Data()[:BBHeaderSize], &pktHeader)
+func (server LoginServer) Name() string { return "LOGIN" }
 
-		if config.DebugMode {
-			fmt.Printf("LOGIN: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(lc.Data(), int(pktHeader.Size))
-			fmt.Println()
-		}
+func (server LoginServer) Port() string { return config.LoginPort }
 
-		switch pktHeader.Type {
-		case LoginType:
-			err = handleLogin(lc)
-		case DisconnectType:
-			// Just wait until we recv 0 from the client to d/c.
-			break
-		default:
-			log.Info("Received unknown packet %x from %s", pktHeader.Type, lc.IPAddr())
-		}
-		if err != nil {
-			log.Warn("Error in client communication: " + err.Error())
-			return
-		}
-	}
-}
-
-// Process packets sent to the CHARACTER port by sending them off to another
-// handler or by taking some brief action.
-func CharacterHandler(lc *Client) {
-	for {
-		err := lc.Process()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			// Error communicating with the client.
-			log.Warn(err.Error())
-			break
-		}
-
-		var pktHeader BBHeader
-		util.StructFromBytes(lc.Data(), &pktHeader)
-
-		if config.DebugMode {
-			fmt.Printf("CHAR: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(lc.Data(), int(pktHeader.Size))
-			fmt.Println()
-		}
-
-		switch pktHeader.Type {
-		case LoginType:
-			err = handleCharLogin(lc)
-		case DisconnectType:
-			// Just wait until we recv 0 from the client to d/c.
-			break
-		case LoginOptionsRequestType:
-			err = handleKeyConfig(lc)
-		case LoginCharPreviewReqType:
-			err = handleCharacterSelect(lc)
-		case LoginChecksumType:
-			// Everybody else seems to ignore this, so...
-			lc.SendChecksumAck(1)
-		case LoginGuildcardReqType:
-			err = handleGuildcardDataStart(lc)
-		case LoginGuildcardChunkReqType:
-			handleGuildcardChunk(lc)
-		case LoginParameterHeaderReqType:
-			lc.SendParameterHeader(uint32(len(paramFiles)), paramHeaderData)
-		case LoginParameterChunkReqType:
-			var pkt BBHeader
-			util.StructFromBytes(lc.Data(), &pkt)
-			lc.SendParameterChunk(paramChunkData[int(pkt.Flags)], pkt.Flags)
-		case LoginSetFlagType:
-			var pkt SetFlagPacket
-			util.StructFromBytes(lc.Data(), &pkt)
-			lc.flag = pkt.Flag
-		case LoginCharPreviewType:
-			err = handleCharacterUpdate(lc)
-		case LoginMenuSelectType:
-			handleShipSelection(lc)
-		default:
-			log.Info("Received unknown packet %x from %s", pktHeader.Type, lc.IPAddr())
-		}
-
-		if err != nil {
-			log.Warn("Error in client communication: " + err.Error())
-			return
-		}
-	}
-}
-
-func InitLogin() {
+func (server LoginServer) Init() {
 	loadParameterFiles()
 	loadBaseStats()
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	charRedirectPort = uint16(charPort)
 	fmt.Println()
+}
+
+func (server LoginServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewLoginClient(conn)
+}
+
+func (server LoginServer) Handle(c *Client) error {
+	var err error = nil
+	var hdr BBHeader
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+
+	switch hdr.Type {
+	case LoginType:
+		err = handleLogin(c)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c.
+		break
+	default:
+		log.Info("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+	}
+	return err
+}
+
+// Character sub-server definition.
+type CharacterServer struct{}
+
+func (server CharacterServer) Name() string { return "CHARACTER" }
+
+func (server CharacterServer) Port() string { return config.CharacterPort }
+
+func (server CharacterServer) Init() {}
+
+func (server CharacterServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewLoginClient(conn)
+}
+
+func (server CharacterServer) Handle(c *Client) error {
+	var err error = nil
+	var hdr BBHeader
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+
+	switch hdr.Type {
+	case LoginType:
+		err = handleCharLogin(c)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c.
+		break
+	case LoginOptionsRequestType:
+		err = handleKeyConfig(c)
+	case LoginCharPreviewReqType:
+		err = handleCharacterSelect(c)
+	case LoginChecksumType:
+		// Everybody else seems to ignore this, so...
+		c.SendChecksumAck(1)
+	case LoginGuildcardReqType:
+		err = handleGuildcardDataStart(c)
+	case LoginGuildcardChunkReqType:
+		handleGuildcardChunk(c)
+	case LoginParameterHeaderReqType:
+		c.SendParameterHeader(uint32(len(paramFiles)), paramHeaderData)
+	case LoginParameterChunkReqType:
+		var pkt BBHeader
+		util.StructFromBytes(c.Data(), &pkt)
+		c.SendParameterChunk(paramChunkData[int(pkt.Flags)], pkt.Flags)
+	case LoginSetFlagType:
+		var pkt SetFlagPacket
+		util.StructFromBytes(c.Data(), &pkt)
+		c.flag = pkt.Flag
+	case LoginCharPreviewType:
+		err = handleCharacterUpdate(c)
+	case LoginMenuSelectType:
+		handleShipSelection(c)
+	default:
+		log.Info("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+	}
+	return err
 }

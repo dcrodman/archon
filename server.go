@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon/configuration"
 	"github.com/dcrodman/archon/logging"
+	"github.com/dcrodman/archon/util"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -40,65 +42,86 @@ const (
 
 var (
 	// Our global connection list.
-	conns  *ConnList             = NewClientList()
 	config *configuration.Config = configuration.GetConfig()
 	log    *logging.ServerLogger
-	host   string
-
-	// Register all of the server handlers and their corresponding ports.
-	servers = []Server{
-		Server{"PATCH", config.PatchPort, NewPatchClient, PatchHandler},
-		Server{"DATA", config.DataPort, NewPatchClient, DataHandler},
-		Server{"LOGIN", config.LoginPort, NewLoginClient, LoginHandler},
-		Server{"CHARACTER", config.CharacterPort, NewLoginClient, CharacterHandler},
-		Server{"SHIP", config.ShipPort, NewShipClient, ShipHandler},
-	}
 )
 
-type Server struct {
-	name string
-	port string
-	// Allow each server to define their client structures.
-	newClient func(conn *net.TCPConn) (*Client, error)
-	handler   func(c *Client)
+// Server defines the methods implemented by all sub-servers that can be
+// registered and started when the server is brought up.
+type Server interface {
+	// Uniquely identifying string, mostly used for logging.
+	Name() string
+	// Port on which the server should listen for connections.
+	Port() string
+	// Perform any pre-startup initialization.
+	Init()
+	// Client factory responsible for performing whatever initialization is
+	// needed for Client objects to represent new connections.
+	NewClient(conn *net.TCPConn) (*Client, error)
+	// Process the packet in the client's buffer. The dispatcher will
+	// read the latest packet from the client before calling.
+	Handle(c *Client) error
 }
 
-func (s Server) Start(wg *sync.WaitGroup) {
-	// Open our server socket. All sockets must be open for the server
-	// to launch correctly, so errors are terminal.
-	hostAddr, err := net.ResolveTCPAddr("tcp", config.Hostname+":"+s.port)
-	if err != nil {
-		fmt.Println("Error creating socket: " + err.Error())
-		os.Exit(1)
-	}
-	socket, err := net.ListenTCP("tcp", hostAddr)
-	if err != nil {
-		fmt.Println("Error listening on socket: " + err.Error())
-		os.Exit(1)
-	}
+type Dispatcher struct {
+	host    string
+	servers []Server
+	conns   *ConnList
+}
 
-	go func() {
-		fmt.Printf("Waiting for %s connections on %v:%v\n", s.name, host, s.port)
-		// Poll until we can accept more clients.
-		for conns.Count() < config.MaxConnections {
-			connection, err := socket.AcceptTCP()
-			if err != nil {
-				log.Warn("Failed to accept connection: %v", err.Error())
-				continue
-			}
-			c, err := s.newClient(connection)
-			if err != nil {
-				log.Warn(err.Error())
-			} else {
-				log.Info("Accepted %s connection from %s", s.name, c.IPAddr())
-				s.dispatch(c)
-			}
+// Registers a server instance to be brought up once the dispatcher is run.
+func (d *Dispatcher) register(s Server) {
+	d.servers = append(d.servers, s)
+}
+
+// Iterate over our registered servers, creating a goroutine for each
+// one to listen on its registered port.
+func (d *Dispatcher) start(wg *sync.WaitGroup) {
+	for _, s := range d.servers {
+		s.Init()
+		// Open our server socket. All sockets must be open for the server
+		// to launch correctly, so errors are terminal.
+		hostAddr, err := net.ResolveTCPAddr("tcp", config.Hostname+":"+s.Port())
+		if err != nil {
+			fmt.Println("Error creating socket: " + err.Error())
+			os.Exit(1)
 		}
-		wg.Done()
-	}()
+		socket, err := net.ListenTCP("tcp", hostAddr)
+		if err != nil {
+			fmt.Println("Error listening on socket: " + err.Error())
+			os.Exit(1)
+		}
+
+		go func(serv Server) {
+			wg.Add(1)
+			// Poll until we can accept more clients.
+			for d.conns.Count() < config.MaxConnections {
+				conn, err := socket.AcceptTCP()
+				if err != nil {
+					log.Warn("Failed to accept connection: %v", err.Error())
+					continue
+				}
+				c, err := serv.NewClient(conn)
+				if err != nil {
+					log.Warn(err.Error())
+				} else {
+					log.Info("Accepted %s connection from %s", serv.Name(), c.IPAddr())
+					d.dispatch(c, serv)
+				}
+			}
+			wg.Done()
+		}(s)
+	}
+	// Pass through again to prevent the output from changing due to race cond.
+	for _, s := range d.servers {
+		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), d.host, s.Port())
+	}
+	log.Important("Dispatcher: Server Initialized")
 }
 
-func (s Server) dispatch(c *Client) {
+// Spawn a dedicated Goroutine for Client and handle communications
+// until the connection is closed.
+func (d *Dispatcher) dispatch(c *Client, s Server) {
 	go func() {
 		// Defer so that we catch any panics, d/c the client, and
 		// remove them from the list regardless of the connection state.
@@ -108,12 +131,35 @@ func (s Server) dispatch(c *Client) {
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
-			conns.Remove(c)
-			log.Info("Disconnected %s client %s", s.name, c.IPAddr())
+			d.conns.Remove(c)
+			log.Info("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
-		conns.Add(c)
-		// Pass along the connection handling to the registered server.
-		s.handler(c)
+		d.conns.Add(c)
+
+		// Connection loop; process packets until the connection is closed.
+		var pktHeader PCHeader
+		for {
+			err := c.Process()
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				// Error communicating with the client.
+				log.Warn(err.Error())
+				break
+			}
+
+			util.StructFromBytes(c.Data()[:PCHeaderSize], &pktHeader)
+			if config.DebugMode {
+				fmt.Printf("%s: Got %v bytes from client:\n", s.Name(), pktHeader.Size)
+				util.PrintPayload(c.Data(), int(pktHeader.Size))
+				fmt.Println()
+			}
+
+			if err = s.Handle(c); err != nil {
+				log.Warn("Error in client communication: " + err.Error())
+				return
+			}
+		}
 	}()
 }
 
@@ -140,7 +186,6 @@ func main() {
 		}
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
-	host = config.Hostname
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
@@ -169,30 +214,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize the remaining servers and spin off our top-level
-	// goroutines to listen on each port.
-	InitPatch()
-	InitLogin()
-	InitShipgate()
-	InitShip()
+	// Register all of the server handlers and their corresponding ports.
+	dispatcher := Dispatcher{
+		host:    config.Hostname,
+		servers: make([]Server, 0),
+		conns:   NewClientList(),
+	}
+
+	dispatcher.register(new(PatchServer))
+	dispatcher.register(new(DataServer))
+	dispatcher.register(new(LoginServer))
+	dispatcher.register(new(CharacterServer))
+	dispatcher.register(new(ShipServer))
 
 	// The available block ports will depend on how the server is configured,
 	// so once we've read the config then add the server entries on the fly.
 	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
 	for i := 1; i <= config.NumBlocks; i++ {
-		servers = append(servers, Server{
-			fmt.Sprintf("BLOCK%d", i),
-			strconv.FormatInt(shipPort+int64(i), 10),
-			NewShipClient,
-			BlockHandler,
+		dispatcher.register(BlockServer{
+			name: fmt.Sprintf("BLOCK%d", i),
+			port: strconv.FormatInt(shipPort+int64(i), 10),
 		})
 	}
 
+	// Start up all of our servers and block until they exit.
 	var wg sync.WaitGroup
-	for _, server := range servers {
-		wg.Add(1)
-		server.Start(&wg)
-	}
-	log.Important("Server Initialized")
+	dispatcher.start(&wg)
 	wg.Wait()
 }

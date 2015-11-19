@@ -33,7 +33,7 @@ import (
 
 // Client struct intended to be included as part of the client definitions
 // in each of the servers. This struct wraps the connection handling logic
-// used by the generator below to handle receiving packets.
+// used by Process() below to handle receiving packets.
 type Client struct {
 	conn   *net.TCPConn
 	ipAddr string

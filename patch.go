@@ -150,96 +150,6 @@ func updateClientFiles(client *Client) error {
 	return nil
 }
 
-// Create and initialize a new struct to hold client information.
-func NewPatchClient(conn *net.TCPConn) (*Client, error) {
-	var err error
-	pc := NewClient(conn, PCHeaderSize)
-	if pc.SendPCWelcome() != 0 {
-		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
-		pc = nil
-	}
-	return pc, err
-}
-
-// Handle communication with a PATCH client until the connection
-// is closed or an error is encountered.
-func PatchHandler(pc *Client) {
-	var pktHeader PCHeader
-	for {
-		err := pc.Process()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			// Error communicating with the client.
-			log.Warn(err.Error())
-			break
-		}
-
-		util.StructFromBytes(pc.Data()[:PCHeaderSize], &pktHeader)
-		if config.DebugMode {
-			fmt.Printf("PATCH: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pc.Data(), int(pktHeader.Size))
-			fmt.Println()
-		}
-
-		switch pktHeader.Type {
-		case PatchWelcomeType:
-			pc.SendWelcomeAck()
-		case PatchLoginType:
-			if pc.SendWelcomeMessage() == 0 {
-				pc.SendPatchRedirect(dataRedirectPort, config.HostnameBytes())
-			}
-		default:
-			log.Info("Received unknown packet %2x from %s", pktHeader.Type, pc.IPAddr())
-		}
-
-		if err != nil {
-			log.Warn("Error in client communication: " + err.Error())
-			return
-		}
-	}
-}
-
-// Handle communication with a DATA client until the connection
-// is closed or an error is encountered.
-func DataHandler(pc *Client) {
-	var pktHeader PCHeader
-	for {
-		err := pc.Process()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			// Error communicating with the client.
-			log.Warn(err.Error())
-			break
-		}
-
-		util.StructFromBytes(pc.Data()[:PCHeaderSize], &pktHeader)
-		if config.DebugMode {
-			fmt.Printf("DATA: Got %v bytes from client:\n", pktHeader.Size)
-			util.PrintPayload(pc.Data(), int(pktHeader.Size))
-			fmt.Println()
-		}
-
-		switch pktHeader.Type {
-		case PatchWelcomeType:
-			pc.SendWelcomeAck()
-		case PatchLoginType:
-			pc.SendDataAck()
-			sendFileList(pc, &patchTree)
-			pc.SendFileListDone()
-		case PatchFileStatusType:
-			handleFileStatus(pc)
-		case PatchClientListDoneType:
-			if updateClientFiles(pc) != nil {
-				return
-			}
-		default:
-			log.Info("Received unknown packet %02x from %s", pktHeader.Type, pc.IPAddr())
-		}
-	}
-}
-
 // Recursively build the list of patch files present in the patch directory
 // to sync with the client. Files are represented in a tree, directories act
 // as nodes (PatchDir) and each keeps a list of patches/subdirectories.
@@ -302,7 +212,26 @@ func buildPatchIndex(node *PatchDir) {
 	}
 }
 
-func InitPatch() {
+// Create and initialize a new Patch client so long as we're able
+// to send the welcome packet to begin encryption.
+func NewPatchClient(conn *net.TCPConn) (*Client, error) {
+	var err error
+	pc := NewClient(conn, PCHeaderSize)
+	if pc.SendPCWelcome() != 0 {
+		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
+		pc = nil
+	}
+	return pc, err
+}
+
+// Patch sub-server definition.
+type PatchServer struct{}
+
+func (server PatchServer) Name() string { return "PATCH" }
+
+func (server PatchServer) Port() string { return config.PatchPort }
+
+func (server PatchServer) Init() {
 	wd, _ := os.Getwd()
 	os.Chdir(config.PatchDir)
 
@@ -323,4 +252,61 @@ func InitPatch() {
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
 	dataRedirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 	fmt.Println()
+}
+
+func (server PatchServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewPatchClient(conn)
+}
+
+func (server PatchServer) Handle(c *Client) error {
+	var hdr PCHeader
+	util.StructFromBytes(c.Data()[:PCHeaderSize], &hdr)
+
+	switch hdr.Type {
+	case PatchWelcomeType:
+		c.SendWelcomeAck()
+	case PatchLoginType:
+		if c.SendWelcomeMessage() == 0 {
+			c.SendPatchRedirect(dataRedirectPort, config.HostnameBytes())
+		}
+	default:
+		log.Info("Received unknown packet %2x from %s", hdr.Type, c.IPAddr())
+	}
+	return nil
+}
+
+// Data sub-server definition.
+type DataServer struct{}
+
+func (server DataServer) Name() string { return "DATA" }
+
+func (server DataServer) Port() string { return config.DataPort }
+
+func (server DataServer) Init() {}
+
+func (server DataServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewPatchClient(conn)
+}
+
+func (server DataServer) Handle(c *Client) error {
+	var hdr PCHeader
+	util.StructFromBytes(c.Data()[:PCHeaderSize], &hdr)
+
+	switch hdr.Type {
+	case PatchWelcomeType:
+		c.SendWelcomeAck()
+	case PatchLoginType:
+		c.SendDataAck()
+		sendFileList(c, &patchTree)
+		c.SendFileListDone()
+	case PatchFileStatusType:
+		handleFileStatus(c)
+	case PatchClientListDoneType:
+		if err := updateClientFiles(c); err != nil {
+			return err
+		}
+	default:
+		log.Info("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+	}
+	return nil
 }

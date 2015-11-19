@@ -137,7 +137,7 @@ func (client *Client) SendPatchRedirect(port uint16, ipAddr [4]byte) int {
 
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
-		fmt.Println("Sending Redirect")
+		fmt.Println("Sending Patch Redirect")
 	}
 	return sendEncrypted(client, data, uint16(size))
 }
