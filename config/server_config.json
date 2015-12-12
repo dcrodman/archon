@@ -19,7 +19,7 @@
 	"DBUsername" : "archonadmin",
 	"DBPassword" : "psoadminpassword",
 	"Logfile" : "server.log",
-	"LogLevel" : 2,
+	"LogLevel" : "warn",
 	"DebugMode" : false,
 
 	"BlockPort": "15000",

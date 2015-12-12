@@ -13,7 +13,7 @@ together the PSO protocol and develop a core archiecture.
 
 Forks, bug fixes, issue reports, etc. are welcome!
 
-Installation At a Glance
+Installation
 ===========
 
 Detailed instructions can be found [on the wiki](https://github.com/dcrodman/archon/wiki/Installation).
