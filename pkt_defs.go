@@ -15,54 +15,378 @@
 * You should have received a copy of the GNU General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
+*
+* Packet constants and structures. All functions return 0 on success,
+* negative int on db error, and a positive int for any other errors.
  */
-
-// Responsible for initializing default data for players and accounts.
 package main
 
-import (
-	// "encoding/json"
-	"fmt"
-	"github.com/dcrodman/archon/prs"
-	"github.com/dcrodman/archon/util"
-	"hash/crc32"
-	"io/ioutil"
-	"os"
+const (
+	PCHeaderSize = 0x04
+	BBHeaderSize = 0x08
 )
 
-// Maximum size of a block of parameter or guildcard data.
-const MaxChunkSize = 0x6800
+// Packet types handled by the patch and data servers.
+const (
+	PatchWelcomeType        = 0x02
+	PatchLoginType          = 0x04
+	PatchMessageType        = 0x13
+	PatchRedirectType       = 0x14
+	PatchDataAckType        = 0x0B
+	PatchDirAboveType       = 0x0A
+	PatchChangeDirType      = 0x09
+	PatchCheckFileType      = 0x0C
+	PatchFileListDoneType   = 0x0D
+	PatchFileStatusType     = 0x0F
+	PatchClientListDoneType = 0x10
+	PatchUpdateFilesType    = 0x11
+	PatchFileHeaderType     = 0x06
+	PatchFileChunkType      = 0x07
+	PatchFileCompleteType   = 0x08
+	PatchUpdateCompleteType = 0x12
+)
 
-// Struct for caching the parameter chunk data and header so
-// that the param files aren't re-read every time.
-type parameterEntry struct {
-	Size     uint32
+// Packet types for packets sent to and from the login and character servers.
+const (
+	LoginWelcomeType            = 0x03
+	LoginType                   = 0x93
+	LoginSecurityType           = 0xE6
+	LoginClientMessageType      = 0x1A
+	LoginOptionsRequestType     = 0xE0
+	LoginOptionsType            = 0xE2
+	LoginCharPreviewReqType     = 0xE3
+	LoginCharAckType            = 0xE4
+	LoginCharPreviewType        = 0xE5
+	LoginChecksumType           = 0x01E8
+	LoginChecksumAckType        = 0x02E8
+	LoginGuildcardReqType       = 0x03E8
+	LoginGuildcardHeaderType    = 0x01DC
+	LoginGuildcardChunkType     = 0x02DC
+	LoginGuildcardChunkReqType  = 0x03DC
+	LoginParameterHeaderType    = 0x01EB
+	LoginParameterChunkType     = 0x02EB
+	LoginParameterChunkReqType  = 0x03EB
+	LoginParameterHeaderReqType = 0x04EB
+	LoginSetFlagType            = 0xEC
+	LoginTimestampType          = 0xB1
+	LoginShipListType           = 0xA0
+	LoginScrollMessageType      = 0xEE
+	LoginMenuSelectType         = 0x10
+)
+
+// Packet types for packets sent to and from the ship and block servers.
+const (
+	BlockListType  = 0x07
+	MenuSelectType = 0x10
+)
+
+// Packet types common to all servers.
+const (
+	DisconnectType = 0x05
+	RedirectType   = 0x19
+)
+
+// Error code types used for packet E6.
+type BBLoginError uint32
+
+const (
+	BBLoginErrorNone         = 0x0
+	BBLoginErrorUnknown      = 0x1
+	BBLoginErrorPassword     = 0x2
+	BBLoginErrorPassword2    = 0x3 // Same as password
+	BBLoginErrorMaintenance  = 0x4
+	BBLoginErrorUserInUse    = 0x5
+	BBLoginErrorBanned       = 0x6
+	BBLoginErrorBanned2      = 0x7 // Same as banned
+	BBLoginErrorUnregistered = 0x8
+	BBLoginErrorExpiredSub   = 0x9
+	BBLoginErrorLocked       = 0xA
+	BBLoginErrorPatch        = 0xB
+	BBLoginErrorDisconnect   = 0xC
+)
+
+// Blueburst, PC, and Gamecube clients all use a 4 byte header to
+// communicate with the patch server instead of the 8 byte one used
+// by Blueburst for the other servers.
+type PCHeader struct {
+	Size uint16
+	Type uint16
+}
+
+// Packet header for every packet sent between the server and BlueBurst clients.
+type BBHeader struct {
+	Size  uint16
+	Type  uint16
+	Flags uint32
+}
+
+// Welcome packet with encryption vectors sent to the client upon initial connection.
+type PatchWelcomePkt struct {
+	Header       PCHeader
+	Copyright    [44]byte
+	Padding      [20]byte
+	ServerVector [4]byte
+	ClientVector [4]byte
+}
+
+// Packet containing the patch server welcome message.
+type PatchWelcomeMessage struct {
+	Header  PCHeader
+	Message []byte
+}
+
+// Redirect packet for patch to send character server IP.
+type PatchRedirectPacket struct {
+	Header  PCHeader
+	IPAddr  [4]uint8
+	Port    uint16
+	Padding uint16
+}
+
+// Instruct the client to chdir into Dirname (one level below).
+type ChangeDirPacket struct {
+	Header  PCHeader
+	Dirname [64]byte
+}
+
+// Request a check on a file in the client's working directory.
+type CheckFilePacket struct {
+	Header   PCHeader
+	PatchId  uint32
+	Filename [32]byte
+}
+
+// Response to CheckFilePacket from the client with the properties of a file.
+type FileStatusPacket struct {
+	Header   PCHeader
+	PatchId  uint32
 	Checksum uint32
-	Offset   uint32
-	Filename [0x40]uint8
+	FileSize uint32
 }
 
-// Parameter files we're expecting. I still don't really know what they're
-// for yet, so emulating what I've seen others do.
-var paramFiles = []string{
-	"ItemMagEdit.prs",
-	"ItemPMT.prs",
-	"BattleParamEntry.dat",
-	"BattleParamEntry_on.dat",
-	"BattleParamEntry_lab.dat",
-	"BattleParamEntry_lab_on.dat",
-	"BattleParamEntry_ep4.dat",
-	"BattleParamEntry_ep4_on.dat",
-	"PlyLevelTbl.prs",
+// Size and number of files that need to be updated.
+type UpdateFilesPacket struct {
+	Header    PCHeader
+	TotalSize uint32
+	NumFiles  uint32
 }
 
-// Starting stats for any new character. This global should be considered immutable
-// and is populated by LoadBaseStats. The CharClass constants can be used to index
-// into this array to obtain the base stats for each class.
-var baseStats [12]CharacterStats
+// File header for a series of file chunks.
+type FileHeaderPacket struct {
+	Header   PCHeader
+	Padding  uint32
+	FileSize uint32
+	Filename [48]byte
+}
 
-// Default keyboard/joystick configuration used for players who are logging
-// in for the first time.
+// Chunk of data from a file.
+type FileChunkPacket struct {
+	Header   PCHeader
+	Chunk    uint32
+	Checksum uint32
+	Size     uint32
+	Data     []byte
+}
+
+// Welcome packet with encryption vectors sent to the client upon initial connection.
+type WelcomePkt struct {
+	Header       BBHeader
+	Copyright    [96]byte
+	ServerVector [48]byte
+	ClientVector [48]byte
+}
+
+// Login Packet (0x93) sent to both the login and character servers.
+type LoginPkt struct {
+	Header        BBHeader
+	Unknown       [8]byte
+	ClientVersion uint16
+	Unknown2      [6]byte
+	TeamId        uint32
+	Username      [16]byte
+	Padding       [32]byte
+	Password      [16]byte
+	Unknown3      [40]byte
+	HardwareInfo  [8]byte
+	Security      [40]byte
+}
+
+// Represent the client's progression through the login process.
+type ClientConfig struct {
+	Magic        uint32 // Must be set to 0x48615467
+	CharSelected uint8  // Has a character been selected?
+	SlotNum      uint8  // Slot number of selected Character
+	Flags        uint16
+	Ports        [4]uint16
+	Unused       [4]uint32
+	Unused2      [2]uint32
+}
+
+// Security packet (0xE6) sent to the client to indicate the state of client login.
+type SecurityPacket struct {
+	Header       BBHeader
+	ErrorCode    uint32
+	PlayerTag    uint32
+	Guildcard    uint32
+	TeamId       uint32
+	Config       *ClientConfig
+	Capabilities uint32
+}
+
+// The address of the next server; in this case, the character server.
+type RedirectPacket struct {
+	Header  BBHeader
+	IPAddr  [4]uint8
+	Port    uint16
+	Padding uint16
+}
+
+// Based on the key config structure from sylverant and newserv. KeyConfig
+// and JoystickConfig are saved in the database.
+type KeyTeamConfig struct {
+	Unknown            [0x114]uint8
+	KeyConfig          [0x16C]uint8
+	JoystickConfig     [0x38]uint8
+	Guildcard          uint32
+	TeamId             uint32
+	TeamInfo           [2]uint32
+	TeamPrivilegeLevel uint16
+	Reserved           uint16
+	Teamname           [0x10]uint16
+	TeamFlag           [0x0800]uint8
+	TeamRewards        [2]uint32
+}
+
+// Option packet containing keyboard and joystick config, team options, etc.
+type OptionsPacket struct {
+	Header          BBHeader
+	PlayerKeyConfig KeyTeamConfig
+}
+
+//
+type CharSelectionPacket struct {
+	Header    BBHeader
+	Slot      uint32
+	Selecting uint32
+}
+
+// Acknowledge a character selection from the client or indicate an error.
+type CharAckPacket struct {
+	Header BBHeader
+	Slot   uint32
+	Flag   uint32
+}
+
+// Sent in response to 0x01E8 to acknowledge a checksum (really it's just ignored).
+type ChecksumAckPacket struct {
+	Header BBHeader
+	Ack    uint32
+}
+
+// Chunk header with info about the guildcard data we're about to send.
+type GuildcardHeaderPacket struct {
+	Header   BBHeader
+	Unknown  uint32
+	Length   uint16
+	Padding  uint16
+	Checksum uint32
+}
+
+// Received from the client to request a guildcard data chunk.
+type GuildcardChunkReqPacket struct {
+	Header         BBHeader
+	Unknown        uint32
+	ChunkRequested uint32
+	Continue       uint32
+}
+
+type GuildcardChunkPacket struct {
+	Header  BBHeader
+	Unknown uint32
+	Chunk   uint32
+	Data    []uint8
+}
+
+// Parameter header containing details about the param files we're about to send.
+type ParameterHeaderPacket struct {
+	Header  BBHeader
+	Entries []byte
+}
+
+type ParameterChunkPacket struct {
+	Header BBHeader
+	Chunk  uint32
+	Data   []byte
+}
+
+// Used by the client to indicate whether a character should be recreated or updated.
+type SetFlagPacket struct {
+	Header BBHeader
+	Flag   uint32
+}
+
+// Sent to the client for the selection menu and received for updating a character.
+type CharPreviewPacket struct {
+	Header    BBHeader
+	Slot      uint32
+	Character *CharacterPreview
+}
+
+// Message in a large text box, usually sent right before a disconnect.
+type LoginClientMessagePacket struct {
+	Header   BBHeader
+	Language uint32
+	Message  []byte
+}
+
+// Indicate the server's current time.
+type TimestampPacket struct {
+	Header    BBHeader
+	Timestamp [28]byte
+}
+
+// The list of menu items to display to the client.
+type ShipListPacket struct {
+	Header      BBHeader
+	Padding     uint16
+	Unknown     uint16 // set to 0xFFFFFFF4
+	Unknown2    uint32 // set to 0x02
+	Unknown3    uint16 // set to 0x04
+	ServerName  [36]byte
+	ShipEntries []ShipEntry
+}
+
+// Scroll message the client should display on the ship select screen.
+type ScrollMessagePacket struct {
+	Header  BBHeader
+	Padding [2]uint32
+	Message []byte
+}
+
+// Client's selection from the ship list menu.
+type ShipMenuSelectionPacket struct {
+	Header BBHeader
+	Id     uint32
+	Item   uint32
+}
+
+// List containing the available blocks on a ship.
+type BlockListPacket struct {
+	Header   BBHeader
+	Padding  [10]byte
+	ShipName [32]byte
+	Unknown  uint32
+	Blocks   []Block
+}
+
+type MenuSelectionPacket struct {
+	Header BBHeader
+	MenuId uint32
+	ItemId uint32
+}
+
+// Default keyboard/joystick configuration used for players who are
+// logging in for the first time.
 var baseKeyConfig = [420]byte{
 	0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00,
@@ -172,87 +496,4 @@ var baseSymbolChats = [1248]byte{
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
 	0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
-}
-
-// Load the PSOBB parameter files, build the parameter header, and init/cache
-// the param file chunks for the EB packets.
-func loadParameterFiles() {
-	offset := 0
-	var tmpChunkData []byte
-
-	paramDir := config.ParametersDir
-	fmt.Printf("Loading parameters from %s...\n", paramDir)
-	for _, paramFile := range paramFiles {
-		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
-		if err != nil {
-			fmt.Println("Error reading parameter file: " + err.Error())
-			os.Exit(1)
-		}
-		fileSize := len(data)
-
-		entry := new(parameterEntry)
-		entry.Size = uint32(fileSize)
-		entry.Checksum = crc32.ChecksumIEEE(data)
-		entry.Offset = uint32(offset)
-		copy(entry.Filename[:], []uint8(paramFile))
-
-		offset += fileSize
-
-		// We don't care what the actual entries are for the packet, so just append
-		// the bytes to save us having to do the conversion every time.
-		bytes, _ := util.BytesFromStruct(entry)
-		paramHeaderData = append(paramHeaderData, bytes...)
-
-		tmpChunkData = append(tmpChunkData, data...)
-		fmt.Printf("%s (%v bytes, checksum: %v\n", paramFile, fileSize, entry.Checksum)
-	}
-
-	// Offset should at this point be the total size of the files to send - break
-	// it all up into indexable chunks.
-	paramChunkData = make(map[int][]byte)
-	chunks := offset / MaxChunkSize
-	for i := 0; i < chunks; i++ {
-		dataOff := i * MaxChunkSize
-		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
-		offset -= MaxChunkSize
-	}
-	// Add any remaining data
-	if offset > 0 {
-		paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
-	}
-}
-
-// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
-// all seem to rely on this file, so we'll do the same.
-func loadBaseStats() {
-	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
-	compressed, err := ioutil.ReadAll(statsFile)
-	if err != nil {
-		fmt.Println("Error reading stats file: " + err.Error())
-		os.Exit(1)
-	}
-	decompressedSize := prs.DecompressSize(compressed)
-	decompressed := make([]byte, decompressedSize)
-	prs.Decompress(compressed, decompressed)
-
-	// var chars = map[int]string{
-	// 	0:  "Humar",
-	// 	1:  "Hunewearl",
-	// 	2:  "Hucast",
-	// 	3:  "Ramar",
-	// 	4:  "Racast",
-	// 	5:  "Racaseal",
-	// 	6:  "Fomarl",
-	// 	7:  "Fonewm",
-	// 	8:  "Fonewearl",
-	// 	9:  "Hucaseal",
-	// 	10: "Fomar",
-	// 	11: "Ramarl",
-	// }
-
-	for i := 0; i < 12; i++ {
-		util.StructFromBytes(decompressed[i*14:], &baseStats[i])
-		// j, err := json.Marshal(BaseStats[i])
-		// fmt.Printf("\"%s\" : %s,\n", chars[i], j)
-	}
 }

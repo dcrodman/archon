@@ -16,18 +16,17 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Singleton package for handling the global server configuration.
-* Also responsible for establishing a connection to the database
+* Singleton package for handling the global server configuration
+* and responsible for establishing a connection to the database
 * to be maintained during execution.
  */
-package configuration
+package main
 
 import (
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/logging"
 	"github.com/dcrodman/archon/util"
 	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
@@ -36,9 +35,9 @@ import (
 	"strings"
 )
 
-// Configuration structure that can be shared between the Login and
-// Character servers. The fields are intentionally exported to cut
-// down on verbosity with the intent that they be considered immutable.
+// Configuration structure that can be shared between sub servers.
+// The fields are intentionally exported to cut down on verbosity
+// with the intent that they be considered immutable.
 type Config struct {
 	Hostname string
 	// Patch ports.
@@ -77,7 +76,7 @@ type Config struct {
 	DBPassword string
 
 	Logfile   string
-	LogLevel  logging.Priority
+	LogLevel  string
 	DebugMode bool
 
 	// Ship server config.
@@ -114,7 +113,7 @@ var config *Config = &Config{
 	DBName: "archondb",
 
 	Logfile:   "",
-	LogLevel:  logging.Medium,
+	LogLevel:  "warn",
 	DebugMode: false,
 }
 
@@ -145,12 +144,6 @@ func (config *Config) InitFromFile(fileName string) error {
 	if strings.HasSuffix(config.PatchDir, "/") {
 		config.PatchDir = filepath.Dir(config.PatchDir)
 	}
-
-	if config.LogLevel < logging.High || config.LogLevel > logging.Low {
-		// The log level must be at least open to critical messages.
-		config.LogLevel = logging.High
-	}
-
 	return nil
 }
 
@@ -227,6 +220,6 @@ func (config *Config) String() string {
 		"Database Username: " + config.DBUsername + "\n" +
 		"Database Password: " + config.DBPassword + "\n" +
 		"Output Logged To: " + outfile + "\n" +
-		"Logging Level: " + strconv.FormatInt(int64(config.LogLevel), 10) + "\n" +
+		"Logging Level: " + config.LogLevel + "\n" +
 		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
 }

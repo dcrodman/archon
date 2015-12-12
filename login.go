@@ -25,13 +25,21 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/prs"
 	"github.com/dcrodman/archon/util"
 	"hash/crc32"
+	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 )
 
-const ClientVersionString = "TethVer12510"
+const (
+	// Client version string we're expecting during auth.
+	ClientVersionString = "TethVer12510"
+	// Maximum size of a block of parameter or guildcard data.
+	MaxChunkSize = 0x6800
+)
 
 var (
 	// Cached and parsed representation of the character port.
@@ -44,14 +52,41 @@ var (
 	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
 	paramChunkData  map[int][]byte
+
+	// Parameter files we're expecting. I still don't really know what they're
+	// for yet, so emulating what I've seen others do.
+	paramFiles = []string{
+		"ItemMagEdit.prs",
+		"ItemPMT.prs",
+		"BattleParamEntry.dat",
+		"BattleParamEntry_on.dat",
+		"BattleParamEntry_lab.dat",
+		"BattleParamEntry_lab_on.dat",
+		"BattleParamEntry_ep4.dat",
+		"BattleParamEntry_ep4_on.dat",
+		"PlyLevelTbl.prs",
+	}
+
+	// Starting stats for any new character. The CharClass constants can be used
+	// to index into this array to obtain the base stats for each class.
+	BaseStats [12]CharacterStats
 )
 
-// Struct for representing available ships in the ship selection menu.
+// Entry in the available ships lis on the ship selection menu.
 type ShipEntry struct {
 	Unknown  uint16
 	Id       uint32
 	Padding  uint16
 	Shipname [23]byte
+}
+
+// Struct for caching the parameter chunk data and header so
+// that the param files aren't re-read every time.
+type parameterEntry struct {
+	Size     uint32
+	Checksum uint32
+	Offset   uint32
+	Filename [0x40]uint8
 }
 
 // Handle account verification tasks.
@@ -292,7 +327,7 @@ func handleCharacterUpdate(client *Client) error {
 			return err
 		}
 		// Grab our base stats for this character class.
-		stats := baseStats[prev.Class]
+		stats := BaseStats[prev.Class]
 
 		// TODO: Set up the default inventory and techniques.
 		meseta := 300
@@ -354,9 +389,72 @@ func (server LoginServer) Name() string { return "LOGIN" }
 
 func (server LoginServer) Port() string { return config.LoginPort }
 
+// Load the PSOBB parameter files, build the parameter header, and init/cache
+// the param file chunks for the EB packets.
+func (server LoginServer) loadParameterFiles() {
+	offset := 0
+	var tmpChunkData []byte
+
+	paramDir := config.ParametersDir
+	fmt.Printf("Loading parameters from %s...\n", paramDir)
+	for _, paramFile := range paramFiles {
+		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
+		if err != nil {
+			fmt.Println("Error reading parameter file: " + err.Error())
+			os.Exit(1)
+		}
+		fileSize := len(data)
+
+		entry := new(parameterEntry)
+		entry.Size = uint32(fileSize)
+		entry.Checksum = crc32.ChecksumIEEE(data)
+		entry.Offset = uint32(offset)
+		copy(entry.Filename[:], []uint8(paramFile))
+
+		offset += fileSize
+
+		// We don't care what the actual entries are for the packet, so just append
+		// the bytes to save us having to do the conversion every time.
+		bytes, _ := util.BytesFromStruct(entry)
+		paramHeaderData = append(paramHeaderData, bytes...)
+
+		tmpChunkData = append(tmpChunkData, data...)
+		fmt.Printf("%s (%v bytes, checksum: %v\n", paramFile, fileSize, entry.Checksum)
+	}
+
+	// Offset should at this point be the total size of the files to send - break
+	// it all up into indexable chunks.
+	paramChunkData = make(map[int][]byte)
+	chunks := offset / MaxChunkSize
+	for i := 0; i < chunks; i++ {
+		dataOff := i * MaxChunkSize
+		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
+		offset -= MaxChunkSize
+	}
+	// Add any remaining data
+	if offset > 0 {
+		paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
+	}
+}
+
 func (server LoginServer) Init() {
-	loadParameterFiles()
-	loadBaseStats()
+	server.loadParameterFiles()
+
+	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
+	// all seem to rely on this file, so we'll do the same.
+	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
+	compressed, err := ioutil.ReadAll(statsFile)
+	if err != nil {
+		fmt.Println("Error reading stats file: " + err.Error())
+		os.Exit(1)
+	}
+	decompressedSize := prs.DecompressSize(compressed)
+	decompressed := make([]byte, decompressedSize)
+	prs.Decompress(compressed, decompressed)
+
+	for i := 0; i < 12; i++ {
+		util.StructFromBytes(decompressed[i*14:], &BaseStats[i])
+	}
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	charRedirectPort = uint16(charPort)

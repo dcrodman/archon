@@ -20,9 +20,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/dcrodman/archon/configuration"
-	"github.com/dcrodman/archon/logging"
+	"github.com/Sirupsen/logrus"
 	"github.com/dcrodman/archon/util"
+	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"net"
 	"net/http"
@@ -41,9 +41,7 @@ const (
 )
 
 var (
-	// Our global connection list.
-	config *configuration.Config = configuration.GetConfig()
-	log    *logging.ServerLogger
+	log *logrus.Logger
 )
 
 // Server defines the methods implemented by all sub-servers that can be
@@ -67,6 +65,7 @@ type Dispatcher struct {
 	host    string
 	servers []Server
 	conns   *ConnList
+	log     *logrus.Logger
 }
 
 // Registers a server instance to be brought up once the dispatcher is run.
@@ -98,14 +97,14 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 			for d.conns.Count() < config.MaxConnections {
 				conn, err := socket.AcceptTCP()
 				if err != nil {
-					log.Warn("Failed to accept connection: %v", err.Error())
+					d.log.Warn("Failed to accept connection: %v", err.Error())
 					continue
 				}
 				c, err := serv.NewClient(conn)
 				if err != nil {
-					log.Warn(err.Error())
+					d.log.Warn(err.Error())
 				} else {
-					log.Info("Accepted %s connection from %s", serv.Name(), c.IPAddr())
+					d.log.Info("Accepted %s connection from %s", serv.Name(), c.IPAddr())
 					d.dispatch(c, serv)
 				}
 			}
@@ -116,7 +115,7 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 	for _, s := range d.servers {
 		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), d.host, s.Port())
 	}
-	log.Important("Dispatcher: Server Initialized")
+	d.log.Info("Dispatcher: Server Initialized")
 }
 
 // Spawn a dedicated Goroutine for Client and handle communications
@@ -127,12 +126,12 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 		// remove them from the list regardless of the connection state.
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("Error in client communication: %s: %s\n%s\n",
+				d.log.Error("Error in client communication: %s: %s\n%s\n",
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
 			d.conns.Remove(c)
-			log.Info("Disconnected %s client %s", s.Name(), c.IPAddr())
+			d.log.Info("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
 		d.conns.Add(c)
 
@@ -144,23 +143,55 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 				break
 			} else if err != nil {
 				// Error communicating with the client.
-				log.Warn(err.Error())
+				d.log.Warn(err.Error())
 				break
 			}
 
+			// PC and BB header packets have the same structure for the first four
+			// bytes, so for basic inspection it's safe to treat them the same way.
 			util.StructFromBytes(c.Data()[:PCHeaderSize], &pktHeader)
 			if config.DebugMode {
-				fmt.Printf("%s: Got %v bytes from client:\n", s.Name(), pktHeader.Size)
+				fmt.Printf("%s: Got %v bytes from client:\n\n", s.Name(), pktHeader.Size)
 				util.PrintPayload(c.Data(), int(pktHeader.Size))
 				fmt.Println()
 			}
 
 			if err = s.Handle(c); err != nil {
-				log.Warn("Error in client communication: " + err.Error())
+				d.log.Warn("Error in client communication: " + err.Error())
 				return
 			}
 		}
 	}()
+}
+
+func initLogger(filename string) {
+	var w io.Writer
+	var err error
+	if filename != "" {
+		w, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Println("ERROR: Failed to open log file " + config.Logfile)
+			os.Exit(1)
+		}
+	} else {
+		w = os.Stdout
+	}
+
+	logLvl, err := logrus.ParseLevel(config.LogLevel)
+	if err != nil {
+		fmt.Println("ERROR: Failed to parse log level: " + err.Error())
+		os.Exit(1)
+	}
+	log = &logrus.Logger{
+		Out: w,
+		Formatter: &logrus.TextFormatter{
+			TimestampFormat: "2006-1-_2 15:04:05",
+			FullTimestamp:   true,
+			DisableSorting:  true,
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logLvl,
+	}
 }
 
 func main() {
@@ -207,18 +238,14 @@ func main() {
 		go http.ListenAndServe(config.WebPort, nil)
 	}
 
-	// Initialize the logger.
-	log, err = logging.New(config.Logfile, config.LogLevel)
-	if err != nil {
-		fmt.Println("ERROR: Failed to open log file " + config.Logfile)
-		os.Exit(1)
-	}
+	initLogger(config.Logfile)
 
 	// Register all of the server handlers and their corresponding ports.
 	dispatcher := Dispatcher{
 		host:    config.Hostname,
 		servers: make([]Server, 0),
 		conns:   NewClientList(),
+		log:     log,
 	}
 
 	dispatcher.register(new(PatchServer))

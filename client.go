@@ -47,13 +47,12 @@ type Client struct {
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
 
-	// Patch server; list of files that need update.
-	updateList []*PatchEntry
-
-	// Login server
 	guildcard uint32
 	teamId    uint32
 	isGm      bool
+
+	// Patch server; list of files that need update.
+	updateList []*PatchEntry
 
 	gcData     []byte
 	gcDataSize uint16
