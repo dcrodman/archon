@@ -97,14 +97,14 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 			for d.conns.Count() < config.MaxConnections {
 				conn, err := socket.AcceptTCP()
 				if err != nil {
-					d.log.Warn("Failed to accept connection: %v", err.Error())
+					d.log.Warnf("Failed to accept connection: %v", err.Error())
 					continue
 				}
 				c, err := serv.NewClient(conn)
 				if err != nil {
 					d.log.Warn(err.Error())
 				} else {
-					d.log.Info("Accepted %s connection from %s", serv.Name(), c.IPAddr())
+					d.log.Infof("Accepted %s connection from %s", serv.Name(), c.IPAddr())
 					d.dispatch(c, serv)
 				}
 			}
@@ -115,7 +115,7 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 	for _, s := range d.servers {
 		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), d.host, s.Port())
 	}
-	d.log.Info("Dispatcher: Server Initialized")
+	d.log.Infof("Dispatcher: Server Initialized")
 }
 
 // Spawn a dedicated Goroutine for Client and handle communications
@@ -126,12 +126,12 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 		// remove them from the list regardless of the connection state.
 		defer func() {
 			if err := recover(); err != nil {
-				d.log.Error("Error in client communication: %s: %s\n%s\n",
+				d.log.Errorf("Error in client communication: %s: %s\n%s\n",
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
 			d.conns.Remove(c)
-			d.log.Info("Disconnected %s client %s", s.Name(), c.IPAddr())
+			d.log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
 		d.conns.Add(c)
 

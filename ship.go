@@ -54,7 +54,6 @@ func handleBlockSelection(sc *Client) error {
 	if int(selectedBlock) > config.NumBlocks {
 		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
 	}
-	fmt.Printf("Redirecting to port: %v\n", uint16(port)+uint16(selectedBlock))
 	sc.SendRedirect(uint16(uint32(port)+selectedBlock), config.HostnameBytes())
 	return nil
 }
@@ -118,7 +117,7 @@ func (server ShipServer) Handle(c *Client) error {
 	case MenuSelectType:
 		err = handleBlockSelection(c)
 	default:
-		log.Info("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -149,7 +148,7 @@ func (server BlockServer) Handle(c *Client) error {
 		err = handleShipLogin(c)
 		// TODO: Send lobby data
 	default:
-		log.Info("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }

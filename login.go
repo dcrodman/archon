@@ -477,7 +477,7 @@ func (server LoginServer) Handle(c *Client) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		log.Info("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -532,7 +532,7 @@ func (server CharacterServer) Handle(c *Client) error {
 	case LoginMenuSelectType:
 		handleShipSelection(c)
 	default:
-		log.Info("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }

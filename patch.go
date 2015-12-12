@@ -270,7 +270,7 @@ func (server PatchServer) Handle(c *Client) error {
 			c.SendPatchRedirect(dataRedirectPort, config.HostnameBytes())
 		}
 	default:
-		log.Info("Received unknown packet %2x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %2x from %s", hdr.Type, c.IPAddr())
 	}
 	return nil
 }
@@ -306,7 +306,7 @@ func (server DataServer) Handle(c *Client) error {
 			return err
 		}
 	default:
-		log.Info("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return nil
 }
