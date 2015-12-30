@@ -115,7 +115,7 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 		// that if this is changed to query by username and add a password check,
 		// the index on account_data will need to be modified.
 		client.SendSecurity(BBLoginErrorPassword, 0, 0)
-		return nil, errors.New("Account does not exist for username: " + username)
+		return nil, errors.New("Account does not exist for username: " + pktUername)
 	// Database error?
 	case err != nil:
 		client.SendClientMessage("Encountered an unexpected error while accessing the " +
