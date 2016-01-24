@@ -29,7 +29,7 @@ CREATE TABLE characters (
   guildcard int(11),
   slot_num tinyint(2),
   experience int DEFAULT 0,
-  level smallint DEFAULT 1,
+  level smallint DEFAULT 0,
   guildcard_str binary(16),
   name_color int,
   model smallint,
