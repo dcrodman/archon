@@ -163,8 +163,7 @@ func handleLogin(client *Client) error {
 
 // Handle initial login sent to the character port.
 func handleCharLogin(client *Client) error {
-	_, err := VerifyAccount(client)
-	if err != nil {
+	if _, err := VerifyAccount(client); err != nil {
 		return err
 	}
 	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
@@ -437,7 +436,7 @@ func (server LoginServer) loadParameterFiles() {
 	}
 }
 
-func (server LoginServer) Init() {
+func (server *LoginServer) Init() {
 	server.loadParameterFiles()
 
 	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
@@ -489,7 +488,7 @@ func (server CharacterServer) Name() string { return "CHARACTER" }
 
 func (server CharacterServer) Port() string { return config.CharacterPort }
 
-func (server CharacterServer) Init() {}
+func (server *CharacterServer) Init() {}
 
 func (server CharacterServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewLoginClient(conn)

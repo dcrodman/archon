@@ -78,7 +78,7 @@ func (server ShipServer) Name() string { return "SHIP" }
 
 func (server ShipServer) Port() string { return config.ShipPort }
 
-func (server ShipServer) Init() {
+func (server *ShipServer) Init() {
 	// Precompute the block list packet since it's not going to change.
 	numBlocks := config.NumBlocks
 	ship := shipList[0]
@@ -132,7 +132,7 @@ func (server BlockServer) Name() string { return server.name }
 
 func (server BlockServer) Port() string { return server.port }
 
-func (server BlockServer) Init() {}
+func (server *BlockServer) Init() {}
 
 func (server BlockServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewShipClient(conn)

@@ -231,7 +231,7 @@ func (server PatchServer) Name() string { return "PATCH" }
 
 func (server PatchServer) Port() string { return config.PatchPort }
 
-func (server PatchServer) Init() {
+func (server *PatchServer) Init() {
 	wd, _ := os.Getwd()
 	os.Chdir(config.PatchDir)
 
@@ -282,7 +282,7 @@ func (server DataServer) Name() string { return "DATA" }
 
 func (server DataServer) Port() string { return config.DataPort }
 
-func (server DataServer) Init() {}
+func (server *DataServer) Init() {}
 
 func (server DataServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewPatchClient(conn)

@@ -252,13 +252,14 @@ func main() {
 	dispatcher.register(new(DataServer))
 	dispatcher.register(new(LoginServer))
 	dispatcher.register(new(CharacterServer))
+	dispatcher.register(new(ShipgateServer))
 	dispatcher.register(new(ShipServer))
 
 	// The available block ports will depend on how the server is configured,
 	// so once we've read the config then add the server entries on the fly.
 	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
 	for i := 1; i <= config.NumBlocks; i++ {
-		dispatcher.register(BlockServer{
+		dispatcher.register(&BlockServer{
 			name: fmt.Sprintf("BLOCK%d", i),
 			port: strconv.FormatInt(shipPort+int64(i), 10),
 		})

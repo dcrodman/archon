@@ -27,12 +27,13 @@ import (
 	// 	"errors"
 	// "fmt"
 	// 	"io"
-	// 	"net"
+	"net"
 	// 	"os"
 	// 	"runtime/debug"
 	// 	"strings"
 	// 	"sync"
 	// 	"time"
+	"github.com/dcrodman/archon/util"
 	"strconv"
 )
 
@@ -326,8 +327,15 @@ type Ship struct {
 
 // 	wg.Done()
 // }
+//
+// Shipgate sub-server definition.
+type ShipgateServer struct{}
 
-func InitShipgate() {
+func (server ShipgateServer) Name() string { return "Shipgate" }
+
+func (server ShipgateServer) Port() string { return config.ShipgatePort }
+
+func (server *ShipgateServer) Init() {
 	// Create our ship entry for the built-in ship server. Any other connected
 	// ships will be added to this list by the shipgate, if it's enabled.
 	s := &shipList[0]
@@ -336,4 +344,21 @@ func InitShipgate() {
 	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
 	s.port = uint16(port)
 	copy(s.name[:], config.ShipName)
+}
+
+func (server ShipgateServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewLoginClient(conn)
+}
+
+// Basically a no-op at this point since we only have one ship.
+func (server ShipgateServer) Handle(c *Client) error {
+	var err error = nil
+	var hdr BBHeader
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+
+	switch hdr.Type {
+	default:
+		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+	}
+	return err
 }
