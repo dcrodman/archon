@@ -30,6 +30,7 @@ import (
 // Block ID reserved for returning to the ship select menu.
 const BackMenuItem = 0xFF
 
+// Info about the available block servers.
 type Block struct {
 	Unknown   uint16
 	BlockId   uint32
@@ -45,6 +46,7 @@ func handleShipLogin(sc *Client) error {
 	return nil
 }
 
+// The player selected a block to join from the menu.
 func handleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
 	// Grab the chosen block and redirect them to the selected block server.
 	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
@@ -159,7 +161,7 @@ func (server BlockServer) Handle(c *Client) error {
 	switch hdr.Type {
 	case LoginType:
 		err = handleShipLogin(c)
-		// TODO: Send lobby data
+		// TODO: Send lobby data (0x83)
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}

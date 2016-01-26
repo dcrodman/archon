@@ -42,9 +42,6 @@ const (
 )
 
 var (
-	// Cached and parsed representation of the character port.
-	charRedirectPort uint16
-
 	// Connected ships. Each Ship's id corresponds to its position
 	// in the array - 1.
 	shipList []Ship = make([]Ship, 1)
@@ -144,7 +141,7 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 }
 
 // Handle the initial login sent to the Login port.
-func handleLogin(client *Client) error {
+func handleLogin(client *Client, charPort uint16) error {
 	loginPkt, err := VerifyAccount(client)
 	if err != nil {
 		return err
@@ -161,7 +158,7 @@ func handleLogin(client *Client) error {
 	client.config.Magic = 0x48615467
 
 	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
-	client.SendRedirect(charRedirectPort, config.HostnameBytes())
+	client.SendRedirect(charPort, config.HostnameBytes())
 	return nil
 }
 
@@ -396,7 +393,10 @@ func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 }
 
 // Login sub-server definition.
-type LoginServer struct{}
+type LoginServer struct {
+	// Cached and parsed representation of the character port.
+	charRedirectPort uint16
+}
 
 func (server LoginServer) Name() string { return "LOGIN" }
 
@@ -470,7 +470,7 @@ func (server *LoginServer) Init() {
 	}
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
-	charRedirectPort = uint16(charPort)
+	server.charRedirectPort = uint16(charPort)
 	fmt.Println()
 }
 
@@ -485,7 +485,7 @@ func (server LoginServer) Handle(c *Client) error {
 
 	switch hdr.Type {
 	case LoginType:
-		err = handleLogin(c)
+		err = handleLogin(c, server.charRedirectPort)
 	case DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
@@ -542,7 +542,7 @@ func (server CharacterServer) Handle(c *Client) error {
 		c.flag = pkt.Flag
 	case LoginCharPreviewType:
 		err = handleCharacterUpdate(c)
-	case LoginMenuSelectType:
+	case MenuSelectType:
 		err = handleShipSelection(c)
 	default:
 		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())

@@ -120,7 +120,7 @@ func (c *Client) Process() error {
 			return err
 		} else if err != nil {
 			fmt.Println("Sockt error")
-			// Socket error, nothing we can do now
+			// Socket error, nothing we can do now.
 			return errors.New("Socket Error (" + c.ipAddr + ") " + err.Error())
 		}
 		c.recvSize += bytes
@@ -133,9 +133,9 @@ func (c *Client) Process() error {
 				// Something is seriously wrong if this causes an error. Bail.
 				panic(err.Error())
 			}
-			// PSO likes to occasionally send us packets that are longer
-			// than their declared size. Adjust the expected length just
-			// in case in order to avoid leaving stray bytes in the buffer.
+			// PSO likes to occasionally send us packets that are longer than their declared
+			// size, but are always a multiple of the length of the packet header. Adjust the
+			// expected length just in case in order to avoid leaving stray bytes in the buffer.
 			for c.packetSize%c.hdrSize != 0 {
 				c.packetSize++
 			}
@@ -143,8 +143,7 @@ func (c *Client) Process() error {
 	}
 	pktSize := int(c.packetSize)
 
-	// Grow the client's receive buffer if they send us a packet bigger
-	// than its current capacity.
+	// Grow the client's receive buffer if they send us a packet bigger than its current capacity.
 	if pktSize > cap(c.buffer) {
 		newSize := pktSize + len(c.buffer)
 		newBuf := make([]byte, newSize)

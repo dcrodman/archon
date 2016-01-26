@@ -71,19 +71,18 @@ const (
 	LoginTimestampType          = 0xB1
 	LoginShipListType           = 0xA0
 	LoginScrollMessageType      = 0xEE
-	LoginMenuSelectType         = 0x10
 )
 
 // Packet types for packets sent to and from the ship and block servers.
 const (
-	BlockListType  = 0x07
-	MenuSelectType = 0x10
+	BlockListType = 0x07
 )
 
-// Packet types common to all servers.
+// Packet types common to multiple servers.
 const (
 	DisconnectType = 0x05
 	RedirectType   = 0x19
+	MenuSelectType = 0x10
 )
 
 // Error code types used for packet E6.
