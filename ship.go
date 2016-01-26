@@ -27,7 +27,8 @@ import (
 	"strconv"
 )
 
-const BlockName = "Block"
+// Block ID reserved for returning to the ship select menu.
+const BackMenuItem = 0xFF
 
 type Block struct {
 	Unknown   uint16
@@ -44,17 +45,17 @@ func handleShipLogin(sc *Client) error {
 	return nil
 }
 
-func handleBlockSelection(sc *Client) error {
-	var pkt MenuSelectionPacket
-	util.StructFromBytes(sc.Data(), &pkt)
-
+func handleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
 	// Grab the chosen block and redirect them to the selected block server.
 	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
 	selectedBlock := pkt.ItemId
-	if int(selectedBlock) > config.NumBlocks {
+	if selectedBlock == BackMenuItem {
+		sc.SendShipList(shipList)
+	} else if int(selectedBlock) > config.NumBlocks {
 		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
+	} else {
+		sc.SendRedirect(uint16(uint32(port)+selectedBlock), config.HostnameBytes())
 	}
-	sc.SendRedirect(uint16(uint32(port)+selectedBlock), config.HostnameBytes())
 	return nil
 }
 
@@ -84,9 +85,9 @@ func (server *ShipServer) Init() {
 	ship := shipList[0]
 
 	server.blockPkt = &BlockListPacket{
-		Header:  BBHeader{Type: BlockListType, Flags: uint32(numBlocks)},
+		Header:  BBHeader{Type: BlockListType, Flags: uint32(numBlocks + 1)},
 		Unknown: 0x08,
-		Blocks:  make([]Block, numBlocks),
+		Blocks:  make([]Block, numBlocks+1),
 	}
 	shipName := fmt.Sprintf("%d:%s", ship.id, ship.name)
 	copy(server.blockPkt.ShipName[:], util.ConvertToUtf16(shipName))
@@ -94,11 +95,15 @@ func (server *ShipServer) Init() {
 	for i := 0; i < numBlocks; i++ {
 		b := &server.blockPkt.Blocks[i]
 		b.Unknown = 0x12
-		// TODO: Teth sets this to (0xEFFFFFFF - block num)?
 		b.BlockId = uint32(i + 1)
 		blockName := fmt.Sprintf("BLOCK %02d", i+1)
 		copy(b.BlockName[:], util.ConvertToUtf16(blockName))
 	}
+	// Always append a menu item for returning to the ship select screen.
+	b := &server.blockPkt.Blocks[numBlocks]
+	b.Unknown = 0x12
+	b.BlockId = BackMenuItem
+	copy(b.BlockName[:], util.ConvertToUtf16("Ship Selection"))
 }
 
 func (server ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
@@ -115,7 +120,15 @@ func (server ShipServer) Handle(c *Client) error {
 		err = handleShipLogin(c)
 		c.SendBlockList(server.blockPkt)
 	case MenuSelectType:
-		err = handleBlockSelection(c)
+		var pkt MenuSelectionPacket
+		util.StructFromBytes(c.Data(), &pkt)
+		// They can be at either the ship or block selection menu, so make sure we have the right one.
+		if pkt.MenuId == ShipSelectionMenuId {
+			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
+			err = handleShipSelection(c)
+		} else {
+			err = handleBlockSelection(c, pkt)
+		}
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}

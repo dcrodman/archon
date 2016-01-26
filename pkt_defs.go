@@ -263,7 +263,6 @@ type OptionsPacket struct {
 	PlayerKeyConfig KeyTeamConfig
 }
 
-//
 type CharSelectionPacket struct {
 	Header    BBHeader
 	Slot      uint32
@@ -353,7 +352,7 @@ type ShipListPacket struct {
 	Unknown2    uint32 // set to 0x02
 	Unknown3    uint16 // set to 0x04
 	ServerName  [36]byte
-	ShipEntries []ShipEntry
+	ShipEntries []ShipMenuEntry
 }
 
 // Scroll message the client should display on the ship select screen.
@@ -363,11 +362,12 @@ type ScrollMessagePacket struct {
 	Message []byte
 }
 
-// Client's selection from the ship list menu.
-type ShipMenuSelectionPacket struct {
-	Header BBHeader
-	Id     uint32
-	Item   uint32
+// Client's selection from the ship or block selection menu.
+type MenuSelectionPacket struct {
+	Header  BBHeader
+	Unknown uint16
+	MenuId  uint16
+	ItemId  uint32
 }
 
 // List containing the available blocks on a ship.
@@ -377,12 +377,6 @@ type BlockListPacket struct {
 	ShipName [32]byte
 	Unknown  uint32
 	Blocks   []Block
-}
-
-type MenuSelectionPacket struct {
-	Header BBHeader
-	MenuId uint32
-	ItemId uint32
 }
 
 // Default keyboard/joystick configuration used for players who are

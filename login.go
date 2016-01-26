@@ -70,12 +70,16 @@ var (
 	// Starting stats for any new character. The CharClass constants can be used
 	// to index into this array to obtain the base stats for each class.
 	BaseStats [12]CharacterStats
+
+	// Id sent in the menu selection packet to tell the client
+	// that the selection was made on the ship menu.
+	ShipSelectionMenuId uint16 = 0x13
 )
 
 // Entry in the available ships lis on the ship selection menu.
-type ShipEntry struct {
-	Unknown  uint16
-	Id       uint32
+type ShipMenuEntry struct {
+	MenuId   uint16
+	ShipId   uint32
 	Padding  uint16
 	Shipname [23]byte
 }
@@ -362,11 +366,16 @@ func handleCharacterUpdate(client *Client) error {
 }
 
 // Player selected one of the items on the ship select screen.
-func handleShipSelection(client *Client) {
-	var pkt ShipMenuSelectionPacket
+func handleShipSelection(client *Client) error {
+	var pkt MenuSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
-	s := &shipList[pkt.Item-1]
+	selectedShip := pkt.ItemId - 1
+	if selectedShip < 0 || selectedShip >= uint32(len(shipList)) {
+		return errors.New("Invalid ship selection: " + string(selectedShip))
+	}
+	s := &shipList[selectedShip]
 	client.SendRedirect(s.port, s.ipAddr)
+	return nil
 }
 
 // Create and initialize a new Login client so long as we're able
@@ -388,8 +397,8 @@ func (server LoginServer) Name() string { return "LOGIN" }
 
 func (server LoginServer) Port() string { return config.LoginPort }
 
-// Load the PSOBB parameter files, build the parameter header, and init/cache
-// the param file chunks for the EB packets.
+// Load the PSOBB parameter files, build the parameter header,
+// and init/cache the param file chunks for the EB packets.
 func (server LoginServer) loadParameterFiles() {
 	offset := 0
 	var tmpChunkData []byte
@@ -421,8 +430,8 @@ func (server LoginServer) loadParameterFiles() {
 		fmt.Printf("%s (%v bytes, checksum: %v\n", paramFile, fileSize, entry.Checksum)
 	}
 
-	// Offset should at this point be the total size of the files to send - break
-	// it all up into indexable chunks.
+	// Offset should at this point be the total size of the files
+	// to send - break it all up into indexable chunks.
 	paramChunkData = make(map[int][]byte)
 	chunks := offset / MaxChunkSize
 	for i := 0; i < chunks; i++ {
@@ -529,7 +538,7 @@ func (server CharacterServer) Handle(c *Client) error {
 	case LoginCharPreviewType:
 		err = handleCharacterUpdate(c)
 	case LoginMenuSelectType:
-		handleShipSelection(c)
+		err = handleShipSelection(c)
 	default:
 		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}

@@ -151,7 +151,7 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 			// bytes, so for basic inspection it's safe to treat them the same way.
 			util.StructFromBytes(c.Data()[:PCHeaderSize], &pktHeader)
 			if config.DebugMode {
-				fmt.Printf("%s: Got %v bytes from client:\n\n", s.Name(), pktHeader.Size)
+				fmt.Printf("%s: Got %v bytes from client:\n", s.Name(), pktHeader.Size)
 				util.PrintPayload(c.Data(), int(pktHeader.Size))
 				fmt.Println()
 			}

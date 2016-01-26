@@ -487,15 +487,15 @@ func (client *Client) SendShipList(ships []Ship) int {
 		Unknown:     0x02,
 		Unknown2:    0xFFFFFFF4,
 		Unknown3:    0x04,
-		ShipEntries: make([]ShipEntry, len(ships)),
+		ShipEntries: make([]ShipMenuEntry, len(ships)),
 	}
 	copy(pkt.ServerName[:], serverName)
 
 	// TODO: Will eventually need a mutex for read.
 	for i, ship := range ships {
 		item := &pkt.ShipEntries[i]
-		item.Unknown = 0x12
-		item.Id = ship.id
+		item.MenuId = ShipSelectionMenuId
+		item.ShipId = ship.id
 		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
