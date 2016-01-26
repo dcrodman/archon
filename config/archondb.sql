@@ -31,7 +31,7 @@ CREATE TABLE characters (
   experience int DEFAULT 0,
   level smallint DEFAULT 0,
   guildcard_str binary(16),
-  name_color int,
+  name_color int unsigned DEFAULT X'FFFFFFFF',
   model smallint,
   name_color_chksm int,
   section_id tinyint,

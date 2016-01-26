@@ -303,7 +303,7 @@ func handleCharacterUpdate(client *Client) error {
 	var charPkt CharPreviewPacket
 	charPkt.Character = new(CharacterPreview)
 	util.StructFromBytes(client.Data(), &charPkt)
-	prev := charPkt.Character
+	p := charPkt.Character
 
 	archonDB := config.DB()
 	if client.flag == 0x02 {
@@ -313,9 +313,9 @@ func handleCharacterUpdate(client *Client) error {
 			"name_color_chksm=?, section_id=?, char_class=?, costume=?, skin=?, "+
 			"head=?, hair_red=?, hair_green=?, hair_blue,=? proportion_x=?, "+
 			"proportion_y=?, name=? WHERE guildcard = ? AND slot_num = ?",
-			prev.NameColor, prev.Model, prev.NameColorChksm, prev.SectionId,
-			prev.Class, prev.Costume, prev.Skin, prev.Head, prev.HairRed,
-			prev.HairGreen, prev.HairBlue, prev.Name[:], prev.PropX, prev.PropY,
+			p.NameColor, p.Model, p.NameColorChksm, p.SectionId,
+			p.Class, p.Costume, p.Skin, p.Head, p.HairRed,
+			p.HairGreen, p.HairBlue, p.Name[:], p.PropX, p.PropY,
 			client.guildcard, charPkt.Slot)
 		if err != nil {
 			log.Error(err.Error())
@@ -330,7 +330,7 @@ func handleCharacterUpdate(client *Client) error {
 			return err
 		}
 		// Grab our base stats for this character class.
-		stats := BaseStats[prev.Class]
+		stats := BaseStats[p.Class]
 
 		// TODO: Set up the default inventory and techniques.
 		meseta := 300
@@ -342,14 +342,19 @@ func handleCharacterUpdate(client *Client) error {
 		*/
 
 		// Create the new character.
-		_, err = archonDB.Exec("INSERT INTO characters VALUES (?, ?, 0, 1, ?, "+
-			"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, "+
-			"?, ?, ?, ?, ?, ?, 0, 0)", client.guildcard, charPkt.Slot,
-			prev.GuildcardStr[:], prev.NameColor, prev.Model, prev.NameColorChksm,
-			prev.SectionId, prev.Class, prev.V2flags, prev.Version, prev.V1Flags,
-			prev.Costume, prev.Skin, prev.Face, prev.Head, prev.Hair, prev.HairRed,
-			prev.HairGreen, prev.HairBlue, prev.PropX, prev.PropY, prev.Name[:],
-			stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
+		_, err = archonDB.Exec("INSERT INTO characters (guildcard, slot_num,"+
+			"experience, level, guildcard_str, name_color, model, name_color_chksm,"+
+			"section_id, char_class, v2_flags, version, v1_flags, costume,"+
+			"skin, face, head, hair, hair_red, hair_green, hair_blue,"+
+			"proportion_x, proportion_y, name, playtime, atp, mst, evp, "+
+			"hp, dfp, ata, lck, meseta, bank_use, bank_meseta) "+
+			"VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "+
+			"?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)",
+			client.guildcard, charPkt.Slot, p.GuildcardStr[:], p.NameColor,
+			p.Model, p.NameColorChksm, p.SectionId, p.Class, p.V2flags,
+			p.Version, p.V1Flags, p.Costume, p.Skin, p.Face, p.Head,
+			p.Hair, p.HairRed, p.HairGreen, p.HairBlue, p.PropX, p.PropY,
+			p.Name[:], stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
 			stats.LCK, meseta)
 		if err != nil {
 			log.Error(err.Error())
