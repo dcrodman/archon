@@ -27,50 +27,52 @@ import "C"
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"github.com/dcrodman/archon/blowfish"
 	"unsafe"
 )
 
 type PSOCrypt struct {
 	cryptSetup C.CRYPT_SETUP
+	cipher     *blowfish.Cipher
 	Vector     []uint8
 }
 
 // Returns a newly allocated and zeroed PSOCrypt.
-func NewCrypt() *PSOCrypt {
-	return new(PSOCrypt)
-}
-
-// Initializes a CRYPT_SETUP with a 4-byte key (used by Patch clients).
-func (crypt *PSOCrypt) CreateKeys() int {
-	crypt.Vector = make([]uint8, 4)
-	for i := 0; i < 4; i++ {
+func NewCrypt(vectorSize int) *PSOCrypt {
+	crypt := new(PSOCrypt)
+	crypt.Vector = make([]uint8, vectorSize)
+	for i := 0; i < vectorSize; i++ {
 		binary.Read(rand.Reader, binary.LittleEndian, &(crypt.Vector[i]))
 	}
-	return int(C.CRYPT_CreateKeys(&crypt.cryptSetup,
-		unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_PC))
-}
-
-// Initializes a CRYPT_SETUP with a 48-byte key.
-func (crypt *PSOCrypt) CreateBBKeys() int {
-	crypt.Vector = make([]uint8, 48)
-	for i := 0; i < 48; i++ {
-		binary.Read(rand.Reader, binary.LittleEndian, &(crypt.Vector[i]))
+	if vectorSize == 4 {
+		C.CRYPT_CreateKeys(&crypt.cryptSetup, unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_PC)
+	} else {
+		var err error
+		if crypt.cipher, err = blowfish.NewCipher(crypt.Vector); err != nil {
+			panic(err)
+		}
 	}
-	return int(C.CRYPT_CreateKeys(&crypt.cryptSetup,
-		unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_BLUEBURST))
+	return crypt
 }
 
 // Convenience wrapper for CryptData with encrypting = 1.
 func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
-	CryptData(crypt, data, size, C.int(1))
+	if crypt.cipher != nil {
+		crypt.cipher.Encrypt(data, data)
+	} else {
+		CryptData(crypt, data, size, C.int(1))
+	}
 }
 
 // Convenience wrapper for CryptData with encrypting = 0.
 func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
-	CryptData(crypt, data, size, C.int(0))
+	if crypt.cipher != nil {
+		crypt.cipher.Decrypt(data, data)
+	} else {
+		CryptData(crypt, data, size, C.int(0))
+	}
 }
 
-// Encrypt or decrypt the packet pointed to by data in-place using crypt_setup.
 func CryptData(crypt *PSOCrypt, data []byte, size uint32, encrypting C.int) int {
 	return int(C.CRYPT_CryptData(&crypt.cryptSetup,
 		unsafe.Pointer(&data[0]), C.ulong(size), encrypting))

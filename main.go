@@ -235,7 +235,7 @@ func main() {
 		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
 			pprof.Lookup("goroutine").WriteTo(resp, 1)
 		})
-		go http.ListenAndServe(config.WebPort, nil)
+		go http.ListenAndServe(":"+config.WebPort, nil)
 	}
 
 	initLogger(config.Logfile)

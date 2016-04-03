@@ -61,25 +61,23 @@ type Client struct {
 }
 
 func NewClient(conn *net.TCPConn, hdrSize uint16) *Client {
+	var vectorSize int
+	if hdrSize == 8 {
+		vectorSize = 48
+	} else if hdrSize == 4 {
+		vectorSize = 4
+	}
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
 	c := &Client{
 		conn:        conn,
 		ipAddr:      addr[0],
 		port:        addr[1],
 		hdrSize:     hdrSize,
-		clientCrypt: encryption.NewCrypt(),
-		serverCrypt: encryption.NewCrypt(),
+		clientCrypt: encryption.NewCrypt(vectorSize),
+		serverCrypt: encryption.NewCrypt(vectorSize),
 		buffer:      make([]byte, 512),
 	}
 
-	// Hacky, but we know that BB packets must be of length 8.
-	if hdrSize >= 8 {
-		c.clientCrypt.CreateBBKeys()
-		c.serverCrypt.CreateBBKeys()
-	} else {
-		c.clientCrypt.CreateKeys()
-		c.serverCrypt.CreateKeys()
-	}
 	return c
 }
 

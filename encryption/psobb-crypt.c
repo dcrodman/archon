@@ -28,7 +28,9 @@
 static const uint32_t bbtable[18+1024] = {
     0x640cded2, 0xca6cf7cf, 0xc7bc95fb, 0x7d0d60a3, 0xcf23ad88, 0x8ffb62dc, 0x6c3da5cc, 0x6bfcd6d6,
     0x63f492df, 0xe32ebe65, 0xc3746b6d, 0xc5703934, 0xdc940bce, 0x590e0892, 0xea9413e8, 0xf4b13de7,
-    0x505893fc, 0xe3d696e3, 0x5cc73fd6, 0x19572a8e, 0x1ead320e, 0x29913b33, 0x05c06104, 0xc5a1316e,
+    0x505893fc, 0xe3d696e3,
+
+    0x5cc73fd6, 0x19572a8e, 0x1ead320e, 0x29913b33, 0x05c06104, 0xc5a1316e,
     0x456d82a7, 0x5a987789, 0xbfdcaa97, 0x23094413, 0x70b100f7, 0xef18f524, 0x9b2632b1, 0x1a7aa450,
     0x36355519, 0x1a8fc2ad, 0xe13d6a17, 0xc74af6af, 0xb771fc73, 0x8c332a8c, 0x13792c10, 0xa707616f,
     0x69d18ce4, 0x4bb744c2, 0x74da584b, 0xc2186564, 0xbef96bfd, 0x9ff42f9e, 0xf6334290, 0x74249103,
@@ -60,7 +62,9 @@ static const uint32_t bbtable[18+1024] = {
     0xce85cae0, 0x9477d5b7, 0x7ee161b8, 0x1c4f6b1b, 0xad1073f1, 0xfba9fff8, 0x11a5ce22, 0x19be7af3,
     0x8646d47a, 0xdd92e45b, 0xa5b089c8, 0x05db18a7, 0xd915fb67, 0xae545e52, 0x738b8333, 0xe351e074,
     0xd846f324, 0x4c4c85ae, 0x1f705eaf, 0x3c65970c, 0xb540a652, 0x08355576, 0x88fd52f2, 0x1176fa93,
-    0x04d2406a, 0xa53e17c7, 0xc5fb6441, 0xd36fc212, 0x5c5ac0c9, 0xe2c932c2, 0xd22a7467, 0xad1d4b06,
+    0x04d2406a, 0xa53e17c7,
+
+    0xc5fb6441, 0xd36fc212, 0x5c5ac0c9, 0xe2c932c2, 0xd22a7467, 0xad1d4b06,
     0xdc30354a, 0x09f640ea, 0x1b063309, 0x0777b7a2, 0xe30f2845, 0xb16ed5e6, 0x897b6abf, 0x1e2ec223,
     0xcfb0ac5c, 0x0297f232, 0x7f56f89d, 0xa3f50491, 0x7c847191, 0x61d4b903, 0x25ee2690, 0x58f77a26,
     0xc2d527fe, 0x8123afbe, 0x7dff42e6, 0x9572104b, 0x15d8e9f6, 0x23f908c8, 0x1156a4dc, 0xf8816e83,
@@ -92,7 +96,9 @@ static const uint32_t bbtable[18+1024] = {
     0x48e1c890, 0xae102653, 0xc977a7f2, 0x2fe76749, 0x754513c2, 0xa2a86df9, 0x7312f6b7, 0xcca4e105,
     0xacfb96cd, 0xa0a9a9b2, 0x237faf6d, 0x45b7eb4d, 0x0c3e5872, 0x460c5991, 0x97248330, 0xa47541b2,
     0xbf76d53b, 0x6c6c782b, 0x38a76a50, 0x712e9fec, 0xe7071507, 0x0e4202b2, 0x95a4154e, 0x62f6da87,
-    0x3dfd5418, 0xd7ab33f5, 0x8e13062c, 0x2ceee22e, 0x0b54e6a6, 0xd073c03a, 0x3d3f670e, 0xdb090f3a,
+    0x3dfd5418, 0xd7ab33f5,
+
+    0x8e13062c, 0x2ceee22e, 0x0b54e6a6, 0xd073c03a, 0x3d3f670e, 0xdb090f3a,
     0xcb73ab2d, 0x210cc211, 0x79fc9477, 0x56db66ce, 0x7607573a, 0xc56d0340, 0x0d6f50e7, 0x0f911f2a,
     0x16f5699b, 0x63123cb0, 0x0015f81b, 0xfc22cc2b, 0x6594c4ba, 0x1d645134, 0x8633c3c5, 0x6565d5d9,
     0xc902200b, 0x8ea7aa6e, 0xa28b3d86, 0x9f22ef15, 0x9e80e834, 0x1931d611, 0xd25095ed, 0xdce57608,
@@ -124,7 +130,9 @@ static const uint32_t bbtable[18+1024] = {
     0xffdb0f83, 0xa34404c9, 0x70c36e1e, 0x9be9babb, 0x2a932500, 0x5750fd0e, 0xa4cab6f5, 0x9ec00d66,
     0x1b5f057d, 0xc88a5a6b, 0x57e3d177, 0xbc09b7d8, 0xb7eba4d3, 0x077f3fe7, 0xf8dc24f4, 0x25e5cf54,
     0xd052aef5, 0x30c74026, 0xfd5e2773, 0xce327753, 0xcabd0692, 0xcf4c8be0, 0x3af2851f, 0xf2b8cc7c,
-    0x2838c54b, 0xbd2729db, 0xc570a03c, 0x1cd9298d, 0x53ac5593, 0x5cb35e31, 0xca7f4500, 0x868e31f8,
+    0x2838c54b, 0xbd2729db,
+
+    0xc570a03c, 0x1cd9298d, 0x53ac5593, 0x5cb35e31, 0xca7f4500, 0x868e31f8,
     0x68bf5639, 0x927bb899, 0x97869f8c, 0x22c8aff2, 0xe97ab5ac, 0xc4e199f7, 0x11f56e63, 0x316e6f9b,
     0xdc0b25b0, 0x3c0e37bf, 0x2260ab3d, 0xc7f5e4fe, 0x3d408195, 0x618dc6c1, 0x8801c70e, 0xc181139d,
     0xeecfb730, 0x19f23de1, 0xd9c4ed07, 0x6e4c91a3, 0x4b7131fd, 0x882fd1b0, 0x95dac0a1, 0xc764f41b,
@@ -366,6 +374,7 @@ void CRYPT_BB_Encrypt(CRYPT_SETUP *pcry, void *vdata, uint32_t length)
     }
 }
 
+// salt the key
 void L_CRYPT_BB_InitKey(unsigned char *data)
 {
     unsigned x;
@@ -384,7 +393,9 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
 
     pcry->bb_posn = 0;
 
+    // stick the original salt in bb_seed of the CRYPT_SETUP; appears to be useless
     memcpy(pcry->bb_seed,salt,48);
+    // copy the salt and run it through the salt
     memcpy(s, salt, sizeof(s));
     L_CRYPT_BB_InitKey(s);
 
@@ -396,16 +407,18 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
 	eax = 0;
 	ebx = 0;
 
-	for(ecx=0;ecx<0x12;ecx++)
+    // Reverse the bytes in the P entry table (first 18 bytes).
+    // E.x., 0x640cded2 -> 0xd2de0c64
+	for(ecx=0; ecx<18; ecx++)
 	{
 		dx = bbtbl[eax++];
 		dx = ( ( dx & 0xFF ) << 8 ) + ( dx >> 8 );
 		pcryp[ebx] = dx;
-		dx = bbtbl[eax++];
-		dx ^= pcryp[ebx++];
-		pcryp[ebx++] = dx;
+        dx = bbtbl[eax++];
+        dx ^= pcryp[ebx++];
+        pcryp[ebx++] = dx;
 	}
-
+    // Copy the rest of the keys as-is
     memcpy(&pcry->keys[18], &bbtable[18], 4096);
 
 #else
@@ -432,29 +445,31 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
 #endif
 
     ecx=0;
-    ebx=0;
-
-    while (ebx < 0x12)
+    // expand the key
+    for (ebx = 0; ebx < 18; ebx++)
     {
-        ebp=((uint32_t) (s[ecx])) << 0x18;
-        eax=ecx+1;
-        edx=eax-((eax / 48)*48);
-        eax=(((uint32_t) (s[edx])) << 0x10) & 0xFF0000;
-        ebp=(ebp | eax) & 0xffff00ff;
-        eax=ecx+2;
-        edx=eax-((eax / 48)*48);
-        eax=(((uint32_t) (s[edx])) << 0x8) & 0xFF00;
-        ebp=(ebp | eax) & 0xffffff00;
-        eax=ecx+3;
-        ecx=ecx+4;
-        edx=eax-((eax / 48)*48);
-        eax=(uint32_t) (s[edx]);
-        ebp=ebp | eax;
-        eax=ecx;
-        edx=eax-((eax / 48)*48);
-        pcry->keys[ebx]=pcry->keys[ebx] ^ ebp;
-        ecx=edx;
-        ebx++;
+        ebp = ((uint32_t) (s[ecx])) << 0x18; // first two bytes of the key (0x??000000)
+
+        eax = ecx+1;
+        edx = eax-((eax / 48)*48);
+        eax = (((uint32_t) (s[edx])) << 0x10) & 0xFF0000;
+        ebp = (ebp | eax) & 0xffff0000; // combine (0x????0000)
+
+        eax = ecx+2;
+        edx = eax-((eax / 48)*48);
+        eax = (((uint32_t) (s[edx])) << 0x8) & 0xFF00;
+        ebp = (ebp | eax) & 0xffffff00; //combine (0x??????00)
+
+        eax = ecx+3;
+        ecx = ecx+4;
+        edx = eax-((eax / 48)*48);
+        eax = (uint32_t) (s[edx]);
+        ebp = ebp | eax; // combine (0x????????)
+
+        eax = ecx;
+        edx = eax-((eax / 48)*48);  // make edx and eax wrap around when eax = 48
+        ecx = edx;
+        pcry->keys[ebx] ^= ebp; // XOR the P table with the keys
     }
 
     ebp=0;
@@ -464,6 +479,7 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
     ebx=0;
     edx=0x48;
 
+    // Iterate over the P table (for i := range 72; i+=8)
     while (edi < edx)
     {
         esi=esi ^ pcry->keys[0];
@@ -541,6 +557,7 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
     eax=0;
     edx=0;
     ou=0;
+    // Iterate over the S boxes
     while (ou < 0x1000)
     {
         edi=0x48;
