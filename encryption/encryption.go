@@ -1,8 +1,5 @@
 package encryption
 
-//#include "encryption.h"
-import "C"
-
 /*
 * Archon PSO Server
 * Copyright (C) 2014 Andrew Rodman
@@ -24,56 +21,32 @@ import "C"
 * Wrapper library for Fuzzier's encryption lib.
  */
 
-import (
-	"crypto/rand"
-	"encoding/binary"
-	"github.com/dcrodman/archon/blowfish"
-	"unsafe"
-)
-
 type PSOCrypt struct {
-	cryptSetup C.CRYPT_SETUP
-	cipher     *blowfish.Cipher
-	Vector     []uint8
+	cipher *Cipher
+	Vector []uint8
 }
 
 // Returns a newly allocated and zeroed PSOCrypt.
-func NewCrypt(vectorSize int) *PSOCrypt {
+func NewCrypt(key []byte) *PSOCrypt {
 	crypt := new(PSOCrypt)
-	crypt.Vector = make([]uint8, vectorSize)
-	for i := 0; i < vectorSize; i++ {
-		binary.Read(rand.Reader, binary.LittleEndian, &(crypt.Vector[i]))
-	}
-	if vectorSize == 4 {
-		C.CRYPT_CreateKeys(&crypt.cryptSetup, unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_PC)
-	} else {
-		var err error
-		if crypt.cipher, err = blowfish.NewCipher(crypt.Vector); err != nil {
-			panic(err)
-		}
+	crypt.Vector = key
+	var err error
+	if crypt.cipher, err = NewCipher(crypt.Vector); err != nil {
+		panic(err)
 	}
 	return crypt
 }
 
 // Convenience wrapper for CryptData with encrypting = 1.
-func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
-	if crypt.cipher != nil {
-		crypt.cipher.Encrypt(data, data)
-	} else {
-		CryptData(crypt, data, size, C.int(1))
-	}
+func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) []byte {
+	dst := make([]byte, size)
+	crypt.cipher.Encrypt(dst, data)
+	return dst
 }
 
 // Convenience wrapper for CryptData with encrypting = 0.
-func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
-	if crypt.cipher != nil {
-		crypt.cipher.Decrypt(data, data)
-	} else {
-		CryptData(crypt, data, size, C.int(0))
-	}
-}
-
-func CryptData(crypt *PSOCrypt, data []byte, size uint32, encrypting C.int) int {
-	return int(C.CRYPT_CryptData(&crypt.cryptSetup,
-		unsafe.Pointer(&data[0]), C.ulong(size), encrypting))
+func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) []byte {
+	dst := make([]byte, size)
+	crypt.cipher.Decrypt(dst, data)
+	return dst
 }
