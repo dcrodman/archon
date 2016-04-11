@@ -130,10 +130,10 @@ func (config *Config) InitFromFile(fileName string) error {
 
 	// Convert the welcome message to UTF-16LE and cache it.
 	config.MessageBytes = util.ConvertToUtf16(config.WelcomeMessage)
-	// PSOBB expects this prefix to the message, not completely sure why...
+	// PSOBB expects this prefix to the message, not completely sure why. Language perhaps?
 	config.MessageBytes = append([]byte{0xFF, 0xFE}, config.MessageBytes...)
 	msgLen := len(config.MessageBytes)
-	if msgLen > (1 << 16) {
+	if msgLen > (1<<16 - 16) {
 		return errors.New("Message length must be less than 65,000 characters")
 	}
 	config.MessageSize = uint16(msgLen)
