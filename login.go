@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/prs"
 	"github.com/dcrodman/archon/util"
 	"hash/crc32"
@@ -384,7 +385,9 @@ func handleShipSelection(client *Client) error {
 // to send the welcome packet to begin encryption.
 func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 	var err error
-	lc := NewClient(conn, BBHeaderSize)
+	cCrypt := crypto.NewBBCrypt()
+	sCrypt := crypto.NewBBCrypt()
+	lc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
 	if lc.SendWelcome() != 0 {
 		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
 		lc = nil

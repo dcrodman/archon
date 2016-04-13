@@ -22,6 +22,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
 	"net"
 	"strconv"
@@ -62,7 +63,10 @@ func handleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
 }
 
 func NewShipClient(conn *net.TCPConn) (*Client, error) {
-	sc := NewClient(conn, BBHeaderSize)
+	cCrypt := crypto.NewBBCrypt()
+	sCrypt := crypto.NewBBCrypt()
+	sc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
+
 	err := error(nil)
 	if sc.SendWelcome() != 0 {
 		err = errors.New("Error sending welcome packet to: " + sc.IPAddr())

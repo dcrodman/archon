@@ -23,7 +23,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/encryption"
+	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
 	"io"
 	"net"
@@ -44,8 +44,8 @@ type Client struct {
 	packetSize uint16
 	buffer     []byte
 
-	clientCrypt *encryption.PSOCrypt
-	serverCrypt *encryption.PSOCrypt
+	clientCrypt *crypto.PSOCrypt
+	serverCrypt *crypto.PSOCrypt
 
 	guildcard uint32
 	teamId    uint32
@@ -60,24 +60,17 @@ type Client struct {
 	flag       uint32
 }
 
-func NewClient(conn *net.TCPConn, hdrSize uint16) *Client {
-	var vectorSize int
-	if hdrSize == 8 {
-		vectorSize = 48
-	} else if hdrSize == 4 {
-		vectorSize = 4
-	}
+func NewClient(conn *net.TCPConn, hdrSize uint16, cCrypt, sCrypt *crypto.PSOCrypt) *Client {
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
 	c := &Client{
 		conn:        conn,
 		ipAddr:      addr[0],
 		port:        addr[1],
 		hdrSize:     hdrSize,
-		clientCrypt: encryption.NewCrypt(vectorSize),
-		serverCrypt: encryption.NewCrypt(vectorSize),
+		clientCrypt: sCrypt,
+		serverCrypt: cCrypt,
 		buffer:      make([]byte, 512),
 	}
-
 	return c
 }
 

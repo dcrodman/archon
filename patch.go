@@ -23,6 +23,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
 	"hash/crc32"
 	"io"
@@ -216,7 +217,9 @@ func buildPatchIndex(node *PatchDir) {
 // to send the welcome packet to begin encryption.
 func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 	var err error
-	pc := NewClient(conn, PCHeaderSize)
+	cCrypt := crypto.NewPCCrypt()
+	sCrypt := crypto.NewPCCrypt()
+	pc := NewClient(conn, PCHeaderSize, cCrypt, sCrypt)
 	if pc.SendPCWelcome() != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
