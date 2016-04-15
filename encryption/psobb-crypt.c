@@ -434,7 +434,8 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
     ecx=0;
     ebx=0;
 
-    while (ebx < 0x12) {
+    while (ebx < 0x12)
+    {
         ebp=((uint32_t) (s[ecx])) << 0x18;
         eax=ecx+1;
         edx=eax-((eax / 48)*48);
@@ -456,33 +457,36 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
         ebx++;
     }
 
-    ebp = 0;
-    esi = 0;
-    ecx = 0;
-    ebx = 0;
+    ebp=0;
+    esi=0;
+    ecx=0;
+    edi=0;
+    ebx=0;
+    edx=0x48;
 
-    // 0..72, some processing with the P table
-    for (edi = 0; edi < 0x48; edi += 8) {
-        esi = esi ^ pcry->keys[0];
-        eax = esi >> 0x18;
-        ebx = (esi >> 0x10) & 0xff;
-        eax = pcry->keys[eax+0x12]+pcry->keys[ebx+0x112];
-        ebx = (esi >> 8) & 0xFF;
-        eax = eax ^ pcry->keys[ebx+0x212];
-        ebx = esi & 0xff;
-        eax = eax + pcry->keys[ebx+0x312];
+    while (edi < edx)
+    {
+        esi=esi ^ pcry->keys[0];
+        eax=esi >> 0x18;
+        ebx=(esi >> 0x10) & 0xff;
+        eax=pcry->keys[eax+0x12]+pcry->keys[ebx+0x112];
+        ebx=(esi >> 8) & 0xFF;
+        eax=eax ^ pcry->keys[ebx+0x212];
+        ebx=esi & 0xff;
+        eax=eax + pcry->keys[ebx+0x312];
         
-        eax = eax ^ pcry->keys[1];
-        ecx =  ecx ^ eax;
-        ebx = ecx >> 0x18;
-        eax = (ecx >> 0x10) & 0xFF;
-        ebx = pcry->keys[ebx+0x12]+pcry->keys[eax+0x112];
-        eax = (ecx >> 8) & 0xff;
-        ebx = ebx ^ pcry->keys[eax+0x212];
-        eax = ecx & 0xff;
-        ebx = ebx + pcry->keys[eax+0x312];
+        eax=eax ^ pcry->keys[1];
+        ecx= ecx ^ eax;
+        ebx=ecx >> 0x18;
+        eax=(ecx >> 0x10) & 0xFF;
+        ebx=pcry->keys[ebx+0x12]+pcry->keys[eax+0x112];
+        eax=(ecx >> 8) & 0xff;
+        ebx=ebx ^ pcry->keys[eax+0x212];
+        eax=ecx & 0xff;
+        ebx=ebx + pcry->keys[eax+0x312];
         
-        for (x = 0; x <= 5; x++) {
+        for (x = 0; x <= 5; x++)
+        {
             ebx=ebx ^ pcry->keys[(x*2)+2];
             esi= esi ^ ebx;
             ebx=esi >> 0x18;
@@ -530,91 +534,57 @@ void CRYPT_BB_CreateKeys(CRYPT_SETUP *pcry, void *salt)
         esi=esi ^ eax;
         pcry->keys[(edi / 4)]=esi;
         pcry->keys[(edi / 4)+1]=ecx;
+        edi=edi+8;
     }
 
     eax=0;
-    edx=0;
+    uint32_t xl = esi, xr = ecx;
+
+    uint32_t *p = pcry->keys;
+    uint32_t *s0 = &pcry->keys[18];
+    uint32_t *s1 = &pcry->keys[274];
+    uint32_t *s2 = &pcry->keys[530];
+    uint32_t *s3 = &pcry->keys[786];
+    int shown = 0;
+
     // 0...4096 in intervals of 1024, rest of the S box processing
-    // esi = l, ecx = r in terms of the Go blowfish code. These two are
-    // equal to their corresponding Go value-s by this point.
     //
     // So, this outer loop is going to execute 4 times, the inner loop 128.
+    // 0   indexes into p
+    // 18  indexes into s0
+    // 274 indexes into s1
+    // 530 indexes into s2
+    // 786 indexes into s3
     for (ou = 0; ou < 0x1000; ou += 0x400) {
-        // Starting after the 72 bytes of the P table
         for (edi = 0x48; edi < 0x448; edi += 8) {
-            esi = esi ^ pcry->keys[0];
-            eax = esi >> 0x18;
-            ebx = (esi >> 0x10) & 0xff;
-            eax = pcry->keys[eax+0x12] + pcry->keys[ebx+0x112];
-            ebx = (esi >> 8) & 0xFF;
-            eax = eax ^ pcry->keys[ebx+0x212];
-            ebx = esi & 0xff;
-            eax = eax + pcry->keys[ebx+0x312];
+            xl ^= p[0];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[1];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[2];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[3];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[4];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[5];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[6];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[7];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[8];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[9];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[10];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[11];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[12];
+            xr ^= (((s0[xl>>24] + s1[(xl>>16) & 0xff]) ^ s2[(xl>>8) & 0xFF]) + s3[xl & 0xff]) ^ p[13];
+            xl ^= (((s0[xr>>24] + s1[(xr>>16) & 0xFF]) ^ s2[(xr>>8) & 0xff]) + s3[xr & 0xff]) ^ p[14];
+
+            eax = (((s0[xl>>24] + s1[(xl>>16) & 0xFF]) ^ s2[(xl>>8) & 0xff]) + s3[xl & 0xff]) ^ p[15];
+            eax ^= xr;
             
-            eax = eax ^ pcry->keys[1];
-            ecx =  ecx ^ eax;
-            ebx = ecx >> 0x18;
-            eax = (ecx >> 0x10) & 0xFF;
-            ebx = pcry->keys[ebx+0x12] + pcry->keys[eax+0x112];
-            eax = (ecx >> 8) & 0xff;
-            ebx = ebx ^ pcry->keys[eax+0x212];
-            eax = ecx & 0xff;
-            ebx = ebx + pcry->keys[eax+0x312];
-            
-            for (x = 0; x <= 5; x++) {
-                ebx=ebx ^ pcry->keys[(x*2)+2];
-                esi= esi ^ ebx;
-                ebx=esi >> 0x18;
-                eax=(esi >> 0x10) & 0xFF;
-                ebx=pcry->keys[ebx+0x12]+pcry->keys[eax+0x112];
-                eax=(esi >> 8) & 0xff;
-                ebx=ebx ^ pcry->keys[eax+0x212];
-                eax=esi & 0xff;
-                ebx=ebx + pcry->keys[eax+0x312];
-                
-                ebx=ebx ^ pcry->keys[(x*2)+3];
-                ecx= ecx ^ ebx;
-                ebx=ecx >> 0x18;
-                eax=(ecx >> 0x10) & 0xFF;
-                ebx=pcry->keys[ebx+0x12]+pcry->keys[eax+0x112];
-                eax=(ecx >> 8) & 0xff;
-                ebx=ebx ^ pcry->keys[eax+0x212];
-                eax=ecx & 0xff;
-                ebx=ebx + pcry->keys[eax+0x312];
-            }
-            
-            ebx =ebx ^ pcry->keys[14];
-            esi = esi ^ ebx;
-            eax = esi >> 0x18;
-            ebx = (esi >> 0x10) & 0xFF;
-            eax = pcry->keys[eax+0x12] + pcry->keys[ebx+0x112];
-            ebx = (esi >> 8) & 0xff;
-            eax = eax ^ pcry->keys[ebx+0x212];
-            ebx = esi & 0xff;
-            eax = eax + pcry->keys[ebx+0x312];
-            
-            eax = eax ^ pcry->keys[15];
-            eax = ecx ^ eax;
-            ecx = eax >> 0x18;
-            ebx = (eax >> 0x10) & 0xFF;
-            ecx = pcry->keys[ecx+0x12] + pcry->keys[ebx+0x112];
-            ebx = (eax >> 8) & 0xff;
-            ecx = ecx ^ pcry->keys[ebx+0x212];
-            ebx = eax & 0xff;
-            ecx = ecx + pcry->keys[ebx+0x312];
-            
-            ecx=ecx ^ pcry->keys[16];
-            ecx=ecx ^ esi;
-            esi= pcry->keys[17];
-            esi=esi ^ eax;
-            pcry->keys[(ou / 4)+(edi / 4)] = esi;
-            pcry->keys[(ou / 4)+(edi / 4)+1] = ecx;
+            xr = (((s0[eax>>24] + s1[(eax>>16) & 0xFF]) ^ s2[(eax>>8) & 0xff]) + s3[eax & 0xff]) ^ p[16];
+            xr ^= xl;
+
+            xl= p[17];
+            xl ^= eax;
+
+            pcry->keys[(ou / 4)+(edi / 4)] = xl;
+            pcry->keys[(ou / 4)+(edi / 4)+1] = xr;
         }
-        // printf("Original S box (%d to %d):\n", ou, ou+0x400);
-        // for (int i = ou; i < ou+0x400; i++) {
-        //     printf("%02x ", pcry->keys[i]);
-        // }
-        // printf("\n");
     }
 }
 

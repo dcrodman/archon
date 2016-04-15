@@ -1,12 +1,16 @@
 // Copyright 2010 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// The code is a port of Bruce Schneier's C implementation.
+// See http://www.schneier.com/blowfish.html.
+//
+// Source modified by Andrew Rodman to work with the customized
+// PSOBB Blowfish implementation. Work based off of the encryption
+// library written by Fuzziqer Software.
 
 // Package blowfish implements Bruce Schneier's Blowfish encryption algorithm.
 package encryption
-
-// The code is a port of Bruce Schneier's C implementation.
-// See http://www.schneier.com/blowfish.html.
 
 import "strconv"
 
@@ -48,21 +52,23 @@ func (c *Cipher) BlockSize() int { return BlockSize }
 // it is not safe to just call Encrypt on successive blocks;
 // instead, use an encryption mode like CBC (see crypto/cipher/cbc.go).
 func (c *Cipher) Encrypt(dst, src []byte) {
-	l := uint32(src[0])<<24 | uint32(src[1])<<16 | uint32(src[2])<<8 | uint32(src[3])
-	r := uint32(src[4])<<24 | uint32(src[5])<<16 | uint32(src[6])<<8 | uint32(src[7])
+	// Force LE order since the BB protocol seems to rely on it.
+	l := uint32(src[0]) | uint32(src[1])<<8 | uint32(src[2])<<16 | uint32(src[3])<<24
+	r := uint32(src[4]) | uint32(src[5])<<8 | uint32(src[6])<<16 | uint32(src[7])<<24
 	l, r = encryptData(l, r, c)
-	dst[0], dst[1], dst[2], dst[3] = byte(l>>24), byte(l>>16), byte(l>>8), byte(l)
-	dst[4], dst[5], dst[6], dst[7] = byte(r>>24), byte(r>>16), byte(r>>8), byte(r)
+	dst[0], dst[1], dst[2], dst[3] = byte(l), byte(l>>8), byte(l>>16), byte(l>>24)
+	dst[4], dst[5], dst[6], dst[7] = byte(r), byte(r>>8), byte(r>>16), byte(r>>24)
 }
 
 // Decrypt decrypts the 8-byte buffer src using the key k
 // and stores the result in dst.
 func (c *Cipher) Decrypt(dst, src []byte) {
-	l := uint32(src[0])<<24 | uint32(src[1])<<16 | uint32(src[2])<<8 | uint32(src[3])
-	r := uint32(src[4])<<24 | uint32(src[5])<<16 | uint32(src[6])<<8 | uint32(src[7])
+	// Force LE order since the BB protocol seems to rely on it.
+	l := uint32(src[0]) | uint32(src[1])<<8 | uint32(src[2])<<16 | uint32(src[3])<<24
+	r := uint32(src[4]) | uint32(src[5])<<8 | uint32(src[6])<<16 | uint32(src[7])<<24
 	l, r = decryptData(l, r, c)
-	dst[0], dst[1], dst[2], dst[3] = byte(l>>24), byte(l>>16), byte(l>>8), byte(l)
-	dst[4], dst[5], dst[6], dst[7] = byte(r>>24), byte(r>>16), byte(r>>8), byte(r)
+	dst[0], dst[1], dst[2], dst[3] = byte(l), byte(l>>8), byte(l>>16), byte(l>>24)
+	dst[4], dst[5], dst[6], dst[7] = byte(r), byte(r>>8), byte(r>>16), byte(r>>24)
 }
 
 func initCipher(c *Cipher) {

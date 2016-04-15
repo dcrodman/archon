@@ -1,10 +1,10 @@
 // Copyright 2010 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-
-// The startup permutation array and substitution boxes.
-// They are the hexadecimal digits of PI; see:
-// http://www.schneier.com/code/constants.txt.
+//
+// Source modified by Andrew Rodman to work with the customized
+// PSOBB Blowfish implementation. Work based off of the encryption
+// library written by Fuzziqer Software.
 
 package encryption
 

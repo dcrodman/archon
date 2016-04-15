@@ -21,7 +21,7 @@ import "C"
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * ---------------------------------------------------------------------
 *
-* Wrapper library for Fuzzier's encryption lib.
+* Blowfish implementation adapted to work with PSOBB's protocol.
  */
 
 import (
@@ -44,43 +44,46 @@ func createKey(size int) []byte {
 	return key
 }
 
-// Returns a newly allocated and zeroed PSOCrypt for encrypting PSOPC connections.
+// Returns a newly allocated PSOCrypt with randomly generated, appropriately
+// sized keys for encrypting packets over PSOPC connections.
 func NewPCCrypt() *PSOCrypt {
 	crypt := &PSOCrypt{Vector: createKey(4)}
 	C.CRYPT_CreateKeys(&crypt.cryptSetup, unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_PC)
 	return crypt
 }
 
-// Returns a newly allocated and zeroed PSOCrypt for encrypting PSOBB connections.
+// Returns a newly allocated PSOCrypt with randomly generated, appropriately
+// sized keys for encrypting packets over PSOBB connections.
 func NewBBCrypt() *PSOCrypt {
 	crypt := &PSOCrypt{Vector: createKey(48)}
 	var err error
 	if crypt.cipher, err = NewCipher(crypt.Vector); err != nil {
 		panic(err)
 	}
+	C.CRYPT_CreateKeys(&crypt.cryptSetup, unsafe.Pointer(&crypt.Vector[0]), C.CRYPT_BLUEBURST)
 	return crypt
 }
 
-// Convenience wrapper for CryptData with encrypting = 1.
-func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) []byte {
+// Encrypt a block of data in place.
+func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
 	if crypt.cipher != nil {
-		dst := make([]byte, size)
-		crypt.cipher.Encrypt(dst, data)
-		return dst
+		for i := 0; i < int(size); i += BlockSize {
+			block := data[i : i+BlockSize]
+			crypt.cipher.Encrypt(block, block)
+		}
 	} else {
 		C.CRYPT_CryptData(&crypt.cryptSetup, unsafe.Pointer(&data[0]), C.ulong(size), C.int(1))
-		return data
 	}
 }
 
-// Convenience wrapper for CryptData with encrypting = 0.
-func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) []byte {
+// Decrypt a block of data in place.
+func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
 	if crypt.cipher != nil {
-		dst := make([]byte, size)
-		crypt.cipher.Decrypt(dst, data)
-		return dst
+		for i := 0; i < int(size); i += BlockSize {
+			block := data[i : i+BlockSize]
+			crypt.cipher.Decrypt(block, block)
+		}
 	} else {
 		C.CRYPT_CryptData(&crypt.cryptSetup, unsafe.Pointer(&data[0]), C.ulong(size), C.int(0))
-		return data
 	}
 }

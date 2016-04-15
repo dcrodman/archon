@@ -67,8 +67,8 @@ func NewClient(conn *net.TCPConn, hdrSize uint16, cCrypt, sCrypt *crypto.PSOCryp
 		ipAddr:      addr[0],
 		port:        addr[1],
 		hdrSize:     hdrSize,
-		clientCrypt: sCrypt,
-		serverCrypt: cCrypt,
+		clientCrypt: cCrypt,
+		serverCrypt: sCrypt,
 		buffer:      make([]byte, 512),
 	}
 	return c
