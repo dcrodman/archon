@@ -163,7 +163,7 @@ func (c *Client) Process() error {
 type ConnList struct {
 	clientList *list.List
 	size       int
-	mutex      sync.RWMutex
+	sync.RWMutex
 }
 
 func NewClientList() *ConnList {
@@ -172,10 +172,10 @@ func NewClientList() *ConnList {
 
 // Appends a client to the end of the connection list.
 func (cl *ConnList) Add(c *Client) {
-	cl.mutex.Lock()
+	cl.Lock()
 	cl.clientList.PushBack(c)
 	cl.size++
-	cl.mutex.Unlock()
+	cl.Unlock()
 }
 
 // Returns true if the list has a Client matching the IP address of c.
@@ -183,19 +183,19 @@ func (cl *ConnList) Add(c *Client) {
 func (cl *ConnList) Has(c *Client) bool {
 	found := false
 	clAddr := c.IPAddr()
-	cl.mutex.RLock()
+	cl.RLock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if c.IPAddr() == clAddr {
 			found = true
 			break
 		}
 	}
-	cl.mutex.RUnlock()
+	cl.RUnlock()
 	return found
 }
 
 func (cl *ConnList) Remove(c *Client) {
-	cl.mutex.Lock()
+	cl.Lock()
 	for client := cl.clientList.Front(); client != nil; client = client.Next() {
 		if client.Value == c {
 			cl.clientList.Remove(client)
@@ -203,12 +203,12 @@ func (cl *ConnList) Remove(c *Client) {
 			break
 		}
 	}
-	cl.mutex.Unlock()
+	cl.Unlock()
 }
 
 func (cl *ConnList) Count() int {
-	cl.mutex.RLock()
+	cl.RLock()
 	length := cl.size
-	cl.mutex.RUnlock()
+	cl.RUnlock()
 	return length
 }
