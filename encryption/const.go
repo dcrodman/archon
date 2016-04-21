@@ -1,10 +1,11 @@
-// Copyright 2010 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-//
-// Source modified by Andrew Rodman to work with the customized
-// PSOBB Blowfish implementation. Work based off of the encryption
-// library written by Fuzziqer Software.
+/* Copyright 2010 The Go Authors. All rights reserved.
+* Use of this source code is governed by a BSD-style
+* license that can be found in the LICENSE file.
+*
+* Source modified by Andrew Rodman to work with the customized
+* PSOBB Blowfish implementation. Work based off of the encryption
+* library written by Fuzziqer Software.
+ */
 
 package encryption
 
