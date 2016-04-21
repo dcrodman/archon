@@ -54,7 +54,7 @@ func sendPacket(c *Client, pkt []byte, length uint16) int {
 // Send data to client after padding it to a length disible by 8 and
 // encrypting it with the client's server ciper.
 func sendEncrypted(c *Client, data []byte, length uint16) int {
-	length = fixLength(data, length, c.hdrSize)
+	data, length = fixLength(data, length, c.hdrSize)
 	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()
@@ -65,14 +65,14 @@ func sendEncrypted(c *Client, data []byte, length uint16) int {
 
 // Pad the length of a packet to a multiple of 8 and set the first two
 // bytes of the header.
-func fixLength(data []byte, length uint16, hdrSize uint16) uint16 {
+func fixLength(data []byte, length uint16, hdrSize uint16) ([]byte, uint16) {
 	for length%hdrSize != 0 {
 		length++
 		data = append(data, 0)
 	}
 	data[0] = byte(length & 0xFF)
 	data[1] = byte((length & 0xFF00) >> 8)
-	return length
+	return data, length
 }
 
 // Send a simple 4-byte header packet.

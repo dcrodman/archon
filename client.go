@@ -23,7 +23,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/encryption"
+	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
 	"io"
 	"net"
@@ -44,8 +44,8 @@ type Client struct {
 	packetSize uint16
 	buffer     []byte
 
-	clientCrypt *encryption.PSOCrypt
-	serverCrypt *encryption.PSOCrypt
+	clientCrypt *crypto.PSOCrypt
+	serverCrypt *crypto.PSOCrypt
 
 	guildcard uint32
 	teamId    uint32
@@ -60,25 +60,16 @@ type Client struct {
 	flag       uint32
 }
 
-func NewClient(conn *net.TCPConn, hdrSize uint16) *Client {
+func NewClient(conn *net.TCPConn, hdrSize uint16, cCrypt, sCrypt *crypto.PSOCrypt) *Client {
 	addr := strings.Split(conn.RemoteAddr().String(), ":")
 	c := &Client{
 		conn:        conn,
 		ipAddr:      addr[0],
 		port:        addr[1],
 		hdrSize:     hdrSize,
-		clientCrypt: encryption.NewCrypt(),
-		serverCrypt: encryption.NewCrypt(),
+		clientCrypt: cCrypt,
+		serverCrypt: sCrypt,
 		buffer:      make([]byte, 512),
-	}
-
-	// Hacky, but we know that BB packets must be of length 8.
-	if hdrSize >= 8 {
-		c.clientCrypt.CreateBBKeys()
-		c.serverCrypt.CreateBBKeys()
-	} else {
-		c.clientCrypt.CreateKeys()
-		c.serverCrypt.CreateKeys()
 	}
 	return c
 }
