@@ -67,7 +67,7 @@ CREATE TABLE characters (
   FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
 );
 
--- This table may get big, so keep an index to make queries from paket E3 fast.
+-- Keep an index to make queries from paket E3 fast.
 CREATE INDEX character_index ON characters(guildcard, slot_num);
 
 CREATE TABLE guildcard_entries (

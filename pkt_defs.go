@@ -200,7 +200,9 @@ type LoginPkt struct {
 	Header        BBHeader
 	Unknown       [8]byte
 	ClientVersion uint16
-	Unknown2      [6]byte
+	Unknown2      [3]byte
+	SlotNum       int8
+	Phase         uint16 // differentiate login packet?
 	TeamId        uint32
 	Username      [16]byte
 	Padding       [32]byte

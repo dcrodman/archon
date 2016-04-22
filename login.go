@@ -165,16 +165,18 @@ func handleLogin(client *Client, charPort uint16) error {
 
 // Handle initial login sent to the character port.
 func handleCharLogin(client *Client) error {
-	if _, err := VerifyAccount(client); err != nil {
-		return err
+	var err error = nil
+	if pkt, err := VerifyAccount(client); err == nil {
+		client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
+		// At this point, if we've chosen (or created) a character then the
+		// client will send us the slot number and the corresponding phase.
+		if pkt.SlotNum >= 0 && pkt.Phase == 4 {
+			client.SendTimestamp()
+			client.SendShipList(shipList)
+			client.SendScrollMessage()
+		}
 	}
-	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
-	if client.config.CharSelected == 1 {
-		client.SendTimestamp()
-		client.SendShipList(shipList)
-		client.SendScrollMessage()
-	}
-	return nil
+	return err
 }
 
 // Handle the options request - load key config and other option data from the
@@ -235,7 +237,6 @@ func handleCharacterSelect(client *Client) error {
 
 	if pkt.Selecting == 0x01 {
 		// They've selected a character from the menu.
-		client.config.CharSelected = 1
 		client.config.SlotNum = uint8(pkt.Slot)
 		client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
 		client.SendCharacterAck(pkt.Slot, 1)
@@ -362,7 +363,6 @@ func handleCharacterUpdate(client *Client) error {
 
 	// Send the security packet with the updated state and slot number so that
 	// we know a character has been selected.
-	client.config.CharSelected = 1
 	client.config.SlotNum = uint8(charPkt.Slot)
 	client.SendCharacterAck(charPkt.Slot, 0)
 	return nil
