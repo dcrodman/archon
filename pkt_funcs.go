@@ -534,6 +534,15 @@ func (client *Client) SendBlockList(pkt *BlockListPacket) int {
 	return sendEncrypted(client, data, uint16(size))
 }
 
+// Send the client the lobby list on the selection screen.
+func (client *Client) SendLobbyList(pkt *LobbyListPacket) int {
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Lobby List Packet")
+	}
+	return sendEncrypted(client, data, uint16(size))
+}
+
 func init() {
 	patchCopyrightBytes = []byte(patchCopyright)
 	loginCopyrightBytes = []byte(loginCopyright)

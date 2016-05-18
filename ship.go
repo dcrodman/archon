@@ -145,13 +145,32 @@ func (server ShipServer) Handle(c *Client) error {
 type BlockServer struct {
 	name string
 	port string
+
+	lobbyPkt LobbyListPacket
 }
 
 func (server BlockServer) Name() string { return server.name }
 
 func (server BlockServer) Port() string { return server.port }
 
-func (server *BlockServer) Init() {}
+func (server *BlockServer) Init() {
+	// Precompute our lobby list since this won't change once the server has started.
+	server.lobbyPkt.Header.Size = BBHeaderSize
+	server.lobbyPkt.Header.Type = LobbyListType
+	server.lobbyPkt.Header.Flags = uint32(config.NumLobbies)
+	for i := 0; i <= config.NumLobbies; i++ {
+		server.lobbyPkt.Lobbies = append(server.lobbyPkt.Lobbies, struct {
+			MenuId  uint32
+			LobbyId uint32
+			Padding uint32
+		}{
+			MenuId:  0x1A0001,
+			LobbyId: uint32(i),
+			Padding: 0,
+		})
+		server.lobbyPkt.Header.Size += 12
+	}
+}
 
 func (server BlockServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewShipClient(conn)
@@ -165,7 +184,7 @@ func (server BlockServer) Handle(c *Client) error {
 	switch hdr.Type {
 	case LoginType:
 		err = handleShipLogin(c)
-		// TODO: Send lobby data (0x83)
+		c.SendLobbyList(&server.lobbyPkt)
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
