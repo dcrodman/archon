@@ -212,7 +212,7 @@ func handleCharacterSelect(client *Client) error {
 
 	// Character preview request.
 	archondb := config.DB()
-	var gc, name []uint8
+	var gc, dbName []uint8
 	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
 		" name_color, name_color_chksm, model, section_id, char_class, "+
 		"v2_flags, version, v1_flags, costume, skin, face, head, hair, "+
@@ -220,11 +220,11 @@ func handleCharacterSelect(client *Client) error {
 		"name, playtime FROM characters WHERE guildcard = ? AND slot_num = ?",
 		client.guildcard, pkt.Slot)
 	err := row.Scan(&prev.Experience, &prev.Level, &gc,
-		&prev.NameColor, &prev.NameColorChksm, &prev.Model, &prev.SectionId,
-		&prev.Class, &prev.V2flags, &prev.Version, &prev.V1Flags, &prev.Costume,
+		&prev.NameColor, &prev.NameColorChksm, &prev.Model, &prev.SectionID,
+		&prev.CharClass, &prev.V2flags, &prev.Version, &prev.V1Flags, &prev.Costume,
 		&prev.Skin, &prev.Face, &prev.Head, &prev.Hair, &prev.HairRed,
 		&prev.HairGreen, &prev.HairBlue, &prev.PropX, &prev.PropY,
-		&name, &prev.Playtime)
+		&dbName, &prev.Playtime)
 
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot.
@@ -243,7 +243,7 @@ func handleCharacterSelect(client *Client) error {
 	} else {
 		// They have a character in that slot; send the character preview.
 		copy(prev.GuildcardStr[:], gc[:])
-		copy(prev.Name[:], name[:])
+		copy(prev.Name[:], util.Utf8To16(dbName))
 		client.SendCharacterPreview(prev)
 	}
 	return nil
@@ -312,8 +312,8 @@ func handleCharacterUpdate(client *Client) error {
 			"name_color_chksm=?, section_id=?, char_class=?, costume=?, skin=?, "+
 			"head=?, hair_red=?, hair_green=?, hair_blue,=? proportion_x=?, "+
 			"proportion_y=?, name=? WHERE guildcard = ? AND slot_num = ?",
-			p.NameColor, p.Model, p.NameColorChksm, p.SectionId,
-			p.Class, p.Costume, p.Skin, p.Head, p.HairRed,
+			p.NameColor, p.Model, p.NameColorChksm, p.SectionID,
+			p.CharClass, p.Costume, p.Skin, p.Head, p.HairRed,
 			p.HairGreen, p.HairBlue, p.Name[:], p.PropX, p.PropY,
 			client.guildcard, charPkt.Slot)
 		if err != nil {
@@ -329,7 +329,7 @@ func handleCharacterUpdate(client *Client) error {
 			return err
 		}
 		// Grab our base stats for this character class.
-		stats := BaseStats[p.Class]
+		stats := BaseStats[p.CharClass]
 
 		// TODO: Set up the default inventory and techniques.
 		meseta := 300
@@ -350,10 +350,10 @@ func handleCharacterUpdate(client *Client) error {
 			"VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "+
 			"?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)",
 			client.guildcard, charPkt.Slot, p.GuildcardStr[:], p.NameColor,
-			p.Model, p.NameColorChksm, p.SectionId, p.Class, p.V2flags,
+			p.Model, p.NameColorChksm, p.SectionID, p.CharClass, p.V2flags,
 			p.Version, p.V1Flags, p.Costume, p.Skin, p.Face, p.Head,
 			p.Hair, p.HairRed, p.HairGreen, p.HairBlue, p.PropX, p.PropY,
-			p.Name[:], stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
+			util.ExpandUtf16(p.Name[:]), stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
 			stats.LCK, meseta)
 		if err != nil {
 			log.Error(err.Error())

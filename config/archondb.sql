@@ -49,7 +49,7 @@ CREATE TABLE characters (
   hair_blue smallint,
   proportion_x float,
   proportion_y float,
-  name binary(24),
+  name binary(32),
   playtime int DEFAULT 0,
   # keyConfig binary(232),
   # techniques blob,

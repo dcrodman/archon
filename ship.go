@@ -185,6 +185,8 @@ func (server BlockServer) Handle(c *Client) error {
 	case LoginType:
 		err = handleShipLogin(c)
 		c.SendLobbyList(&server.lobbyPkt)
+		// TODO: Send E7
+		// TODO: Send 95
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}

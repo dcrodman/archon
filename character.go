@@ -60,18 +60,23 @@ type GuildcardData struct {
 	Unknown3 [0x1BC]uint8
 }
 
-// Struct used by Character Info packet.
-type CharacterPreview struct {
-	Experience     uint32
-	Level          uint32
-	GuildcardStr   [16]byte
-	Unknown        [2]uint32
-	NameColor      uint32
-	Model          byte
-	Padding        [15]byte
+// Per-character stats.
+type CharacterStats struct {
+	ATP uint16
+	MST uint16
+	EVP uint16
+	HP  uint16
+	DFP uint16
+	TP  uint16
+	LCK uint16
+	ATA uint16
+}
+
+// Common fields for representing a character's appearance.
+type CharacterInfo struct {
 	NameColorChksm uint32
-	SectionId      byte
-	Class          byte
+	SectionID      byte
+	CharClass      byte
 	V2flags        byte
 	Version        byte
 	V1Flags        uint32
@@ -85,19 +90,114 @@ type CharacterPreview struct {
 	HairBlue       uint16
 	PropX          float32
 	PropY          float32
-	Name           [24]uint8
-	Playtime       uint32
+	Name           [16]uint16
 }
 
-// Per-character stats.
-type CharacterStats struct {
-	ATP uint16
-	MST uint16
-	EVP uint16
-	HP  uint16
-	DFP uint16
-	ATA uint16
-	LCK uint16
+// Item stored in the player's inventory.
+type Item struct {
+	Equipped uint32
+	Flags    uint32
+	// TODO: Mostly copied from Sylverant, figure out what these do.
+	Data   uint32
+	ItemID uint32
+	Data2  uint32
+}
+
+// Items stored in the player's bank.
+type BankItem struct {
+	Data   uint32
+	ItemID uint32
+	Data2  uint32
+	Amount uint16
+	Flags  uint16
+}
+
+// A player's inventory.
+type Inventory struct {
+	NumItems   uint8
+	HPMatsUsed uint8
+	TPMatsUsed uint8
+	Language   uint8
+	Items      [30]Item
+}
+
+// A player's bank
+type Bank struct {
+	NumItems uint32
+	Meseta   uint32
+	Items    [200]BankItem
+}
+
+// Struct used by Character Info packet.
+type CharacterPreview struct {
+	Experience   uint32
+	Level        uint32
+	GuildcardStr [16]byte
+	Unknown      [2]uint32
+	NameColor    uint32
+	Model        byte
+	Unused       [15]byte
+	CharacterInfo
+	Playtime uint32
+}
+
+// Data specific to a particular character. This is a hybrid of tethealla/newserv/sylverant,
+// incorporating what they agree on and making a best guess where they don't.
+type Character struct {
+	CharacterStats
+	Unknown      [8]uint8
+	Level        uint32
+	Exp          uint32
+	Meseta       uint32
+	GuildcardStr [24]uint8
+	NameColor    uint32
+	Model        uint8
+	Unused       [11]uint8
+	Playtime     uint32
+	CharacterInfo
+	Config     [0xE8]uint8
+	Techniques [20]uint8
+}
+
+// Full representation of a character, Stored identically to the format
+// expected by the E7 packet for convenience.
+type FullCharacter struct {
+	Inventory
+	CharacterStats
+	Unknown    [16]uint8
+	Options    uint32
+	QuestData1 [520]uint8
+	Bank
+	Guildcard     uint32
+	Name          [16]uint16
+	TeaName       [16]uint16
+	GuildcardDesc [88]uint16
+	Reserved1     uint8
+	Reserved2     uint8
+	SectionID     uint8
+	CharClass     uint8
+	Unknown2      uint32
+	SymbolChats   [1248]uint8
+	Shortcuts     [2624]uint8
+	Autoreply     [172]uint16
+	Infoboard     [172]uint16
+	GCBoard       [172]uint8
+	ChallengeData [320]uint8
+	TechMenu      [40]uint8
+	Unknown3      [44]uint8
+	QuestData2    [88]uint8
+	// Team config?
+	Unknown4         [0x144]uint8
+	KeyConfig        [364]uint8
+	JoystickConfig   [56]uint8
+	Guildcard2       uint32
+	TeamID           uint32
+	TeamInfo         [8]uint8
+	TeamPrivilegeLvl uint16
+	Reserved3        uint16
+	TeamName         [16]uint16
+	TeamFlag         [2048]uint8
+	TeamRewards      [2]uint32
 }
 
 // Default keyboard/joystick configuration used for players who are

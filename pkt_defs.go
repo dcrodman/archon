@@ -75,8 +75,9 @@ const (
 
 // Packet types for packets sent to and from the ship and block servers.
 const (
-	BlockListType = 0x07
-	LobbyListType = 0x83
+	BlockListType     = 0x07
+	LobbyListType     = 0x83
+	CharacterDataType = 0xE7
 )
 
 // Packet types common to multiple servers.
@@ -389,4 +390,10 @@ type LobbyListPacket struct {
 		LobbyId uint32
 		Padding uint32
 	}
+}
+
+// Full representation of a character send to the client on login.
+type FullCharacterPacket struct {
+	Header   BBHeader
+	CharData *Character
 }

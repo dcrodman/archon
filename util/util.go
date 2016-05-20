@@ -43,6 +43,19 @@ func GetPacketSize(data []byte) (uint16, error) {
 	return size, nil
 }
 
+func Utf8To16(src []uint8) []uint16 {
+	if len(src)%2 != 0 {
+		src = append(src, 0)
+	}
+	arr := make([]uint16, len(src)/2)
+	fmt.Println("arrlen: ", len(arr))
+	for i := 0; i < len(arr); i++ {
+		fmt.Println("i:", i)
+		arr[i] = uint16(src[i*2] | (src[(i*2)+1] << 8))
+	}
+	return arr
+}
+
 // Expands an array of UTF-16 elements to a slice of uint8 elements in
 // little endian order. E.g: [0x1234] -> [0x34, 0x12]
 func ExpandUtf16(src []uint16) []uint8 {
