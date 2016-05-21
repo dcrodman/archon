@@ -181,23 +181,23 @@ type FullCharacter struct {
 	Shortcuts     [2624]uint8
 	Autoreply     [172]uint16
 	Infoboard     [172]uint16
-	GCBoard       [172]uint8
+	Unknown3      [28]uint8
 	ChallengeData [320]uint8
 	TechMenu      [40]uint8
-	Unknown3      [44]uint8
+	Unknown4      [44]uint8
 	QuestData2    [88]uint8
 	// Team config?
-	Unknown4         [0x144]uint8
-	KeyConfig        [364]uint8
-	JoystickConfig   [56]uint8
-	Guildcard2       uint32
-	TeamID           uint32
-	TeamInfo         [8]uint8
-	TeamPrivilegeLvl uint16
-	Reserved3        uint16
-	TeamName         [16]uint16
-	TeamFlag         [2048]uint8
-	TeamRewards      [2]uint32
+	Unknown5       [276]uint8
+	KeyConfig      [364]uint8
+	JoystickConfig [56]uint8
+	Guildcard2     uint32
+	TeamID         uint32
+	TeamInfo       [8]uint8
+	TeamPrivilege  uint16
+	Reserved3      uint16
+	TeamName       [16]uint16
+	TeamFlag       [2048]uint8
+	TeamRewards    [2]uint32
 }
 
 // Default keyboard/joystick configuration used for players who are
