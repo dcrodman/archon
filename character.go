@@ -97,19 +97,9 @@ type CharacterInfo struct {
 type Item struct {
 	Equipped uint32
 	Flags    uint32
-	// TODO: Mostly copied from Sylverant, figure out what these do.
-	Data   uint32
-	ItemID uint32
-	Data2  uint32
-}
-
-// Items stored in the player's bank.
-type BankItem struct {
-	Data   uint32
-	ItemID uint32
-	Data2  uint32
-	Amount uint16
-	Flags  uint16
+	Data     uint32
+	ItemID   uint32
+	Data2    uint32 // Only for mags?
 }
 
 // A player's inventory.
@@ -121,6 +111,15 @@ type Inventory struct {
 	Items      [30]Item
 }
 
+// Items stored in the player's bank.
+type BankItem struct {
+	Data   uint32
+	ItemID uint32
+	Data2  uint32
+	Amount uint16
+	Flags  uint16
+}
+
 // A player's bank
 type Bank struct {
 	NumItems uint32
@@ -128,21 +127,7 @@ type Bank struct {
 	Items    [200]BankItem
 }
 
-// Struct used by Character Info packet.
-type CharacterPreview struct {
-	Experience   uint32
-	Level        uint32
-	GuildcardStr [16]byte
-	Unknown      [2]uint32
-	NameColor    uint32
-	Model        byte
-	Unused       [15]byte
-	CharacterInfo
-	Playtime uint32
-}
-
-// Data specific to a particular character. This is a hybrid of tethealla/newserv/sylverant,
-// incorporating what they agree on and making a best guess where they don't.
+// Character data sent out to other lobby members.
 type Character struct {
 	CharacterStats
 	Unknown      [8]uint8
@@ -155,22 +140,38 @@ type Character struct {
 	Unused       [11]uint8
 	Playtime     uint32
 	CharacterInfo
-	Config     [0xE8]uint8
+	Config     [232]uint8
 	Techniques [20]uint8
 }
 
-// Full representation of a character, Stored identically to the format
-// expected by the E7 packet for convenience.
+// Character data sent to the client via the login server when
+// selecting a character from the menu.
+type CharacterPreview struct {
+	Experience   uint32
+	Level        uint32
+	GuildcardStr [16]byte
+	Unknown      [2]uint32
+	NameColor    uint32
+	Model        byte
+	Unused       [15]byte
+	CharacterInfo
+	Playtime uint32
+}
+
+// Full representation of a character, stored identically to the format
+// expected by the E7 packet for convenience. This is a hybrid of
+// tethealla/newserv/sylverant, incorporating what they agree on and
+// making a best guess where they don't.
 type FullCharacter struct {
 	Inventory
-	CharacterStats
+	Character
 	Unknown    [16]uint8
 	Options    uint32
 	QuestData1 [520]uint8
 	Bank
 	Guildcard     uint32
 	Name          [16]uint16
-	TeaName       [16]uint16
+	TeamName      [16]uint16
 	GuildcardDesc [88]uint16
 	Reserved1     uint8
 	Reserved2     uint8
@@ -195,7 +196,7 @@ type FullCharacter struct {
 	TeamInfo       [8]uint8
 	TeamPrivilege  uint16
 	Reserved3      uint16
-	TeamName       [16]uint16
+	TeamName2      [16]uint16
 	TeamFlag       [2048]uint8
 	TeamRewards    [2]uint32
 }

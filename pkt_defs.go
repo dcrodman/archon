@@ -77,7 +77,7 @@ const (
 const (
 	BlockListType     = 0x07
 	LobbyListType     = 0x83
-	CharacterDataType = 0xE7
+	FullCharacterType = 0xE7
 )
 
 // Packet types common to multiple servers.
@@ -395,5 +395,5 @@ type LobbyListPacket struct {
 // Full representation of a character send to the client on login.
 type FullCharacterPacket struct {
 	Header   BBHeader
-	CharData *Character
+	CharData *FullCharacter
 }
