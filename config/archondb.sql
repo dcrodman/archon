@@ -1,13 +1,13 @@
 
 DROP TABLE IF EXISTS account_data;
 CREATE TABLE account_data (
+  guildcard int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username varchar(17) NOT NULL,
   password char(64) NOT NULL,
   email varchar(255),
   registration_date timestamp DEFAULT NOW(),
   lastip varchar(16),
   lasthwinfo tinyblob,
-  guildcard int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   is_gm boolean  DEFAULT false,
   is_banned boolean DEFAULT false,
   is_active boolean DEFAULT false,
@@ -22,11 +22,11 @@ CREATE INDEX login_index ON account_data (username, password);
 CREATE TABLE player_options (
   guildcard int(11) PRIMARY KEY,
   key_config blob,
-  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
+  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard) ON DELETE CASCADE
 );
 
 CREATE TABLE characters (
-  guildcard int(11),
+  guildcard int(11) REFERENCES account_data(guildcard),
   slot_num tinyint(2),
   experience int DEFAULT 0,
   level smallint DEFAULT 0,
@@ -59,16 +59,18 @@ CREATE TABLE characters (
   evp smallint,
   hp smallint,
   dfp smallint,
+  tp smallint,
   ata smallint,
   lck smallint,
   meseta int,
-  bank_use int DEFAULT 0,
-  bank_meseta int DEFAULT 0,
-  FOREIGN KEY (guildcard) REFERENCES account_data(guildcard)
+  PRIMARY KEY (guildcard, slot_num)
 );
 
--- Keep an index to make queries from paket E3 fast.
-CREATE INDEX character_index ON characters(guildcard, slot_num);
+CREATE TABLE character_inventory (
+  guildcard int(11) REFERENCES characters(guildcard),
+  slot_num tinyint(2),
+  PRIMARY KEY (guildcard, slot_num) ON DELETE CASCADE
+);
 
 CREATE TABLE guildcard_entries (
   guildcard int(11) PRIMARY KEY,
