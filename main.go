@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	ServerConfigDir  = "/usr/local/share/archon"
+	ServerConfigDir  = "/usr/local/etc/archon"
 	ServerConfigFile = "server_config.json"
 	CertificateFile  = "certificate.pem"
 	KeyFile          = "key.pem"
