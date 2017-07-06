@@ -20,7 +20,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/dcrodman/archon/util"
 	_ "github.com/go-sql-driver/mysql"
 	"io"
