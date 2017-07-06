@@ -458,7 +458,8 @@ func (server *LoginServer) Init() {
 
 	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
 	// all seem to rely on this file, so we'll do the same.
-	statsFile, _ := os.Open("parameters/PlyLevelTbl.prs")
+	paramDir := config.ParametersDir
+	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
 		fmt.Println("Error reading stats file: " + err.Error())
