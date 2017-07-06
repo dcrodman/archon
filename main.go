@@ -91,8 +91,10 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 			os.Exit(1)
 		}
 
+		wg.Add(1)
 		go func(serv Server) {
-			wg.Add(1)
+			defer fmt.Println(serv.Name() + " shutdown.")
+			fmt.Println(serv.Name() + " running.")
 			// Poll until we can accept more clients.
 			for d.conns.Count() < config.MaxConnections {
 				conn, err := socket.AcceptTCP()
