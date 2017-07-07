@@ -115,7 +115,7 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 	}
 	// Pass through again to prevent the output from changing due to race cond.
 	for _, s := range d.servers {
-		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), d.host, s.Port())
+		fmt.Printf("%s will wait for connections on %v:%v\n", s.Name(), d.host, s.Port())
 	}
 	d.log.Infof("Dispatcher: Server Initialized")
 }
