@@ -236,7 +236,18 @@ func (server PatchServer) Port() string { return config.PatchPort }
 
 func (server *PatchServer) Init() {
 	wd, _ := os.Getwd()
-	os.Chdir(config.PatchDir)
+
+	// Enter patch directory, making it if it doesn't exist.
+	if err := os.Chdir(config.PatchDir); err != nil {
+		if err = os.Mkdir(config.PatchDir, 0777); err != nil {
+			fmt.Println("Failed to create patch directory.")
+			os.Exit(1)
+		}
+		if err = os.Chdir(config.PatchDir); err != nil {
+			fmt.Println("Failed to enter patch directory: " + err.Error())
+			os.Exit(1)
+		}
+	}
 
 	// Construct our patch tree from the specified directory.
 	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
