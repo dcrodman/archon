@@ -40,6 +40,7 @@ import (
 // with the intent that they be considered immutable.
 type Config struct {
 	Hostname string
+	ExternalIP string
 	// Patch ports.
 	PatchPort string
 	DataPort  string
@@ -92,6 +93,7 @@ type Config struct {
 // that some configurations can remain simpler.
 var config *Config = &Config{
 	Hostname:       "127.0.0.1",
+	ExternalIP:     "127.0.0.1",
 	PatchPort:      "11000",
 	DataPort:       "11001",
 	LoginPort:      "12000",
@@ -183,7 +185,7 @@ func (config *Config) HostnameBytes() [4]byte {
 	// Hacky, but chances are the IP address isn't going to start with 0 and a
 	// fixed-length array can't be null.
 	if config.cachedHostBytes[0] == 0x00 {
-		parts := strings.Split(config.Hostname, ".")
+		parts := strings.Split(config.ExternalIP, ".")
 		for i := 0; i < 4; i++ {
 			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
 			config.cachedHostBytes[i] = uint8(tmp)
