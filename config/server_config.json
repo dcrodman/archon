@@ -1,5 +1,6 @@
 { 
 	"Hostname" : "127.0.0.1",
+	"ExternalIP" : "127.0.0.1",
 	"PatchPort" : "11000",
 	"DataPort" : "11001",
 	"LoginPort" : "12000",
