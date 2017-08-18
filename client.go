@@ -20,7 +20,6 @@
 package main
 
 import (
-	"container/list"
 	"errors"
 	"fmt"
 	crypto "github.com/dcrodman/archon/encryption"
@@ -28,7 +27,6 @@ import (
 	"io"
 	"net"
 	"strings"
-	"sync"
 )
 
 // Client struct intended to be included as part of the client definitions
@@ -74,29 +72,46 @@ func NewClient(conn *net.TCPConn, hdrSize uint16, cCrypt, sCrypt *crypto.PSOCryp
 	return c
 }
 
-func (c *Client) IPAddr() string { return c.ipAddr }
+func (c *Client) IPAddr() string {
+	return c.ipAddr
+}
 
-func (c *Client) ClientVector() []uint8 { return c.clientCrypt.Vector }
+func (c *Client) ClientVector() []uint8 {
+	return c.clientCrypt.Vector
+}
 
-func (c *Client) ServerVector() []uint8 { return c.serverCrypt.Vector }
+func (c *Client) ServerVector() []uint8 {
+	return c.serverCrypt.Vector
+}
 
-func (c *Client) Data() []byte { return c.buffer }
+// Data returns the current contents of the buffer read from the client.
+func (c *Client) Data() []byte {
+	return c.buffer
+}
 
-func (c *Client) Close() { c.conn.Close() }
-
+// Send all data contained in the slice to the client.
 func (c *Client) Send(data []byte) error {
 	_, err := c.conn.Write(data)
 	return err
 }
 
+// Encrypt a block of data of the given size in-place using the server's cipher
+// in order to prep it for sending to the client.
 func (c *Client) Encrypt(data []byte, size uint32) {
 	c.serverCrypt.Encrypt(data, size)
 }
 
+// Decrypt a block of data of the given size in-place using the client's cipher
+// in order to prep it for reading.
 func (c *Client) Decrypt(data []byte, size uint32) {
 	c.clientCrypt.Decrypt(data, size)
 }
 
+// Process blocks until we read the next packet from the client. Once we get the full
+// packet, this method decrypts and stores it in the client's buffer variable.
+//
+// Warning: Calling this method without first grabbing the data from the buffer will
+// cause you to lose the packet since it overwrites the contents of buffer.
 func (c *Client) Process() error {
 	// Extra bytes left in the buffer will just be ignored.
 	c.recvSize = 0
@@ -159,56 +174,6 @@ func (c *Client) Process() error {
 	return nil
 }
 
-// Synchronized list for maintaining a list of connected clients.
-type ConnList struct {
-	clientList *list.List
-	size       int
-	sync.RWMutex
-}
-
-func NewClientList() *ConnList {
-	return &ConnList{clientList: list.New()}
-}
-
-// Appends a client to the end of the connection list.
-func (cl *ConnList) Add(c *Client) {
-	cl.Lock()
-	cl.clientList.PushBack(c)
-	cl.size++
-	cl.Unlock()
-}
-
-// Returns true if the list has a Client matching the IP address of c.
-// Note that this comparison is by IP address, not element value.
-func (cl *ConnList) Has(c *Client) bool {
-	found := false
-	clAddr := c.IPAddr()
-	cl.RLock()
-	for client := cl.clientList.Front(); client != nil; client = client.Next() {
-		if c.IPAddr() == clAddr {
-			found = true
-			break
-		}
-	}
-	cl.RUnlock()
-	return found
-}
-
-func (cl *ConnList) Remove(c *Client) {
-	cl.Lock()
-	for client := cl.clientList.Front(); client != nil; client = client.Next() {
-		if client.Value == c {
-			cl.clientList.Remove(client)
-			cl.size--
-			break
-		}
-	}
-	cl.Unlock()
-}
-
-func (cl *ConnList) Count() int {
-	cl.RLock()
-	length := cl.size
-	cl.RUnlock()
-	return length
+func (c *Client) Close() {
+	c.conn.Close()
 }

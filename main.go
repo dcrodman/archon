@@ -19,10 +19,11 @@
 package main
 
 import (
+	"container/list"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"github.com/dcrodman/archon/util"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
@@ -36,13 +37,11 @@ import (
 const (
 	ServerConfigDir  = "/usr/local/etc/archon"
 	ServerConfigFile = "server_config.json"
-	CertificateFile  = "certificate.pem"
-	KeyFile          = "key.pem"
+	//CertificateFile  = "certificate.pem"
+	//KeyFile          = "key.pem"
 )
 
-var (
-	log *logrus.Logger
-)
+var log *logrus.Logger
 
 // Server defines the methods implemented by all sub-servers that can be
 // registered and started when the server is brought up.
@@ -61,22 +60,69 @@ type Server interface {
 	Handle(c *Client) error
 }
 
-type Dispatcher struct {
-	host    string
-	servers []Server
-	conns   *ConnList
-	log     *logrus.Logger
+// Synchronized list for maintaining a list of connected clients.
+type clientList struct {
+	clients *list.List
+	sync.RWMutex
+}
+
+func (c *clientList) Add(cl *Client) {
+	c.Lock()
+	c.clients.PushBack(cl)
+	c.Unlock()
+}
+
+func (c *clientList) Remove(cl *Client) {
+	clAddr := cl.IPAddr()
+	c.RLock()
+	for clientElem := c.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
+		client := clientElem.Value.(*Client)
+		if client.IPAddr() == clAddr {
+			c.clients.Remove(clientElem)
+			break
+		}
+	}
+	c.RUnlock()
+}
+
+// Returns true if the list has a Client matching the IP address of c.
+// Note that this comparison is by IP address, not element value.
+func (c *clientList) Has(cl *Client) bool {
+	clAddr := cl.IPAddr()
+	c.RLock()
+	defer c.RUnlock()
+	for clientElem := c.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
+		if cl.IPAddr() == clAddr {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *clientList) Len() int {
+	c.RLock()
+	defer c.RUnlock()
+	return c.clients.Len()
+}
+
+// controller is responsible for standing up the server instances we need and
+// for dispatching handlers for each connected client.
+type controller struct {
+	host        string
+	servers     []Server
+	connections *clientList
 }
 
 // Registers a server instance to be brought up once the dispatcher is run.
-func (d *Dispatcher) register(s Server) {
-	d.servers = append(d.servers, s)
+func (controller *controller) registerServer(s Server) {
+	controller.servers = append(controller.servers, s)
 }
 
-// Iterate over our registered servers, creating a goroutine for each
-// one to listen on its registered port.
-func (d *Dispatcher) start(wg *sync.WaitGroup) {
-	for _, s := range d.servers {
+// Iterate over our registered servers, initializing TCP sockets on each of the
+// defined ports and setting up the connection handlers.
+func (controller *controller) start() *sync.WaitGroup {
+	var wg sync.WaitGroup
+	for _, s := range controller.servers {
 		s.Init()
 		// Open our server socket. All sockets must be open for the server
 		// to launch correctly, so errors are terminal.
@@ -92,49 +138,56 @@ func (d *Dispatcher) start(wg *sync.WaitGroup) {
 		}
 
 		wg.Add(1)
-		go func(serv Server) {
-			defer fmt.Println(serv.Name() + " shutdown.")
-			// Poll until we can accept more clients.
-			for d.conns.Count() < config.MaxConnections {
-				conn, err := socket.AcceptTCP()
-				if err != nil {
-					d.log.Warnf("Failed to accept connection: %v", err.Error())
-					continue
-				}
-				c, err := serv.NewClient(conn)
-				if err != nil {
-					d.log.Warn(err.Error())
-				} else {
-					d.log.Infof("Accepted %s connection from %s", serv.Name(), c.IPAddr())
-					d.dispatch(c, serv)
-				}
-			}
+		go func(s Server, socket *net.TCPListener) {
+			controller.startHandler(s, socket)
 			wg.Done()
-		}(s)
+		}(s, socket)
 	}
-	// Pass through again to prevent the output from changing due to race cond.
-	for _, s := range d.servers {
-		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), d.host, s.Port())
+
+	for _, s := range controller.servers {
+		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), controller.host, s.Port())
 	}
-	d.log.Infof("Dispatcher: Server Initialized")
+	log.Infof("Dispatcher: Server Initialized")
+	return &wg
 }
 
-// Spawn a dedicated Goroutine for Client and handle communications
-// until the connection is closed.
-func (d *Dispatcher) dispatch(c *Client, s Server) {
+// Client connection handling loop, started for each server.
+func (controller *controller) startHandler(server Server, socket *net.TCPListener) {
+	defer fmt.Println(server.Name() + " shutdown.")
+
+	// Poll until we can accept more clients.
+	for controller.connections.Len() < config.MaxConnections {
+		conn, err := socket.AcceptTCP()
+		if err != nil {
+			log.Warnf("Failed to accept connection: %v", err.Error())
+			continue
+		}
+		c, err := server.NewClient(conn)
+		// TODO: Disconnect the client if we already have a matching connection.
+		if err != nil {
+			log.Warn(err.Error())
+		} else {
+			log.Infof("Accepted %s connection from %s", server.Name(), c.IPAddr())
+			controller.handleClient(c, server)
+		}
+	}
+}
+
+// Spawn a dedicated goroutine for each Client for the length of each connection.
+func (controller *controller) handleClient(c *Client, s Server) {
 	go func() {
-		// Defer so that we catch any panics, d/c the client, and
+		// Defer so that we catch any panics, disconnect the client, and
 		// remove them from the list regardless of the connection state.
 		defer func() {
 			if err := recover(); err != nil {
-				d.log.Errorf("Error in client communication: %s: %s\n%s\n",
+				log.Errorf("Error in client communication: %s: %s\n%s\n",
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
-			d.conns.Remove(c)
-			d.log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
+			controller.connections.Remove(c)
+			log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
-		d.conns.Add(c)
+		controller.connections.Add(c)
 
 		// Connection loop; process packets until the connection is closed.
 		var pktHeader PCHeader
@@ -144,7 +197,7 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 				break
 			} else if err != nil {
 				// Error communicating with the client.
-				d.log.Warn(err.Error())
+				log.Warn(err.Error())
 				break
 			}
 
@@ -158,41 +211,11 @@ func (d *Dispatcher) dispatch(c *Client, s Server) {
 			}
 
 			if err = s.Handle(c); err != nil {
-				d.log.Warn("Error in client communication: " + err.Error())
+				log.Warn("Error in client communication: " + err.Error())
 				return
 			}
 		}
 	}()
-}
-
-func initLogger(filename string) {
-	var w io.Writer
-	var err error
-	if filename != "" {
-		w, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Println("ERROR: Failed to open log file " + config.Logfile)
-			os.Exit(1)
-		}
-	} else {
-		w = os.Stdout
-	}
-
-	logLvl, err := logrus.ParseLevel(config.LogLevel)
-	if err != nil {
-		fmt.Println("ERROR: Failed to parse log level: " + err.Error())
-		os.Exit(1)
-	}
-	log = &logrus.Logger{
-		Out: w,
-		Formatter: &logrus.TextFormatter{
-			TimestampFormat: "2006-1-_2 15:04:05",
-			FullTimestamp:   true,
-			DisableSorting:  true,
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logLvl,
-	}
 }
 
 func main() {
@@ -227,7 +250,7 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("Done.\n")
+	fmt.Print("Done.\n\n")
 	defer config.CloseDB()
 
 	// If we're in debug mode, spawn off an HTTP server that, when hit, dumps
@@ -242,32 +265,59 @@ func main() {
 	initLogger(config.Logfile)
 
 	// Register all of the server handlers and their corresponding ports.
-	dispatcher := Dispatcher{
-		host:    config.Hostname,
-		servers: make([]Server, 0),
-		conns:   NewClientList(),
-		log:     log,
+	c := controller{
+		host:        config.Hostname,
+		servers:     make([]Server, 0),
+		connections: new(clientList),
 	}
 
-	dispatcher.register(new(PatchServer))
-	dispatcher.register(new(DataServer))
-	dispatcher.register(new(LoginServer))
-	dispatcher.register(new(CharacterServer))
-	dispatcher.register(new(ShipgateServer))
-	dispatcher.register(new(ShipServer))
+	c.registerServer(new(PatchServer))
+	c.registerServer(new(DataServer))
+	c.registerServer(new(LoginServer))
+	c.registerServer(new(CharacterServer))
+	c.registerServer(new(ShipgateServer))
+	c.registerServer(new(ShipServer))
 
 	// The available block ports will depend on how the server is configured,
 	// so once we've read the config then add the server entries on the fly.
 	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
 	for i := 1; i <= config.NumBlocks; i++ {
-		dispatcher.register(&BlockServer{
+		c.registerServer(&BlockServer{
 			name: fmt.Sprintf("BLOCK%d", i),
 			port: strconv.FormatInt(shipPort+int64(i), 10),
 		})
 	}
 
 	// Start up all of our servers and block until they exit.
-	var wg sync.WaitGroup
-	dispatcher.start(&wg)
-	wg.Wait()
+	c.start().Wait()
+}
+
+func initLogger(filename string) {
+	var w io.Writer
+	var err error
+	if filename != "" {
+		w, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Println("ERROR: Failed to open log file " + config.Logfile)
+			os.Exit(1)
+		}
+	} else {
+		w = os.Stdout
+	}
+
+	logLvl, err := logrus.ParseLevel(config.LogLevel)
+	if err != nil {
+		fmt.Println("ERROR: Failed to parse log level: " + err.Error())
+		os.Exit(1)
+	}
+	log = &logrus.Logger{
+		Out: w,
+		Formatter: &logrus.TextFormatter{
+			TimestampFormat: "2006-1-_2 15:04:05",
+			FullTimestamp:   true,
+			DisableSorting:  true,
+		},
+		Hooks: make(logrus.LevelHooks),
+		Level: logLvl,
+	}
 }
