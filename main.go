@@ -151,7 +151,7 @@ func (controller *controller) start() *sync.WaitGroup {
 	for _, s := range controller.servers {
 		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), controller.host, s.Port())
 	}
-	log.Infof("Dispatcher: Server Initialized")
+	log.Infof("Controller: Server Initialized")
 	return &wg
 }
 
@@ -275,6 +275,7 @@ func main() {
 		connections: &clientList{clients: list.New()},
 	}
 
+	c.registerServer(new(PatchServer))
 	c.registerServer(new(DataServer))
 	c.registerServer(new(LoginServer))
 	c.registerServer(new(CharacterServer))

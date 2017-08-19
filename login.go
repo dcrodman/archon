@@ -454,7 +454,6 @@ func (server LoginServer) loadParameterFiles() error {
 }
 
 func (server *LoginServer) Init() error {
-	fmt.Println("Init start()")
 	if err := server.loadParameterFiles(); err != nil {
 		return err
 	}
