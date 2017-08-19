@@ -89,10 +89,41 @@ func (c *Client) Data() []byte {
 	return c.buffer
 }
 
-// Send all data contained in the slice to the client.
-func (c *Client) Send(data []byte) error {
-	_, err := c.conn.Write(data)
-	return err
+func (c *Client) SendEncrypted(data []byte, length uint16) error {
+	data, length = fixLength(data, length, c.hdrSize)
+
+	if config.DebugMode {
+		util.PrintPayload(data, int(length))
+		fmt.Println()
+	}
+
+	c.Encrypt(data, uint32(length))
+	return c.SendRaw(data, length)
+}
+
+// fixLength pads the length of a packet to a multiple of 8 and set the first two bytes of the header.
+func fixLength(data []byte, length uint16, hdrSize uint16) ([]byte, uint16) {
+	for length%hdrSize != 0 {
+		length++
+		data = append(data, 0)
+	}
+	data[0] = byte(length & 0xFF)
+	data[1] = byte((length & 0xFF00) >> 8)
+	return data, length
+}
+
+// SendRow writes all data contained in the slice to the client as-is.
+// Note: Packets sent to BB Clients must have a length divisible by 8.
+func (c *Client) SendRaw(data []byte, length uint16) error {
+	bytesSent := 0
+	for bytesSent < int(length) {
+		b, err := c.conn.Write(data[:length])
+		if err != nil {
+			return fmt.Errorf("Error sending to client %v: %s", c.IPAddr(), err.Error())
+		}
+		bytesSent += b
+	}
+	return nil
 }
 
 // Encrypt a block of data of the given size in-place using the server's cipher
