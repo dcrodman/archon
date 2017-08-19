@@ -51,7 +51,7 @@ type Server interface {
 	// Port on which the server should listen for connections.
 	Port() string
 	// Perform any pre-startup initialization.
-	Init()
+	Init() error
 	// Client factory responsible for performing whatever initialization is
 	// needed for Client objects to represent new connections.
 	NewClient(conn *net.TCPConn) (*Client, error)
@@ -123,7 +123,11 @@ func (controller *controller) registerServer(s Server) {
 func (controller *controller) start() *sync.WaitGroup {
 	var wg sync.WaitGroup
 	for _, s := range controller.servers {
-		s.Init()
+		if err := s.Init(); err != nil {
+			fmt.Printf("Error initializing %s: %s\n", s.Name(), err.Error())
+			return nil
+		}
+
 		// Open our server socket. All sockets must be open for the server
 		// to launch correctly, so errors are terminal.
 		hostAddr, err := net.ResolveTCPAddr("tcp", config.Hostname+":"+s.Port())
@@ -244,7 +248,7 @@ func main() {
 
 	// Initialize the database.
 	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
-	err = config.InitDb()
+	err = config.InitDB()
 	if err != nil {
 		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
 		fmt.Printf("Error: %s\n", err)
@@ -268,10 +272,9 @@ func main() {
 	c := controller{
 		host:        config.Hostname,
 		servers:     make([]Server, 0),
-		connections: new(clientList),
+		connections: &clientList{clients: list.New()},
 	}
 
-	c.registerServer(new(PatchServer))
 	c.registerServer(new(DataServer))
 	c.registerServer(new(LoginServer))
 	c.registerServer(new(CharacterServer))
@@ -289,7 +292,10 @@ func main() {
 	}
 
 	// Start up all of our servers and block until they exit.
-	c.start().Wait()
+	wg := c.start()
+	if wg != nil {
+		wg.Wait()
+	}
 }
 
 func initLogger(filename string) {

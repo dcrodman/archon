@@ -407,7 +407,7 @@ func (server LoginServer) Port() string { return config.LoginPort }
 
 // Load the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
-func (server LoginServer) loadParameterFiles() {
+func (server LoginServer) loadParameterFiles() error {
 	offset := 0
 	var tmpChunkData []byte
 
@@ -416,8 +416,7 @@ func (server LoginServer) loadParameterFiles() {
 	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
 		if err != nil {
-			fmt.Println("Error reading parameter file: " + err.Error())
-			os.Exit(1)
+			return errors.New("Error reading parameter file: " + err.Error())
 		}
 		fileSize := len(data)
 
@@ -435,7 +434,7 @@ func (server LoginServer) loadParameterFiles() {
 		paramHeaderData = append(paramHeaderData, bytes...)
 
 		tmpChunkData = append(tmpChunkData, data...)
-		fmt.Printf("%s (%v bytes, checksum: %v\n", paramFile, fileSize, entry.Checksum)
+		fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
 	}
 
 	// Offset should at this point be the total size of the files
@@ -451,10 +450,14 @@ func (server LoginServer) loadParameterFiles() {
 	if offset > 0 {
 		paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
 	}
+	return nil
 }
 
-func (server *LoginServer) Init() {
-	server.loadParameterFiles()
+func (server *LoginServer) Init() error {
+	fmt.Println("Init start()")
+	if err := server.loadParameterFiles(); err != nil {
+		return err
+	}
 
 	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
 	// all seem to rely on this file, so we'll do the same.
@@ -462,9 +465,9 @@ func (server *LoginServer) Init() {
 	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
-		fmt.Println("Error reading stats file: " + err.Error())
-		os.Exit(1)
+		return errors.New("Error reading stats file: " + err.Error())
 	}
+
 	decompressedSize := prs.DecompressSize(compressed)
 	decompressed := make([]byte, decompressedSize)
 	prs.Decompress(compressed, decompressed)
@@ -475,7 +478,9 @@ func (server *LoginServer) Init() {
 
 	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
 	server.charRedirectPort = uint16(charPort)
+
 	fmt.Println()
+	return nil
 }
 
 func (server LoginServer) NewClient(conn *net.TCPConn) (*Client, error) {
@@ -506,7 +511,7 @@ func (server CharacterServer) Name() string { return "CHARACTER" }
 
 func (server CharacterServer) Port() string { return config.CharacterPort }
 
-func (server *CharacterServer) Init() {}
+func (server *CharacterServer) Init() error { return nil }
 
 func (server CharacterServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewLoginClient(conn)

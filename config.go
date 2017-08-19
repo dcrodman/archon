@@ -39,7 +39,7 @@ import (
 // The fields are intentionally exported to cut down on verbosity
 // with the intent that they be considered immutable.
 type Config struct {
-	Hostname string
+	Hostname   string
 	ExternalIP string
 	// Patch ports.
 	PatchPort string
@@ -153,7 +153,7 @@ func (config *Config) InitFromFile(fileName string) error {
 }
 
 // Establish a connection to the database and ping it to verify.
-func (config *Config) InitDb() error {
+func (config *Config) InitDB() error {
 	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
 		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
 

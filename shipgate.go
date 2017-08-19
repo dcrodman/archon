@@ -335,7 +335,7 @@ func (server ShipgateServer) Name() string { return "Shipgate" }
 
 func (server ShipgateServer) Port() string { return config.ShipgatePort }
 
-func (server *ShipgateServer) Init() {
+func (server *ShipgateServer) Init() error {
 	// Create our ship entry for the built-in ship server. Any other connected
 	// ships will be added to this list by the shipgate, if it's enabled.
 	s := &shipList[0]
@@ -344,6 +344,7 @@ func (server *ShipgateServer) Init() {
 	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
 	s.port = uint16(port)
 	copy(s.name[:], config.ShipName)
+	return nil
 }
 
 func (server ShipgateServer) NewClient(conn *net.TCPConn) (*Client, error) {

@@ -85,7 +85,7 @@ func (server ShipServer) Name() string { return "SHIP" }
 
 func (server ShipServer) Port() string { return config.ShipPort }
 
-func (server *ShipServer) Init() {
+func (server *ShipServer) Init() error {
 	// Precompute the block list packet since it's not going to change.
 	numBlocks := config.NumBlocks
 	ship := shipList[0]
@@ -110,6 +110,7 @@ func (server *ShipServer) Init() {
 	b.Unknown = 0x12
 	b.BlockId = BackMenuItem
 	copy(b.BlockName[:], util.ConvertToUtf16("Ship Selection"))
+	return nil
 }
 
 func (server ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
@@ -153,7 +154,7 @@ func (server BlockServer) Name() string { return server.name }
 
 func (server BlockServer) Port() string { return server.port }
 
-func (server *BlockServer) Init() {
+func (server *BlockServer) Init() error {
 	// Precompute our lobby list since this won't change once the server has started.
 	server.lobbyPkt.Header.Size = BBHeaderSize
 	server.lobbyPkt.Header.Type = LobbyListType
@@ -170,6 +171,7 @@ func (server *BlockServer) Init() {
 		})
 		server.lobbyPkt.Header.Size += 12
 	}
+	return nil
 }
 
 func (server BlockServer) NewClient(conn *net.TCPConn) (*Client, error) {

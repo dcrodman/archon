@@ -234,20 +234,20 @@ func (server PatchServer) Name() string { return "PATCH" }
 
 func (server PatchServer) Port() string { return config.PatchPort }
 
-func (server *PatchServer) Init() {
+func (server *PatchServer) Init() error {
 	wd, _ := os.Getwd()
-	os.Chdir(config.PatchDir)
+	if err := os.Chdir(config.PatchDir); err != nil {
+		return errors.New("Unable to cd to patches directory: " + err.Error())
+	}
 
 	// Construct our patch tree from the specified directory.
 	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
 	if err := loadPatches(&patchTree, "."); err != nil {
-		fmt.Printf("Failed to load patches: %s\n", err.Error())
-		os.Exit(1)
+		return errors.New("Failed to load patches: " + err.Error())
 	}
 	buildPatchIndex(&patchTree)
 	if len(patchIndex) < 1 {
-		fmt.Println("Failed: At least one patch file must be present.")
-		os.Exit(1)
+		return errors.New("Failed: At least one patch file must be present.")
 	}
 	os.Chdir(wd)
 
@@ -255,6 +255,7 @@ func (server *PatchServer) Init() {
 	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
 	dataRedirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 	fmt.Println()
+	return nil
 }
 
 func (server PatchServer) NewClient(conn *net.TCPConn) (*Client, error) {
@@ -285,7 +286,7 @@ func (server DataServer) Name() string { return "DATA" }
 
 func (server DataServer) Port() string { return config.DataPort }
 
-func (server *DataServer) Init() {}
+func (server *DataServer) Init() error { return nil }
 
 func (server DataServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewPatchClient(conn)
