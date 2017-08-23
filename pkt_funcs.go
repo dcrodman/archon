@@ -51,40 +51,10 @@ func sendPacket(c *Client, pkt []byte, length uint16) int {
 
 // Deprecated
 func sendEncrypted(c *Client, data []byte, length uint16) int {
-	if err := c.SendEncrypted(data, length); err != nil {
+	if err := c.SendEncrypted(data, int(length)); err != nil {
 		return -1
 	}
 	return 0
-}
-
-// Send the welcome packet to a client with the copyright message and encryption vectors.
-func (client *Client) SendPCWelcome() int {
-	pkt := new(PatchWelcomePkt)
-	pkt.Header.Type = PatchWelcomeType
-	pkt.Header.Size = 0x4C
-	copy(pkt.Copyright[:], patchCopyrightBytes)
-	copy(pkt.ClientVector[:], client.ClientVector())
-	copy(pkt.ServerVector[:], client.ServerVector())
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Welcome Packet")
-		util.PrintPayload(data, size)
-		fmt.Println()
-	}
-	return sendPacket(client, data, uint16(size))
-}
-
-func (client *Client) SendWelcomeAck() int {
-	pkt := &PCHeader{
-		Size: 0x04,
-		Type: PatchLoginType, // treated as an ack
-	}
-	data, _ := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Welcome Ack")
-	}
-	return sendEncrypted(client, data, 0x0004)
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.

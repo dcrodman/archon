@@ -89,15 +89,15 @@ func (c *Client) Data() []byte {
 	return c.buffer
 }
 
-func (c *Client) SendEncrypted(data []byte, length uint16) error {
-	data, length = fixLength(data, length, c.hdrSize)
+func (c *Client) SendEncrypted(data []byte, length int) error {
+	bytes, blen := fixLength(data, uint16(length), c.hdrSize)
 	if config.DebugMode {
-		util.PrintPayload(data, int(length))
+		util.PrintPayload(bytes, int(blen))
 		fmt.Println()
 	}
 
-	c.Encrypt(data, uint32(length))
-	return c.SendRaw(data, length)
+	c.Encrypt(bytes, uint32(blen))
+	return c.SendRaw(bytes, blen)
 }
 
 // fixLength pads the length of a packet to a multiple of 8 and set the first two bytes of the header.
