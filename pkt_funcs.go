@@ -20,7 +20,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/dcrodman/archon/util"
 	"syscall"
@@ -41,6 +40,7 @@ var (
 	serverName          = util.ConvertToUtf16("Archon")
 )
 
+// Deprecated
 func sendPacket(c *Client, pkt []byte, length uint16) int {
 	if err := c.SendRaw(pkt[:length], length); err != nil {
 		log.Info("Error sending to client %v: %s", c.IPAddr(), err.Error())
@@ -49,23 +49,12 @@ func sendPacket(c *Client, pkt []byte, length uint16) int {
 	return 0
 }
 
-// Send data to client after padding it to a length disible by 8 and
-// encrypting it with the client's server ciper.
+// Deprecated
 func sendEncrypted(c *Client, data []byte, length uint16) int {
 	if err := c.SendEncrypted(data, length); err != nil {
 		return -1
 	}
 	return 0
-}
-
-// Send a simple 4-byte header packet.
-func (client *Client) sendPCHeader(pktType uint16) int {
-	pkt := &PCHeader{Type: pktType, Size: 0x04}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		util.PrintPayload(data, size)
-	}
-	return sendEncrypted(client, data, uint16(size))
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
@@ -96,72 +85,6 @@ func (client *Client) SendWelcomeAck() int {
 		fmt.Println("Sending Welcome Ack")
 	}
 	return sendEncrypted(client, data, 0x0004)
-}
-
-// Send the total number and cumulative size of files that need updating.
-func (client *Client) SendUpdateFiles(num, totalSize uint32) int {
-	pkt := new(UpdateFilesPacket)
-	pkt.Header.Type = PatchUpdateFilesType
-	pkt.NumFiles = num
-	pkt.TotalSize = totalSize
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Update Files")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the header for a file we're about to update.
-func (client *Client) SendFileHeader(patch *PatchEntry) int {
-	pkt := new(FileHeaderPacket)
-	pkt.Header.Type = PatchFileHeaderType
-	pkt.FileSize = patch.fileSize
-	copy(pkt.Filename[:], patch.filename)
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending File Header")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send a chunk of file data.
-func (client *Client) SendFileChunk(chunk, chksm, chunkSize uint32, fdata []byte) int {
-	if chunkSize > MaxFileChunkSize {
-		log.Error("Attempted to send %v byte chunk; max is %v",
-			string(chunkSize), string(MaxFileChunkSize))
-		panic(errors.New("File chunk size exceeds maximum"))
-	}
-	pkt := &FileChunkPacket{
-		Header:   PCHeader{Type: PatchFileChunkType},
-		Chunk:    chunk,
-		Checksum: chksm,
-		Size:     chunkSize,
-		Data:     fdata[:chunkSize],
-	}
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending File Chunk")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Finished sending a particular file.
-func (client *Client) SendFileComplete() int {
-	if config.DebugMode {
-		fmt.Println("Sending File Complete")
-	}
-	return client.sendPCHeader(PatchFileCompleteType)
-}
-
-// We've finished updating files.
-func (client *Client) SendUpdateComplete() int {
-	if config.DebugMode {
-		fmt.Println("Sending File Update Done")
-	}
-	return client.sendPCHeader(PatchUpdateCompleteType)
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.

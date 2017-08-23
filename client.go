@@ -91,7 +91,6 @@ func (c *Client) Data() []byte {
 
 func (c *Client) SendEncrypted(data []byte, length uint16) error {
 	data, length = fixLength(data, length, c.hdrSize)
-
 	if config.DebugMode {
 		util.PrintPayload(data, int(length))
 		fmt.Println()

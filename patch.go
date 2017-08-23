@@ -302,10 +302,13 @@ func (server *DataServer) HandlePatchLogin(c *Client) error {
 
 // Acknowledgement sent after the DATA connection handshake.
 func (server *DataServer) sendDataAck(client *Client) int {
+	pkt := &PCHeader{Type: PatchDataAckType, Size: 0x04}
+	data, size := util.BytesFromStruct(pkt)
+
 	if config.DebugMode {
 		fmt.Println("Sending Data Ack")
 	}
-	return client.sendPCHeader(PatchDataAckType)
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
@@ -338,18 +341,24 @@ func (server *DataServer) sendChangeDir(client *Client, dir string) int {
 
 // Tell the client to change to one directory above.
 func (server *DataServer) sendDirAbove(client *Client) int {
+	pkt := &PCHeader{Type: PatchDirAboveType, Size: 0x04}
+	data, size := util.BytesFromStruct(pkt)
+
 	if config.DebugMode {
 		fmt.Println("Sending Dir Above")
 	}
-	return client.sendPCHeader(PatchDirAboveType)
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Inform the client that we've finished sending the patch list.
 func (server *DataServer) sendFileListDone(client *Client) int {
+	pkt := &PCHeader{Type: PatchFileListDoneType, Size: 0x04}
+	data, size := util.BytesFromStruct(pkt)
+
 	if config.DebugMode {
 		fmt.Println("Sending List Done")
 	}
-	return client.sendPCHeader(PatchFileListDoneType)
+	return sendEncrypted(client, data, uint16(size))
 }
 
 // Tell the client to check a file in its current working directory.
@@ -427,7 +436,7 @@ func (server *DataServer) UpdateClientFiles(client *Client) error {
 			}
 		}
 	}
-	client.SendUpdateComplete()
+	server.sendUpdateComplete(client)
 	return nil
 }
 
@@ -482,17 +491,24 @@ func (server *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize 
 }
 
 // Finished sending a particular file.
-func (server *DataServer) sendFileComplete(client *Client) int {
+func (server *DataServer) sendFileComplete(client *Client) error {
+	pkt := &PCHeader{Type: PatchFileCompleteType, Size: 0x04}
+	data, size := util.BytesFromStruct(pkt)
+
 	if config.DebugMode {
 		fmt.Println("Sending File Complete")
 	}
-	return client.sendPCHeader(PatchFileCompleteType)
+	sendEncrypted(client, data, uint16(size))
+	return nil
 }
 
 // We've finished updating files.
 func (server *DataServer) sendUpdateComplete(client *Client) int {
+	pkt := &PCHeader{Type: PatchUpdateCompleteType, Size: 0x04}
+	data, size := util.BytesFromStruct(pkt)
+
 	if config.DebugMode {
 		fmt.Println("Sending File Update Done")
 	}
-	return client.sendPCHeader(PatchUpdateCompleteType)
+	return sendEncrypted(client, data, uint16(size))
 }
