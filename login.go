@@ -47,10 +47,6 @@ var (
 	// in the array - 1.
 	shipList []Ship = make([]Ship, 1)
 
-	// Cached parameter data to avoid computing it every time.
-	paramHeaderData []byte
-	paramChunkData  map[int][]byte
-
 	// Parameter files we're expecting. I still don't really know what they're
 	// for yet, so emulating what I've seen others do.
 	paramFiles = []string{
@@ -65,10 +61,6 @@ var (
 		"PlyLevelTbl.prs",
 	}
 
-	// Starting stats for any new character. The CharClass constants can be used
-	// to index into this array to obtain the base stats for each class.
-	BaseStats [12]CharacterStats
-
 	// Id sent in the menu selection packet to tell the client
 	// that the selection was made on the ship menu.
 	ShipSelectionMenuId uint16 = 0x13
@@ -76,9 +68,10 @@ var (
 
 // Entry in the available ships lis on the ship selection menu.
 type ShipMenuEntry struct {
-	MenuId   uint16
-	ShipId   uint32
-	Padding  uint16
+	MenuId  uint16
+	ShipId  uint32
+	Padding uint16
+
 	Shipname [23]byte
 }
 
@@ -141,31 +134,217 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 	return &loginPkt, nil
 }
 
-// Handle the initial login sent to the Login port.
-func handleLogin(client *Client, charPort uint16) error {
+// Create and initialize a new Login client so long as we're able
+// to send the welcome packet to begin encryption.
+func NewLoginClient(conn *net.TCPConn) (*Client, error) {
+	var err error
+	cCrypt := crypto.NewBBCrypt()
+	sCrypt := crypto.NewBBCrypt()
+	lc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
+	if lc.SendWelcome() != 0 {
+		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
+		lc = nil
+	}
+	return lc, err
+}
+
+// Login sub-server definition.
+type LoginServer struct {
+	// Cached and parsed representation of the character port.
+	charRedirectPort uint16
+}
+
+func (server LoginServer) Name() string { return "LOGIN" }
+
+func (server LoginServer) Port() string { return config.LoginPort }
+
+func (server *LoginServer) Init() error {
+	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	server.charRedirectPort = uint16(charPort)
+	return nil
+}
+
+func (server *LoginServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewLoginClient(conn)
+}
+
+func (server *LoginServer) Handle(c *Client) error {
+	var hdr BBHeader
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+
+	var err error
+	switch hdr.Type {
+	case LoginType:
+		err = server.HandleLogin(c)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c.
+		break
+	default:
+		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+	}
+	return err
+}
+
+func (server *LoginServer) HandleLogin(client *Client) error {
 	loginPkt, err := VerifyAccount(client)
 	if err != nil {
 		return err
 	}
+
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
 	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
 		client.SendSecurity(BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
 	}
+
 	// Newserv sets this field when the client first connects. I think this is
 	// used to indicate that the client has made it through the LOGIN server,
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
 	client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
-	client.SendRedirect(charPort, config.HostnameBytes())
+	client.SendRedirect(server.charRedirectPort, config.HostnameBytes())
 	return nil
 }
 
-// Handle initial login sent to the character port.
-func handleCharLogin(client *Client) error {
-	var err error = nil
+// Character sub-server definition.
+type CharacterServer struct {
+	// Cached parameter data to avoid computing it every time.
+	paramHeaderData []byte
+	paramChunkData  map[int][]byte
+
+	// Starting stats for any new character. The CharClass constants can be used
+	// to index into this array to obtain the base stats for each class.
+	BaseStats [12]CharacterStats
+}
+
+func (server CharacterServer) Name() string { return "CHARACTER" }
+
+func (server CharacterServer) Port() string { return config.CharacterPort }
+
+func (server *CharacterServer) Init() error {
+	if err := server.loadParameterFiles(); err != nil {
+		return err
+	}
+
+	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
+	// all seem to rely on this file, so we'll do the same.
+	paramDir := config.ParametersDir
+	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
+	compressed, err := ioutil.ReadAll(statsFile)
+	if err != nil {
+		return errors.New("Error reading stats file: " + err.Error())
+	}
+
+	decompressedSize := prs.DecompressSize(compressed)
+	decompressed := make([]byte, decompressedSize)
+	prs.Decompress(compressed, decompressed)
+
+	for i := 0; i < 12; i++ {
+		util.StructFromBytes(decompressed[i*14:], &server.BaseStats[i])
+	}
+
+	fmt.Println()
+	return nil
+}
+
+// Load the PSOBB parameter files, build the parameter header,
+// and init/cache the param file chunks for the EB packets.
+func (server *CharacterServer) loadParameterFiles() error {
+	offset := 0
+	var tmpChunkData []byte
+
+	paramDir := config.ParametersDir
+	fmt.Printf("Loading parameters from %s...\n", paramDir)
+	for _, paramFile := range paramFiles {
+		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
+		if err != nil {
+			return errors.New("Error reading parameter file: " + err.Error())
+		}
+		fileSize := len(data)
+
+		entry := new(parameterEntry)
+		entry.Size = uint32(fileSize)
+		entry.Checksum = crc32.ChecksumIEEE(data)
+		entry.Offset = uint32(offset)
+		copy(entry.Filename[:], []uint8(paramFile))
+
+		offset += fileSize
+
+		// We don't care what the actual entries are for the packet, so just append
+		// the bytes to save us having to do the conversion every time.
+		bytes, _ := util.BytesFromStruct(entry)
+		server.paramHeaderData = append(server.paramHeaderData, bytes...)
+
+		tmpChunkData = append(tmpChunkData, data...)
+		fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
+	}
+
+	// Offset should at this point be the total size of the files
+	// to send - break it all up into indexable chunks.
+	server.paramChunkData = make(map[int][]byte)
+	chunks := offset / MaxChunkSize
+	for i := 0; i < chunks; i++ {
+		dataOff := i * MaxChunkSize
+		server.paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
+		offset -= MaxChunkSize
+	}
+	// Add any remaining data
+	if offset > 0 {
+		server.paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
+	}
+	return nil
+}
+
+func (server *CharacterServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewLoginClient(conn)
+}
+
+func (server *CharacterServer) Handle(c *Client) error {
+	var hdr BBHeader
+	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+
+	var err error
+	switch hdr.Type {
+	case LoginType:
+		err = server.HandleCharLogin(c)
+	case DisconnectType:
+		// Just wait until we recv 0 from the client to d/c.
+		break
+	case LoginOptionsRequestType:
+		err = server.HandleKeyConfig(c)
+	case LoginCharPreviewReqType:
+		err = server.HandleCharacterSelect(c)
+	case LoginChecksumType:
+		// Everybody else seems to ignore this, so...
+		c.SendChecksumAck(1)
+	case LoginGuildcardReqType:
+		err = server.HandleGuildcardDataStart(c)
+	case LoginGuildcardChunkReqType:
+		server.HandleGuildcardChunk(c)
+	case LoginParameterHeaderReqType:
+		c.SendParameterHeader(uint32(len(paramFiles)), server.paramHeaderData)
+	case LoginParameterChunkReqType:
+		var pkt BBHeader
+		util.StructFromBytes(c.Data(), &pkt)
+		c.SendParameterChunk(server.paramChunkData[int(pkt.Flags)], pkt.Flags)
+	case LoginSetFlagType:
+		var pkt SetFlagPacket
+		util.StructFromBytes(c.Data(), &pkt)
+		c.flag = pkt.Flag
+	case LoginCharPreviewType:
+		err = server.HandleCharacterUpdate(c)
+	case MenuSelectType:
+		err = server.HandleShipSelection(c)
+	default:
+		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+	}
+	return err
+}
+
+func (server *CharacterServer) HandleCharLogin(client *Client) error {
+	var err error
 	if pkt, err := VerifyAccount(client); err == nil {
 		client.SendSecurity(BBLoginErrorNone, client.guildcard, client.teamId)
 		// At this point, if we've chosen (or created) a character then the
@@ -181,7 +360,7 @@ func handleCharLogin(client *Client) error {
 
 // Handle the options request - load key config and other option data from the
 // datebase or provide defaults for new accounts.
-func handleKeyConfig(client *Client) error {
+func (server *CharacterServer) HandleKeyConfig(client *Client) error {
 	optionData := make([]byte, 420)
 	archondb := config.DB()
 
@@ -205,7 +384,7 @@ func handleKeyConfig(client *Client) error {
 // Handle the character select/preview request. Will either return information
 // about a character given a particular slot in via 0xE5 response or ack the
 // selection with an 0xE4 (also used for an empty slot).
-func handleCharacterSelect(client *Client) error {
+func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 	var pkt CharSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
 	prev := new(CharacterPreview)
@@ -251,7 +430,7 @@ func handleCharacterSelect(client *Client) error {
 
 // Load the player's saved guildcards, build the chunk data, and
 // send the chunk header.
-func handleGuildcardDataStart(client *Client) error {
+func (server *CharacterServer) HandleGuildcardDataStart(client *Client) error {
 	archondb := config.DB()
 	rows, err := archondb.Query(
 		"SELECT friend_gc, name, team_name, description, language, "+
@@ -267,7 +446,7 @@ func handleGuildcardDataStart(client *Client) error {
 	// Maximum of 140 entries can be sent.
 	for i := 0; rows.Next() && i < 140; i++ {
 		// TODO: This may not actually work yet, but I haven't gotten to
-		// figuring out how this is used yet.
+		// figuring out how the other servers use it.
 		var name, teamName, desc, comment []uint8
 		entry := &gcData.Entries[i]
 		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc,
@@ -287,18 +466,17 @@ func handleGuildcardDataStart(client *Client) error {
 }
 
 // Send another chunk of the client's guildcard data.
-func handleGuildcardChunk(client *Client) {
+func (server *CharacterServer) HandleGuildcardChunk(client *Client) {
 	var chunkReq GuildcardChunkReqPacket
 	util.StructFromBytes(client.Data(), &chunkReq)
-	if chunkReq.Continue != 0x01 {
-		// Cancelled sending guildcard chunks.
-		return
+	if chunkReq.Continue == 0x01 {
+		client.SendGuildcardChunk(chunkReq.ChunkRequested)
 	}
-	client.SendGuildcardChunk(chunkReq.ChunkRequested)
+	// Anything else is a request to cancel sending guildcard chunks.
 }
 
 // Create or update a character in a slot.
-func handleCharacterUpdate(client *Client) error {
+func (server *CharacterServer) HandleCharacterUpdate(client *Client) error {
 	var charPkt CharPreviewPacket
 	charPkt.Character = new(CharacterPreview)
 	util.StructFromBytes(client.Data(), &charPkt)
@@ -329,7 +507,7 @@ func handleCharacterUpdate(client *Client) error {
 			return err
 		}
 		// Grab our base stats for this character class.
-		stats := BaseStats[p.Class]
+		stats := server.BaseStats[p.Class]
 
 		// TODO: Set up the default inventory and techniques.
 		meseta := 300
@@ -369,7 +547,7 @@ func handleCharacterUpdate(client *Client) error {
 }
 
 // Player selected one of the items on the ship select screen.
-func handleShipSelection(client *Client) error {
+func (server *CharacterServer) HandleShipSelection(client *Client) error {
 	var pkt MenuSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
 	selectedShip := pkt.ItemId - 1
@@ -379,181 +557,4 @@ func handleShipSelection(client *Client) error {
 	s := &shipList[selectedShip]
 	client.SendRedirect(s.port, s.ipAddr)
 	return nil
-}
-
-// Create and initialize a new Login client so long as we're able
-// to send the welcome packet to begin encryption.
-func NewLoginClient(conn *net.TCPConn) (*Client, error) {
-	var err error
-	cCrypt := crypto.NewBBCrypt()
-	sCrypt := crypto.NewBBCrypt()
-	lc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
-	if lc.SendWelcome() != 0 {
-		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
-		lc = nil
-	}
-	return lc, err
-}
-
-// Login sub-server definition.
-type LoginServer struct {
-	// Cached and parsed representation of the character port.
-	charRedirectPort uint16
-}
-
-func (server LoginServer) Name() string { return "LOGIN" }
-
-func (server LoginServer) Port() string { return config.LoginPort }
-
-// Load the PSOBB parameter files, build the parameter header,
-// and init/cache the param file chunks for the EB packets.
-func (server LoginServer) loadParameterFiles() error {
-	offset := 0
-	var tmpChunkData []byte
-
-	paramDir := config.ParametersDir
-	fmt.Printf("Loading parameters from %s...\n", paramDir)
-	for _, paramFile := range paramFiles {
-		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
-		if err != nil {
-			return errors.New("Error reading parameter file: " + err.Error())
-		}
-		fileSize := len(data)
-
-		entry := new(parameterEntry)
-		entry.Size = uint32(fileSize)
-		entry.Checksum = crc32.ChecksumIEEE(data)
-		entry.Offset = uint32(offset)
-		copy(entry.Filename[:], []uint8(paramFile))
-
-		offset += fileSize
-
-		// We don't care what the actual entries are for the packet, so just append
-		// the bytes to save us having to do the conversion every time.
-		bytes, _ := util.BytesFromStruct(entry)
-		paramHeaderData = append(paramHeaderData, bytes...)
-
-		tmpChunkData = append(tmpChunkData, data...)
-		fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
-	}
-
-	// Offset should at this point be the total size of the files
-	// to send - break it all up into indexable chunks.
-	paramChunkData = make(map[int][]byte)
-	chunks := offset / MaxChunkSize
-	for i := 0; i < chunks; i++ {
-		dataOff := i * MaxChunkSize
-		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
-		offset -= MaxChunkSize
-	}
-	// Add any remaining data
-	if offset > 0 {
-		paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
-	}
-	return nil
-}
-
-func (server *LoginServer) Init() error {
-	if err := server.loadParameterFiles(); err != nil {
-		return err
-	}
-
-	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
-	// all seem to rely on this file, so we'll do the same.
-	paramDir := config.ParametersDir
-	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
-	compressed, err := ioutil.ReadAll(statsFile)
-	if err != nil {
-		return errors.New("Error reading stats file: " + err.Error())
-	}
-
-	decompressedSize := prs.DecompressSize(compressed)
-	decompressed := make([]byte, decompressedSize)
-	prs.Decompress(compressed, decompressed)
-
-	for i := 0; i < 12; i++ {
-		util.StructFromBytes(decompressed[i*14:], &BaseStats[i])
-	}
-
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
-	server.charRedirectPort = uint16(charPort)
-
-	fmt.Println()
-	return nil
-}
-
-func (server LoginServer) NewClient(conn *net.TCPConn) (*Client, error) {
-	return NewLoginClient(conn)
-}
-
-func (server LoginServer) Handle(c *Client) error {
-	var err error = nil
-	var hdr BBHeader
-	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
-
-	switch hdr.Type {
-	case LoginType:
-		err = handleLogin(c, server.charRedirectPort)
-	case DisconnectType:
-		// Just wait until we recv 0 from the client to d/c.
-		break
-	default:
-		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
-	}
-	return err
-}
-
-// Character sub-server definition.
-type CharacterServer struct{}
-
-func (server CharacterServer) Name() string { return "CHARACTER" }
-
-func (server CharacterServer) Port() string { return config.CharacterPort }
-
-func (server *CharacterServer) Init() error { return nil }
-
-func (server CharacterServer) NewClient(conn *net.TCPConn) (*Client, error) {
-	return NewLoginClient(conn)
-}
-
-func (server CharacterServer) Handle(c *Client) error {
-	var err error = nil
-	var hdr BBHeader
-	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
-
-	switch hdr.Type {
-	case LoginType:
-		err = handleCharLogin(c)
-	case DisconnectType:
-		// Just wait until we recv 0 from the client to d/c.
-		break
-	case LoginOptionsRequestType:
-		err = handleKeyConfig(c)
-	case LoginCharPreviewReqType:
-		err = handleCharacterSelect(c)
-	case LoginChecksumType:
-		// Everybody else seems to ignore this, so...
-		c.SendChecksumAck(1)
-	case LoginGuildcardReqType:
-		err = handleGuildcardDataStart(c)
-	case LoginGuildcardChunkReqType:
-		handleGuildcardChunk(c)
-	case LoginParameterHeaderReqType:
-		c.SendParameterHeader(uint32(len(paramFiles)), paramHeaderData)
-	case LoginParameterChunkReqType:
-		var pkt BBHeader
-		util.StructFromBytes(c.Data(), &pkt)
-		c.SendParameterChunk(paramChunkData[int(pkt.Flags)], pkt.Flags)
-	case LoginSetFlagType:
-		var pkt SetFlagPacket
-		util.StructFromBytes(c.Data(), &pkt)
-		c.flag = pkt.Flag
-	case LoginCharPreviewType:
-		err = handleCharacterUpdate(c)
-	case MenuSelectType:
-		err = handleShipSelection(c)
-	default:
-		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
-	}
-	return err
 }

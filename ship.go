@@ -142,6 +142,19 @@ func (server ShipServer) Handle(c *Client) error {
 	return err
 }
 
+// Player selected one of the items on the ship select screen.
+func handleShipSelection(client *Client) error {
+	var pkt MenuSelectionPacket
+	util.StructFromBytes(client.Data(), &pkt)
+	selectedShip := pkt.ItemId - 1
+	if selectedShip < 0 || selectedShip >= uint32(len(shipList)) {
+		return errors.New("Invalid ship selection: " + string(selectedShip))
+	}
+	s := &shipList[selectedShip]
+	client.SendRedirect(s.port, s.ipAddr)
+	return nil
+}
+
 // Block sub-server definition.
 type BlockServer struct {
 	name string
