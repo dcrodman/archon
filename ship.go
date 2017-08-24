@@ -142,21 +142,14 @@ func (server *ShipServer) sendSecurity(client *Client, errorCode BBLoginError,
 		Config:       &client.config,
 		Capabilities: 0x00000102,
 	}
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Security Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Security Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send the client the block list on the selection screen.
 func (server *ShipServer) sendBlockList(client *Client) error {
-	data, size := util.BytesFromStruct(server.blockPkt)
-	if config.DebugMode {
-		fmt.Println("Sending Block Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Block Packet")
+	return EncryptAndSend(client, server.blockPkt)
 }
 
 // Player selected one of the items on the ship select screen.
@@ -204,11 +197,8 @@ func (server *ShipServer) SendShipList(client *Client, ships []Ship) error {
 		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Ship List Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Ship List Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Block sub-server definition.
@@ -276,7 +266,6 @@ func (server *BlockServer) HandleShipLogin(c *Client) error {
 
 func (server *BlockServer) sendSecurity(client *Client, errorCode BBLoginError,
 	guildcard uint32, teamId uint32) error {
-
 	// Constants set according to how Newserv does it.
 	pkt := &SecurityPacket{
 		Header:       BBHeader{Type: LoginSecurityType},
@@ -288,28 +277,20 @@ func (server *BlockServer) sendSecurity(client *Client, errorCode BBLoginError,
 		Capabilities: 0x00000102,
 	}
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Security Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Security Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send the client the block list on the selection screen.
 func (server *BlockServer) sendBlockList(client *Client) error {
 	//data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Block Packet - NOT IMPLEMENTED")
-	}
+	DebugLog("Sending Block Packet - NOT IMPLEMENTED")
 	//return client.SendEncrypted(data, size)
 	return nil
 }
 
 // Send the client the lobby list on the selection screen.
 func (server *BlockServer) sendLobbyList(client *Client) error {
-	data, size := util.BytesFromStruct(server.lobbyPkt)
-	if config.DebugMode {
-		fmt.Println("Sending Lobby List Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Lobby List Packet")
+	return EncryptAndSend(client, server.lobbyPkt)
 }

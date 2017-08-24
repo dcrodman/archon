@@ -22,7 +22,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"github.com/dcrodman/archon/util"
 )
 
@@ -85,11 +84,8 @@ func SendClientMessage(client *Client, message string) error {
 		Language: 0x00450009,
 		Message:  util.ConvertToUtf16(message),
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Client Message Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Client Message Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // SendWelcome transmits the welcome packet to a client with the copyright message and encryption vectors.
@@ -119,12 +115,8 @@ func SendSecurity(client *Client, errorCode BBLoginError, guildcard uint32, team
 		Config:       &client.config,
 		Capabilities: 0x00000102,
 	}
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Security Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Security Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // SendRedirect sends the client the address of the next server to which they should connect.

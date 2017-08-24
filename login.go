@@ -337,11 +337,8 @@ func (server *CharacterServer) sendSecurity(client *Client, errorCode BBLoginErr
 		Capabilities: 0x00000102,
 	}
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Security Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Security Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send a timestamp packet in order to indicate the server's current time.
@@ -355,11 +352,8 @@ func (server *CharacterServer) sendTimestamp(client *Client) error {
 	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Timestamp Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Timestamp Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send the menu items for the ship select screen.
@@ -381,11 +375,8 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error 
 		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Ship List Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Ship List Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send whatever scrolling message was read out of the config file for the login screen.
@@ -394,16 +385,14 @@ func (server *CharacterServer) sendScrollMessage(client *Client) error {
 		Header:  BBHeader{Type: LoginScrollMessageType},
 		Message: config.ScrollMessageBytes(),
 	}
+
 	data, size := util.BytesFromStruct(pkt)
 	// The end of the message appears to be garbled unless
 	// there is a block of extra bytes on the end; add an extra
 	// and let fixLength add the rest.
 	data = append(data, 0x00)
-	size += 1
-	if config.DebugMode {
-		fmt.Println("Sending Scroll Message Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Scroll Message Packet")
+	return client.SendEncrypted(data, size+1)
 }
 
 // Load key config and other option data from the database or provide defaults for new accounts.
@@ -444,11 +433,8 @@ func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) err
 	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
 	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Key Config Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Key Config Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Handle the character select/preview request. Will either return information
@@ -505,11 +491,8 @@ func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, 
 		Slot:   slotNum,
 		Flag:   flag,
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Character Ack Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Character Ack Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send the preview packet containing basic details about a character in the selected slot.
@@ -519,11 +502,8 @@ func (server *CharacterServer) sendCharacterPreview(client *Client, charPreview 
 		Slot:      0,
 		Character: charPreview,
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Character Preview Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Character Preview Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Acknowledge the checksum the client sent us. We don't actually do
@@ -533,11 +513,8 @@ func (server *CharacterServer) sendChecksumAck(client *Client) error {
 	pkt.Header.Type = LoginChecksumAckType
 	pkt.Ack = uint32(1)
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Checksum Ack Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Checksum Ack Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Load the player's saved guildcards, build the chunk data, and send the chunk header.
@@ -583,11 +560,8 @@ func (server *CharacterServer) sendGuildcardHeader(client *Client, checksum uint
 		Length:   dataLen,
 		Checksum: checksum,
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Guildcard Header Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Guildcard Header Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send another chunk of the client's guildcard data.
@@ -615,11 +589,8 @@ func (server *CharacterServer) sendGuildcardChunk(client *Client, chunkNum uint3
 		pkt.Data = client.gcData[offset:]
 	}
 
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Guildcard Chunk Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Guildcard Chunk Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Send the header for the parameter files we're about to start sending.
@@ -628,11 +599,8 @@ func (server *CharacterServer) sendParameterHeader(client *Client, numEntries ui
 		Header:  BBHeader{Type: LoginParameterHeaderType, Flags: numEntries},
 		Entries: entries,
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Parameter Header Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Parameter Header Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Index into chunkData and send the specified chunk of parameter data.
@@ -642,11 +610,8 @@ func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []by
 		Chunk:  chunk,
 		Data:   chunkData,
 	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Parameter Chunk Packet")
-	}
-	return client.SendEncrypted(data, size)
+	DebugLog("Sending Parameter Chunk Packet")
+	return EncryptAndSend(client, pkt)
 }
 
 // Create or update a character in a slot.
