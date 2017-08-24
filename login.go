@@ -65,8 +65,6 @@ var (
 		"PlyLevelTbl.prs",
 	}
 
-	// Format for the timestamp sent to the client.
-
 	// Id sent in the menu selection packet to tell the client
 	// that the selection was made on the ship menu.
 	ShipSelectionMenuId uint16 = 0x13
@@ -359,17 +357,17 @@ func (server *CharacterServer) Handle(c *Client) error {
 		err = server.HandleCharacterSelect(c)
 	case LoginChecksumType:
 		// Everybody else seems to ignore this, so...
-		server.sendChecksumAck(c)
+		err = server.sendChecksumAck(c)
 	case LoginGuildcardReqType:
 		err = server.HandleGuildcardDataStart(c)
 	case LoginGuildcardChunkReqType:
 		server.HandleGuildcardChunk(c)
 	case LoginParameterHeaderReqType:
-		server.sendParameterHeader(c, uint32(len(paramFiles)), server.paramHeaderData)
+		err = server.sendParameterHeader(c, uint32(len(paramFiles)), server.paramHeaderData)
 	case LoginParameterChunkReqType:
 		var pkt BBHeader
 		util.StructFromBytes(c.Data(), &pkt)
-		server.sendParameterChunk(c, server.paramChunkData[int(pkt.Flags)], pkt.Flags)
+		err = server.sendParameterChunk(c, server.paramChunkData[int(pkt.Flags)], pkt.Flags)
 	case LoginSetFlagType:
 		var pkt SetFlagPacket
 		util.StructFromBytes(c.Data(), &pkt)
@@ -390,13 +388,22 @@ func (server *CharacterServer) Handle(c *Client) error {
 func (server *CharacterServer) HandleCharLogin(client *Client) error {
 	var err error
 	if pkt, err := VerifyAccount(client); err == nil {
-		server.sendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+		err = server.sendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+		if err != nil {
+			return err
+		}
 		// At this point, if we've chosen (or created) a character then the
 		// client will send us the slot number and the corresponding phase.
 		if pkt.SlotNum >= 0 && pkt.Phase == 4 {
-			server.sendTimestamp(client)
-			server.sendShipList(client, shipList)
-			server.sendScrollMessage(client)
+			if err = server.sendTimestamp(client); err != nil {
+				return err
+			}
+			if err = server.sendShipList(client, shipList); err != nil {
+				return err
+			}
+			if err = server.sendScrollMessage(client); err != nil {
+				return err
+			}
 		}
 	}
 	return err
@@ -405,7 +412,7 @@ func (server *CharacterServer) HandleCharLogin(client *Client) error {
 // Send the security initialization packet with information about the user's
 // authentication status.
 func (server *CharacterServer) sendSecurity(client *Client, errorCode BBLoginError,
-	guildcard uint32, teamId uint32) int {
+	guildcard uint32, teamId uint32) error {
 
 	// Constants set according to how Newserv does it.
 	pkt := &SecurityPacket{
@@ -422,11 +429,11 @@ func (server *CharacterServer) sendSecurity(client *Client, errorCode BBLoginErr
 	if config.DebugMode {
 		fmt.Println("Sending Security Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send a timestamp packet in order to indicate the server's current time.
-func (server *CharacterServer) sendTimestamp(client *Client) int {
+func (server *CharacterServer) sendTimestamp(client *Client) error {
 	pkt := new(TimestampPacket)
 	pkt.Header.Type = LoginTimestampType
 
@@ -440,11 +447,11 @@ func (server *CharacterServer) sendTimestamp(client *Client) int {
 	if config.DebugMode {
 		fmt.Println("Sending Timestamp Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send the menu items for the ship select screen.
-func (server *CharacterServer) sendShipList(client *Client, ships []Ship) int {
+func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error {
 	pkt := &ShipListPacket{
 		Header:      BBHeader{Type: LoginShipListType, Flags: 0x01},
 		Unknown:     0x02,
@@ -466,11 +473,11 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) int {
 	if config.DebugMode {
 		fmt.Println("Sending Ship List Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send whatever scrolling message was read out of the config file for the login screen.
-func (server *CharacterServer) sendScrollMessage(client *Client) int {
+func (server *CharacterServer) sendScrollMessage(client *Client) error {
 	pkt := &ScrollMessagePacket{
 		Header:  BBHeader{Type: LoginScrollMessageType},
 		Message: config.ScrollMessageBytes(),
@@ -484,7 +491,7 @@ func (server *CharacterServer) sendScrollMessage(client *Client) int {
 	if config.DebugMode {
 		fmt.Println("Sending Scroll Message Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Load key config and other option data from the database or provide defaults for new accounts.
@@ -505,13 +512,12 @@ func (server *CharacterServer) HandleOptionsRequest(client *Client) error {
 		log.Error(err.Error())
 		return err
 	}
-	server.sendOptions(client, optionData)
-	return nil
+	return server.sendOptions(client, optionData)
 }
 
 // Send the client's configuration options. keyConfig should be 420 bytes long and either
 // point to the default keys array or loaded from the database.
-func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) int {
+func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) error {
 	if len(keyConfig) != 420 {
 		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
 	}
@@ -530,7 +536,7 @@ func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) int
 	if config.DebugMode {
 		fmt.Println("Sending Key Config Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Handle the character select/preview request. Will either return information
@@ -559,8 +565,7 @@ func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 
 	if err == sql.ErrNoRows {
 		// We don't have a character for this slot.
-		server.sendCharacterAck(client, pkt.Slot, 2)
-		return nil
+		return server.sendCharacterAck(client, pkt.Slot, 2)
 	} else if err != nil {
 		log.Error(err.Error())
 		return err
@@ -570,20 +575,19 @@ func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 		// They've selected a character from the menu.
 		client.config.SlotNum = uint8(pkt.Slot)
 		server.sendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-		server.sendCharacterAck(client, pkt.Slot, 1)
+		return server.sendCharacterAck(client, pkt.Slot, 1)
 	} else {
 		// They have a character in that slot; send the character preview.
 		copy(prev.GuildcardStr[:], gc[:])
 		copy(prev.Name[:], name[:])
-		server.sendCharacterPreview(client, prev)
+		return server.sendCharacterPreview(client, prev)
 	}
-	return nil
 }
 
 // Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
 // ack'ing a selected character, and 2 indicates that a character doesn't exist
 // in the slot requested via preview request.
-func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, flag uint32) int {
+func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, flag uint32) error {
 	pkt := &CharAckPacket{
 		Header: BBHeader{Type: LoginCharAckType},
 		Slot:   slotNum,
@@ -593,11 +597,11 @@ func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, 
 	if config.DebugMode {
 		fmt.Println("Sending Character Ack Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send the preview packet containing basic details about a character in the selected slot.
-func (server *CharacterServer) sendCharacterPreview(client *Client, charPreview *CharacterPreview) int {
+func (server *CharacterServer) sendCharacterPreview(client *Client, charPreview *CharacterPreview) error {
 	pkt := &CharPreviewPacket{
 		Header:    BBHeader{Type: LoginCharPreviewType},
 		Slot:      0,
@@ -607,12 +611,12 @@ func (server *CharacterServer) sendCharacterPreview(client *Client, charPreview 
 	if config.DebugMode {
 		fmt.Println("Sending Character Preview Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Acknowledge the checksum the client sent us. We don't actually do
 // anything with it but the client won't proceed otherwise.
-func (server *CharacterServer) sendChecksumAck(client *Client) int {
+func (server *CharacterServer) sendChecksumAck(client *Client) error {
 	pkt := new(ChecksumAckPacket)
 	pkt.Header.Type = LoginChecksumAckType
 	pkt.Ack = uint32(1)
@@ -621,7 +625,7 @@ func (server *CharacterServer) sendChecksumAck(client *Client) int {
 	if config.DebugMode {
 		fmt.Println("Sending Checksum Ack Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Load the player's saved guildcards, build the chunk data, and send the chunk header.
@@ -656,12 +660,11 @@ func (server *CharacterServer) HandleGuildcardDataStart(client *Client) error {
 	checksum := crc32.ChecksumIEEE(client.gcData)
 	client.gcDataSize = uint16(size)
 
-	server.sendGuildcardHeader(client, checksum, client.gcDataSize)
-	return nil
+	return server.sendGuildcardHeader(client, checksum, client.gcDataSize)
 }
 
 // Send the header containing metadata about the guildcard chunk.
-func (server *CharacterServer) sendGuildcardHeader(client *Client, checksum uint32, dataLen uint16) int {
+func (server *CharacterServer) sendGuildcardHeader(client *Client, checksum uint32, dataLen uint16) error {
 	pkt := &GuildcardHeaderPacket{
 		Header:   BBHeader{Type: LoginGuildcardHeaderType},
 		Unknown:  0x00000001,
@@ -672,7 +675,7 @@ func (server *CharacterServer) sendGuildcardHeader(client *Client, checksum uint
 	if config.DebugMode {
 		fmt.Println("Sending Guildcard Header Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send another chunk of the client's guildcard data.
@@ -686,7 +689,7 @@ func (server *CharacterServer) HandleGuildcardChunk(client *Client) {
 }
 
 // Send the specified chunk of guildcard data.
-func (server *CharacterServer) sendGuildcardChunk(client *Client, chunkNum uint32) int {
+func (server *CharacterServer) sendGuildcardChunk(client *Client, chunkNum uint32) error {
 	pkt := new(GuildcardChunkPacket)
 	pkt.Header.Type = LoginGuildcardChunkType
 	pkt.Chunk = chunkNum
@@ -704,11 +707,11 @@ func (server *CharacterServer) sendGuildcardChunk(client *Client, chunkNum uint3
 	if config.DebugMode {
 		fmt.Println("Sending Guildcard Chunk Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Send the header for the parameter files we're about to start sending.
-func (server *CharacterServer) sendParameterHeader(client *Client, numEntries uint32, entries []byte) int {
+func (server *CharacterServer) sendParameterHeader(client *Client, numEntries uint32, entries []byte) error {
 	pkt := &ParameterHeaderPacket{
 		Header:  BBHeader{Type: LoginParameterHeaderType, Flags: numEntries},
 		Entries: entries,
@@ -717,11 +720,11 @@ func (server *CharacterServer) sendParameterHeader(client *Client, numEntries ui
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Header Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Index into chunkData and send the specified chunk of parameter data.
-func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []byte, chunk uint32) int {
+func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []byte, chunk uint32) error {
 	pkt := &ParameterChunkPacket{
 		Header: BBHeader{Type: LoginParameterChunkType},
 		Chunk:  chunk,
@@ -731,7 +734,7 @@ func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []by
 	if config.DebugMode {
 		fmt.Println("Sending Parameter Chunk Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
 
 // Create or update a character in a slot.
@@ -801,8 +804,7 @@ func (server *CharacterServer) HandleCharacterUpdate(client *Client) error {
 	// Send the security packet with the updated state and slot number so that
 	// we know a character has been selected.
 	client.config.SlotNum = uint8(charPkt.Slot)
-	server.sendCharacterAck(client, charPkt.Slot, 0)
-	return nil
+	return server.sendCharacterAck(client, charPkt.Slot, 0)
 }
 
 // Player selected one of the items on the ship select screen.
@@ -814,12 +816,11 @@ func (server *CharacterServer) HandleShipSelection(client *Client) error {
 		return errors.New("Invalid ship selection: " + string(selectedShip))
 	}
 	s := &shipList[selectedShip]
-	server.sendRedirect(client, s.ipAddr[:], s.port)
-	return nil
+	return server.sendRedirect(client, s.ipAddr[:], s.port)
 }
 
 // Send the client the address of the ship they selected.
-func (server *CharacterServer) sendRedirect(client *Client, shipAddr []byte, shipPort uint16) int {
+func (server *CharacterServer) sendRedirect(client *Client, shipAddr []byte, shipPort uint16) error {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = RedirectType
 	pkt.Port = shipPort
@@ -829,5 +830,5 @@ func (server *CharacterServer) sendRedirect(client *Client, shipAddr []byte, shi
 	if config.DebugMode {
 		fmt.Println("Sending Redirect Packet")
 	}
-	return sendEncrypted(client, data, uint16(size))
+	return client.SendEncrypted(data, size)
 }
