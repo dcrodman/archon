@@ -22,16 +22,12 @@ package main
 import (
 	"fmt"
 	"github.com/dcrodman/archon/util"
-	"syscall"
-	"time"
 )
 
 const (
 	// Copyright messages the client expects.
 	patchCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
 	loginCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
-	// Format for the timestamp sent to the client.
-	timeFmt = "2006:01:02: 15:05:05"
 )
 
 var (
@@ -112,139 +108,6 @@ func (client *Client) SendRedirect(port uint16, ipAddr [4]byte) int {
 	return sendEncrypted(client, data, uint16(size))
 }
 
-// Send the client's configuration options. keyConfig should be 420 bytes long and either
-// point to the default keys array or loaded from the database.
-func (client *Client) SendOptions(keyConfig []byte) int {
-	if len(keyConfig) != 420 {
-		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
-	}
-	pkt := new(OptionsPacket)
-	pkt.Header.Type = LoginOptionsType
-
-	pkt.PlayerKeyConfig.Guildcard = client.guildcard
-	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
-	copy(pkt.PlayerKeyConfig.JoystickConfig[:], keyConfig[0x16C:])
-
-	// Sylverant sets these to enable all team rewards? Not sure what this means yet.
-	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
-	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Key Config Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
-// ack'ing a selected character, and 2 indicates that a character doesn't exist
-// in the slot requested via preview request.
-func (client *Client) SendCharacterAck(slotNum uint32, flag uint32) int {
-	pkt := &CharAckPacket{
-		Header: BBHeader{Type: LoginCharAckType},
-		Slot:   slotNum,
-		Flag:   flag,
-	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Character Ack Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the preview packet containing basic details about a character in
-// the selected slot.
-func (client *Client) SendCharacterPreview(charPreview *CharacterPreview) int {
-	pkt := &CharPreviewPacket{
-		Header:    BBHeader{Type: LoginCharPreviewType},
-		Slot:      0,
-		Character: charPreview,
-	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Character Preview Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Acknowledge the checksum the client sent us. We don't actually do
-// anything with it but the client won't proceed otherwise.
-func (client *Client) SendChecksumAck(ack uint32) int {
-	pkt := new(ChecksumAckPacket)
-	pkt.Header.Type = LoginChecksumAckType
-	pkt.Ack = ack
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Checksum Ack Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the guildcard chunk header.
-func (client *Client) SendGuildcardHeader(checksum uint32, dataLen uint16) int {
-	pkt := &GuildcardHeaderPacket{
-		Header:   BBHeader{Type: LoginGuildcardHeaderType},
-		Unknown:  0x00000001,
-		Length:   dataLen,
-		Checksum: checksum,
-	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Guildcard Header Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the next chunk of guildcard data.
-func (client *Client) SendGuildcardChunk(chunkNum uint32) int {
-	pkt := new(GuildcardChunkPacket)
-	pkt.Header.Type = LoginGuildcardChunkType
-	pkt.Chunk = chunkNum
-
-	// The client will only accept 0x6800 bytes of a chunk per packet.
-	offset := uint16(chunkNum) * MaxChunkSize
-	remaining := client.gcDataSize - offset
-	if remaining > MaxChunkSize {
-		pkt.Data = client.gcData[offset : offset+MaxChunkSize]
-	} else {
-		pkt.Data = client.gcData[offset:]
-	}
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Guildcard Chunk Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the header for the parameter files we're about to start sending.
-func (client *Client) SendParameterHeader(numEntries uint32, entries []byte) int {
-	pkt := &ParameterHeaderPacket{
-		Header:  BBHeader{Type: LoginParameterHeaderType, Flags: numEntries},
-		Entries: entries,
-	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Parameter Header Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Index into chunkData and send the specified chunk of parameter data.
-func (client *Client) SendParameterChunk(chunkData []byte, chunk uint32) int {
-	pkt := &ParameterChunkPacket{
-		Header: BBHeader{Type: LoginParameterChunkType},
-		Chunk:  chunk,
-		Data:   chunkData,
-	}
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Parameter Chunk Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
 // Send an error message to the client, usually used before disconnecting.
 func (client *Client) SendClientMessage(message string) int {
 	pkt := &LoginClientMessagePacket{
@@ -256,24 +119,6 @@ func (client *Client) SendClientMessage(message string) int {
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Client Message Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send a timestamp packet in order to indicate the server's current time.
-func (client *Client) SendTimestamp() int {
-	pkt := new(TimestampPacket)
-	pkt.Header.Type = LoginTimestampType
-
-	var tv syscall.Timeval
-	syscall.Gettimeofday(&tv)
-	t := time.Now().Format(timeFmt)
-	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
-	copy(pkt.Timestamp[:], stamp)
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Timestamp Packet")
 	}
 	return sendEncrypted(client, data, uint16(size))
 }
@@ -300,25 +145,6 @@ func (client *Client) SendShipList(ships []Ship) int {
 	data, size := util.BytesFromStruct(pkt)
 	if config.DebugMode {
 		fmt.Println("Sending Ship List Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send whatever scrolling message was set in the config file and
-// converted to UTF-16LE when the server started up.
-func (client *Client) SendScrollMessage() int {
-	pkt := &ScrollMessagePacket{
-		Header:  BBHeader{Type: LoginScrollMessageType},
-		Message: config.ScrollMessageBytes(),
-	}
-	data, size := util.BytesFromStruct(pkt)
-	// The end of the message appears to be garbled unless
-	// there is a block of extra bytes on the end; add an extra
-	// and let fixLength add the rest.
-	data = append(data, 0x00)
-	size += 1
-	if config.DebugMode {
-		fmt.Println("Sending Scroll Message Packet")
 	}
 	return sendEncrypted(client, data, uint16(size))
 }
