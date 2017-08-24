@@ -166,7 +166,7 @@ func (server *ShipServer) HandleBlockSelection(sc *Client, pkt MenuSelectionPack
 	} else if int(selectedBlock) > config.NumBlocks {
 		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
 	}
-	ipAddr := config.HostnameBytes()
+	ipAddr := config.BroadcastIP()
 	return SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
 }
 

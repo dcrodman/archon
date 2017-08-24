@@ -340,7 +340,7 @@ func (server *ShipgateServer) Init() error {
 	// ships will be added to this list by the shipgate, if it's enabled.
 	s := &shipList[0]
 	s.id = 1
-	s.ipAddr = config.HostnameBytes()
+	s.ipAddr = config.BroadcastIP()
 	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
 	s.port = uint16(port)
 	copy(s.name[:], config.ShipName)

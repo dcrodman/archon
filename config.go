@@ -85,7 +85,7 @@ type Config struct {
 	// Ship server config.
 	ShipName string
 
-	cachedHostBytes [4]byte
+	cachedIPBytes   [4]byte
 	cachedScrollMsg []byte
 }
 
@@ -180,18 +180,18 @@ func (config *Config) DB() *sql.DB {
 	return config.database
 }
 
-// Convert the hostname string into 4 bytes to be used with the redirect packet.
-func (config *Config) HostnameBytes() [4]byte {
+// Convert the broadcast IP string into 4 bytes to be used with the redirect packet.
+func (config *Config) BroadcastIP() [4]byte {
 	// Hacky, but chances are the IP address isn't going to start with 0 and a
 	// fixed-length array can't be null.
-	if config.cachedHostBytes[0] == 0x00 {
+	if config.cachedIPBytes[0] == 0x00 {
 		parts := strings.Split(config.ExternalIP, ".")
 		for i := 0; i < 4; i++ {
 			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
-			config.cachedHostBytes[i] = uint8(tmp)
+			config.cachedIPBytes[i] = uint8(tmp)
 		}
 	}
-	return config.cachedHostBytes
+	return config.cachedIPBytes
 }
 
 // Returns the configured scroll message for the login server.

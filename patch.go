@@ -160,7 +160,7 @@ func (server *PatchServer) sendPatchRedirect(client *Client) error {
 	pkt := new(PatchRedirectPacket)
 	pkt.Header.Type = PatchRedirectType
 	pkt.Port = server.dataRedirectPort
-	hostnameBytes := config.HostnameBytes()
+	hostnameBytes := config.BroadcastIP()
 	copy(pkt.IPAddr[:], hostnameBytes[:])
 
 	DebugLog("Sending Patch Redirect")

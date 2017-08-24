@@ -103,7 +103,7 @@ func (server *LoginServer) HandleLogin(client *Client) error {
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
-	ipAddr := config.HostnameBytes()
+	ipAddr := config.BroadcastIP()
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	return SendRedirect(client, ipAddr[:], server.charRedirectPort)
 }
