@@ -24,16 +24,8 @@ import (
 	"github.com/dcrodman/archon/util"
 )
 
-const (
-	// Copyright messages the client expects.
-	patchCopyright = "Patch Server. Copyright SonicTeam, LTD. 2001"
-	loginCopyright = "Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM."
-)
-
 var (
-	patchCopyrightBytes []byte
-	loginCopyrightBytes []byte
-	serverName          = util.ConvertToUtf16("Archon")
+	serverName = util.ConvertToUtf16("Archon")
 )
 
 // Deprecated
@@ -51,24 +43,6 @@ func sendEncrypted(c *Client, data []byte, length uint16) int {
 		return -1
 	}
 	return 0
-}
-
-// Send the welcome packet to a client with the copyright message and encryption vectors.
-func (client *Client) SendWelcome() int {
-	pkt := new(WelcomePkt)
-	pkt.Header.Type = LoginWelcomeType
-	pkt.Header.Size = 0xC8
-	copy(pkt.Copyright[:], loginCopyrightBytes)
-	copy(pkt.ClientVector[:], client.ClientVector())
-	copy(pkt.ServerVector[:], client.ServerVector())
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Welcome Packet")
-		util.PrintPayload(data, size)
-		fmt.Println()
-	}
-	return sendPacket(client, data, uint16(size))
 }
 
 // Send the security initialization packet with information about the user's
@@ -165,9 +139,4 @@ func (client *Client) SendLobbyList(pkt *LobbyListPacket) int {
 		fmt.Println("Sending Lobby List Packet")
 	}
 	return sendEncrypted(client, data, uint16(size))
-}
-
-func init() {
-	patchCopyrightBytes = []byte(patchCopyright)
-	loginCopyrightBytes = []byte(loginCopyright)
 }

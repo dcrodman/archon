@@ -37,6 +37,9 @@ import (
 // MaxFileChunkSize is the maximum number of bytes we can send of a file at a time.
 const MaxFileChunkSize = 24576
 
+// Copyright message expected by the client for the patch welcome.
+var PatchCopyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
+
 // PatchEntry instances contain metadata about each of the files in the patches directory.
 type PatchEntry struct {
 	filename string
@@ -65,7 +68,7 @@ func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 	cCrypt := crypto.NewPCCrypt()
 	sCrypt := crypto.NewPCCrypt()
 	pc := NewClient(conn, PCHeaderSize, cCrypt, sCrypt)
-	if pc.SendPCWelcome() != 0 {
+	if SendPCWelcome(pc) != 0 {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
 	}
@@ -73,11 +76,11 @@ func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func (client *Client) SendPCWelcome() int {
+func SendPCWelcome(client *Client) int {
 	pkt := new(PatchWelcomePkt)
 	pkt.Header.Type = PatchWelcomeType
 	pkt.Header.Size = 0x4C
-	copy(pkt.Copyright[:], patchCopyrightBytes)
+	copy(pkt.Copyright[:], PatchCopyright)
 	copy(pkt.ClientVector[:], client.ClientVector())
 	copy(pkt.ServerVector[:], client.ServerVector())
 

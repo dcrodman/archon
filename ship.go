@@ -39,51 +39,27 @@ type Block struct {
 	BlockName [36]byte
 }
 
-func handleShipLogin(sc *Client) error {
-	if _, err := VerifyAccount(sc); err != nil {
-		return err
-	}
-	sc.SendSecurity(BBLoginErrorNone, sc.guildcard, sc.teamId)
-	return nil
-}
-
-// The player selected a block to join from the menu.
-func handleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
-	// Grab the chosen block and redirect them to the selected block server.
-	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
-	selectedBlock := pkt.ItemId
-	if selectedBlock == BackMenuItem {
-		sc.SendShipList(shipList)
-	} else if int(selectedBlock) > config.NumBlocks {
-		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
-	} else {
-		sc.SendRedirect(uint16(uint32(port)+selectedBlock), config.HostnameBytes())
-	}
-	return nil
-}
-
 func NewShipClient(conn *net.TCPConn) (*Client, error) {
 	cCrypt := crypto.NewBBCrypt()
 	sCrypt := crypto.NewBBCrypt()
 	sc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
 
 	err := error(nil)
-	if sc.SendWelcome() != 0 {
+	if SendWelcome(sc) != nil {
 		err = errors.New("Error sending welcome packet to: " + sc.IPAddr())
 		sc = nil
 	}
 	return sc, err
 }
 
-// Ship sub-server definition.
 type ShipServer struct {
 	// Precomputed block packet.
 	blockPkt *BlockListPacket
 }
 
-func (server ShipServer) Name() string { return "SHIP" }
+func (server *ShipServer) Name() string { return "SHIP" }
 
-func (server ShipServer) Port() string { return config.ShipPort }
+func (server *ShipServer) Port() string { return config.ShipPort }
 
 func (server *ShipServer) Init() error {
 	// Precompute the block list packet since it's not going to change.
@@ -113,28 +89,27 @@ func (server *ShipServer) Init() error {
 	return nil
 }
 
-func (server ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
+func (server *ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewShipClient(conn)
 }
 
-func (server ShipServer) Handle(c *Client) error {
-	var err error = nil
+func (server *ShipServer) Handle(c *Client) error {
 	var hdr BBHeader
 	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
 
+	var err error
 	switch hdr.Type {
 	case LoginType:
-		err = handleShipLogin(c)
-		c.SendBlockList(server.blockPkt)
+		err = server.HandleShipLogin(c)
 	case MenuSelectType:
 		var pkt MenuSelectionPacket
 		util.StructFromBytes(c.Data(), &pkt)
 		// They can be at either the ship or block selection menu, so make sure we have the right one.
 		if pkt.MenuId == ShipSelectionMenuId {
 			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
-			err = handleShipSelection(c)
+			err = server.HandleShipSelection(c)
 		} else {
-			err = handleBlockSelection(c, pkt)
+			err = server.HandleBlockSelection(c, pkt)
 		}
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
@@ -142,8 +117,50 @@ func (server ShipServer) Handle(c *Client) error {
 	return err
 }
 
+func (server *ShipServer) HandleShipLogin(sc *Client) error {
+	if _, err := VerifyAccount(sc); err != nil {
+		return err
+	}
+	if err := server.sendSecurity(sc, BBLoginErrorNone, sc.guildcard, sc.teamId); err != nil {
+		return err
+	}
+	return server.sendBlockList(sc)
+}
+
+// Send the security initialization packet with information about the user's
+// authentication status.
+func (server *ShipServer) sendSecurity(client *Client, errorCode BBLoginError,
+	guildcard uint32, teamId uint32) error {
+
+	// Constants set according to how Newserv does it.
+	pkt := &SecurityPacket{
+		Header:       BBHeader{Type: LoginSecurityType},
+		ErrorCode:    uint32(errorCode),
+		PlayerTag:    0x00010000,
+		Guildcard:    guildcard,
+		TeamId:       teamId,
+		Config:       &client.config,
+		Capabilities: 0x00000102,
+	}
+
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Security Packet")
+	}
+	return client.SendEncrypted(data, size)
+}
+
+// Send the client the block list on the selection screen.
+func (server *ShipServer) sendBlockList(client *Client) error {
+	data, size := util.BytesFromStruct(server.blockPkt)
+	if config.DebugMode {
+		fmt.Println("Sending Block Packet")
+	}
+	return client.SendEncrypted(data, size)
+}
+
 // Player selected one of the items on the ship select screen.
-func handleShipSelection(client *Client) error {
+func (server *ShipServer) HandleShipSelection(client *Client) error {
 	var pkt MenuSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
 	selectedShip := pkt.ItemId - 1
@@ -151,8 +168,60 @@ func handleShipSelection(client *Client) error {
 		return errors.New("Invalid ship selection: " + string(selectedShip))
 	}
 	s := &shipList[selectedShip]
-	client.SendRedirect(s.port, s.ipAddr)
-	return nil
+	return server.sendRedirect(client, s.port, s.ipAddr)
+}
+
+// Send the redirect packet, providing the IP and port of the next server.
+func (server *ShipServer) sendRedirect(client *Client, port uint16, ipAddr [4]byte) error {
+	pkt := new(RedirectPacket)
+	pkt.Header.Type = RedirectType
+	copy(pkt.IPAddr[:], ipAddr[:])
+	pkt.Port = port
+
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Redirect Packet")
+	}
+	return client.SendEncrypted(data, size)
+}
+
+// The player selected a block to join from the menu.
+func (server *ShipServer) HandleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
+	// Grab the chosen block and redirect them to the selected block server.
+	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
+	selectedBlock := pkt.ItemId
+	if selectedBlock == BackMenuItem {
+		sc.SendShipList(shipList)
+	} else if int(selectedBlock) > config.NumBlocks {
+		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
+	}
+	return server.sendRedirect(sc, uint16(uint32(port)+selectedBlock), config.HostnameBytes())
+}
+
+// Send the menu items for the ship select screen.
+func (server *ShipServer) SendShipList(client *Client, ships []Ship) error {
+	pkt := &ShipListPacket{
+		Header:      BBHeader{Type: LoginShipListType, Flags: 0x01},
+		Unknown:     0x02,
+		Unknown2:    0xFFFFFFF4,
+		Unknown3:    0x04,
+		ShipEntries: make([]ShipMenuEntry, len(ships)),
+	}
+	copy(pkt.ServerName[:], serverName)
+
+	// TODO: Will eventually need a mutex for read.
+	for i, ship := range ships {
+		item := &pkt.ShipEntries[i]
+		item.MenuId = ShipSelectionMenuId
+		item.ShipId = ship.id
+		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
+	}
+
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Ship List Packet")
+	}
+	return client.SendEncrypted(data, size)
 }
 
 // Block sub-server definition.
@@ -163,9 +232,9 @@ type BlockServer struct {
 	lobbyPkt LobbyListPacket
 }
 
-func (server BlockServer) Name() string { return server.name }
+func (server *BlockServer) Name() string { return server.name }
 
-func (server BlockServer) Port() string { return server.port }
+func (server *BlockServer) Port() string { return server.port }
 
 func (server *BlockServer) Init() error {
 	// Precompute our lobby list since this won't change once the server has started.
@@ -187,21 +256,73 @@ func (server *BlockServer) Init() error {
 	return nil
 }
 
-func (server BlockServer) NewClient(conn *net.TCPConn) (*Client, error) {
+func (server *BlockServer) NewClient(conn *net.TCPConn) (*Client, error) {
 	return NewShipClient(conn)
 }
 
-func (server BlockServer) Handle(c *Client) error {
-	var err error = nil
+func (server *BlockServer) Handle(c *Client) error {
 	var hdr BBHeader
 	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
 
+	var err error
 	switch hdr.Type {
 	case LoginType:
-		err = handleShipLogin(c)
-		c.SendLobbyList(&server.lobbyPkt)
+		err = server.HandleShipLogin(c)
 	default:
 		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
+}
+
+func (server *BlockServer) HandleShipLogin(c *Client) error {
+	if _, err := VerifyAccount(c); err != nil {
+		return err
+	}
+	if err := server.sendSecurity(c, BBLoginErrorNone, c.guildcard, c.teamId); err != nil {
+		return err
+	}
+	if err := server.sendBlockList(c); err != nil {
+		return err
+	}
+	return server.sendLobbyList(c)
+}
+
+func (server *BlockServer) sendSecurity(client *Client, errorCode BBLoginError,
+	guildcard uint32, teamId uint32) error {
+
+	// Constants set according to how Newserv does it.
+	pkt := &SecurityPacket{
+		Header:       BBHeader{Type: LoginSecurityType},
+		ErrorCode:    uint32(errorCode),
+		PlayerTag:    0x00010000,
+		Guildcard:    guildcard,
+		TeamId:       teamId,
+		Config:       &client.config,
+		Capabilities: 0x00000102,
+	}
+
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Security Packet")
+	}
+	return client.SendEncrypted(data, size)
+}
+
+// Send the client the block list on the selection screen.
+func (server *BlockServer) sendBlockList(client *Client) error {
+	//data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Block Packet - NOT IMPLEMENTED")
+	}
+	//return client.SendEncrypted(data, size)
+	return nil
+}
+
+// Send the client the lobby list on the selection screen.
+func (server *BlockServer) sendLobbyList(client *Client) error {
+	data, size := util.BytesFromStruct(server.lobbyPkt)
+	if config.DebugMode {
+		fmt.Println("Sending Lobby List Packet")
+	}
+	return client.SendEncrypted(data, size)
 }

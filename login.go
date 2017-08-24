@@ -44,6 +44,9 @@ const (
 	MaxChunkSize = 0x6800
 	// Expected format of the timestamp sent to the client.
 	TimeFormat = "2006:01:02: 15:05:05"
+	// Id sent in the menu selection packet to tell the client
+	// that the selection was made on the ship menu.
+	ShipSelectionMenuId uint16 = 0x13
 )
 
 var (
@@ -65,9 +68,8 @@ var (
 		"PlyLevelTbl.prs",
 	}
 
-	// Id sent in the menu selection packet to tell the client
-	// that the selection was made on the ship menu.
-	ShipSelectionMenuId uint16 = 0x13
+	// Copyright message expected by the client when connecting.
+	LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 )
 
 // Entry in the available ships lis on the ship selection menu.
@@ -145,11 +147,29 @@ func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 	cCrypt := crypto.NewBBCrypt()
 	sCrypt := crypto.NewBBCrypt()
 	lc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
-	if lc.SendWelcome() != 0 {
+	if SendWelcome(lc) != nil {
 		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
 		lc = nil
 	}
 	return lc, err
+}
+
+// Send the welcome packet to a client with the copyright message and encryption vectors.
+func SendWelcome(client *Client) error {
+	pkt := new(WelcomePkt)
+	pkt.Header.Type = LoginWelcomeType
+	pkt.Header.Size = 0xC8
+	copy(pkt.Copyright[:], LoginCopyright)
+	copy(pkt.ClientVector[:], client.ClientVector())
+	copy(pkt.ServerVector[:], client.ServerVector())
+
+	data, size := util.BytesFromStruct(pkt)
+	if config.DebugMode {
+		fmt.Println("Sending Welcome Packet")
+		util.PrintPayload(data, size)
+		fmt.Println()
+	}
+	return client.SendEncrypted(data, size)
 }
 
 // Login sub-server definition.
