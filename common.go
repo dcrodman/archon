@@ -107,6 +107,9 @@ type CharacterStats struct {
 	LCK uint16
 }
 
+// Copyright message expected by the client when connecting.
+var LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
+
 // VerifyAccount performs all account verification tasks.
 func VerifyAccount(client *Client) (*LoginPkt, error) {
 	var loginPkt LoginPkt
