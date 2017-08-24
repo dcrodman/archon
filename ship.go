@@ -168,21 +168,7 @@ func (server *ShipServer) HandleShipSelection(client *Client) error {
 		return errors.New("Invalid ship selection: " + string(selectedShip))
 	}
 	s := &shipList[selectedShip]
-	return server.sendRedirect(client, s.port, s.ipAddr)
-}
-
-// Send the redirect packet, providing the IP and port of the next server.
-func (server *ShipServer) sendRedirect(client *Client, port uint16, ipAddr [4]byte) error {
-	pkt := new(RedirectPacket)
-	pkt.Header.Type = RedirectType
-	copy(pkt.IPAddr[:], ipAddr[:])
-	pkt.Port = port
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Redirect Packet")
-	}
-	return client.SendEncrypted(data, size)
+	return SendRedirect(client, s.ipAddr[:], s.port)
 }
 
 // The player selected a block to join from the menu.
@@ -191,11 +177,12 @@ func (server *ShipServer) HandleBlockSelection(sc *Client, pkt MenuSelectionPack
 	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
 	selectedBlock := pkt.ItemId
 	if selectedBlock == BackMenuItem {
-		sc.SendShipList(shipList)
+		server.SendShipList(sc, shipList)
 	} else if int(selectedBlock) > config.NumBlocks {
 		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
 	}
-	return server.sendRedirect(sc, uint16(uint32(port)+selectedBlock), config.HostnameBytes())
+	ipAddr := config.HostnameBytes()
+	return SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
 }
 
 // Send the menu items for the ship select screen.
@@ -207,7 +194,7 @@ func (server *ShipServer) SendShipList(client *Client, ships []Ship) error {
 		Unknown3:    0x04,
 		ShipEntries: make([]ShipMenuEntry, len(ships)),
 	}
-	copy(pkt.ServerName[:], serverName)
+	copy(pkt.ServerName[:], "Archon")
 
 	// TODO: Will eventually need a mutex for read.
 	for i, ship := range ships {

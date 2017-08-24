@@ -68,7 +68,7 @@ func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 	cCrypt := crypto.NewPCCrypt()
 	sCrypt := crypto.NewPCCrypt()
 	pc := NewClient(conn, PCHeaderSize, cCrypt, sCrypt)
-	if SendPCWelcome(pc) != 0 {
+	if SendPCWelcome(pc) != nil {
 		err = errors.New("Error sending welcome packet to: " + pc.IPAddr())
 		pc = nil
 	}
@@ -76,7 +76,7 @@ func NewPatchClient(conn *net.TCPConn) (*Client, error) {
 }
 
 // Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendPCWelcome(client *Client) int {
+func SendPCWelcome(client *Client) error {
 	pkt := new(PatchWelcomePkt)
 	pkt.Header.Type = PatchWelcomeType
 	pkt.Header.Size = 0x4C
@@ -90,7 +90,7 @@ func SendPCWelcome(client *Client) int {
 		util.PrintPayload(data, size)
 		fmt.Println()
 	}
-	return sendPacket(client, data, uint16(size))
+	return client.SendRaw(data, size)
 }
 
 // PatchServer is the sub-server that acts as the first point of contact for a client. Its

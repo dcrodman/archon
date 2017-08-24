@@ -20,9 +20,7 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	crypto "github.com/dcrodman/archon/encryption"
@@ -90,56 +88,6 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-// Handle account verification tasks.
-func VerifyAccount(client *Client) (*LoginPkt, error) {
-	var loginPkt LoginPkt
-	util.StructFromBytes(client.Data(), &loginPkt)
-
-	pktUername := string(util.StripPadding(loginPkt.Username[:]))
-	pktPassword := hashPassword(loginPkt.Password[:])
-
-	var username, password string
-	var isBanned, isActive bool
-	row := config.DB().QueryRow("SELECT username, password, "+
-		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
-		"WHERE username = ? and password = ?", pktUername, pktPassword)
-	err := row.Scan(&username, &password, &client.guildcard,
-		&client.isGm, &isBanned, &isActive, &client.teamId)
-	switch {
-	// Check if we have a valid username/combination.
-	case err == sql.ErrNoRows:
-		// The same error is returned for invalid passwords as attempts to log in
-		// with a nonexistent username as some measure of account security. Note
-		// that if this is changed to query by username and add a password check,
-		// the index on account_data will need to be modified.
-		client.SendSecurity(BBLoginErrorPassword, 0, 0)
-		return nil, errors.New("Account does not exist for username: " + pktUername)
-	case err != nil:
-		client.SendClientMessage("Encountered an unexpected error while accessing the " +
-			"database.\n\nPlease contact your server administrator.")
-		log.Error(err.Error())
-	case isBanned:
-		client.SendSecurity(BBLoginErrorBanned, 0, 0)
-		return nil, errors.New("Account banned: " + username)
-	case !isActive:
-		client.SendClientMessage("Encountered an unexpected error while accessing the " +
-			"database.\n\nPlease contact your server administrator.")
-		return nil, errors.New("Account must be activated for username: " + username)
-	}
-	// Copy over the config, which should indicate how far they are in the login flow.
-	util.StructFromBytes(loginPkt.Security[:], &client.config)
-
-	// TODO: Account, hardware, and IP ban checks.
-	return &loginPkt, nil
-}
-
-// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
-func hashPassword(password []byte) string {
-	hasher := sha256.New()
-	hasher.Write(util.StripPadding(password))
-	return hex.EncodeToString(hasher.Sum(nil)[:])
-}
-
 // Create and initialize a new Login client so long as we're able
 // to send the welcome packet to begin encryption.
 func NewLoginClient(conn *net.TCPConn) (*Client, error) {
@@ -152,24 +100,6 @@ func NewLoginClient(conn *net.TCPConn) (*Client, error) {
 		lc = nil
 	}
 	return lc, err
-}
-
-// Send the welcome packet to a client with the copyright message and encryption vectors.
-func SendWelcome(client *Client) error {
-	pkt := new(WelcomePkt)
-	pkt.Header.Type = LoginWelcomeType
-	pkt.Header.Size = 0xC8
-	copy(pkt.Copyright[:], LoginCopyright)
-	copy(pkt.ClientVector[:], client.ClientVector())
-	copy(pkt.ServerVector[:], client.ServerVector())
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Welcome Packet")
-		util.PrintPayload(data, size)
-		fmt.Println()
-	}
-	return client.SendEncrypted(data, size)
 }
 
 // Login sub-server definition.
@@ -218,7 +148,7 @@ func (server *LoginServer) HandleLogin(client *Client) error {
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
 	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
-		server.sendSecurity(client, BBLoginErrorPatch, 0, 0)
+		SendSecurity(client, BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
 	}
 
@@ -227,47 +157,9 @@ func (server *LoginServer) HandleLogin(client *Client) error {
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
-	server.sendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-	server.sendRedirect(client)
-	return nil
-}
-
-// Send the security initialization packet with information about the user's
-// authentication status.
-func (server *LoginServer) sendSecurity(client *Client, errorCode BBLoginError,
-	guildcard uint32, teamId uint32) int {
-
-	// Constants set according to how Newserv does it.
-	pkt := &SecurityPacket{
-		Header:       BBHeader{Type: LoginSecurityType},
-		ErrorCode:    uint32(errorCode),
-		PlayerTag:    0x00010000,
-		Guildcard:    guildcard,
-		TeamId:       teamId,
-		Config:       &client.config,
-		Capabilities: 0x00000102,
-	}
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Security Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
-}
-
-// Send the client the IP and port of the character server.
-func (server *LoginServer) sendRedirect(client *Client) int {
-	pkt := new(RedirectPacket)
-	pkt.Header.Type = RedirectType
-	pkt.Port = server.charRedirectPort
 	ipAddr := config.HostnameBytes()
-	copy(pkt.IPAddr[:], ipAddr[:])
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Redirect Packet")
-	}
-	return sendEncrypted(client, data, uint16(size))
+	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
+	return SendRedirect(client, ipAddr[:], server.charRedirectPort)
 }
 
 // Character sub-server definition.
@@ -479,7 +371,7 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error 
 		Unknown3:    0x04,
 		ShipEntries: make([]ShipMenuEntry, len(ships)),
 	}
-	copy(pkt.ServerName[:], serverName)
+	copy(pkt.ServerName[:], "Archon")
 
 	// TODO: Will eventually need a mutex for read.
 	for i, ship := range ships {
@@ -836,19 +728,5 @@ func (server *CharacterServer) HandleShipSelection(client *Client) error {
 		return errors.New("Invalid ship selection: " + string(selectedShip))
 	}
 	s := &shipList[selectedShip]
-	return server.sendRedirect(client, s.ipAddr[:], s.port)
-}
-
-// Send the client the address of the ship they selected.
-func (server *CharacterServer) sendRedirect(client *Client, shipAddr []byte, shipPort uint16) error {
-	pkt := new(RedirectPacket)
-	pkt.Header.Type = RedirectType
-	pkt.Port = shipPort
-	copy(pkt.IPAddr[:], shipAddr)
-
-	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Redirect Packet")
-	}
-	return client.SendEncrypted(data, size)
+	return SendRedirect(client, s.ipAddr[:], s.port)
 }
