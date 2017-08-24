@@ -101,13 +101,9 @@ func SendWelcome(client *Client) error {
 	copy(pkt.ClientVector[:], client.ClientVector())
 	copy(pkt.ServerVector[:], client.ServerVector())
 
+	DebugLog("Sending Welcome Packet")
 	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Welcome Packet")
-		util.PrintPayload(data, size)
-		fmt.Println()
-	}
-	return client.SendEncrypted(data, size)
+	return client.SendRaw(data, size)
 }
 
 // SendSecurity transmits initialization packet with information about the user's
@@ -138,9 +134,12 @@ func SendRedirect(client *Client, ipAddr []byte, port uint16) error {
 	pkt.Port = port
 	copy(pkt.IPAddr[:], ipAddr)
 
+	DebugLog("Sending Redirect Packet")
+	return EncryptAndSend(client, pkt)
+}
+
+// EncryptAndSend will encode the packet and let Client encrypt and transmit it.
+func EncryptAndSend(client *Client, pkt interface{}) error {
 	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
-		fmt.Println("Sending Redirect Packet")
-	}
 	return client.SendEncrypted(data, size)
 }

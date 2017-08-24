@@ -26,10 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"net"
-	"net/http"
 	"os"
 	"runtime/debug"
-	"runtime/pprof"
 	"strconv"
 	"sync"
 )
@@ -246,51 +244,19 @@ func main() {
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
-	// Initialize the database.
-	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
-	err = config.InitDB()
-	if err != nil {
-		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
-		fmt.Printf("Error: %s\n", err)
-		os.Exit(1)
-	}
-	fmt.Print("Done.\n\n")
+	initializeDatabase()
+	// TODO: This probably needs to be done in an exit signal handler
 	defer config.CloseDB()
 
-	// If we're in debug mode, spawn off an HTTP server that, when hit, dumps
-	// pprof output containing the stack traces of all running goroutines.
-	if config.DebugMode {
-		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
-			pprof.Lookup("goroutine").WriteTo(resp, 1)
-		})
-		go http.ListenAndServe(":"+config.WebPort, nil)
-	}
+	StartDebugServer()
+	initializeLogger(config.Logfile)
 
-	initLogger(config.Logfile)
-
-	// Register all of the server handlers and their corresponding ports.
 	c := controller{
 		host:        config.Hostname,
 		servers:     make([]Server, 0),
 		connections: &clientList{clients: list.New()},
 	}
-
-	c.registerServer(new(PatchServer))
-	c.registerServer(new(DataServer))
-	c.registerServer(new(LoginServer))
-	c.registerServer(new(CharacterServer))
-	c.registerServer(new(ShipgateServer))
-	c.registerServer(new(ShipServer))
-
-	// The available block ports will depend on how the server is configured,
-	// so once we've read the config then add the server entries on the fly.
-	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
-	for i := 1; i <= config.NumBlocks; i++ {
-		c.registerServer(&BlockServer{
-			name: fmt.Sprintf("BLOCK%d", i),
-			port: strconv.FormatInt(shipPort+int64(i), 10),
-		})
-	}
+	registerServers(&c)
 
 	// Start up all of our servers and block until they exit.
 	wg := c.start()
@@ -299,7 +265,19 @@ func main() {
 	}
 }
 
-func initLogger(filename string) {
+// Initialize our database connections.
+func initializeDatabase() {
+	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
+	if err := config.InitDB(); err != nil {
+		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	}
+	fmt.Print("Done.\n\n")
+}
+
+// Set up the logger to write to the specified filename.
+func initializeLogger(filename string) {
 	var w io.Writer
 	var err error
 	if filename != "" {
@@ -326,5 +304,25 @@ func initLogger(filename string) {
 		},
 		Hooks: make(logrus.LevelHooks),
 		Level: logLvl,
+	}
+}
+
+// Register all of the server handlers and their corresponding ports.
+func registerServers(controller *controller) {
+	controller.registerServer(new(PatchServer))
+	controller.registerServer(new(DataServer))
+	controller.registerServer(new(LoginServer))
+	controller.registerServer(new(CharacterServer))
+	controller.registerServer(new(ShipgateServer))
+	controller.registerServer(new(ShipServer))
+
+	// The available block ports will depend on how the server is configured,
+	// so once we've read the config then add the server entries on the fly.
+	shipPort, _ := strconv.ParseInt(config.ShipPort, 10, 16)
+	for i := 1; i <= config.NumBlocks; i++ {
+		controller.registerServer(&BlockServer{
+			name: fmt.Sprintf("BLOCK%d", i),
+			port: strconv.FormatInt(shipPort+int64(i), 10),
+		})
 	}
 }
