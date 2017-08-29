@@ -23,10 +23,8 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/dcrodman/archon/util"
 	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
@@ -71,7 +69,6 @@ type Config struct {
 	KeysDir       string
 
 	// Database parameters.
-	database   *sql.DB
 	DBHost     string
 	DBPort     string
 	DBName     string
@@ -150,34 +147,6 @@ func (config *Config) InitFromFile(fileName string) error {
 		config.PatchDir = filepath.Dir(config.PatchDir)
 	}
 	return nil
-}
-
-// Establish a connection to the database and ping it to verify.
-func (config *Config) InitDB() error {
-	dbName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername,
-		config.DBPassword, config.DBHost, config.DBPort, config.DBName)
-
-	var err error
-	config.database, err = sql.Open("mysql", dbName)
-	if err == nil {
-		err = config.database.Ping()
-	}
-	return err
-}
-
-func (config *Config) CloseDB() {
-	config.database.Close()
-}
-
-// Returns a reference to the database so that it can remain
-// encapsulated and any consistency checks can be centralized.
-func (config *Config) DB() *sql.DB {
-	if config.database == nil {
-		// Don't implicitly initialize the database - if there's an error or other action that causes
-		// the reference to become nil then we're probably leaking a connection.
-		panic("Attempt to reference uninitialized database")
-	}
-	return config.database
 }
 
 // Convert the broadcast IP string into 4 bytes to be used with the redirect packet.

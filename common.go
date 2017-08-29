@@ -19,7 +19,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"github.com/dcrodman/archon/util"
@@ -30,6 +29,7 @@ type CharClass uint8
 
 const (
 	// Possible character classes as defined by the game.
+
 	Humar     CharClass = 0x00
 	Hunewearl           = 0x01
 	Hucast              = 0x02
@@ -44,8 +44,17 @@ const (
 	Ramarl              = 0x0B
 )
 
+// Per-player guildcard data chunk.
+type GuildcardData struct {
+	Unknown  [0x114]uint8
+	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
+	Unknown2 [0x78]uint8
+	Entries  [104]GuildcardDataEntry
+	Unknown3 [0x1BC]uint8
+}
+
 // Per-player friend guildcard entries.
-type GuildcardEntry struct {
+type GuildcardDataEntry struct {
 	Guildcard   uint32
 	Name        [24]uint16
 	TeamName    [16]uint16
@@ -58,15 +67,6 @@ type GuildcardEntry struct {
 	Comment     [88]uint16
 }
 
-// Per-player guildcard data chunk.
-type GuildcardData struct {
-	Unknown  [0x114]uint8
-	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
-	Unknown2 [0x78]uint8
-	Entries  [104]GuildcardEntry
-	Unknown3 [0x1BC]uint8
-}
-
 // Struct used by Character Info packet.
 type CharacterPreview struct {
 	Experience     uint32
@@ -77,9 +77,9 @@ type CharacterPreview struct {
 	Model          byte
 	Padding        [15]byte
 	NameColorChksm uint32
-	SectionId      byte
+	SectionID      byte
 	Class          byte
-	V2flags        byte
+	V2Flags        byte
 	Version        byte
 	V1Flags        uint32
 	Costume        uint16
@@ -96,17 +96,6 @@ type CharacterPreview struct {
 	Playtime       uint32
 }
 
-// Per-character stats.
-type CharacterStats struct {
-	ATP uint16
-	MST uint16
-	EVP uint16
-	HP  uint16
-	DFP uint16
-	ATA uint16
-	LCK uint16
-}
-
 // Copyright message expected by the client when connecting.
 var LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
@@ -115,37 +104,28 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 	var loginPkt LoginPkt
 	util.StructFromBytes(client.Data(), &loginPkt)
 
-	pktUername := string(util.StripPadding(loginPkt.Username[:]))
+	pktUsername := string(util.StripPadding(loginPkt.Username[:]))
 	pktPassword := hashPassword(loginPkt.Password[:])
-
-	var username, password string
-	var isBanned, isActive bool
-	row := config.DB().QueryRow("SELECT username, password, "+
-		"guildcard, is_gm, is_banned, is_active, team_id from account_data "+
-		"WHERE username = ? and password = ?", pktUername, pktPassword)
-	err := row.Scan(&username, &password, &client.guildcard,
-		&client.isGm, &isBanned, &isActive, &client.teamId)
+	account, err := database.FindAccount(pktUsername)
 
 	switch {
-	// Check if we have a valid username/combination.
-	case err == sql.ErrNoRows:
-		// The same error is returned for invalid passwords as attempts to log in
-		// with a nonexistent username as some measure of account security. Note
-		// that if this is changed to query by username and add a password check,
-		// the index on account_data will need to be modified.
-		SendSecurity(client, BBLoginErrorPassword, 0, 0)
-		return nil, errors.New("Account does not exist for username: " + pktUername)
 	case err != nil:
 		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
 			"database.\n\nPlease contact your server administrator.")
 		log.Error(err.Error())
-	case isBanned:
-		SendSecurity(client, BBLoginErrorBanned, 0, 0)
-		return nil, errors.New("Account banned: " + username)
-	case !isActive:
+	case account == nil:
+	case account.Password != pktPassword:
+		// The same error is returned for invalid passwords as attempts to log in
+		// with a nonexistent username as some measure of account security.
+		SendSecurity(client, BBLoginErrorPassword, 0, 0)
+		return nil, errors.New("Account does not exist for username: " + pktUsername)
+	case !account.Active:
 		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
 			"database.\n\nPlease contact your server administrator.")
-		return nil, errors.New("Account must be activated for username: " + username)
+		return nil, errors.New("Account must be activated for username: " + pktUsername)
+	case account.Banned:
+		SendSecurity(client, BBLoginErrorBanned, 0, 0)
+		return nil, errors.New("Account banned: " + pktUsername)
 	}
 	// Copy over the config, which should indicate how far they are in the login flow.
 	util.StructFromBytes(loginPkt.Security[:], &client.config)

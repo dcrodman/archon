@@ -18,7 +18,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon/prs"
@@ -69,6 +68,17 @@ type ShipMenuEntry struct {
 	Padding uint16
 
 	Shipname [23]byte
+}
+
+// Per-character stats as stored in config files.
+type CharacterStats struct {
+	ATP uint16
+	MST uint16
+	EVP uint16
+	HP  uint16
+	DFP uint16
+	ATA uint16
+	LCK uint16
 }
 
 type CharacterServer struct {
@@ -288,6 +298,7 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error 
 }
 
 // Send whatever scrolling message was read out of the config file for the login screen.
+
 func (server *CharacterServer) sendScrollMessage(client *Client) error {
 	pkt := &ScrollMessagePacket{
 		Header:  BBHeader{Type: LoginScrollMessageType},
@@ -305,23 +316,20 @@ func (server *CharacterServer) sendScrollMessage(client *Client) error {
 
 // Load key config and other option data from the database or provide defaults for new accounts.
 func (server *CharacterServer) HandleOptionsRequest(client *Client) error {
-	optionData := make([]byte, 420)
-	archondb := config.DB()
-
-	row := archondb.QueryRow(
-		"SELECT key_config from player_options where guildcard = ?", client.guildcard)
-	err := row.Scan(&optionData)
-	if err == sql.ErrNoRows {
+	playerOptions, err := database.FindPlayerOptions(client.guildcard)
+	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
-		copy(optionData[:420], baseKeyConfig[:])
-		_, err = archondb.Exec("INSERT INTO player_options (guildcard, key_config) "+
-			" VALUES (?, ?)", client.guildcard, optionData[:420])
-	}
-	if err != nil {
+		playerOptions = &PlayerOptions{
+			Guildcard: client.guildcard,
+			KeyConfig: make([]byte, 420),
+		}
+		copy(playerOptions.KeyConfig, baseKeyConfig[:])
+		database.UpdatePlayerOptions(playerOptions)
+	} else if err != nil {
 		log.Error(err.Error())
 		return err
 	}
-	return server.sendOptions(client, optionData)
+	return server.sendOptions(client, playerOptions.KeyConfig)
 }
 
 // Send the client's configuration options. keyConfig should be 420 bytes long and either
@@ -351,25 +359,9 @@ func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) err
 func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 	var pkt CharSelectionPacket
 	util.StructFromBytes(client.Data(), &pkt)
-	prev := new(CharacterPreview)
 
-	// Character preview request.
-	archondb := config.DB()
-	var gc, name []uint8
-	row := archondb.QueryRow("SELECT experience, level, guildcard_str, "+
-		" name_color, name_color_chksm, model, section_id, char_class, "+
-		"v2_flags, version, v1_flags, costume, skin, face, head, hair, "+
-		"hair_red, hair_green, hair_blue, proportion_x, proportion_y, "+
-		"name, playtime FROM characters WHERE guildcard = ? AND slot_num = ?",
-		client.guildcard, pkt.Slot)
-	err := row.Scan(&prev.Experience, &prev.Level, &gc,
-		&prev.NameColor, &prev.NameColorChksm, &prev.Model, &prev.SectionId,
-		&prev.Class, &prev.V2flags, &prev.Version, &prev.V1Flags, &prev.Costume,
-		&prev.Skin, &prev.Face, &prev.Head, &prev.Hair, &prev.HairRed,
-		&prev.HairGreen, &prev.HairBlue, &prev.PropX, &prev.PropY,
-		&name, &prev.Playtime)
-
-	if err == sql.ErrNoRows {
+	character, err := database.FindCharacter(client.guildcard, pkt.Slot)
+	if character == nil {
 		// We don't have a character for this slot.
 		return server.sendCharacterAck(client, pkt.Slot, 2)
 	} else if err != nil {
@@ -382,12 +374,9 @@ func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 		client.config.SlotNum = uint8(pkt.Slot)
 		server.sendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 		return server.sendCharacterAck(client, pkt.Slot, 1)
-	} else {
-		// They have a character in that slot; send the character preview.
-		copy(prev.GuildcardStr[:], gc[:])
-		copy(prev.Name[:], name[:])
-		return server.sendCharacterPreview(client, prev)
 	}
+	// They have a character in that slot; send the character preview.
+	return server.sendCharacterPreview(client, character)
 }
 
 // Send the character acknowledgement packet. 0 indicates a creation ack, 1 is
@@ -404,7 +393,33 @@ func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, 
 }
 
 // Send the preview packet containing basic details about a character in the selected slot.
-func (server *CharacterServer) sendCharacterPreview(client *Client, charPreview *CharacterPreview) error {
+func (server *CharacterServer) sendCharacterPreview(client *Client, character *Character) error {
+	charPreview := &CharacterPreview{
+		Experience:     character.Experience,
+		Level:          character.Level,
+		NameColor:      character.NameColor,
+		Model:          character.Model,
+		NameColorChksm: character.NameColorChecksum,
+		SectionID:      character.SectionID,
+		Class:          character.Class,
+		V2Flags:        character.V2Flags,
+		Version:        character.Version,
+		V1Flags:        character.V1Flags,
+		Costume:        character.Costume,
+		Skin:           character.Skin,
+		Face:           character.Face,
+		Head:           character.Head,
+		Hair:           character.Hair,
+		HairRed:        character.HairRed,
+		HairGreen:      character.HairGreen,
+		HairBlue:       character.HairBlue,
+		PropX:          character.ProportionX,
+		PropY:          character.ProportionY,
+		Playtime:       character.Playtime,
+	}
+	copy(charPreview.GuildcardStr[:], character.GuildcardStr[:])
+	copy(charPreview.Name[:], character.Name[:])
+
 	pkt := &CharPreviewPacket{
 		Header:    BBHeader{Type: LoginCharPreviewType},
 		Slot:      0,
@@ -427,30 +442,25 @@ func (server *CharacterServer) sendChecksumAck(client *Client) error {
 
 // Load the player's saved guildcards, build the chunk data, and send the chunk header.
 func (server *CharacterServer) HandleGuildcardDataStart(client *Client) error {
-	archondb := config.DB()
-	rows, err := archondb.Query(
-		"SELECT friend_gc, name, team_name, description, language, "+
-			"section_id, char_class, comment FROM guildcard_entries "+
-			"WHERE guildcard = ?", client.guildcard)
+	guildcards, err := database.FindGuildcardData(client.guildcard)
 	if err != nil {
-		log.Error(err.Error())
 		return err
 	}
-	defer rows.Close()
-	gcData := new(GuildcardData)
 
+	gcData := new(GuildcardData)
 	// Maximum of 140 entries can be sent.
-	for i := 0; rows.Next() && i < 140; i++ {
+	for i, entry := range guildcards {
 		// TODO: This may not actually work yet, but I haven't gotten to
 		// figuring out how the other servers use it.
-		var name, teamName, desc, comment []uint8
-		entry := &gcData.Entries[i]
-		err = rows.Scan(&entry.Guildcard, &name, &teamName, &desc,
-			&entry.Language, &entry.SectionID, &entry.CharClass, &comment)
-		if err != nil {
-			log.Error(err.Error())
-			return err
-		}
+		pktEntry := gcData.Entries[i]
+		pktEntry.Guildcard = uint32(entry.Guildcard)
+		copy(pktEntry.Name[:], entry.Name)
+		copy(pktEntry.TeamName[:], entry.TeamName)
+		copy(pktEntry.Description[:], entry.Description)
+		pktEntry.Language = entry.Language
+		pktEntry.SectionID = entry.SectionID
+		pktEntry.CharClass = entry.Class
+		copy(pktEntry.Comment[:], entry.Comment)
 	}
 	var size int
 	client.gcData, size = util.BytesFromStruct(gcData)
@@ -522,74 +532,105 @@ func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []by
 	return EncryptAndSend(client, pkt)
 }
 
-// Create or update a character in a slot.
+// Player has modified a character via the dressing room or selected the recreate option.
+// Recreate or update a character in a slot depending on which it was.
 func (server *CharacterServer) HandleCharacterUpdate(client *Client) error {
 	var charPkt CharPreviewPacket
 	charPkt.Character = new(CharacterPreview)
 	util.StructFromBytes(client.Data(), &charPkt)
-	p := charPkt.Character
 
-	archonDB := config.DB()
 	if client.flag == 0x02 {
-		// Player is using the dressing room; update the character. Messy
-		// query, but unavoidable if we don't want to be stuck with blobs.
-		_, err := archonDB.Exec("UPDATE characters SET name_color=?, model=?, "+
-			"name_color_chksm=?, section_id=?, char_class=?, costume=?, skin=?, "+
-			"head=?, hair_red=?, hair_green=?, hair_blue,=? proportion_x=?, "+
-			"proportion_y=?, name=? WHERE guildcard = ? AND slot_num = ?",
-			p.NameColor, p.Model, p.NameColorChksm, p.SectionId,
-			p.Class, p.Costume, p.Skin, p.Head, p.HairRed,
-			p.HairGreen, p.HairBlue, p.Name[:], p.PropX, p.PropY,
-			client.guildcard, charPkt.Slot)
-		if err != nil {
+		if err := server.updateCharacter(client.guildcard, &charPkt); err != nil {
 			log.Error(err.Error())
 			return err
 		}
 	} else {
-		// Delete a character if it already exists.
-		_, err := archonDB.Exec("DELETE FROM characters WHERE "+
-			"guildcard = ? AND slot_num = ?", client.guildcard, charPkt.Slot)
-		if err != nil {
+		// Recreating; delete the existing character and start from scratch.
+		if err := database.DeleteCharacter(client.guildcard, charPkt.Slot); err != nil {
 			log.Error(err.Error())
 			return err
 		}
+
+		p := charPkt.Character
 		// Grab our base stats for this character class.
 		stats := server.BaseStats[p.Class]
 
-		// TODO: Set up the default inventory and techniques.
-		meseta := 300
-
+		character := &Character{
+			Experience:        0,
+			Level:             0,
+			GuildcardStr:      p.GuildcardStr[:],
+			NameColor:         p.NameColor,
+			Model:             p.Model,
+			NameColorChecksum: p.NameColorChksm,
+			SectionID:         p.SectionID,
+			Class:             p.Class,
+			V2Flags:           p.V2Flags,
+			Version:           p.Version,
+			V1Flags:           p.V1Flags,
+			Costume:           p.Costume,
+			Skin:              p.Skin,
+			Face:              p.Face,
+			Head:              p.Head,
+			Hair:              p.Hair,
+			HairRed:           p.HairRed,
+			HairGreen:         p.HairGreen,
+			HairBlue:          p.HairBlue,
+			ProportionX:       p.PropX,
+			ProportionY:       p.PropY,
+			Name:              p.Name[:],
+			ATP:               stats.ATP,
+			MST:               stats.MST,
+			EVP:               stats.EVP,
+			HP:                stats.HP,
+			DFP:               stats.DFP,
+			ATA:               stats.ATA,
+			LCK:               stats.LCK,
+			Meseta:            300,
+		}
 		/* TODO: Add the rest of these.
 		--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
 		--techniques blob,
 		--options blob,
 		*/
 
-		// Create the new character.
-		_, err = archonDB.Exec("INSERT INTO characters (guildcard, slot_num,"+
-			"experience, level, guildcard_str, name_color, model, name_color_chksm,"+
-			"section_id, char_class, v2_flags, version, v1_flags, costume,"+
-			"skin, face, head, hair, hair_red, hair_green, hair_blue,"+
-			"proportion_x, proportion_y, name, playtime, atp, mst, evp, "+
-			"hp, dfp, ata, lck, meseta, bank_use, bank_meseta) "+
-			"VALUES (?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "+
-			"?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)",
-			client.guildcard, charPkt.Slot, p.GuildcardStr[:], p.NameColor,
-			p.Model, p.NameColorChksm, p.SectionId, p.Class, p.V2flags,
-			p.Version, p.V1Flags, p.Costume, p.Skin, p.Face, p.Head,
-			p.Hair, p.HairRed, p.HairGreen, p.HairBlue, p.PropX, p.PropY,
-			p.Name[:], stats.ATP, stats.MST, stats.EVP, stats.HP, stats.DFP, stats.ATA,
-			stats.LCK, meseta)
+		err := database.CreateCharacter(client.guildcard, charPkt.Slot, character)
 		if err != nil {
 			log.Error(err.Error())
 			return err
 		}
 	}
-
 	// Send the security packet with the updated state and slot number so that
 	// we know a character has been selected.
 	client.config.SlotNum = uint8(charPkt.Slot)
 	return server.sendCharacterAck(client, charPkt.Slot, 0)
+}
+
+func (server *CharacterServer) updateCharacter(guildcard uint32, pkt *CharPreviewPacket) error {
+	// Player is using the dressing room; update the character.
+	character, err := database.FindCharacter(guildcard, pkt.Slot)
+	if character == nil {
+		err = fmt.Errorf("Character does not exist in slot %d for guildcard %d",
+			pkt.Slot, guildcard)
+	} else if err == nil {
+		p := pkt.Character
+		character.NameColor = p.NameColor
+		character.Model = p.Model
+		character.NameColorChecksum = p.NameColorChksm
+		character.SectionID = p.SectionID
+		character.Class = p.Class
+		character.Costume = p.Costume
+		character.Skin = p.Skin
+		character.Head = p.Head
+		character.HairRed = p.HairRed
+		character.HairGreen = p.HairGreen
+		character.HairBlue = p.HairBlue
+		character.ProportionX = p.PropX
+		character.ProportionY = p.PropY
+		copy(character.Name, p.Name[:])
+
+		err = database.UpdateCharacter(guildcard, pkt.Slot, character)
+	}
+	return err
 }
 
 // Player selected one of the items on the ship select screen.

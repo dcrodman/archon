@@ -39,7 +39,11 @@ const (
 	//KeyFile          = "key.pem"
 )
 
-var log *logrus.Logger
+// Global variables that should not be globals at some point.
+var (
+	log      *logrus.Logger
+	database *Database
+)
 
 // Server defines the methods implemented by all sub-servers that can be
 // registered and started when the server is brought up.
@@ -244,9 +248,15 @@ func main() {
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
-	initializeDatabase()
-	// TODO: This probably needs to be done in an exit signal handler
-	defer config.CloseDB()
+	fmt.Printf("Connecting to database %s:%s...", config.DBHost, config.DBPort)
+	database, err = InitializeDatabase()
+	if err != nil {
+		fmt.Println("Failed: " + err.Error())
+		os.Exit(1)
+	}
+	// TODO: This should probably be done in a signal handler or somewhere more guaranteed.
+	defer database.Close()
+	fmt.Print("Done.\n\n")
 
 	StartDebugServer()
 	initializeLogger(config.Logfile)
@@ -263,17 +273,6 @@ func main() {
 	if wg != nil {
 		wg.Wait()
 	}
-}
-
-// Initialize our database connections.
-func initializeDatabase() {
-	fmt.Printf("Connecting to MySQL database %s:%s...", config.DBHost, config.DBPort)
-	if err := config.InitDB(); err != nil {
-		fmt.Println("Failed.\nPlease make sure the database connection parameters are correct.")
-		fmt.Printf("Error: %s\n", err)
-		os.Exit(1)
-	}
-	fmt.Print("Done.\n\n")
 }
 
 // Set up the logger to write to the specified filename.
