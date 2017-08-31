@@ -23,66 +23,89 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/dcrodman/archon/util"
-	_ "github.com/go-sql-driver/mysql"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
 
+// Database parameters.
+type DatabaseConfig struct {
+	DBHost     string `yaml:"db_host"`
+	DBPort     string `yaml:"db_port"`
+	DBName     string `yaml:"db_name"`
+	DBUsername string `yaml:"db_username"`
+	DBPassword string `yaml:"db_password"`
+}
+
+// Patch server config.
+type PatchConfig struct {
+	PatchPort string `yaml:"patch_port"`
+	DataPort  string `yaml:"data_port"`
+	PatchDir  string `yaml:"patch_dir"`
+	// Message displayed on the welcome screen.
+	WelcomeMessage string `yaml:"welcome_message"`
+}
+
+// Login server config.
+type LoginConfig struct {
+	LoginPort     string `yaml:"login_port"`
+	CharacterPort string `yaml:"character_port"`
+	ParametersDir string `yaml:"parameters_dir"`
+	// Scrolling message on ship select.
+	ScrollMessage string `yaml:"scroll_message"`
+}
+
+// Ship server config.
+type ShipConfig struct {
+	ShipPort string `yaml:"ship_port"`
+	ShipName string `yaml:"ship_name"`
+	// Number of blocks to open on the ship server.
+	NumBlocks int `yaml:"num_blocks"`
+}
+
+// Block server config.
+type BlockConfig struct {
+	BlockPort string `yaml:"block_port"`
+	// Number of lobbies available per block.
+	NumLobbies int `yaml:"num_lobbies"`
+}
+
+// Shipgate server config.
+type ShipgateConfig struct {
+	ShipgatePort string `yaml:"shipgate_port"`
+}
+
+// External HTTP server config.
+type WebConfig struct {
+	WebPort string `yaml:"http_port"`
+}
+
 // Configuration structure that can be shared between sub servers.
 // The fields are intentionally exported to cut down on verbosity
 // with the intent that they be considered immutable.
 type Config struct {
-	Hostname   string
-	ExternalIP string
-	// Patch ports.
-	PatchPort string
-	DataPort  string
-	// Login ports.
-	LoginPort     string
-	CharacterPort string
-	// Shipgate ports.
-	ShipgatePort string
-	WebPort      string
-	// Ship ports.
-	ShipPort string
+	Hostname       string `yaml:"hostname"`
+	ExternalIP     string `yaml:"external_ip"`
+	MaxConnections int    `yaml:"max_connections"`
+	Logfile        string `yaml:"log_file"`
+	LogLevel       string `yaml:"log_level"`
+	DebugMode      bool   `yaml:"debug_mode"`
 
-	// Number of blocks to open on the ship server.
-	NumBlocks int
-	// Number of lobbies available per block.
-	NumLobbies     int
-	MaxConnections int
-
-	// Patch server welcome message.
-	WelcomeMessage string
-	// Scrolling message on ship select.
-	ScrollMessage string
-	MessageBytes  []byte
-	MessageSize   uint16
-
-	PatchDir      string
-	ParametersDir string
-	KeysDir       string
-
-	// Database parameters.
-	DBHost     string
-	DBPort     string
-	DBName     string
-	DBUsername string
-	DBPassword string
-
-	Logfile   string
-	LogLevel  string
-	DebugMode bool
-
-	// Ship server config.
-	ShipName string
+	DatabaseConfig `yaml:"database"`
+	PatchConfig    `yaml:"patch_server"`
+	LoginConfig    `yaml:"login_server"`
+	ShipConfig     `yaml:"ship_server"`
+	BlockConfig    `yaml:"block_server"`
+	ShipgateConfig `yaml:"shipgate_config"`
+	WebConfig      `yaml:"web"`
 
 	cachedIPBytes   [4]byte
+	MessageBytes    []byte
+	MessageSize     uint16
 	cachedScrollMsg []byte
 }
 
@@ -91,35 +114,48 @@ type Config struct {
 var config *Config = &Config{
 	Hostname:       "127.0.0.1",
 	ExternalIP:     "127.0.0.1",
-	PatchPort:      "11000",
-	DataPort:       "11001",
-	LoginPort:      "12000",
-	CharacterPort:  "12001",
-	ShipgatePort:   "13000",
-	WebPort:        "14000",
-	ShipPort:       "15000",
-	NumBlocks:      2,
-	NumLobbies:     15,
+	Logfile:        "",
+	LogLevel:       "warn",
+	DebugMode:      false,
 	MaxConnections: 30000,
-
-	ShipName:       "Unconfigured",
-	WelcomeMessage: "Unconfigured Welcome Message",
-	ScrollMessage:  "Add a welcome message here",
-
-	PatchDir:      "patches/",
-	ParametersDir: "parameters/",
-	KeysDir:       "keys/",
-
-	DBHost: "127.0.0.1",
-	DBPort: "3306",
-	DBName: "archondb",
-
-	Logfile:   "",
-	LogLevel:  "warn",
-	DebugMode: false,
+	DatabaseConfig: DatabaseConfig{
+		DBHost: "127.0.0.1",
+		DBPort: "3306",
+		DBName: "archondb",
+	},
+	PatchConfig: PatchConfig{
+		PatchPort:      "11000",
+		DataPort:       "11001",
+		PatchDir:       "patches/",
+		WelcomeMessage: "Unconfigured Welcome Message",
+	},
+	LoginConfig: LoginConfig{
+		LoginPort:     "12000",
+		CharacterPort: "12001",
+		ParametersDir: "parameters/",
+		ScrollMessage: "Add a welcome message here",
+	},
+	ShipConfig: ShipConfig{
+		ShipPort:  "15000",
+		ShipName:  "Unconfigured",
+		NumBlocks: 2,
+	},
+	BlockConfig: BlockConfig{
+		NumLobbies: 15,
+	},
+	ShipgateConfig: ShipgateConfig{
+		ShipgatePort: "13000",
+	},
+	WebConfig: WebConfig{
+		WebPort: "14000",
+	},
 }
 
-func GetConfig() *Config { return config }
+// GetConfig returns the singleton instance of the config struct containing all of
+// the configuration data read from our YAML file.
+func GetConfig() *Config {
+	return config
+}
 
 // Populate config with the contents of a JSON file at path fileName. Config parameters
 // in the file must match the above fields exactly in order to be read.
@@ -128,7 +164,10 @@ func (config *Config) InitFromFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(data, config)
+
+	if err = yaml.UnmarshalStrict(data, config); err != nil {
+		return errors.New("Failed to parse config file: " + err.Error())
+	}
 
 	// Convert the welcome message to UTF-16LE and cache it.
 	config.MessageBytes = util.ConvertToUtf16(config.WelcomeMessage)
@@ -174,6 +213,7 @@ func (config *Config) String() string {
 		outfile = "Standard Out"
 	}
 	return "Hostname: " + config.Hostname + "\n" +
+		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode) + "\n" +
 		"Patch Port: " + config.PatchPort + "\n" +
 		"Data Port: " + config.DataPort + "\n" +
 		"Login Port: " + config.LoginPort + "\n" +
@@ -188,13 +228,11 @@ func (config *Config) String() string {
 		"Welcome Message: " + config.WelcomeMessage + "\n" +
 		"Parameters Directory: " + config.ParametersDir + "\n" +
 		"Patch Directory: " + config.PatchDir + "\n" +
-		"Keys Directory: " + config.KeysDir + "\n" +
 		"Database Host: " + config.DBHost + "\n" +
 		"Database Port: " + config.DBPort + "\n" +
 		"Database Name: " + config.DBName + "\n" +
 		"Database Username: " + config.DBUsername + "\n" +
 		"Database Password: " + config.DBPassword + "\n" +
 		"Output Logged To: " + outfile + "\n" +
-		"Logging Level: " + config.LogLevel + "\n" +
-		"Debug Mode Enabled: " + strconv.FormatBool(config.DebugMode)
+		"Logging Level: " + config.LogLevel
 }

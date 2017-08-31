@@ -33,10 +33,10 @@ import (
 )
 
 const (
-	ServerConfigDir  = "/usr/local/etc/archon"
-	ServerConfigFile = "server_config.json"
-	//CertificateFile  = "certificate.pem"
-	//KeyFile          = "key.pem"
+	// ServerConfigDir is the configuration directory that Archon will fall back to.
+	ServerConfigDir = "/usr/local/etc/archon"
+	// ServerConfigFile is the filename of the config file Archon expects.
+	ServerConfigFile = "config.yaml"
 )
 
 // Global variables that should not be globals at some point.
