@@ -100,7 +100,7 @@ type Config struct {
 	LoginConfig    `yaml:"login_server"`
 	ShipConfig     `yaml:"ship_server"`
 	BlockConfig    `yaml:"block_server"`
-	ShipgateConfig `yaml:"shipgate_config"`
+	ShipgateConfig `yaml:"shipgate_server"`
 	WebConfig      `yaml:"web"`
 
 	cachedIPBytes   [4]byte
