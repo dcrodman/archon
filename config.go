@@ -165,7 +165,7 @@ func (config *Config) InitFromFile(fileName string) error {
 		return err
 	}
 
-	if err = yaml.UnmarshalStrict(data, config); err != nil {
+	if err = yaml.Unmarshal(data, config); err != nil {
 		return errors.New("Failed to parse config file: " + err.Error())
 	}
 
