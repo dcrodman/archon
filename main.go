@@ -19,12 +19,12 @@ package main
 
 import (
 	"container/list"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,8 +37,8 @@ const (
 
 // Global variables that should not be globals at some point.
 var (
-	log      *logrus.Logger
-	database *Database
+	log        *logrus.Logger
+	configPath = flag.String("conf", "", "Full path to a custom config file location")
 )
 
 func main() {
@@ -49,22 +49,30 @@ func main() {
 		"published by the Free Software Foundation, either version 3 of\n" +
 		"the License, or (at your option) any later version.\n" +
 		"This program is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n")
+	flag.Parse()
 
 	// Initialize our config singleton from one of two expected file locations.
-	fmt.Printf("Loading config file %v...", ServerConfigFile)
-	err := config.InitFromFile(ServerConfigFile)
-	if err != nil {
-		os.Chdir(ServerConfigDir)
-		fmt.Printf("Failed.\nLoading config from %v...", ServerConfigDir+"/"+ServerConfigFile)
-		err = config.InitFromFile(ServerConfigFile)
-		if err != nil {
-			fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
-			fmt.Printf("Error: %s\n", err)
-			os.Exit(1)
+	var err error
+	if *configPath == "" {
+		fmt.Printf("Loading configuration file %v...", ServerConfigFile)
+		if config.InitFromFile(ServerConfigFile) != nil {
+			fmt.Printf("Failed.\nLoading configuration from %v...", ServerConfigDir+"/"+ServerConfigFile)
+			os.Chdir(ServerConfigDir)
+			err = config.InitFromFile(ServerConfigFile)
 		}
+	} else {
+		fmt.Printf("Loading configuration file %v...", *configPath)
+		err = config.InitFromFile(*configPath)
+	}
+
+	if err != nil {
+		fmt.Println("Failed.\nPlease check that one of these files exists and restart the server.")
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
 	}
 	fmt.Printf("Done.\n\n--Configuration Parameters--\n%v\n\n", config.String())
 
+	// Set up the database singleton with the params from the config file.
 	fmt.Printf("Connecting to database %s:%s...", config.DBHost, config.DBPort)
 	database, err = InitializeDatabase()
 	if err != nil {

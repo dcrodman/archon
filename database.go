@@ -31,6 +31,8 @@ const (
 	guildcards = "guildcards"
 )
 
+var database *Database
+
 // dbFunc is an alias for the method signature expected by Database.op. All methods that
 // leverage the session boilerplate define this for the actual database operations.
 type dbFunc func(c *mgo.Collection) (interface{}, error)
