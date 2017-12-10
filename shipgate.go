@@ -33,8 +33,9 @@ import (
 	// 	"strings"
 	// 	"sync"
 	// 	"time"
-	"github.com/dcrodman/archon/util"
 	"strconv"
+
+	"github.com/dcrodman/archon/util"
 )
 
 type Ship struct {
@@ -353,7 +354,7 @@ func (server ShipgateServer) NewClient(conn *net.TCPConn) (*Client, error) {
 
 // Basically a no-op at this point since we only have one ship.
 func (server ShipgateServer) Handle(c *Client) error {
-	var err error = nil
+	var err error
 	var hdr BBHeader
 	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
 

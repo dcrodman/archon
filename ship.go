@@ -22,10 +22,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/util"
 	"net"
 	"strconv"
+
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/util"
 )
 
 // Block ID reserved for returning to the ship select menu.
@@ -164,7 +165,7 @@ func (server *ShipServer) HandleBlockSelection(sc *Client, pkt MenuSelectionPack
 	if selectedBlock == BackMenuItem {
 		server.SendShipList(sc, shipList)
 	} else if int(selectedBlock) > config.NumBlocks {
-		return errors.New(fmt.Sprintf("Block selection %v out of range %v", selectedBlock, config.NumBlocks))
+		return fmt.Errorf("Block selection %v out of range %v", selectedBlock, config.NumBlocks)
 	}
 	ipAddr := config.BroadcastIP()
 	return SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))

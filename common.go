@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+
 	"github.com/dcrodman/archon/util"
 )
 
@@ -29,7 +30,6 @@ type CharClass uint8
 
 const (
 	// Possible character classes as defined by the game.
-
 	Humar     CharClass = 0x00
 	Hunewearl           = 0x01
 	Hucast              = 0x02
