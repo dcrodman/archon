@@ -172,9 +172,7 @@ func (c *Client) Process() error {
 			// PSO likes to occasionally send us packets that are longer than their declared
 			// size, but are always a multiple of the length of the packet header. Adjust the
 			// expected length just in case in order to avoid leaving stray bytes in the buffer.
-			for c.packetSize%c.hdrSize != 0 {
-				c.packetSize++
-			}
+			c.packetSize += c.packetSize % c.hdrSize
 		}
 	}
 	pktSize := int(c.packetSize)

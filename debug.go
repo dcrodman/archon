@@ -27,6 +27,7 @@ import (
 // pprof output containing the stack traces of all running goroutines.
 func StartDebugServer() {
 	if config.DebugMode {
+		fmt.Println("Opening Debug port on " + config.WebPort)
 		http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
 			pprof.Lookup("goroutine").WriteTo(resp, 1)
 		})

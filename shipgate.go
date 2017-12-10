@@ -331,7 +331,7 @@ type Ship struct {
 // Shipgate sub-server definition.
 type ShipgateServer struct{}
 
-func (server ShipgateServer) Name() string { return "Shipgate" }
+func (server ShipgateServer) Name() string { return "SHIPGATE" }
 
 func (server ShipgateServer) Port() string { return config.ShipgatePort }
 
