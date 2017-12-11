@@ -20,19 +20,18 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/prs"
-	"github.com/dcrodman/archon/util"
 	"hash/crc32"
 	"io/ioutil"
 	"net"
 	"os"
 	"syscall"
 	"time"
+
+	"github.com/dcrodman/archon/prs"
+	"github.com/dcrodman/archon/util"
 )
 
 const (
-	// Client version string we're expecting during auth.
-	ClientVersionString = "TethVer12510"
 	// Maximum size of a block of parameter or guildcard data.
 	MaxChunkSize = 0x6800
 	// Expected format of the timestamp sent to the client.

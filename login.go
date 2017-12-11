@@ -19,10 +19,11 @@ package main
 
 import (
 	"errors"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/util"
 	"net"
 	"strconv"
+
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/util"
 )
 
 // Struct for caching the parameter chunk data and header so
@@ -86,17 +87,18 @@ func (server *LoginServer) Handle(c *Client) error {
 }
 
 func (server *LoginServer) HandleLogin(client *Client) error {
-	loginPkt, err := VerifyAccount(client)
+	//loginPkt, err := VerifyAccount(client)
+	_, err := VerifyAccount(client)
 	if err != nil {
 		return err
 	}
 
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
-	if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
+	/* if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
 		SendSecurity(client, BBLoginErrorPatch, 0, 0)
 		return errors.New("Incorrect version string")
-	}
+	} */
 
 	// Newserv sets this field when the client first connects. I think this is
 	// used to indicate that the client has made it through the LOGIN server,
