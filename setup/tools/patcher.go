@@ -18,6 +18,8 @@
 *
 * Utility script that can be used to patch unpacked PSOBB executables
 * in order to force them to connect to a different IP address.
+*
+* Usage: go run patcher.go ip address [exe name]
  */
 package main
 
@@ -28,6 +30,7 @@ import (
 
 const blockLen = 0x18
 
+/* Use this block instead if you're using TethVer12510 executables.
 var exeName = "Vista.exe"
 var offsets = []int64{
 	0x56b8eC,
@@ -36,6 +39,17 @@ var offsets = []int64{
 	0x56B94C,
 	0x56B968,
 	0x56B984,
+}
+*/
+
+// Offsets for the TethVer12513 executables.
+var exeName = "Psobb.exe"
+var offsets = []int64{
+	0x56d70c,
+	0x56d724,
+	0x56d76c,
+	0x56d788,
+	0x56d7a4,
 }
 
 func main() {
