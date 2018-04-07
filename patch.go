@@ -23,8 +23,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/util"
 	"hash/crc32"
 	"io"
 	"io/ioutil"
@@ -32,6 +30,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/util"
 )
 
 // MaxFileChunkSize is the maximum number of bytes we can send of a file at a time.
@@ -470,7 +471,7 @@ func (server *DataServer) sendFileHeader(client *Client, patch *PatchEntry) erro
 // Send a chunk of file data.
 func (server *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > MaxFileChunkSize {
-		log.Error("Attempted to send %v byte chunk; max is %v",
+		log.Errorf("Attempted to send %v byte chunk; max is %v",
 			string(chunkSize), string(MaxFileChunkSize))
 		panic(errors.New("File chunk size exceeds maximum"))
 	}

@@ -24,15 +24,16 @@ package main
 
 import (
 	"errors"
-	"github.com/dcrodman/archon/util"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/dcrodman/archon/util"
+	"gopkg.in/yaml.v2"
 )
 
-// Database parameters.
+// DatabaseConfig contains all parameters for db initialization.
 type DatabaseConfig struct {
 	DBHost     string `yaml:"db_host"`
 	DBPort     string `yaml:"db_port"`
@@ -41,7 +42,7 @@ type DatabaseConfig struct {
 	DBPassword string `yaml:"db_password"`
 }
 
-// Patch server config.
+// PatchConfig contains all parameters for the patch server.
 type PatchConfig struct {
 	PatchPort string `yaml:"patch_port"`
 	DataPort  string `yaml:"data_port"`
@@ -50,7 +51,7 @@ type PatchConfig struct {
 	WelcomeMessage string `yaml:"welcome_message"`
 }
 
-// Login server config.
+// LoginConfig contains all parameters for the login server.
 type LoginConfig struct {
 	LoginPort     string `yaml:"login_port"`
 	CharacterPort string `yaml:"character_port"`
@@ -59,7 +60,7 @@ type LoginConfig struct {
 	ScrollMessage string `yaml:"scroll_message"`
 }
 
-// Ship server config.
+// ShipConfig contains all parameters for the ship server.
 type ShipConfig struct {
 	ShipPort string `yaml:"ship_port"`
 	ShipName string `yaml:"ship_name"`
@@ -67,19 +68,21 @@ type ShipConfig struct {
 	NumBlocks int `yaml:"num_blocks"`
 }
 
-// Block server config.
+// BlockConfig contains all parameters for the block server(s).
 type BlockConfig struct {
 	BlockPort string `yaml:"block_port"`
 	// Number of lobbies available per block.
 	NumLobbies int `yaml:"num_lobbies"`
 }
 
-// Shipgate server config.
+// ShipgateConfig contains all parameters for the shipgate.
 type ShipgateConfig struct {
 	ShipgatePort string `yaml:"shipgate_port"`
 }
 
-// External HTTP server config.
+// WebConfig contains all parameters for the external HTTP server,
+// which is used to expose server status and other metadata to external
+// callers. This can be disabled.
 type WebConfig struct {
 	WebPort string `yaml:"http_port"`
 }
