@@ -8,14 +8,6 @@ import (
 	"net"
 )
 
-// Info about the available block servers.
-type Block struct {
-	Unknown   uint16
-	BlockId   uint32
-	Padding   uint16
-	BlockName [36]byte
-}
-
 type BlockServer struct {
 	name string
 	port string
@@ -31,8 +23,8 @@ func (server *BlockServer) Init() error {
 	// Precompute our lobby list since this won't change once the server has started.
 	server.lobbyPkt.Header.Size = BBHeaderSize
 	server.lobbyPkt.Header.Type = LobbyListType
-	server.lobbyPkt.Header.Flags = uint32(config.NumLobbies)
-	for i := 0; i <= config.NumLobbies; i++ {
+	server.lobbyPkt.Header.Flags = uint32(Config.BlockServer.NumLobbies)
+	for i := 0; i <= Config.BlockServer.NumLobbies; i++ {
 		server.lobbyPkt.Lobbies = append(server.lobbyPkt.Lobbies, struct {
 			MenuId  uint32
 			LobbyId uint32
@@ -60,7 +52,7 @@ func (server *BlockServer) Handle(c *Client) error {
 	case LoginType:
 		err = server.HandleShipLogin(c)
 	default:
-		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -91,20 +83,20 @@ func (server *BlockServer) sendSecurity(client *Client, errorCode BBLoginError,
 		Capabilities: 0x00000102,
 	}
 
-	DebugLog("Sending Security Packet")
+	Log.Debug("Sending Security Packet")
 	return EncryptAndSend(client, pkt)
 }
 
 // Send the client the block list on the selection screen.
 func (server *BlockServer) sendBlockList(client *Client) error {
 	//data, size := util.BytesFromStruct(pkt)
-	DebugLog("Sending Block Packet - NOT IMPLEMENTED")
+	Log.Debug("Sending Block Packet - NOT IMPLEMENTED")
 	//return client.SendEncrypted(data, size)
 	return nil
 }
 
 // Send the client the lobby list on the selection screen.
 func (server *BlockServer) sendLobbyList(client *Client) error {
-	DebugLog("Sending Lobby List Packet")
+	Log.Debug("Sending Lobby List Packet")
 	return EncryptAndSend(client, server.lobbyPkt)
 }

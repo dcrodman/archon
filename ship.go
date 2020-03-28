@@ -1,22 +1,4 @@
-/*
-* Archon PSO Server
-* Copyright (C) 2014 Andrew Rodman
-*
-* This program is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>.
-* ---------------------------------------------------------------------
-* The BLOCK and SHIP server logic.
- */
+// The BLOCK and SHIP server logic.
 package main
 
 import (
@@ -29,8 +11,51 @@ import (
 	"github.com/dcrodman/archon/util"
 )
 
-// Block ID reserved for returning to the ship select menu.
+// BackMenuItem is the block ID reserved for returning to the ship select menu.
 const BackMenuItem = 0xFF
+
+// ShipServer defines the operations for the gameplay servers.
+type ShipServer struct {
+	// Precomputed block packet.
+	blockListPkt *BlockListPacket
+}
+
+func (server *ShipServer) Name() string { return "SHIP" }
+
+func (server *ShipServer) Port() string { return Config.ShipServer.Port }
+
+func (server *ShipServer) Init() error {
+	// Precompute the block list packet since it's not going to change.
+	numBlocks := Config.ShipServer.NumBlocks
+	ship := shipList[0]
+
+	server.blockListPkt = &BlockListPacket{
+		Header:  BBHeader{Type: BlockListType, Flags: uint32(numBlocks + 1)},
+		Unknown: 0x08,
+		Blocks:  make([]Block, numBlocks+1),
+	}
+	shipName := fmt.Sprintf("%d:%s", ship.id, ship.name)
+	copy(server.blockListPkt.ShipName[:], util.ConvertToUtf16(shipName))
+
+	for i := 0; i < numBlocks; i++ {
+		b := &server.blockListPkt.Blocks[i]
+		b.Unknown = 0x12
+		b.BlockId = uint32(i + 1)
+		blockName := fmt.Sprintf("BLOCK %02d", i+1)
+		copy(b.BlockName[:], util.ConvertToUtf16(blockName))
+	}
+
+	// Always append a menu item for returning to the ship select screen.
+	b := &server.blockListPkt.Blocks[numBlocks]
+	b.Unknown = 0x12
+	b.BlockId = BackMenuItem
+	copy(b.BlockName[:], util.ConvertToUtf16("Ship Selection"))
+	return nil
+}
+
+func (server *ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
+	return NewShipClient(conn)
+}
 
 func NewShipClient(conn *net.TCPConn) (*Client, error) {
 	cCrypt := crypto.NewBBCrypt()
@@ -43,47 +68,6 @@ func NewShipClient(conn *net.TCPConn) (*Client, error) {
 		sc = nil
 	}
 	return sc, err
-}
-
-type ShipServer struct {
-	// Precomputed block packet.
-	blockPkt *BlockListPacket
-}
-
-func (server *ShipServer) Name() string { return "SHIP" }
-
-func (server *ShipServer) Port() string { return config.ShipPort }
-
-func (server *ShipServer) Init() error {
-	// Precompute the block list packet since it's not going to change.
-	numBlocks := config.NumBlocks
-	ship := shipList[0]
-
-	server.blockPkt = &BlockListPacket{
-		Header:  BBHeader{Type: BlockListType, Flags: uint32(numBlocks + 1)},
-		Unknown: 0x08,
-		Blocks:  make([]Block, numBlocks+1),
-	}
-	shipName := fmt.Sprintf("%d:%s", ship.id, ship.name)
-	copy(server.blockPkt.ShipName[:], util.ConvertToUtf16(shipName))
-
-	for i := 0; i < numBlocks; i++ {
-		b := &server.blockPkt.Blocks[i]
-		b.Unknown = 0x12
-		b.BlockId = uint32(i + 1)
-		blockName := fmt.Sprintf("BLOCK %02d", i+1)
-		copy(b.BlockName[:], util.ConvertToUtf16(blockName))
-	}
-	// Always append a menu item for returning to the ship select screen.
-	b := &server.blockPkt.Blocks[numBlocks]
-	b.Unknown = 0x12
-	b.BlockId = BackMenuItem
-	copy(b.BlockName[:], util.ConvertToUtf16("Ship Selection"))
-	return nil
-}
-
-func (server *ShipServer) NewClient(conn *net.TCPConn) (*Client, error) {
-	return NewShipClient(conn)
 }
 
 func (server *ShipServer) Handle(c *Client) error {
@@ -105,7 +89,7 @@ func (server *ShipServer) Handle(c *Client) error {
 			err = server.HandleBlockSelection(c, pkt)
 		}
 	default:
-		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -135,14 +119,14 @@ func (server *ShipServer) sendSecurity(client *Client, errorCode BBLoginError,
 		Config:       &client.config,
 		Capabilities: 0x00000102,
 	}
-	DebugLog("Sending Security Packet")
+	Log.Debug("Sending Security Packet")
 	return EncryptAndSend(client, pkt)
 }
 
 // Send the client the block list on the selection screen.
 func (server *ShipServer) sendBlockList(client *Client) error {
-	DebugLog("Sending Block Packet")
-	return EncryptAndSend(client, server.blockPkt)
+	Log.Debug("Sending Block List Packet")
+	return EncryptAndSend(client, server.blockListPkt)
 }
 
 // Player selected one of the items on the ship select screen.
@@ -160,14 +144,16 @@ func (server *ShipServer) HandleShipSelection(client *Client) error {
 // The player selected a block to join from the menu.
 func (server *ShipServer) HandleBlockSelection(sc *Client, pkt MenuSelectionPacket) error {
 	// Grab the chosen block and redirect them to the selected block server.
-	port, _ := strconv.ParseInt(config.ShipPort, 10, 16)
+	port, _ := strconv.ParseInt(Config.ShipServer.Port, 10, 16)
 	selectedBlock := pkt.ItemId
+
 	if selectedBlock == BackMenuItem {
 		server.SendShipList(sc, shipList)
-	} else if int(selectedBlock) > config.NumBlocks {
-		return fmt.Errorf("Block selection %v out of range %v", selectedBlock, config.NumBlocks)
+	} else if int(selectedBlock) > Config.ShipServer.NumBlocks {
+		return fmt.Errorf("Block selection %v out of range %v", selectedBlock, Config.ShipServer.NumBlocks)
 	}
-	ipAddr := config.BroadcastIP()
+
+	ipAddr := BroadcastIP()
 	return SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
 }
 
@@ -190,6 +176,6 @@ func (server *ShipServer) SendShipList(client *Client, ships []Ship) error {
 		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
-	DebugLog("Sending Ship List Packet")
+	Log.Debug("Sending Ship List Packet")
 	return EncryptAndSend(client, pkt)
 }

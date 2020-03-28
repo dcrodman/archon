@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -25,11 +26,15 @@ type Database struct {
 }
 
 // Initialize the base Mongo session that we'll copy for all of our work.
-func InitializeDatabase() (*Database, error) {
+func InitializeDatabase(host, port string) (*Database, error) {
+	fmt.Printf("Connecting to database %s:%s...", host, port)
+
 	session, err := mgo.Dial("mongodb://archonadmin:psoadminpassword@127.0.0.1:27017/archondb")
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("Done")
 	return &Database{session: session}, nil
 }
 
@@ -138,7 +143,7 @@ func (db *Database) op(collection string, dbfn dbFunc) (interface{}, error) {
 	s := db.session.Copy()
 	defer s.Close()
 
-	c := s.DB(config.DBName).C(collection)
+	c := s.DB("archon").C(collection)
 	result, err := dbfn(c)
 
 	if err == mgo.ErrNotFound {

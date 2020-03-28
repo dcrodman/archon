@@ -364,6 +364,14 @@ type BlockListPacket struct {
 	Blocks   []Block
 }
 
+// Info about the available block servers.
+type Block struct {
+	Unknown   uint16
+	BlockId   uint32
+	Padding   uint16
+	BlockName [36]byte
+}
+
 // Available lobbies on a block.
 type LobbyListPacket struct {
 	Header  BBHeader

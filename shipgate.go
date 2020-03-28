@@ -123,7 +123,7 @@ type Ship struct {
 // // Send the packet serialized (or otherwise contained) in pkt to a ship.
 // func SendShipPacket(ship *Ship, pkt []byte, length uint16) int {
 // 	if err := ship.Send(pkt[:length]); err != nil {
-// 		log.Warn("Error sending to ship %v: %s", ship.IPAddr(), err.Error())
+// 		Log.Warn("Error sending to ship %v: %s", ship.IPAddr(), err.Error())
 // 		return -1
 // 	}
 // 	return 0
@@ -170,7 +170,7 @@ type Ship struct {
 // 	for {
 // 		resp, err := http.Get(shipgateUrl)
 // 		if err != nil {
-// 			log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
+// 			Log.Error("Failed to connect to shipgate: "+err.Error(), logger.CriticalPriority)
 // 			// Sleep for a shorter interval since we want to know as soon
 // 			// as the shipgate is back online.
 // 			time.Sleep(errorInterval)
@@ -180,7 +180,7 @@ type Ship struct {
 // 			shipData := make([]byte, 100)
 // 			resp.Body.Read(shipData)
 // 			if err = json.Unmarshal(util.StripPadding(shipData), &ships); err != nil {
-// 				log.Error("Error parsing JSON response from shipgate: "+err.Error(),
+// 				Log.Error("Error parsing JSON response from shipgate: "+err.Error(),
 // 					logger.MediumPriority)
 // 				time.Sleep(errorInterval)
 // 				continue
@@ -204,7 +204,7 @@ type Ship struct {
 // 				}
 // 			}
 // 			shipListMutex.Unlock()
-// 			log.Info("Updated ship list", logger.LowPriority)
+// 			Log.Info("Updated ship list", logger.LowPriority)
 // 			time.Sleep(pingInterval)
 // 		}
 // 	}
@@ -221,16 +221,16 @@ type Ship struct {
 // 		util.StructFromBytes(ship.Data(), &pkt)
 // 		ship.name = string(pkt.Name[:])
 // 		SendAuthAck(ship)
-// 		log.Info("Registered ship: %v", ship.name)
+// 		Log.Info("Registered ship: %v", ship.name)
 // 	default:
-// 		log.Info("Received unknown packet %x from %s", hdr.Type, ship.IPAddr())
+// 		Log.Info("Received unknown packet %x from %s", hdr.Type, ship.IPAddr())
 // 	}
 
-// 	// Just log the error and let the handlers above do any cleanup. We don't
+// 	// Just Log the error and let the handlers above do any cleanup. We don't
 // 	// want to close the connection here like we would for a game client
 // 	// in order to prevent one packet error from causing a reconnect.
 // 	if err != nil {
-// 		log.Warn(err.Error())
+// 		Log.Warn(err.Error())
 // 	}
 // }
 
@@ -247,15 +247,15 @@ type Ship struct {
 // 		buffer: make([]byte, 512),
 // 	}
 // 	// shipConnections.AddClient(ship)
-// 	log.Info("Accepted ship connection from %v", ship.IPAddr())
+// 	Log.Info("Accepted ship connection from %v", ship.IPAddr())
 
 // 	defer func() {
 // 		if err := recover(); err != nil {
-// 			log.Error("Error in ship communication: %s: %s\n%s\n",
+// 			Log.Error("Error in ship communication: %s: %s\n%s\n",
 // 				ship.IPAddr(), err, debug.Stack())
 // 		}
 // 		conn.Close()
-// 		log.Info("Disconnected ship: %s", ship.name)
+// 		Log.Info("Disconnected ship: %s", ship.name)
 // 		// shipConnections.RemoveClient(ship)
 // 	}()
 
@@ -274,7 +274,7 @@ type Ship struct {
 // 			break
 // 		} else if err != nil {
 // 			// Error communicating with the client.
-// 			log.Warn(err.Error())
+// 			Log.Warn(err.Error())
 // 			break
 // 		}
 // 		go processShipgatePacket(ship)
@@ -303,7 +303,7 @@ type Ship struct {
 // 	for {
 // 		conn, err := socket.Accept()
 // 		if err != nil {
-// 			log.Warn("Failed to accept connection: %s", err.Error())
+// 			Log.Warn("Failed to accept connection: %s", err.Error())
 // 			continue
 // 		}
 // 		go handleShipConnection(conn)
@@ -317,17 +317,17 @@ type ShipgateServer struct{}
 
 func (server ShipgateServer) Name() string { return "SHIPGATE" }
 
-func (server ShipgateServer) Port() string { return config.ShipgatePort }
+func (server ShipgateServer) Port() string { return Config.ShipgateServer.Port }
 
 func (server *ShipgateServer) Init() error {
 	// Create our ship entry for the built-in ship server. Any other connected
 	// ships will be added to this list by the shipgate, if it's enabled.
 	s := &shipList[0]
 	s.id = 1
-	s.ipAddr = config.BroadcastIP()
-	port, _ := strconv.ParseUint(config.ShipPort, 10, 16)
+	s.ipAddr = BroadcastIP()
+	port, _ := strconv.ParseUint(Config.ShipServer.Port, 10, 16)
 	s.port = uint16(port)
-	copy(s.name[:], config.ShipName)
+	copy(s.name[:], Config.ShipServer.Name)
 	return nil
 }
 
@@ -343,7 +343,7 @@ func (server ShipgateServer) Handle(c *Client) error {
 
 	switch hdr.Type {
 	default:
-		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }

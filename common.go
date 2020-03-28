@@ -95,10 +95,10 @@ func VerifyAccount(client *Client) (*LoginPkt, error) {
 	case err != nil:
 		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
 			"database.\n\nPlease contact your server administrator.")
-		log.Error(err.Error())
+		Log.Error(err.Error())
 	case account == nil:
 	case account.Password != pktPassword:
-		// The same error is returned for invalid passwords as attempts to log in
+		// The same error is returned for invalid passwords as attempts to Log in
 		// with a nonexistent username as some measure of account security.
 		SendSecurity(client, BBLoginErrorPassword, 0, 0)
 		return nil, errors.New("Account does not exist for username: " + pktUsername)
@@ -132,7 +132,7 @@ func SendClientMessage(client *Client, message string) error {
 		Language: 0x00450009,
 		Message:  util.ConvertToUtf16(message),
 	}
-	DebugLog("Sending Client Message Packet")
+	Log.Debug("Sending Client Message Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -145,7 +145,7 @@ func SendWelcome(client *Client) error {
 	copy(pkt.ClientVector[:], client.ClientVector())
 	copy(pkt.ServerVector[:], client.ServerVector())
 
-	DebugLog("Sending Welcome Packet")
+	Log.Debug("Sending Welcome Packet")
 	data, size := util.BytesFromStruct(pkt)
 	return client.SendRaw(data, size)
 }
@@ -163,7 +163,7 @@ func SendSecurity(client *Client, errorCode BBLoginError, guildcard uint32, team
 		Config:       &client.config,
 		Capabilities: 0x00000102,
 	}
-	DebugLog("Sending Security Packet")
+	Log.Debug("Sending Security Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -174,7 +174,7 @@ func SendRedirect(client *Client, ipAddr []byte, port uint16) error {
 	pkt.Port = port
 	copy(pkt.IPAddr[:], ipAddr)
 
-	DebugLog("Sending Redirect Packet")
+	Log.Debug("Sending Redirect Packet")
 	return EncryptAndSend(client, pkt)
 }
 

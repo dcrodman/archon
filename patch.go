@@ -70,7 +70,7 @@ func SendPCWelcome(client *Client) error {
 	copy(pkt.ServerVector[:], client.ServerVector())
 
 	data, size := util.BytesFromStruct(pkt)
-	if config.DebugMode {
+	if Config.DebugMode {
 		fmt.Println("Sending Welcome Packet")
 		util.PrintPayload(data, size)
 		fmt.Println()
@@ -87,11 +87,11 @@ type PatchServer struct {
 
 func (server PatchServer) Name() string { return "PATCH" }
 
-func (server PatchServer) Port() string { return config.PatchPort }
+func (server PatchServer) Port() string { return Config.PatchServer.PatchPort }
 
 func (server *PatchServer) Init() error {
 	// Convert the data port to a BE uint for the redirect packet.
-	dataPort, _ := strconv.ParseUint(config.DataPort, 10, 16)
+	dataPort, _ := strconv.ParseUint(Config.PatchServer.DataPort, 10, 16)
 	server.dataRedirectPort = uint16((dataPort >> 8) | (dataPort << 8))
 	return nil
 }
@@ -113,7 +113,7 @@ func (server *PatchServer) Handle(c *Client) error {
 			err = server.sendPatchRedirect(c)
 		}
 	default:
-		log.Infof("Received unknown packet %2x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %2x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -125,7 +125,7 @@ func (server *PatchServer) sendWelcomeAck(client *Client) error {
 		Type: PatchLoginType,
 	}
 
-	DebugLog("Sending Welcome Ack")
+	Log.Debug("Sending Welcome Ack")
 	data, _ := util.BytesFromStruct(pkt)
 	return client.SendEncrypted(data, 0x04)
 }
@@ -133,10 +133,10 @@ func (server *PatchServer) sendWelcomeAck(client *Client) error {
 // Message displayed on the patch download screen.
 func (server *PatchServer) sendWelcomeMessage(client *Client) error {
 	pkt := new(PatchWelcomeMessage)
-	pkt.Header = PCHeader{Size: PCHeaderSize + config.MessageSize, Type: PatchMessageType}
-	pkt.Message = config.MessageBytes
+	pkt.Header = PCHeader{Size: PCHeaderSize + MessageSize, Type: PatchMessageType}
+	pkt.Message = MessageBytes
 
-	DebugLog("Sending Welcome Message")
+	Log.Debug("Sending Welcome Message")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -145,10 +145,10 @@ func (server *PatchServer) sendPatchRedirect(client *Client) error {
 	pkt := new(PatchRedirectPacket)
 	pkt.Header.Type = PatchRedirectType
 	pkt.Port = server.dataRedirectPort
-	hostnameBytes := config.BroadcastIP()
+	hostnameBytes := BroadcastIP()
 	copy(pkt.IPAddr[:], hostnameBytes[:])
 
-	DebugLog("Sending Patch Redirect")
+	Log.Debug("Sending Patch Redirect")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -166,18 +166,18 @@ type DataServer struct {
 
 func (server DataServer) Name() string { return "DATA" }
 
-func (server DataServer) Port() string { return config.DataPort }
+func (server DataServer) Port() string { return Config.PatchServer.DataPort }
 
 func (server *DataServer) Init() error {
 	server.SkipPaths = []string{".", "..", ".DS_Store", ".rid"}
 
 	wd, _ := os.Getwd()
-	if err := os.Chdir(config.PatchDir); err != nil {
+	if err := os.Chdir(Config.PatchServer.PatchDir); err != nil {
 		return errors.New("Unable to cd to patches directory: " + err.Error())
 	}
 
 	// Construct our patch tree from the specified directory.
-	fmt.Printf("Loading patches from %s...\n", config.PatchDir)
+	fmt.Printf("Loading patches from %s...\n", Config.PatchServer.PatchDir)
 	if err := server.loadPatches(&server.patchTree, "."); err != nil {
 		return errors.New("Failed to load patches: " + err.Error())
 	}
@@ -226,7 +226,7 @@ func (server *DataServer) loadPatches(node *PatchDir, path string) error {
 			}
 			patch := &PatchEntry{
 				filename:     filename,
-				relativePath: config.PatchDir + "/" + path + "/" + filename,
+				relativePath: Config.PatchServer.PatchDir + "/" + path + "/" + filename,
 				pathDirs:     dirs,
 				fileSize:     uint32(file.Size()),
 				checksum:     crc32.ChecksumIEEE(data),
@@ -272,7 +272,7 @@ func (server DataServer) Handle(c *Client) error {
 	case PatchClientListDoneType:
 		err = server.UpdateClientFiles(c)
 	default:
-		log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -284,7 +284,7 @@ func (server *DataServer) sendWelcomeAck(client *Client) error {
 		Size: 0x04,
 		Type: PatchLoginType,
 	}
-	DebugLog("Sending Welcome Ack")
+	Log.Debug("Sending Welcome Ack")
 	data, _ := util.BytesFromStruct(pkt)
 	return client.SendEncrypted(data, 0x04)
 }
@@ -303,7 +303,7 @@ func (server *DataServer) HandlePatchLogin(c *Client) error {
 // Acknowledgement sent after the DATA connection handshake.
 func (server *DataServer) sendDataAck(client *Client) error {
 	pkt := &PCHeader{Type: PatchDataAckType, Size: 0x04}
-	DebugLog("Sending Data Ack")
+	Log.Debug("Sending Data Ack")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -337,21 +337,21 @@ func (server *DataServer) sendChangeDir(client *Client, dir string) error {
 	pkt.Header.Type = PatchChangeDirType
 	copy(pkt.Dirname[:], dir)
 
-	DebugLog("Sending Change Directory")
+	Log.Debug("Sending Change Directory")
 	return EncryptAndSend(client, pkt)
 }
 
 // Tell the client to change to one directory above.
 func (server *DataServer) sendDirAbove(client *Client) error {
 	pkt := &PCHeader{Type: PatchDirAboveType, Size: 0x04}
-	DebugLog("Sending Dir Above")
+	Log.Debug("Sending Dir Above")
 	return EncryptAndSend(client, pkt)
 }
 
 // Inform the client that we've finished sending the patch list.
 func (server *DataServer) sendFileListDone(client *Client) error {
 	pkt := &PCHeader{Type: PatchFileListDoneType, Size: 0x04}
-	DebugLog("Sending List Done")
+	Log.Debug("Sending List Done")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -362,7 +362,7 @@ func (server *DataServer) sendCheckFile(client *Client, index uint32, filename s
 	pkt.PatchId = index
 	copy(pkt.Filename[:], filename)
 
-	DebugLog("Sending Check File")
+	Log.Debug("Sending Check File")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -407,7 +407,7 @@ func (server *DataServer) UpdateClientFiles(client *Client) error {
 			file, err := os.Open(patch.relativePath)
 			if err != nil {
 				// Critical since this is most likely a filesystem error.
-				log.Error(err.Error())
+				Log.Error(err.Error())
 				return err
 			}
 			for i := 0; i < chunks; i++ {
@@ -437,7 +437,7 @@ func (server *DataServer) sendUpdateFiles(client *Client, num, totalSize uint32)
 	pkt.NumFiles = num
 	pkt.TotalSize = totalSize
 
-	DebugLog("Sending Update Files")
+	Log.Debug("Sending Update Files")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -448,14 +448,14 @@ func (server *DataServer) sendFileHeader(client *Client, patch *PatchEntry) erro
 	pkt.FileSize = patch.fileSize
 	copy(pkt.Filename[:], patch.filename)
 
-	DebugLog("Sending File Header")
+	Log.Debug("Sending File Header")
 	return EncryptAndSend(client, pkt)
 }
 
 // Send a chunk of file data.
 func (server *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > MaxFileChunkSize {
-		log.Errorf("Attempted to send %v byte chunk; max is %v",
+		Log.Errorf("Attempted to send %v byte chunk; max is %v",
 			string(chunkSize), string(MaxFileChunkSize))
 		panic(errors.New("File chunk size exceeds maximum"))
 	}
@@ -467,20 +467,20 @@ func (server *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize 
 		Data:     fdata[:chunkSize],
 	}
 
-	DebugLog("Sending File Chunk")
+	Log.Debug("Sending File Chunk")
 	return EncryptAndSend(client, pkt)
 }
 
 // Finished sending a particular file.
 func (server *DataServer) sendFileComplete(client *Client) error {
 	pkt := &PCHeader{Type: PatchFileCompleteType, Size: 0x04}
-	DebugLog("Sending File Complete")
+	Log.Debug("Sending File Complete")
 	return EncryptAndSend(client, pkt)
 }
 
 // We've finished updating files.
 func (server *DataServer) sendUpdateComplete(client *Client) error {
 	pkt := &PCHeader{Type: PatchUpdateCompleteType, Size: 0x04}
-	DebugLog("Sending File Update Done")
+	Log.Debug("Sending File Update Done")
 	return EncryptAndSend(client, pkt)
 }

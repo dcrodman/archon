@@ -6,11 +6,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/util"
 	"io"
 	"net"
 	"strings"
+
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/util"
 )
 
 // Client struct intended to be included as part of the client definitions
@@ -75,7 +76,7 @@ func (c *Client) Data() []byte {
 
 func (c *Client) SendEncrypted(data []byte, length int) error {
 	bytes, blen := fixLength(data, uint16(length), c.hdrSize)
-	if config.DebugMode {
+	if Config.DebugMode {
 		util.PrintPayload(bytes, int(blen))
 		fmt.Println()
 	}

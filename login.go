@@ -40,10 +40,10 @@ type LoginServer struct {
 
 func (server LoginServer) Name() string { return "LOGIN" }
 
-func (server LoginServer) Port() string { return config.LoginPort }
+func (server LoginServer) Port() string { return Config.LoginServer.LoginPort }
 
 func (server *LoginServer) Init() error {
-	charPort, _ := strconv.ParseUint(config.CharacterPort, 10, 16)
+	charPort, _ := strconv.ParseUint(Config.LoginServer.CharacterPort, 10, 16)
 	server.charRedirectPort = uint16(charPort)
 	return nil
 }
@@ -64,7 +64,7 @@ func (server *LoginServer) Handle(c *Client) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -88,7 +88,7 @@ func (server *LoginServer) HandleLogin(client *Client) error {
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
-	ipAddr := config.BroadcastIP()
+	ipAddr := BroadcastIP()
 	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
 	return SendRedirect(client, ipAddr[:], server.charRedirectPort)
 }

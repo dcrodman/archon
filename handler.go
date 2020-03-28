@@ -99,7 +99,7 @@ func (controller *controller) start() *sync.WaitGroup {
 
 		// Open our server socket. All sockets must be open for the server
 		// to launch correctly, so errors are terminal.
-		hostAddr, err := net.ResolveTCPAddr("tcp", config.Hostname+":"+s.Port())
+		hostAddr, err := net.ResolveTCPAddr("tcp", Config.Hostname+":"+s.Port())
 		if err != nil {
 			fmt.Println("Error creating socket: " + err.Error())
 			os.Exit(1)
@@ -120,7 +120,7 @@ func (controller *controller) start() *sync.WaitGroup {
 	for _, s := range controller.servers {
 		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), controller.host, s.Port())
 	}
-	log.Infof("Controller: Server Initialized")
+	Log.Infof("Controller: Server Initialized")
 	return &wg
 }
 
@@ -129,18 +129,18 @@ func (controller *controller) startHandler(server Server, socket *net.TCPListene
 	defer fmt.Println(server.Name() + " shutdown.")
 
 	// Poll until we can accept more clients.
-	for controller.connections.Len() < config.MaxConnections {
+	for controller.connections.Len() < Config.MaxConnections {
 		conn, err := socket.AcceptTCP()
 		if err != nil {
-			log.Warnf("Failed to accept connection: %v", err.Error())
+			Log.Warnf("Failed to accept connection: %v", err.Error())
 			continue
 		}
 		c, err := server.NewClient(conn)
 		// TODO: Disconnect the client if we already have a matching connection.
 		if err != nil {
-			log.Warn(err.Error())
+			Log.Warn(err.Error())
 		} else {
-			log.Infof("Accepted %s connection from %s", server.Name(), c.IPAddr())
+			Log.Infof("Accepted %s connection from %s", server.Name(), c.IPAddr())
 			controller.handleClient(c, server)
 		}
 	}
@@ -153,12 +153,12 @@ func (controller *controller) handleClient(c *Client, s Server) {
 		// remove them from the list regardless of the connection state.
 		defer func() {
 			if err := recover(); err != nil {
-				log.Errorf("Error in client communication: %s: %s\n%s\n",
+				Log.Errorf("Error in client communication: %s: %s\n%s\n",
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
 			controller.connections.Remove(c)
-			log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
+			Log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
 		controller.connections.Add(c)
 
@@ -170,21 +170,21 @@ func (controller *controller) handleClient(c *Client, s Server) {
 				break
 			} else if err != nil {
 				// Error communicating with the client.
-				log.Warn(err.Error())
+				Log.Warn(err.Error())
 				break
 			}
 
 			// PC and BB header packets have the same structure for the first four
 			// bytes, so for basic inspection it's safe to treat them the same way.
 			util.StructFromBytes(c.Data()[:PCHeaderSize], &pktHeader)
-			if config.DebugMode {
+			if Config.DebugMode {
 				fmt.Printf("%s: Got %v bytes from client:\n", s.Name(), pktHeader.Size)
 				util.PrintPayload(c.Data(), int(pktHeader.Size))
 				fmt.Println()
 			}
 
 			if err = s.Handle(c); err != nil {
-				log.Warn("Error in client communication: " + err.Error())
+				Log.Warn("Error in client communication: " + err.Error())
 				return
 			}
 		}

@@ -1,3 +1,4 @@
+// The CHARACTER server logic.
 package main
 
 import (
@@ -26,7 +27,7 @@ const (
 
 var (
 	// Connected ships. Each Ship's id corresponds to its position in the array - 1.
-	shipList []Ship = make([]Ship, 1)
+	shipList = make([]Ship, 1)
 
 	// Parameter files we're expecting. I still don't really know what they're
 	// for yet, so emulating what I've seen others do.
@@ -75,7 +76,7 @@ type CharacterServer struct {
 
 func (server CharacterServer) Name() string { return "CHARACTER" }
 
-func (server CharacterServer) Port() string { return config.CharacterPort }
+func (server CharacterServer) Port() string { return Config.LoginServer.CharacterPort }
 
 func (server *CharacterServer) Init() error {
 	if err := server.loadParameterFiles(); err != nil {
@@ -84,7 +85,7 @@ func (server *CharacterServer) Init() error {
 
 	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
 	// all seem to rely on this file, so we'll do the same.
-	paramDir := config.ParametersDir
+	paramDir := Config.LoginServer.ParametersDir
 	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
 	compressed, err := ioutil.ReadAll(statsFile)
 	if err != nil {
@@ -109,7 +110,7 @@ func (server *CharacterServer) loadParameterFiles() error {
 	offset := 0
 	var tmpChunkData []byte
 
-	paramDir := config.ParametersDir
+	paramDir := Config.LoginServer.ParametersDir
 	fmt.Printf("Loading parameters from %s...\n", paramDir)
 	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
@@ -192,7 +193,7 @@ func (server *CharacterServer) Handle(c *Client) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -237,7 +238,7 @@ func (server *CharacterServer) sendSecurity(client *Client, errorCode BBLoginErr
 		Capabilities: 0x00000102,
 	}
 
-	DebugLog("Sending Security Packet")
+	Log.Debug("Sending Security Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -252,7 +253,7 @@ func (server *CharacterServer) sendTimestamp(client *Client) error {
 	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
-	DebugLog("Sending Timestamp Packet")
+	Log.Debug("Sending Timestamp Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -275,7 +276,7 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error 
 		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
 	}
 
-	DebugLog("Sending Ship List Packet")
+	Log.Debug("Sending Ship List Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -284,7 +285,7 @@ func (server *CharacterServer) sendShipList(client *Client, ships []Ship) error 
 func (server *CharacterServer) sendScrollMessage(client *Client) error {
 	pkt := &ScrollMessagePacket{
 		Header:  BBHeader{Type: LoginScrollMessageType},
-		Message: config.ScrollMessageBytes(),
+		Message: cachedScrollMsg[:],
 	}
 
 	data, size := util.BytesFromStruct(pkt)
@@ -292,7 +293,7 @@ func (server *CharacterServer) sendScrollMessage(client *Client) error {
 	// there is a block of extra bytes on the end; add an extra
 	// and let fixLength add the rest.
 	data = append(data, 0x00)
-	DebugLog("Sending Scroll Message Packet")
+	Log.Debug("Sending Scroll Message Packet")
 	return client.SendEncrypted(data, size+1)
 }
 
@@ -308,7 +309,7 @@ func (server *CharacterServer) HandleOptionsRequest(client *Client) error {
 		copy(playerOptions.KeyConfig, baseKeyConfig[:])
 		database.UpdatePlayerOptions(playerOptions)
 	} else if err != nil {
-		log.Error(err.Error())
+		Log.Error(err.Error())
 		return err
 	}
 	return server.sendOptions(client, playerOptions.KeyConfig)
@@ -331,7 +332,7 @@ func (server *CharacterServer) sendOptions(client *Client, keyConfig []byte) err
 	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
 	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
 
-	DebugLog("Sending Key Config Packet")
+	Log.Debug("Sending Key Config Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -347,7 +348,7 @@ func (server *CharacterServer) HandleCharacterSelect(client *Client) error {
 		// We don't have a character for this slot.
 		return server.sendCharacterAck(client, pkt.Slot, 2)
 	} else if err != nil {
-		log.Error(err.Error())
+		Log.Error(err.Error())
 		return err
 	}
 
@@ -370,7 +371,7 @@ func (server *CharacterServer) sendCharacterAck(client *Client, slotNum uint32, 
 		Slot:   slotNum,
 		Flag:   flag,
 	}
-	DebugLog("Sending Character Ack Packet")
+	Log.Debug("Sending Character Ack Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -407,7 +408,7 @@ func (server *CharacterServer) sendCharacterPreview(client *Client, character *C
 		Slot:      0,
 		Character: charPreview,
 	}
-	DebugLog("Sending Character Preview Packet")
+	Log.Debug("Sending Character Preview Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -418,7 +419,7 @@ func (server *CharacterServer) sendChecksumAck(client *Client) error {
 	pkt.Header.Type = LoginChecksumAckType
 	pkt.Ack = uint32(1)
 
-	DebugLog("Sending Checksum Ack Packet")
+	Log.Debug("Sending Checksum Ack Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -460,7 +461,7 @@ func (server *CharacterServer) sendGuildcardHeader(client *Client, checksum uint
 		Length:   dataLen,
 		Checksum: checksum,
 	}
-	DebugLog("Sending Guildcard Header Packet")
+	Log.Debug("Sending Guildcard Header Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -489,7 +490,7 @@ func (server *CharacterServer) sendGuildcardChunk(client *Client, chunkNum uint3
 		pkt.Data = client.gcData[offset:]
 	}
 
-	DebugLog("Sending Guildcard Chunk Packet")
+	Log.Debug("Sending Guildcard Chunk Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -499,7 +500,7 @@ func (server *CharacterServer) sendParameterHeader(client *Client, numEntries ui
 		Header:  BBHeader{Type: LoginParameterHeaderType, Flags: numEntries},
 		Entries: entries,
 	}
-	DebugLog("Sending Parameter Header Packet")
+	Log.Debug("Sending Parameter Header Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -510,7 +511,7 @@ func (server *CharacterServer) sendParameterChunk(client *Client, chunkData []by
 		Chunk:  chunk,
 		Data:   chunkData,
 	}
-	DebugLog("Sending Parameter Chunk Packet")
+	Log.Debug("Sending Parameter Chunk Packet")
 	return EncryptAndSend(client, pkt)
 }
 
@@ -523,13 +524,13 @@ func (server *CharacterServer) HandleCharacterUpdate(client *Client) error {
 
 	if client.flag == 0x02 {
 		if err := server.updateCharacter(client.guildcard, &charPkt); err != nil {
-			log.Error(err.Error())
+			Log.Error(err.Error())
 			return err
 		}
 	} else {
 		// Recreating; delete the existing character and start from scratch.
 		if err := database.DeleteCharacter(client.guildcard, charPkt.Slot); err != nil {
-			log.Error(err.Error())
+			Log.Error(err.Error())
 			return err
 		}
 
@@ -577,7 +578,7 @@ func (server *CharacterServer) HandleCharacterUpdate(client *Client) error {
 
 		err := database.CreateCharacter(client.guildcard, charPkt.Slot, character)
 		if err != nil {
-			log.Error(err.Error())
+			Log.Error(err.Error())
 			return err
 		}
 	}

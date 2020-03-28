@@ -7,7 +7,7 @@
 
 # Hostname or IP address on which the servers will listen for connections.
 hostname: 127.0.0.1
-# IP broadcasted to clients in the redirect packets.
+# IP broadcast to clients in the redirect packets.
 external_ip: 127.0.0.1
 # Maximum number of concurrent connections the server will allow.
 max_connections: 3000
@@ -20,14 +20,14 @@ debug_mode: true
 
 database:
   # Hostname of the Mongodb database instance.
-  db_host: 127.0.0.1
+  host: 127.0.0.1
   # Port on db_host on which the Mongodb instance is accepting connections.
-  db_port: 27017
+  port: 27017
   # Name of the database in Mongodb for archon.
-  db_name: archondb
+  name: archondb
   # Username and password of a user with full RW privileges to ${db_name}.
-  db_username: archonadmin
-  db_password: psoadminpassword
+  username: archonadmin
+  password: psoadminpassword
 
 patch_server:
   # Port on whith the PATCH server will listen.
@@ -52,19 +52,19 @@ login_server:
 
 shipgate_server:
   # Port on which the SHIPGATE server will listen.
-  shipgate_port: 13000
+  port: 13000
 
 ship_server:
   # Port on which the SHIP server will listen.
-  ship_port: 15001
+  port: 15001
   # Name of the ship that will appear in the selection screen.
-  ship_name: "Default"
+  name: "Default"
   # Number of block servers to run for this ship.
   num_blocks: 5
 
 block_server:
   # Base block port.
-  block_port: 15000
+  port: 15000
   # Number of lobbies to create per block.
   num_lobbies: 15
 
