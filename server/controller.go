@@ -1,33 +1,18 @@
-package main
+package server
 
 import (
 	"container/list"
 	"fmt"
+	"github.com/dcrodman/archon"
 	"io"
 	"net"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
 	"github.com/dcrodman/archon/util"
 )
-
-// Server defines the methods implemented by all sub-servers that can be
-// registered and started when the server is brought up.
-type Server interface {
-	// Uniquely identifying string, mostly used for logging.
-	Name() string
-	// Port on which the server should listen for connections.
-	Port() string
-	// Perform any pre-startup initialization.
-	Init() error
-	// Client factory responsible for performing whatever initialization is
-	// needed for Client objects to represent new connections.
-	NewClient(conn *net.TCPConn) (*Client, error)
-	// Process the packet in the client's buffer. The dispatcher will
-	// read the latest packet from the client before calling.
-	Handle(c *Client) error
-}
 
 // Synchronized list for maintaining a list of connected clients.
 type clientList struct {
@@ -74,32 +59,41 @@ func (c *clientList) Len() int {
 	return c.clients.Len()
 }
 
-// controller is responsible for standing up the server instances we need and
+// Controller is responsible for standing up the server instances we need and
 // for dispatching handlers for each connected client.
-type controller struct {
+type Controller struct {
 	host        string
 	servers     []Server
 	connections *clientList
 }
 
+func New(hostname string) *Controller {
+	return &Controller{
+		host:        hostname,
+		servers:     make([]Server, 0),
+		connections: &clientList{clients: list.New()},
+	}
+}
+
 // Registers a server instance to be brought up once the dispatcher is run.
-func (controller *controller) registerServer(s Server) {
+func (controller *Controller) RegisterServer(s Server) {
 	controller.servers = append(controller.servers, s)
 }
 
 // Iterate over our registered servers, initializing TCP sockets on each of the
 // defined ports and setting up the connection handlers.
-func (controller *controller) start() *sync.WaitGroup {
+func (controller *Controller) Start() {
 	var wg sync.WaitGroup
+
 	for _, s := range controller.servers {
 		if err := s.Init(); err != nil {
 			fmt.Printf("Error initializing %s: %s\n", s.Name(), err.Error())
-			return nil
+			return
 		}
 
 		// Open our server socket. All sockets must be open for the server
 		// to launch correctly, so errors are terminal.
-		hostAddr, err := net.ResolveTCPAddr("tcp", Config.Hostname+":"+s.Port())
+		hostAddr, err := net.ResolveTCPAddr("tcp", archon.Config.Hostname+":"+s.Port())
 		if err != nil {
 			fmt.Println("Error creating socket: " + err.Error())
 			os.Exit(1)
@@ -120,71 +114,97 @@ func (controller *controller) start() *sync.WaitGroup {
 	for _, s := range controller.servers {
 		fmt.Printf("Waiting for %s connections on %v:%v\n", s.Name(), controller.host, s.Port())
 	}
-	Log.Infof("Controller: Server Initialized")
-	return &wg
+	archon.Log.Infof("Controller: Server Initialized")
+	wg.Wait()
+}
+
+// Register all of the server handlers and their corresponding ports.
+func registerServers(controller *server.controller) {
+	servers := []Server{
+		new(PatchServer),
+		new(DataServer),
+		new(LoginServer),
+		new(CharacterServer),
+		new(ShipgateServer),
+		new(ShipServer),
+	}
+	for _, server := range servers {
+		controller.registerServer(server)
+	}
+
+	shipPort, _ := strconv.ParseInt(Config.ShipServer.Port, 10, 16)
+
+	// The available block ports will depend on how the server is configured,
+	// so once we've read the config then add the server entries on the fly.
+	for i := 1; i <= Config.ShipServer.NumBlocks; i++ {
+		controller.registerServer(&BlockServer{
+			name: fmt.Sprintf("BLOCK%d", i),
+			port: strconv.FormatInt(shipPort+int64(i), 10),
+		})
+	}
 }
 
 // Client connection handling loop, started for each server.
-func (controller *controller) startHandler(server Server, socket *net.TCPListener) {
+func (controller *Controller) startHandler(server Server, socket *net.TCPListener) {
 	defer fmt.Println(server.Name() + " shutdown.")
 
 	// Poll until we can accept more clients.
-	for controller.connections.Len() < Config.MaxConnections {
+	for controller.connections.Len() < archon.Config.MaxConnections {
 		conn, err := socket.AcceptTCP()
 		if err != nil {
-			Log.Warnf("Failed to accept connection: %v", err.Error())
+			archon.Log.Warnf("Failed to accept connection: %v", err.Error())
 			continue
 		}
 		c, err := server.NewClient(conn)
 		// TODO: Disconnect the client if we already have a matching connection.
 		if err != nil {
-			Log.Warn(err.Error())
+			archon.Log.Warn(err.Error())
 		} else {
-			Log.Infof("Accepted %s connection from %s", server.Name(), c.IPAddr())
+			archon.Log.Infof("Accepted %s connection from %s", server.Name(), c.IPAddr())
 			controller.handleClient(c, server)
 		}
 	}
 }
 
 // Spawn a dedicated goroutine for each Client for the length of each connection.
-func (controller *controller) handleClient(c *Client, s Server) {
+func (controller *Controller) handleClient(c *Client, s Server) {
 	go func() {
 		// Defer so that we catch any panics, disconnect the client, and
 		// remove them from the list regardless of the connection state.
 		defer func() {
 			if err := recover(); err != nil {
-				Log.Errorf("Error in client communication: %s: %s\n%s\n",
+				archon.Log.Errorf("Error in client communication: %s: %s\n%s\n",
 					c.IPAddr(), err, debug.Stack())
 			}
 			c.Close()
 			controller.connections.Remove(c)
-			Log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
+			archon.Log.Infof("Disconnected %s client %s", s.Name(), c.IPAddr())
 		}()
 		controller.connections.Add(c)
 
 		// Connection loop; process packets until the connection is closed.
-		var pktHeader PCHeader
+		var pktHeader archon.PCHeader
 		for {
 			err := c.Process()
 			if err == io.EOF {
 				break
 			} else if err != nil {
 				// Error communicating with the client.
-				Log.Warn(err.Error())
+				archon.Log.Warn(err.Error())
 				break
 			}
 
 			// PC and BB header packets have the same structure for the first four
 			// bytes, so for basic inspection it's safe to treat them the same way.
-			util.StructFromBytes(c.Data()[:PCHeaderSize], &pktHeader)
-			if Config.DebugMode {
+			util.StructFromBytes(c.Data()[:archon.PCHeaderSize], &pktHeader)
+			if archon.Config.DebugMode {
 				fmt.Printf("%s: Got %v bytes from client:\n", s.Name(), pktHeader.Size)
 				util.PrintPayload(c.Data(), int(pktHeader.Size))
 				fmt.Println()
 			}
 
 			if err = s.Handle(c); err != nil {
-				Log.Warn("Error in client communication: " + err.Error())
+				archon.Log.Warn("Error in client communication: " + err.Error())
 				return
 			}
 		}

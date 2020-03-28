@@ -1,17 +1,19 @@
 /*
  * Client definition for generic handling of connections.
  */
-package main
+package server
 
 import (
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/server/patch"
 	"io"
 	"net"
 	"strings"
 
-	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
+	crypto "github.com/dcrodman/archon/util/encryption"
 )
 
 // Client struct intended to be included as part of the client definitions
@@ -35,11 +37,11 @@ type Client struct {
 	isGm      bool
 
 	// Patch server; list of files that need update.
-	updateList []*PatchEntry
+	updateList []*patch.PatchEntry
 
 	gcData     []byte
 	gcDataSize uint16
-	config     ClientConfig
+	config     archon.ClientConfig
 	flag       uint32
 }
 
@@ -76,7 +78,7 @@ func (c *Client) Data() []byte {
 
 func (c *Client) SendEncrypted(data []byte, length int) error {
 	bytes, blen := fixLength(data, uint16(length), c.hdrSize)
-	if Config.DebugMode {
+	if archon.Config.DebugMode {
 		util.PrintPayload(bytes, int(blen))
 		fmt.Println()
 	}

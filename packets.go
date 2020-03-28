@@ -2,7 +2,9 @@
 * Packet constants and structures. All functions return 0 on success,
 * negative int on db error, and a positive int for any other errors.
  */
-package main
+package archon
+
+import "github.com/dcrodman/archon/server/character"
 
 const (
 	PCHeaderSize = 0x04
@@ -337,7 +339,7 @@ type ShipListPacket struct {
 	Unknown2    uint32 // set to 0x02
 	Unknown3    uint16 // set to 0x04
 	ServerName  [36]byte
-	ShipEntries []ShipMenuEntry
+	ShipEntries []character.ShipMenuEntry
 }
 
 // Scroll message the client should display on the ship select screen.

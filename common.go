@@ -1,9 +1,10 @@
-package main
+package archon
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/dcrodman/archon/server"
 
 	"github.com/dcrodman/archon/util"
 )
@@ -83,7 +84,7 @@ type CharacterPreview struct {
 var LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 // VerifyAccount performs all account verification tasks.
-func VerifyAccount(client *Client) (*LoginPkt, error) {
+func VerifyAccount(client *server.Client) (*LoginPkt, error) {
 	var loginPkt LoginPkt
 	util.StructFromBytes(client.Data(), &loginPkt)
 
@@ -125,7 +126,7 @@ func hashPassword(password []byte) string {
 }
 
 // SendClientMessage is used for error messages to the client, usually used before disconnecting.
-func SendClientMessage(client *Client, message string) error {
+func SendClientMessage(client *server.Client, message string) error {
 	pkt := &LoginClientMessagePacket{
 		Header: BBHeader{Type: LoginClientMessageType},
 		// English? Tethealla sets this.
@@ -137,7 +138,7 @@ func SendClientMessage(client *Client, message string) error {
 }
 
 // SendWelcome transmits the welcome packet to a client with the copyright message and encryption vectors.
-func SendWelcome(client *Client) error {
+func SendWelcome(client *server.Client) error {
 	pkt := new(WelcomePkt)
 	pkt.Header.Type = LoginWelcomeType
 	pkt.Header.Size = 0xC8
@@ -152,7 +153,7 @@ func SendWelcome(client *Client) error {
 
 // SendSecurity transmits initialization packet with information about the user's
 // authentication status. This is used by everything except the patch server.
-func SendSecurity(client *Client, errorCode BBLoginError, guildcard uint32, teamId uint32) error {
+func SendSecurity(client *server.Client, errorCode BBLoginError, guildcard uint32, teamId uint32) error {
 	// Constants set according to how Newserv does it.
 	pkt := &SecurityPacket{
 		Header:       BBHeader{Type: LoginSecurityType},
@@ -168,7 +169,7 @@ func SendSecurity(client *Client, errorCode BBLoginError, guildcard uint32, team
 }
 
 // SendRedirect sends the client the address of the next server to which they should connect.
-func SendRedirect(client *Client, ipAddr []byte, port uint16) error {
+func SendRedirect(client *server.Client, ipAddr []byte, port uint16) error {
 	pkt := new(RedirectPacket)
 	pkt.Header.Type = RedirectType
 	pkt.Port = port
@@ -179,7 +180,7 @@ func SendRedirect(client *Client, ipAddr []byte, port uint16) error {
 }
 
 // EncryptAndSend will encode the packet and let Client encrypt and transmit it.
-func EncryptAndSend(client *Client, pkt interface{}) error {
+func EncryptAndSend(client *server.Client, pkt interface{}) error {
 	data, size := util.BytesFromStruct(pkt)
 	return client.SendEncrypted(data, size)
 }

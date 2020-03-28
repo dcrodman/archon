@@ -3,7 +3,7 @@
 * and responsible for establishing a connection to the database
 * to be maintained during execution.
  */
-package main
+package archon
 
 import (
 	"fmt"

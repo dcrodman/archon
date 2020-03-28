@@ -1,12 +1,14 @@
-package main
+package login
 
 import (
 	"errors"
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/server"
 	"net"
 	"strconv"
 
-	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/util"
+	crypto "github.com/dcrodman/archon/util/encryption"
 )
 
 // Struct for caching the parameter chunk data and header so
@@ -20,12 +22,12 @@ type parameterEntry struct {
 
 // Create and initialize a new Login client so long as we're able
 // to send the welcome packet to begin encryption.
-func NewLoginClient(conn *net.TCPConn) (*Client, error) {
+func NewLoginClient(conn *net.TCPConn) (*server.Client, error) {
 	var err error
 	cCrypt := crypto.NewBBCrypt()
 	sCrypt := crypto.NewBBCrypt()
-	lc := NewClient(conn, BBHeaderSize, cCrypt, sCrypt)
-	if SendWelcome(lc) != nil {
+	lc := server.NewClient(conn, archon.BBHeaderSize, cCrypt, sCrypt)
+	if archon.SendWelcome(lc) != nil {
 		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
 		lc = nil
 	}
@@ -38,40 +40,44 @@ type LoginServer struct {
 	charRedirectPort uint16
 }
 
+func NewServer() *LoginServer {
+	return &LoginServer{}
+}
+
 func (server LoginServer) Name() string { return "LOGIN" }
 
-func (server LoginServer) Port() string { return Config.LoginServer.LoginPort }
+func (server LoginServer) Port() string { return archon.Config.LoginServer.LoginPort }
 
 func (server *LoginServer) Init() error {
-	charPort, _ := strconv.ParseUint(Config.LoginServer.CharacterPort, 10, 16)
+	charPort, _ := strconv.ParseUint(archon.Config.LoginServer.CharacterPort, 10, 16)
 	server.charRedirectPort = uint16(charPort)
 	return nil
 }
 
-func (server *LoginServer) NewClient(conn *net.TCPConn) (*Client, error) {
+func (server *LoginServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
 	return NewLoginClient(conn)
 }
 
-func (server *LoginServer) Handle(c *Client) error {
-	var hdr BBHeader
-	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+func (server *LoginServer) Handle(c *server.Client) error {
+	var hdr archon.BBHeader
+	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
-	case LoginType:
+	case archon.LoginType:
 		err = server.HandleLogin(c)
-	case DisconnectType:
+	case archon.DisconnectType:
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (server *LoginServer) HandleLogin(client *Client) error {
+func (server *LoginServer) HandleLogin(client *server.Client) error {
 	//loginPkt, err := VerifyAccount(client)
-	_, err := VerifyAccount(client)
+	_, err := archon.VerifyAccount(client)
 	if err != nil {
 		return err
 	}
@@ -88,7 +94,7 @@ func (server *LoginServer) HandleLogin(client *Client) error {
 	// but for now we'll just set it and leave it alone.
 	client.config.Magic = 0x48615467
 
-	ipAddr := BroadcastIP()
-	SendSecurity(client, BBLoginErrorNone, client.guildcard, client.teamId)
-	return SendRedirect(client, ipAddr[:], server.charRedirectPort)
+	ipAddr := archon.BroadcastIP()
+	archon.SendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
+	return archon.SendRedirect(client, ipAddr[:], server.charRedirectPort)
 }

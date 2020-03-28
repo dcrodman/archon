@@ -3,9 +3,14 @@
 * ships. This module handles all of its own connection logic since the
 * shipgate protocol differs from the way game clients are processed.
  */
-package main
+package shipgate
 
 import (
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/server"
+	"github.com/dcrodman/archon/server/character"
+	"github.com/dcrodman/archon/server/login"
+
 	// 	"crypto/tls"
 	// 	"errors"
 	// "fmt"
@@ -315,35 +320,39 @@ type Ship struct {
 // Shipgate sub-server definition.
 type ShipgateServer struct{}
 
+func NewServer() *ShipgateServer {
+	return &ShipgateServer{}
+}
+
 func (server ShipgateServer) Name() string { return "SHIPGATE" }
 
-func (server ShipgateServer) Port() string { return Config.ShipgateServer.Port }
+func (server ShipgateServer) Port() string { return archon.Config.ShipgateServer.Port }
 
 func (server *ShipgateServer) Init() error {
 	// Create our ship entry for the built-in ship server. Any other connected
 	// ships will be added to this list by the shipgate, if it's enabled.
-	s := &shipList[0]
+	s := &character.shipList[0]
 	s.id = 1
-	s.ipAddr = BroadcastIP()
-	port, _ := strconv.ParseUint(Config.ShipServer.Port, 10, 16)
+	s.ipAddr = archon.BroadcastIP()
+	port, _ := strconv.ParseUint(archon.Config.ShipServer.Port, 10, 16)
 	s.port = uint16(port)
-	copy(s.name[:], Config.ShipServer.Name)
+	copy(s.name[:], archon.Config.ShipServer.Name)
 	return nil
 }
 
-func (server ShipgateServer) NewClient(conn *net.TCPConn) (*Client, error) {
-	return NewLoginClient(conn)
+func (server ShipgateServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
+	return login.NewLoginClient(conn)
 }
 
 // Basically a no-op at this point since we only have one ship.
-func (server ShipgateServer) Handle(c *Client) error {
+func (server ShipgateServer) Handle(c *server.Client) error {
 	var err error
-	var hdr BBHeader
-	util.StructFromBytes(c.Data()[:BBHeaderSize], &hdr)
+	var hdr archon.BBHeader
+	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
 
 	switch hdr.Type {
 	default:
-		Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
