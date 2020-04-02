@@ -1,14 +1,5 @@
 package archon
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"github.com/dcrodman/archon/server"
-
-	"github.com/dcrodman/archon/util"
-)
-
 // CharClass is an enumeration of the possible character classes.
 type CharClass uint8
 
@@ -83,104 +74,105 @@ type CharacterPreview struct {
 // Copyright message expected by the client when connecting.
 var LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-// VerifyAccount performs all account verification tasks.
-func VerifyAccount(client *server.Client) (*LoginPkt, error) {
-	var loginPkt LoginPkt
-	util.StructFromBytes(client.Data(), &loginPkt)
-
-	pktUsername := string(util.StripPadding(loginPkt.Username[:]))
-	pktPassword := hashPassword(loginPkt.Password[:])
-	account, err := database.FindAccount(pktUsername)
-
-	switch {
-	case err != nil:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-			"database.\n\nPlease contact your server administrator.")
-		Log.Error(err.Error())
-	case account == nil:
-	case account.Password != pktPassword:
-		// The same error is returned for invalid passwords as attempts to Log in
-		// with a nonexistent username as some measure of account security.
-		SendSecurity(client, BBLoginErrorPassword, 0, 0)
-		return nil, errors.New("Account does not exist for username: " + pktUsername)
-	case !account.Active:
-		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-			"database.\n\nPlease contact your server administrator.")
-		return nil, errors.New("Account must be activated for username: " + pktUsername)
-	case account.Banned:
-		SendSecurity(client, BBLoginErrorBanned, 0, 0)
-		return nil, errors.New("Account banned: " + pktUsername)
-	}
-	// Copy over the config, which should indicate how far they are in the login flow.
-	util.StructFromBytes(loginPkt.Security[:], &client.config)
-
-	// TODO: Account, hardware, and IP ban checks.
-	return &loginPkt, nil
-}
-
-// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
-func hashPassword(password []byte) string {
-	hasher := sha256.New()
-	hasher.Write(util.StripPadding(password))
-	return hex.EncodeToString(hasher.Sum(nil)[:])
-}
-
-// SendClientMessage is used for error messages to the client, usually used before disconnecting.
-func SendClientMessage(client *server.Client, message string) error {
-	pkt := &LoginClientMessagePacket{
-		Header: BBHeader{Type: LoginClientMessageType},
-		// English? Tethealla sets this.
-		Language: 0x00450009,
-		Message:  util.ConvertToUtf16(message),
-	}
-	Log.Debug("Sending Client Message Packet")
-	return EncryptAndSend(client, pkt)
-}
-
-// SendWelcome transmits the welcome packet to a client with the copyright message and encryption vectors.
-func SendWelcome(client *server.Client) error {
-	pkt := new(WelcomePkt)
-	pkt.Header.Type = LoginWelcomeType
-	pkt.Header.Size = 0xC8
-	copy(pkt.Copyright[:], LoginCopyright)
-	copy(pkt.ClientVector[:], client.ClientVector())
-	copy(pkt.ServerVector[:], client.ServerVector())
-
-	Log.Debug("Sending Welcome Packet")
-	data, size := util.BytesFromStruct(pkt)
-	return client.SendRaw(data, size)
-}
-
-// SendSecurity transmits initialization packet with information about the user's
-// authentication status. This is used by everything except the patch server.
-func SendSecurity(client *server.Client, errorCode BBLoginError, guildcard uint32, teamId uint32) error {
-	// Constants set according to how Newserv does it.
-	pkt := &SecurityPacket{
-		Header:       BBHeader{Type: LoginSecurityType},
-		ErrorCode:    uint32(errorCode),
-		PlayerTag:    0x00010000,
-		Guildcard:    guildcard,
-		TeamId:       teamId,
-		Config:       &client.config,
-		Capabilities: 0x00000102,
-	}
-	Log.Debug("Sending Security Packet")
-	return EncryptAndSend(client, pkt)
-}
-
-// SendRedirect sends the client the address of the next server to which they should connect.
-func SendRedirect(client *server.Client, ipAddr []byte, port uint16) error {
-	pkt := new(RedirectPacket)
-	pkt.Header.Type = RedirectType
-	pkt.Port = port
-	copy(pkt.IPAddr[:], ipAddr)
-
-	Log.Debug("Sending Redirect Packet")
-	return EncryptAndSend(client, pkt)
-}
-
-// EncryptAndSend will encode the packet and let Client encrypt and transmit it.
-func EncryptAndSend(client *server.Client, pkt interface{}) error {
-	data, size := util.BytesFromStruct(pkt)
-	return client.SendEncrypted(data, size)
-}
+//
+//// VerifyAccount performs all account verification tasks.
+//func VerifyAccount(client *server.Client) (*LoginPkt, error) {
+//	var loginPkt LoginPkt
+//	util.StructFromBytes(client.Data(), &loginPkt)
+//
+//	pktUsername := string(util.StripPadding(loginPkt.Username[:]))
+//	pktPassword := hashPassword(loginPkt.Password[:])
+//	account, err := database.FindAccount(pktUsername)
+//
+//	switch {
+//	case err != nil:
+//		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+//			"database.\n\nPlease contact your server administrator.")
+//		Log.Error(err.Error())
+//	case account == nil:
+//	case account.Password != pktPassword:
+//		// The same error is returned for invalid passwords as attempts to Log in
+//		// with a nonexistent username as some measure of account security.
+//		SendSecurity(client, BBLoginErrorPassword, 0, 0)
+//		return nil, errors.New("Account does not exist for username: " + pktUsername)
+//	case !account.Active:
+//		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
+//			"database.\n\nPlease contact your server administrator.")
+//		return nil, errors.New("Account must be activated for username: " + pktUsername)
+//	case account.Banned:
+//		SendSecurity(client, BBLoginErrorBanned, 0, 0)
+//		return nil, errors.New("Account banned: " + pktUsername)
+//	}
+//	// Copy over the config, which should indicate how far they are in the login flow.
+//	util.StructFromBytes(loginPkt.Security[:], &client.config)
+//
+//	// TODO: Account, hardware, and IP ban checks.
+//	return &loginPkt, nil
+//}
+//
+//// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
+//func hashPassword(password []byte) string {
+//	hasher := sha256.New()
+//	hasher.Write(util.StripPadding(password))
+//	return hex.EncodeToString(hasher.Sum(nil)[:])
+//}
+//
+//// SendClientMessage is used for error messages to the client, usually used before disconnecting.
+//func SendClientMessage(client *server.Client, message string) error {
+//	pkt := &LoginClientMessagePacket{
+//		Header: BBHeader{Type: LoginClientMessageType},
+//		// English? Tethealla sets this.
+//		Language: 0x00450009,
+//		Message:  util.ConvertToUtf16(message),
+//	}
+//	Log.Debug("Sending Client Message Packet")
+//	return EncryptAndSend(client, pkt)
+//}
+//
+//// SendWelcome transmits the welcome packet to a client with the copyright message and encryption vectors.
+//func SendWelcome(client *server.Client) error {
+//	pkt := new(WelcomePkt)
+//	pkt.Header.Type = LoginWelcomeType
+//	pkt.Header.Size = 0xC8
+//	copy(pkt.Copyright[:], LoginCopyright)
+//	copy(pkt.ClientVector[:], client.ClientVector())
+//	copy(pkt.ServerVector[:], client.ServerVector())
+//
+//	Log.Debug("Sending Welcome Packet")
+//	data, size := util.BytesFromStruct(pkt)
+//	return client.send(data, size)
+//}
+//
+//// SendSecurity transmits initialization packet with information about the user's
+//// authentication status. This is used by everything except the patch server.
+//func SendSecurity(client *server.Client, errorCode BBLoginError, guildcard uint32, teamId uint32) error {
+//	// Constants set according to how Newserv does it.
+//	pkt := &SecurityPacket{
+//		Header:       BBHeader{Type: LoginSecurityType},
+//		ErrorCode:    uint32(errorCode),
+//		PlayerTag:    0x00010000,
+//		Guildcard:    guildcard,
+//		TeamId:       teamId,
+//		Config:       &client.config,
+//		Capabilities: 0x00000102,
+//	}
+//	Log.Debug("Sending Security Packet")
+//	return EncryptAndSend(client, pkt)
+//}
+//
+//// SendRedirect sends the client the address of the next server to which they should connect.
+//func SendRedirect(client *server.Client, ipAddr []byte, port uint16) error {
+//	pkt := new(RedirectPacket)
+//	pkt.Header.Type = RedirectType
+//	pkt.Port = port
+//	copy(pkt.IPAddr[:], ipAddr)
+//
+//	Log.Debug("Sending Redirect Packet")
+//	return EncryptAndSend(client, pkt)
+//}
+//
+//// EncryptAndSend will encode the packet and let Client encrypt and transmit it.
+//func EncryptAndSend(client *server.Client, pkt interface{}) error {
+//	data, size := util.BytesFromStruct(pkt)
+//	return client.SendEncrypted(data, size)
+//}

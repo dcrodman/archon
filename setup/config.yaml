@@ -12,7 +12,7 @@ external_ip: 127.0.0.1
 # Maximum number of concurrent connections the server will allow.
 max_connections: 3000
 # Full path to file to which logs will be written. Blank will write to stdout.
-log_file: ""
+log_file_path: ""
 # Minimum level of a log required to be written. Options: debug, info, warn, error
 log_level: debug
 # Enable extra info-providing mechanisms for the server. Only enable for development.

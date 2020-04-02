@@ -4,8 +4,6 @@
  */
 package archon
 
-import "github.com/dcrodman/archon/server/character"
-
 const (
 	PCHeaderSize = 0x04
 	BBHeaderSize = 0x08
@@ -14,7 +12,7 @@ const (
 // Packet types handled by the patch and data servers.
 const (
 	PatchWelcomeType        = 0x02
-	PatchLoginType          = 0x04
+	PatchHandshakeType      = 0x04
 	PatchMessageType        = 0x13
 	PatchRedirectType       = 0x14
 	PatchDataAckType        = 0x0B
@@ -150,7 +148,7 @@ type FileStatusPacket struct {
 }
 
 // Size and number of files that need to be updated.
-type UpdateFilesPacket struct {
+type StartFileUpdatePacket struct {
 	Header    PCHeader
 	TotalSize uint32
 	NumFiles  uint32
@@ -333,13 +331,13 @@ type TimestampPacket struct {
 
 // The list of menu items to display to the client.
 type ShipListPacket struct {
-	Header      BBHeader
-	Padding     uint16
-	Unknown     uint16 // set to 0xFFFFFFF4
-	Unknown2    uint32 // set to 0x02
-	Unknown3    uint16 // set to 0x04
-	ServerName  [36]byte
-	ShipEntries []character.ShipMenuEntry
+	Header     BBHeader
+	Padding    uint16
+	Unknown    uint16 // set to 0xFFFFFFF4
+	Unknown2   uint32 // set to 0x02
+	Unknown3   uint16 // set to 0x04
+	ServerName [36]byte
+	//ShipEntries []character.ShipMenuEntry
 }
 
 // Scroll message the client should display on the ship select screen.

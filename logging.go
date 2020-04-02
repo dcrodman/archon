@@ -3,27 +3,30 @@ package archon
 import (
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 )
 
 var Log *logrus.Logger
 
-func init() {
+func InitLogger() {
 	var w io.Writer
 	var err error
 
-	if Config.Logfile != "" {
-		w, err = os.OpenFile(Config.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile := viper.GetString("log_file_path")
+
+	if logFile == "" {
+		w = os.Stdout
+	} else {
+		w, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			fmt.Println("ERROR: Failed to open Log file " + Config.Logfile)
+			fmt.Println("ERROR: Failed to open Log file " + logFile)
 			os.Exit(1)
 		}
-	} else {
-		w = os.Stdout
 	}
 
-	logLvl, err := logrus.ParseLevel(Config.LogLevel)
+	logLvl, err := logrus.ParseLevel(viper.GetString("log_level"))
 	if err != nil {
 		fmt.Println("ERROR: Failed to parse Log level: " + err.Error())
 		os.Exit(1)

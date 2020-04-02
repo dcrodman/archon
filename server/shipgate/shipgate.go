@@ -5,27 +5,6 @@
  */
 package shipgate
 
-import (
-	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/character"
-	"github.com/dcrodman/archon/server/login"
-
-	// 	"crypto/tls"
-	// 	"errors"
-	// "fmt"
-	// 	"io"
-	"net"
-	// 	"os"
-	// 	"runtime/debug"
-	// 	"strings"
-	// 	"sync"
-	// 	"time"
-	"strconv"
-
-	"github.com/dcrodman/archon/util"
-)
-
 type Ship struct {
 	name [23]byte
 	id   uint32
@@ -48,12 +27,12 @@ type Ship struct {
 // func (s *Ship) Encrypt(data []byte, size uint32) {}
 // func (s *Ship) Decrypt(data []byte, size uint32) {}
 
-// func (s *Ship) Send(data []byte) error {
+// func (s *Ship) send(data []byte) error {
 // 	_, err := s.conn.Write(data)
 // 	return err
 // }
 
-// func (s *Ship) Process() error {
+// func (s *Ship) ReadNextPacket() error {
 // 	s.recvSize = 0
 // 	s.packetSize = 0
 
@@ -94,11 +73,11 @@ type Ship struct {
 // 	return nil
 // }
 
-// // Wraps Process() in a channel that can be used for timeouts.
+// // Wraps ReadNextPacket() in a channel that can be used for timeouts.
 // func (s *Ship) Read() <-chan error {
 // 	c := make(chan error)
 // 	go func() {
-// 		c <- s.Process()
+// 		c <- s.ReadNextPacket()
 // 	}()
 // 	return c
 // }
@@ -125,9 +104,9 @@ type Ship struct {
 // 	Name   [24]byte
 // }
 
-// // Send the packet serialized (or otherwise contained) in pkt to a ship.
+// // send the packet serialized (or otherwise contained) in pkt to a ship.
 // func SendShipPacket(ship *Ship, pkt []byte, length uint16) int {
-// 	if err := ship.Send(pkt[:length]); err != nil {
+// 	if err := ship.send(pkt[:length]); err != nil {
 // 		Log.Warn("Error sending to ship %v: %s", ship.IPAddr(), err.Error())
 // 		return -1
 // 	}
@@ -318,41 +297,41 @@ type Ship struct {
 // }
 //
 // Shipgate sub-server definition.
-type ShipgateServer struct{}
-
-func NewServer() *ShipgateServer {
-	return &ShipgateServer{}
-}
-
-func (server ShipgateServer) Name() string { return "SHIPGATE" }
-
-func (server ShipgateServer) Port() string { return archon.Config.ShipgateServer.Port }
-
-func (server *ShipgateServer) Init() error {
-	// Create our ship entry for the built-in ship server. Any other connected
-	// ships will be added to this list by the shipgate, if it's enabled.
-	s := &character.shipList[0]
-	s.id = 1
-	s.ipAddr = archon.BroadcastIP()
-	port, _ := strconv.ParseUint(archon.Config.ShipServer.Port, 10, 16)
-	s.port = uint16(port)
-	copy(s.name[:], archon.Config.ShipServer.Name)
-	return nil
-}
-
-func (server ShipgateServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
-	return login.NewLoginClient(conn)
-}
-
-// Basically a no-op at this point since we only have one ship.
-func (server ShipgateServer) Handle(c *server.Client) error {
-	var err error
-	var hdr archon.BBHeader
-	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
-
-	switch hdr.Type {
-	default:
-		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
-	}
-	return err
-}
+//type ShipgateServer struct{}
+//
+//func NewServer() server.Server {
+//	return &ShipgateServer{}
+//}
+//
+//func (server ShipgateServer) Name() string { return "SHIPGATE" }
+//
+//func (server ShipgateServer) Port() string { return archon.Config.ShipgateServer.Port }
+//
+//func (server *ShipgateServer) Init() error {
+//	// Create our ship entry for the built-in ship server. Any other connected
+//	// ships will be added to this list by the shipgate, if it's enabled.
+//	s := &character.shipList[0]
+//	s.id = 1
+//	s.ipAddr = archon.BroadcastIP()
+//	port, _ := strconv.ParseUint(archon.Config.ShipServer.Port, 10, 16)
+//	s.port = uint16(port)
+//	copy(s.name[:], archon.Config.ShipServer.Name)
+//	return nil
+//}
+//
+//func (server ShipgateServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
+//	return login.NewLoginClient(conn)
+//}
+//
+//// Basically a no-op at this point since we only have one ship.
+//func (server ShipgateServer) Handle(c *server.Client) error {
+//	var err error
+//	var hdr archon.BBHeader
+//	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
+//
+//	switch hdr.Type {
+//	default:
+//		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+//	}
+//	return err
+//}

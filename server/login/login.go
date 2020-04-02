@@ -4,11 +4,9 @@ import (
 	"errors"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/server"
-	"net"
-	"strconv"
-
 	"github.com/dcrodman/archon/util"
 	crypto "github.com/dcrodman/archon/util/encryption"
+	"net"
 )
 
 // Struct for caching the parameter chunk data and header so
@@ -27,6 +25,7 @@ func NewLoginClient(conn *net.TCPConn) (*server.Client, error) {
 	cCrypt := crypto.NewBBCrypt()
 	sCrypt := crypto.NewBBCrypt()
 	lc := server.NewClient(conn, archon.BBHeaderSize, cCrypt, sCrypt)
+
 	if archon.SendWelcome(lc) != nil {
 		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
 		lc = nil
@@ -34,33 +33,29 @@ func NewLoginClient(conn *net.TCPConn) (*server.Client, error) {
 	return lc, err
 }
 
-// Login sub-server definition.
 type LoginServer struct {
-	// Cached and parsed representation of the character port.
+	name             string
+	port             string
 	charRedirectPort uint16
 }
 
-func NewServer() *LoginServer {
-	return &LoginServer{}
-}
+//func NewServer(name, port, characterPort string) server.Server {
+//	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
+//	return &LoginServer{name: name, port: port, charRedirectPort: uint16(charPort)}
+//}
 
-func (server LoginServer) Name() string { return "LOGIN" }
+func (server LoginServer) Name() string       { return server.name }
+func (server LoginServer) Port() string       { return server.port }
+func (server LoginServer) HeaderSize() uint16 { return archon.BBHeaderSize }
 
-func (server LoginServer) Port() string { return archon.Config.LoginServer.LoginPort }
+//
+//func (server LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+//	return NewLoginClient(conn)
+//}
 
-func (server *LoginServer) Init() error {
-	charPort, _ := strconv.ParseUint(archon.Config.LoginServer.CharacterPort, 10, 16)
-	server.charRedirectPort = uint16(charPort)
-	return nil
-}
-
-func (server *LoginServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
-	return NewLoginClient(conn)
-}
-
-func (server *LoginServer) Handle(c *server.Client) error {
+func (server LoginServer) Handle(c server.Client2) error {
 	var hdr archon.BBHeader
-	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
+	util.StructFromBytes(c.ConnectionState().Data()[:archon.BBHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
@@ -70,17 +65,16 @@ func (server *LoginServer) Handle(c *server.Client) error {
 		// Just wait until we recv 0 from the client to d/c.
 		break
 	default:
-		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
+		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.ConnectionState().IPAddr())
 	}
 	return err
 }
 
-func (server *LoginServer) HandleLogin(client *server.Client) error {
-	//loginPkt, err := VerifyAccount(client)
-	_, err := archon.VerifyAccount(client)
-	if err != nil {
-		return err
-	}
+func (server *LoginServer) HandleLogin(c server.Client2) error {
+	//_, err := archon.VerifyAccount(client)
+	//if err != nil {
+	//	return err
+	//}
 
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
@@ -92,9 +86,10 @@ func (server *LoginServer) HandleLogin(client *server.Client) error {
 	// Newserv sets this field when the client first connects. I think this is
 	// used to indicate that the client has made it through the LOGIN server,
 	// but for now we'll just set it and leave it alone.
-	client.config.Magic = 0x48615467
+	//client.config.Magic = 0x48615467
 
-	ipAddr := archon.BroadcastIP()
-	archon.SendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
-	return archon.SendRedirect(client, ipAddr[:], server.charRedirectPort)
+	//ipAddr := archon.BroadcastIP()
+	//archon.SendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
+	//return archon.SendRedirect(client, ipAddr[:], server.charRedirectPort)
+	return nil
 }

@@ -70,6 +70,7 @@ func ZeroSlice(arr []byte, length int) {
 func BytesFromStruct(data interface{}) ([]byte, int) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()
+
 	if valKind == reflect.Ptr {
 		val = reflect.ValueOf(data).Elem()
 		valKind = val.Kind()
@@ -80,7 +81,7 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 			"or ptr to struct, got: " + valKind.String())
 	}
 
-	bytes := new(bytes.Buffer)
+	convertedBytes := new(bytes.Buffer)
 	// It's possible to use binary.Write on val.Interface itself, but doing
 	// so prevents this function from working with dynamically sized types.
 	for i := 0; i < val.NumField(); i++ {
@@ -90,27 +91,30 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 		switch kind := field.Kind(); kind {
 		case reflect.Struct, reflect.Ptr:
 			b, _ := BytesFromStruct(field.Interface())
-			err = binary.Write(bytes, binary.LittleEndian, b)
+			err = binary.Write(convertedBytes, binary.LittleEndian, b)
 		default:
-			err = binary.Write(bytes, binary.LittleEndian, field.Interface())
+			err = binary.Write(convertedBytes, binary.LittleEndian, field.Interface())
 		}
 		if err != nil {
 			panic(err.Error())
 		}
 	}
-	return bytes.Bytes(), bytes.Len()
+	return convertedBytes.Bytes(), convertedBytes.Len()
 }
 
 // Populates the struct pointed to by targetStruct by reading in a stream of
 // bytes and filling the values in sequential order.
 func StructFromBytes(data []byte, targetStruct interface{}) {
 	targetVal := reflect.ValueOf(targetStruct)
+
 	if valKind := targetVal.Kind(); valKind != reflect.Ptr {
 		panic("StructFromBytes(): targetStruct must be a " +
 			"ptr to struct, got: " + valKind.String())
 	}
+
 	reader := bytes.NewReader(data)
 	val := targetVal.Elem()
+
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 

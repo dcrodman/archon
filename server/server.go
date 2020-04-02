@@ -1,22 +1,23 @@
 package server
 
-import (
-	"net"
-)
-
 // Server defines the methods implemented by all sub-servers that can be
 // registered and started when the server is brought up.
 type Server interface {
-	// Uniquely identifying string, mostly used for logging.
+	// Name returns a uniquely identifying string.
 	Name() string
-	// Port on which the server should listen for connections.
+
+	// Port returns the local port to which the server should be bound.
 	Port() string
-	// Perform any pre-startup initialization.
-	Init() error
-	// Client factory responsible for performing whatever initialization is
-	// needed for Client objects to represent new connections.
-	NewClient(conn *net.TCPConn) (*Client, error)
-	// Process the packet in the client's buffer. The dispatcher will
-	// read the latest packet from the client before calling.
-	Handle(c *Client) error
+
+	// HeaderSize returns the size of the packet header in bytes.
+	HeaderSize() uint16
+
+	// AcceptClient should perform whatever initialization is needed to accept a client
+	//connection and return a Client2 that wraps the provided ConnectionSate instance.
+	//Note that this initialization may involve sending packets to the client.
+	AcceptClient(cs *ConnectionState) (Client2, error)
+
+	// Handle is the main entry point for processing client packets. It's responsible
+	// for generally handling all packets from a client as well as sending any responses.
+	Handle(c Client2) error
 }
