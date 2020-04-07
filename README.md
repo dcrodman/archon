@@ -14,6 +14,14 @@ Forks, bug fixes, issue reports, explanations of some of the client's bizarre be
 etc. are more than welcome! I try to keep the development pretty open but if you have
 questions feel free to open an issue.
 
+- [Installation](#installation)
+    * [1. Compile the code](#1-compile-the-code)
+    * [2. Set up the config file](#2-set-up-the-config-file)
+    * [3. Create the database](#3-create-the-database)
+    * [4. Add files the patch directory](#4-add-files-the-patch-directory)
+- [Developing](#developing)
+
+
 ## Installation
 
 ### 1. Compile the code
@@ -56,5 +64,9 @@ settings in your `config.yaml` reflect them.
 Archon takes care of creating the tables and performing any migrations.
  
 ### 4. Add files the patch directory
+
+TODO
+
+## Developing
 
 TODO
