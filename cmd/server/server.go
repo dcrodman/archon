@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/data"
 	"github.com/dcrodman/archon/server"
+	"github.com/dcrodman/archon/server/login"
 	"github.com/dcrodman/archon/server/patch"
 	"github.com/spf13/viper"
 	"net/http"
@@ -23,24 +25,29 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n\n")
 
-	fmt.Printf("configuration loaded from %s\n\n", archon.ConfigFileUsed())
-
-	archon.InitLogger()
-	//
-	//database, err := archon.InitializeDatabase(
-	//	viper.GetString("database.host"),
-	//	viper.GetString("database.port"),
-	//)
-	//if err != nil {
-	//	fmt.Println("Failed: " + err.Error())
-	//	os.Exit(1)
-	//}
-	//defer database.Close()
-	//fmt.Print("Done.\n\n")
+	fmt.Println("configuration loaded from", archon.ConfigFileUsed())
 
 	if viper.GetBool("debug_mode") {
 		startDebugServer()
 	}
+
+	archon.InitLogger()
+
+	dataSource := fmt.Sprintf(
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
+		viper.GetString("database.host"),
+		viper.GetInt("database.port"),
+		viper.GetString("database.name"),
+		viper.GetString("database.username"),
+		viper.GetString("database.password"),
+		viper.GetString("database.sslmode"),
+	)
+	if err := data.Initialize(dataSource); err != nil {
+		fmt.Println(err.Error())
+	}
+	defer data.Shutdown()
+
+	fmt.Printf("connected to database %s:%d\n", viper.GetString("database.host"), viper.GetInt("database.port"))
 
 	startServers()
 }
@@ -50,7 +57,7 @@ func main() {
 func startDebugServer() {
 	webPort := viper.GetString("web.http_port")
 
-	fmt.Println("opening Debug port on " + webPort)
+	fmt.Println("opening debug port on " + webPort)
 	http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
 		pprof.Lookup("goroutine").WriteTo(resp, 1)
 	})
@@ -74,7 +81,11 @@ func startServers() {
 		dataServer.Port(),
 	)
 
-	//login.NewServer("LOGIN", viper.GetString("login_server.login_port"), viper.GetString("login_server.character_port")),
+	loginServer := login.NewServer(
+		"LOGIN",
+		viper.GetString("login_server.login_port"),
+		viper.GetString("login_server.character_port"),
+	)
 	//character.NewServer(),
 	//ship.NewServer(),
 	//shipgate.NewServer(),
@@ -89,8 +100,9 @@ func startServers() {
 	//}
 
 	servers := []server.Server{
-		dataServer,
 		patchServer,
+		dataServer,
+		loginServer,
 	}
 
 	var wg sync.WaitGroup

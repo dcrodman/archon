@@ -3,15 +3,17 @@ package patch
 import (
 	"errors"
 	"github.com/dcrodman/archon"
+	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/util"
-	crypto "github.com/dcrodman/archon/util/encryption"
+	"github.com/dcrodman/archon/server/internal"
 	"hash/crc32"
 	"io"
 	"os"
 )
 
-// Data sub-server definition.
+// DataServer is responsible for verifying the client's local files to make sure everything
+// is up to date and/or hasn't been tampered with. If "out of date" files are detected, this
+// server also takes care of sending the client the correct file(s).
 type DataServer struct {
 	name string
 	port string
@@ -49,7 +51,7 @@ func (s DataServer) Handle(client server.Client2) error {
 	c := client.(*Client)
 	var hdr archon.PCHeader
 
-	util.StructFromBytes(c.ConnectionState().Data()[:archon.PCHeaderSize], &hdr)
+	internal.StructFromBytes(c.ConnectionState().Data()[:archon.PCHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
@@ -152,7 +154,7 @@ func (s *DataServer) sendFileListDone(client *Client) error {
 // have and add it to the list of files to update if there is any discrepancy.
 func (s *DataServer) handleFileStatus(client *Client) {
 	var fileStatus archon.FileStatusPacket
-	util.StructFromBytes(client.ConnectionState().Data(), &fileStatus)
+	internal.StructFromBytes(client.ConnectionState().Data(), &fileStatus)
 
 	patchFile := patchIndex[fileStatus.PatchId]
 

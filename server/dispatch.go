@@ -1,11 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"container/list"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/util"
 	"github.com/spf13/viper"
 	"io"
 	"net"
@@ -185,7 +186,7 @@ func ReadNextPacket(c Client2, headerSize uint16) error {
 			// At this point the full header has arrived and needs to be decrypted.
 			c.Decrypt(cs.buffer[:headerSize], uint32(headerSize))
 
-			packetSize, err = util.GetPacketSize(cs.buffer[:2])
+			packetSize, err = getPacketSize(cs.buffer[:2])
 			if err != nil {
 				// panic() since this should never occur unless something's _very_ wrong.
 				panic(err.Error())
@@ -222,6 +223,19 @@ func ReadNextPacket(c Client2, headerSize uint16) error {
 	}
 
 	return nil
+}
+
+// Extract the packet length from the first two bytes of data.
+func getPacketSize(data []byte) (uint16, error) {
+	if len(data) < 2 {
+		return 0, errors.New("getSize(): data must be at least two bytes")
+	}
+
+	var size uint16
+	reader := bytes.NewReader(data)
+	err := binary.Read(reader, binary.LittleEndian, &size)
+
+	return size, err
 }
 
 func closeClientConnection(s Server, c Client2) {

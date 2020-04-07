@@ -64,7 +64,7 @@ func initializePatchData() {
 
 		rootNode = &directoryNode{path: dir, clientPath: "./"}
 
-		fmt.Printf("loading patch files from %s...\n", dir)
+		fmt.Println("loading patch files from", dir)
 		if err := buildPatchFileTree(rootNode); err != nil {
 			fmt.Println("error loading patch files: ", err)
 			os.Exit(1)

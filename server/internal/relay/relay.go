@@ -3,13 +3,13 @@ package relay
 import (
 	"fmt"
 	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/util"
+	"github.com/dcrodman/archon/server/internal"
 )
 
 // send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
 func SendPacket(c server.Client2, packet interface{}, lenDivisor uint16) error {
-	data, size := util.BytesFromStruct(packet)
+	data, size := internal.BytesFromStruct(packet)
 	bytes, n := adjustPacketLength(data, uint16(size), lenDivisor)
 
 	c.Encrypt(bytes, uint32(n))

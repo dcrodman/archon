@@ -1,12 +1,11 @@
 /*
  * Functions and constants shared between server components.
  */
-package util
+package internal
 
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -14,17 +13,6 @@ import (
 )
 
 const displayWidth = 16
-
-// Extract the packet length from the first two bytes of data.
-func GetPacketSize(data []byte) (uint16, error) {
-	if len(data) < 2 {
-		return 0, errors.New("getSize(): data must be at least two bytes")
-	}
-	var size uint16
-	reader := bytes.NewReader(data)
-	binary.Read(reader, binary.LittleEndian, &size)
-	return size, nil
-}
 
 // Expands an array of UTF-16 elements to a slice of uint8 elements in
 // little endian order. E.g: [0x1234] -> [0x34, 0x12]
@@ -52,16 +40,6 @@ func StripPadding(b []byte) []byte {
 		}
 	}
 	return b
-}
-
-// Sets the values of a slice of bytes (up to length) to 0.
-func ZeroSlice(arr []byte, length int) {
-	if arrLen := len(arr); arrLen < length {
-		length = arrLen
-	}
-	for i := 0; i < length; i++ {
-		arr[i] = 0
-	}
 }
 
 // Serializes the fields of a struct to an array of bytes in the order in
@@ -131,6 +109,19 @@ func StructFromBytes(data []byte, targetStruct interface{}) {
 	}
 }
 
+// Print the contents of a packet to stdout in two columns, one for bytes and
+// the other for their ascii representation.
+func PrintPayload(data []uint8, pktLen int) {
+	for rem, offset := pktLen, 0; rem > 0; rem -= displayWidth {
+		if rem < displayWidth {
+			printPacketLine(data[(pktLen-rem):pktLen], rem, offset)
+		} else {
+			printPacketLine(data[offset:offset+displayWidth], displayWidth, offset)
+		}
+		offset += displayWidth
+	}
+}
+
 // Write one line of data to stdout.
 func printPacketLine(data []uint8, length int, offset int) {
 	fmt.Printf("(%04X) ", offset)
@@ -162,17 +153,4 @@ func printPacketLine(data []uint8, length int, offset int) {
 		}
 	}
 	fmt.Println()
-}
-
-// Print the contents of a packet to stdout in two columns, one for bytes and
-// the other for their ascii representation.
-func PrintPayload(data []uint8, pktLen int) {
-	for rem, offset := pktLen, 0; rem > 0; rem -= displayWidth {
-		if rem < displayWidth {
-			printPacketLine(data[(pktLen-rem):pktLen], rem, offset)
-		} else {
-			printPacketLine(data[offset:offset+displayWidth], displayWidth, offset)
-		}
-		offset += displayWidth
-	}
 }

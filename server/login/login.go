@@ -1,95 +1,156 @@
 package login
 
 import (
-	"errors"
+	"fmt"
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/auth"
+	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/util"
-	crypto "github.com/dcrodman/archon/util/encryption"
-	"net"
+	"github.com/dcrodman/archon/server/internal"
+	"strconv"
+	"strings"
 )
 
-// Struct for caching the parameter chunk data and header so
-// that the param files aren't re-read every time.
-type parameterEntry struct {
-	Size     uint32
-	Checksum uint32
-	Offset   uint32
-	Filename [0x40]uint8
-}
+// Copyright message expected by the client when connecting.
+var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-// Create and initialize a new Login client so long as we're able
-// to send the welcome packet to begin encryption.
-func NewLoginClient(conn *net.TCPConn) (*server.Client, error) {
-	var err error
-	cCrypt := crypto.NewBBCrypt()
-	sCrypt := crypto.NewBBCrypt()
-	lc := server.NewClient(conn, archon.BBHeaderSize, cCrypt, sCrypt)
-
-	if archon.SendWelcome(lc) != nil {
-		err = errors.New("Error sending welcome packet to: " + lc.IPAddr())
-		lc = nil
-	}
-	return lc, err
-}
-
+// LoginServer is the client's first point of contact with the account/character
+// part of the flow. Its main purpose is to authenticate the client and send them
+// on to the CHARACTER server.
 type LoginServer struct {
 	name             string
 	port             string
 	charRedirectPort uint16
 }
 
-//func NewServer(name, port, characterPort string) server.Server {
-//	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
-//	return &LoginServer{name: name, port: port, charRedirectPort: uint16(charPort)}
-//}
+func NewServer(name, port, characterPort string) server.Server {
+	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
+	return &LoginServer{name: name, port: port, charRedirectPort: uint16(charPort)}
+}
 
-func (server LoginServer) Name() string       { return server.name }
-func (server LoginServer) Port() string       { return server.port }
-func (server LoginServer) HeaderSize() uint16 { return archon.BBHeaderSize }
+func (s *LoginServer) Name() string       { return s.name }
+func (s *LoginServer) Port() string       { return s.port }
+func (s *LoginServer) HeaderSize() uint16 { return archon.BBHeaderSize }
 
-//
-//func (server LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
-//	return NewLoginClient(conn)
-//}
+func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+	c := &Client{
+		cs:          cs,
+		serverCrypt: crypto.NewBBCrypt(),
+		clientCrypt: crypto.NewBBCrypt(),
+	}
 
-func (server LoginServer) Handle(c server.Client2) error {
+	if err := s.SendWelcome(c); err != nil {
+		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
+	}
+	return c, nil
+}
+
+func (s *LoginServer) SendWelcome(c *Client) error {
+	pkt := &archon.WelcomePkt{
+		Header:       archon.BBHeader{Type: archon.LoginWelcomeType, Size: 0xC8},
+		Copyright:    [96]byte{},
+		ServerVector: [48]byte{},
+		ClientVector: [48]byte{},
+	}
+	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.ServerVector[:], c.serverVector())
+	copy(pkt.ClientVector[:], c.clientVector())
+
+	return c.sendRaw(pkt)
+}
+
+func (s *LoginServer) Handle(client server.Client2) error {
+	c := client.(*Client)
 	var hdr archon.BBHeader
-	util.StructFromBytes(c.ConnectionState().Data()[:archon.BBHeaderSize], &hdr)
+	internal.StructFromBytes(c.ConnectionState().Data()[:archon.BBHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
 	case archon.LoginType:
-		err = server.HandleLogin(c)
+		err = s.handleLogin(c)
 	case archon.DisconnectType:
-		// Just wait until we recv 0 from the client to d/c.
+		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
 		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.ConnectionState().IPAddr())
 	}
+
 	return err
 }
 
-func (server *LoginServer) HandleLogin(c server.Client2) error {
-	//_, err := archon.VerifyAccount(client)
-	//if err != nil {
-	//	return err
-	//}
+func (s *LoginServer) handleLogin(c *Client) error {
+	var loginPkt archon.LoginPkt
+	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
+
+	username := string(internal.StripPadding(loginPkt.Username[:]))
+	password := string(internal.StripPadding(loginPkt.Password[:]))
+
+	if err := auth.VerifyAccount(username, password); err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return s.sendSecurity(c, archon.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return s.sendSecurity(c, archon.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return sendErr
+			}
+			return err
+		}
+	}
 
 	// The first time we receive this packet the client will have included the
 	// version string in the security data; check it.
-	/* if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
-		SendSecurity(client, BBLoginErrorPatch, 0, 0)
-		return errors.New("Incorrect version string")
-	} */
+	//if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
+	//	SendSecurity(client, BBLoginErrorPatch, 0, 0)
+	//	return errors.New("Incorrect version string")
+	//}
 
+	// Copy over the config, to indicate they've passed initial authentication.
+	internal.StructFromBytes(loginPkt.Security[:], &c.Config)
 	// Newserv sets this field when the client first connects. I think this is
 	// used to indicate that the client has made it through the LOGIN server,
 	// but for now we'll just set it and leave it alone.
-	//client.config.Magic = 0x48615467
+	c.Config.Magic = 0x48615467
 
-	//ipAddr := archon.BroadcastIP()
-	//archon.SendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
-	//return archon.SendRedirect(client, ipAddr[:], server.charRedirectPort)
-	return nil
+	if err := s.sendSecurity(c, archon.BBLoginErrorNone); err != nil {
+		return err
+	}
+	return s.sendCharacterRedirect(c)
+}
+
+// SendSecurity transmits initialization packet with information about the user's
+// authentication status.
+func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
+	// Constants set according to how Newserv does it.
+	return c.send(&archon.SecurityPacket{
+		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamId:       c.TeamId,
+		Config:       &c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+func (s *LoginServer) sendMessage(c *Client, message string) error {
+	return c.send(&archon.LoginClientMessagePacket{
+		Header:   archon.BBHeader{Type: archon.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
+}
+
+func (s *LoginServer) sendCharacterRedirect(c *Client) error {
+	pkt := &archon.RedirectPacket{
+		Header: archon.BBHeader{Type: archon.RedirectType},
+		IPAddr: [4]uint8{},
+		Port:   s.charRedirectPort,
+	}
+	ip := archon.BroadcastIP()
+	copy(pkt.IPAddr[:], ip[:])
+
+	return c.send(pkt)
 }

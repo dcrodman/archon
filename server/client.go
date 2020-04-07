@@ -5,37 +5,9 @@ package server
 
 import (
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/util/encryption"
 	"net"
 	"strings"
 )
-
-// TODO: REMOVE THIS
-// Client struct intended to be included as part of the client definitions
-// in each of the servers. This struct wraps the connection handling logic
-// used by ReadNextPacket() below to handle receiving packets.
-type Client struct {
-	Connection *net.TCPConn
-	IpAddr     string
-	Port       string
-
-	hdrSize    uint16
-	recvSize   int
-	packetSize uint16
-	buffer     []byte
-
-	clientCrypt *crypto.PSOCrypt
-	serverCrypt *crypto.PSOCrypt
-
-	Config archon.ClientConfig
-	Flag   uint32
-	TeamId uint32
-	IsGm   bool
-
-	Guildcard         uint32
-	GuildcardData     []byte
-	GuildcardDataSize uint16
-}
 
 // ConnectionState encapsulates the TCP connection and any other data required
 // to interact with a client in its simplest form.
@@ -77,4 +49,18 @@ type Client2 interface {
 
 	// Encrypt decrypts bytes in place with the encryption key for the client.
 	Decrypt(bytes []byte, length uint32)
+}
+
+// CommonClient encapsulates the user-specific information common to several server
+// implementations and is intended to be embedded by any Client2 instance that needs it.
+type CommonClient struct {
+	Config archon.ClientConfig
+
+	Flag   uint32
+	TeamId uint32
+	IsGm   bool
+
+	Guildcard         uint32
+	GuildcardData     []byte
+	GuildcardDataSize uint16
 }

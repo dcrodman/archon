@@ -1,6 +1,13 @@
 // The CHARACTER server logic.
 package character
 
+import (
+	"github.com/dcrodman/archon/server/internal"
+	"github.com/spf13/viper"
+)
+
+var cachedScrollMsg = internal.ConvertToUtf16(viper.GetString("login_server.scroll_message"))
+
 //
 //import (
 //	"errors"
@@ -48,6 +55,14 @@ package character
 //		"PlyLevelTbl.prs",
 //	}
 //)
+// Struct for caching the parameter chunk data and header so
+// that the param files aren't re-read every time.
+//type parameterEntry struct {
+//	Size     uint32
+//	Checksum uint32
+//	Offset   uint32
+//	Filename [0x40]uint8
+//}
 //
 //// Entry in the available ships lis on the ship selection menu.
 //type ShipMenuEntry struct {

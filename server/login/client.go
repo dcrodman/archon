@@ -1,4 +1,4 @@
-package patch
+package login
 
 import (
 	"github.com/dcrodman/archon"
@@ -8,15 +8,14 @@ import (
 	"github.com/dcrodman/archon/server/internal/relay"
 )
 
-// Client2 implementation for the PATCH and DATA servers.
+// Client2 implementation for the LOGIN server.
 type Client struct {
 	cs *server.ConnectionState
 
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
 
-	// Set of files that need to be updated.
-	filesToUpdate map[int]*fileEntry
+	server.CommonClient
 }
 
 func (c Client) ConnectionState() *server.ConnectionState { return c.cs }
@@ -33,7 +32,7 @@ func (c Client) Decrypt(bytes []byte, length uint32) {
 }
 
 func (c *Client) send(packet interface{}) error {
-	return relay.SendPacket(c, packet, archon.PCHeaderSize)
+	return relay.SendPacket(c, packet, archon.BBHeaderSize)
 }
 
 func (c *Client) sendRaw(packet interface{}) error {

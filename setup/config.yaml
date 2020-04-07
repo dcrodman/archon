@@ -19,15 +19,17 @@ log_level: debug
 debug_mode: true
 
 database:
-  # Hostname of the Mongodb database instance.
+  # Hostname of the Postgres database instance.
   host: 127.0.0.1
-  # Port on db_host on which the Mongodb instance is accepting connections.
-  port: 27017
-  # Name of the database in Mongodb for archon.
+  # Port on db_host on which the Postgres instance is accepting connections.
+  port: 5432
+  # Name of the database in Postgres for archon.
   name: archondb
   # Username and password of a user with full RW privileges to ${db_name}.
   username: archonadmin
   password: psoadminpassword
+  # Set to verify-full if the Postgres instance supports SSL.
+  sslmode: disable
 
 patch_server:
   # Port on whith the PATCH server will listen.

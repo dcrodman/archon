@@ -1,13 +1,38 @@
 package patch
 
 import (
-	"errors"
+	"fmt"
 	"github.com/dcrodman/archon"
+	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/util"
-	crypto "github.com/dcrodman/archon/util/encryption"
+	"github.com/dcrodman/archon/server/internal"
+	"github.com/spf13/viper"
 	"strconv"
+	"sync"
 )
+
+// Convert the welcome message to UTF-16LE and cache it. PSOBB expects this prefix to the message,
+//not completely sure why. Language perhaps?
+
+var (
+	messageBytes []byte
+	messageInit  sync.Once
+)
+
+func GetWelcomeMessage() ([]byte, uint16) {
+	messageInit.Do(func() {
+		messageBytes = internal.ConvertToUtf16(viper.GetString("patch_server.welcome_message"))
+
+		if len(messageBytes) > (1 << 16) {
+			archon.Log.Warn("patch server welcome message exceeds 65,000 characters")
+			messageBytes = messageBytes[:1<<16-2]
+		}
+
+		messageBytes = append([]byte{0xFF, 0xFE}, messageBytes...)
+	})
+
+	return messageBytes, uint16(len(messageBytes))
+}
 
 // Copyright message expected by the client for the patch welcome.
 var copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
@@ -44,12 +69,10 @@ func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client2, 
 		serverCrypt: crypto.NewPCCrypt(),
 	}
 
-	var err error
-	if SendPCWelcome(c) != nil {
-		err = errors.New("Error sending welcome packet to: " + c.ConnectionState().IPAddr())
-		c = nil
+	if err := SendPCWelcome(c); err != nil {
+		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
 	}
-	return c, err
+	return c, nil
 }
 
 // send the welcome packet to a client with the copyright message and encryption vectors.
@@ -68,7 +91,7 @@ func (s *PatchServer) Handle(client server.Client2) error {
 	c := client.(*Client)
 	var header archon.PCHeader
 
-	util.StructFromBytes(c.ConnectionState().Data()[:archon.PCHeaderSize], &header)
+	internal.StructFromBytes(c.ConnectionState().Data()[:archon.PCHeaderSize], &header)
 
 	var err error
 	switch header.Type {
@@ -94,13 +117,15 @@ func (s *PatchServer) sendWelcomeAck(client *Client) error {
 
 // Message displayed on the patch download screen.
 func (s *PatchServer) sendWelcomeMessage(client *Client) error {
+	message, size := GetWelcomeMessage()
 	pkt := &archon.PatchWelcomeMessage{
 		Header: archon.PCHeader{
-			Size: archon.PCHeaderSize + archon.MessageSize,
+			Size: archon.PCHeaderSize + size,
 			Type: archon.PatchMessageType,
 		},
-		Message: archon.MessageBytes,
+		Message: message,
 	}
+
 	return client.send(pkt)
 }
 
