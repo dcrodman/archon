@@ -1,5 +1,5 @@
 // Constants and structs associated with character data.
-package archon
+package character
 
 // Default keyboard/joystick configuration used for players who are
 // logging in for the first time.

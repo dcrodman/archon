@@ -5,6 +5,7 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"strconv"
@@ -30,7 +31,7 @@ func NewServer(name, port, characterPort string) server.Server {
 
 func (s *LoginServer) Name() string       { return s.name }
 func (s *LoginServer) Port() string       { return s.port }
-func (s *LoginServer) HeaderSize() uint16 { return archon.BBHeaderSize }
+func (s *LoginServer) HeaderSize() uint16 { return packets.BBHeaderSize }
 
 func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{
@@ -46,8 +47,8 @@ func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, 
 }
 
 func (s *LoginServer) SendWelcome(c *Client) error {
-	pkt := &archon.WelcomePkt{
-		Header:       archon.BBHeader{Type: archon.LoginWelcomeType, Size: 0xC8},
+	pkt := &packets.Welcome{
+		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
@@ -61,14 +62,14 @@ func (s *LoginServer) SendWelcome(c *Client) error {
 
 func (s *LoginServer) Handle(client server.Client2) error {
 	c := client.(*Client)
-	var hdr archon.BBHeader
-	internal.StructFromBytes(c.ConnectionState().Data()[:archon.BBHeaderSize], &hdr)
+	var hdr packets.BBHeader
+	internal.StructFromBytes(c.ConnectionState().Data()[:packets.BBHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
-	case archon.LoginType:
+	case packets.LoginType:
 		err = s.handleLogin(c)
-	case archon.DisconnectType:
+	case packets.DisconnectType:
 		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
@@ -79,7 +80,7 @@ func (s *LoginServer) Handle(client server.Client2) error {
 }
 
 func (s *LoginServer) handleLogin(c *Client) error {
-	var loginPkt archon.LoginPkt
+	var loginPkt packets.Login
 	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
 
 	username := string(internal.StripPadding(loginPkt.Username[:]))
@@ -88,9 +89,9 @@ func (s *LoginServer) handleLogin(c *Client) error {
 	if _, err := auth.VerifyAccount(username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
-			return s.sendSecurity(c, archon.BBLoginErrorPassword)
+			return s.sendSecurity(c, packets.BBLoginErrorPassword)
 		case auth.ErrAccountBanned:
-			return s.sendSecurity(c, archon.BBLoginErrorBanned)
+			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, strings.Title(err.Error()))
 			if sendErr == nil {
@@ -114,7 +115,7 @@ func (s *LoginServer) handleLogin(c *Client) error {
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	if err := s.sendSecurity(c, archon.BBLoginErrorNone); err != nil {
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
 	}
 	return s.sendCharacterRedirect(c)
@@ -124,13 +125,13 @@ func (s *LoginServer) handleLogin(c *Client) error {
 // authentication status.
 func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
 	// Constants set according to how Newserv does it.
-	return c.send(&archon.SecurityPacket{
-		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
+	return c.send(&packets.Security{
+		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
 		TeamId:       c.TeamId,
-		Config:       &c.Config,
+		Config:       c.Config,
 		Capabilities: 0x00000102,
 	})
 }
@@ -138,8 +139,8 @@ func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
 func (s *LoginServer) sendMessage(c *Client, message string) error {
-	return c.send(&archon.LoginClientMessagePacket{
-		Header:   archon.BBHeader{Type: archon.LoginClientMessageType},
+	return c.send(&packets.LoginClientMessage{
+		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  internal.ConvertToUtf16(message),
 	})
@@ -148,8 +149,8 @@ func (s *LoginServer) sendMessage(c *Client, message string) error {
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
 func (s *LoginServer) sendCharacterRedirect(c *Client) error {
-	pkt := &archon.RedirectPacket{
-		Header: archon.BBHeader{Type: archon.RedirectType},
+	pkt := &packets.Redirect{
+		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},
 		Port:   s.charRedirectPort,
 	}

@@ -4,7 +4,7 @@
 package server
 
 import (
-	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/packets"
 	"net"
 	"strings"
 )
@@ -54,7 +54,7 @@ type Client2 interface {
 // CommonClient encapsulates the user-specific information common to several server
 // implementations and is intended to be embedded by any Client2 instance that needs it.
 type CommonClient struct {
-	Config archon.ClientConfig
+	Config packets.ClientConfig
 
 	Flag   uint32
 	TeamId uint32

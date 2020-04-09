@@ -1,8 +1,8 @@
 package patch
 
 import (
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/dcrodman/archon/server/internal/relay"
@@ -33,7 +33,7 @@ func (c Client) Decrypt(bytes []byte, length uint32) {
 }
 
 func (c *Client) send(packet interface{}) error {
-	return relay.SendPacket(c, packet, archon.PCHeaderSize)
+	return relay.SendPacket(c, packet, packets.PCHeaderSize)
 }
 
 func (c *Client) sendRaw(packet interface{}) error {

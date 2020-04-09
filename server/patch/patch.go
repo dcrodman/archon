@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/spf13/viper"
@@ -60,7 +61,7 @@ func NewPatchServer(name, port, dataPort string) server.Server {
 
 func (s *PatchServer) Name() string       { return s.name }
 func (s *PatchServer) Port() string       { return s.port }
-func (s *PatchServer) HeaderSize() uint16 { return archon.PCHeaderSize }
+func (s *PatchServer) HeaderSize() uint16 { return packets.PCHeaderSize }
 
 func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{
@@ -77,8 +78,8 @@ func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client2, 
 
 // send the welcome packet to a client with the copyright message and encryption vectors.
 func SendPCWelcome(client *Client) error {
-	pkt := archon.PatchWelcomePkt{
-		Header: archon.PCHeader{Type: archon.PatchWelcomeType, Size: 0x4C},
+	pkt := packets.PatchWelcome{
+		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
 	copy(pkt.ClientVector[:], client.clientVector())
@@ -89,15 +90,15 @@ func SendPCWelcome(client *Client) error {
 
 func (s *PatchServer) Handle(client server.Client2) error {
 	c := client.(*Client)
-	var header archon.PCHeader
+	var header packets.PCHeader
 
-	internal.StructFromBytes(c.ConnectionState().Data()[:archon.PCHeaderSize], &header)
+	internal.StructFromBytes(c.ConnectionState().Data()[:packets.PCHeaderSize], &header)
 
 	var err error
 	switch header.Type {
-	case archon.PatchWelcomeType:
+	case packets.PatchWelcomeType:
 		err = s.sendWelcomeAck(c)
-	case archon.PatchHandshakeType:
+	case packets.PatchHandshakeType:
 		if err := s.sendWelcomeMessage(c); err == nil {
 			err = s.sendPatchRedirect(c)
 		}
@@ -109,19 +110,19 @@ func (s *PatchServer) Handle(client server.Client2) error {
 
 func (s *PatchServer) sendWelcomeAck(client *Client) error {
 	// PatchHandshakeType is treated as an ack in this case.
-	return client.send(&archon.PCHeader{
+	return client.send(&packets.PCHeader{
 		Size: 0x04,
-		Type: archon.PatchHandshakeType,
+		Type: packets.PatchHandshakeType,
 	})
 }
 
 // Message displayed on the patch download screen.
 func (s *PatchServer) sendWelcomeMessage(client *Client) error {
 	message, size := GetWelcomeMessage()
-	pkt := &archon.PatchWelcomeMessage{
-		Header: archon.PCHeader{
-			Size: archon.PCHeaderSize + size,
-			Type: archon.PatchMessageType,
+	pkt := &packets.PatchWelcomeMessage{
+		Header: packets.PCHeader{
+			Size: packets.PCHeaderSize + size,
+			Type: packets.PatchMessageType,
 		},
 		Message: message,
 	}
@@ -131,8 +132,8 @@ func (s *PatchServer) sendWelcomeMessage(client *Client) error {
 
 // send the redirect packet, providing the IP and port of the next server.
 func (s *PatchServer) sendPatchRedirect(client *Client) error {
-	pkt := archon.PatchRedirectPacket{
-		Header:  archon.PCHeader{Type: archon.PatchRedirectType},
+	pkt := packets.PatchRedirect{
+		Header:  packets.PCHeader{Type: packets.PatchRedirectType},
 		IPAddr:  [4]uint8{},
 		Port:    s.dataRedirectPort,
 		Padding: 0,
