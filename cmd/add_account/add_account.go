@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	_ "github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/auth"
 	"github.com/dcrodman/archon/data"
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/spf13/viper"
 )
 

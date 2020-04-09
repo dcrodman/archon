@@ -3,9 +3,9 @@ package login
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/auth"
-	crypto "github.com/dcrodman/archon/internal/encryption"
-	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/auth"
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"strconv"

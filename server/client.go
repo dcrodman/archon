@@ -4,7 +4,7 @@
 package server
 
 import (
-	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/packets"
 	"net"
 	"strings"
 )

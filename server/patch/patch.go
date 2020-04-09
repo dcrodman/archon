@@ -3,8 +3,8 @@ package patch
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/internal/encryption"
-	"github.com/dcrodman/archon/internal/packets"
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/spf13/viper"

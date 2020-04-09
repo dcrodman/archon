@@ -3,7 +3,7 @@ package character
 import (
 	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/internal/prs"
+	"github.com/dcrodman/archon/prs"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/spf13/viper"
 	"hash/crc32"

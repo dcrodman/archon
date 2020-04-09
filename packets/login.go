@@ -5,7 +5,7 @@
 package packets
 
 import (
-	"github.com/dcrodman/archon/internal/characters"
+	"github.com/dcrodman/archon/characters"
 )
 
 // Packet types for packets sent to and from the login and character servers.
