@@ -16,8 +16,8 @@ import (
 // Filesystem locations that will be checked for a config file by default.
 var defaultSearchPaths = []string{
 	".",
-	"/usr/local/etc/archon/",
-	"setup/",
+	"/usr/local/etc/archon",
+	"setup",
 }
 
 var (
@@ -35,7 +35,10 @@ func init() {
 
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println("unable to load config file. error: ", err)
-		fmt.Printf("please check that one of these files exists and restart the server: %v\n", defaultSearchPaths)
+		fmt.Println("please check that one of these files exists and restart the server:")
+		for _, path := range defaultSearchPaths {
+			fmt.Printf("%s/config.yaml\n", path)
+		}
 		os.Exit(1)
 	}
 }

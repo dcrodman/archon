@@ -6,6 +6,7 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/data"
 	"github.com/dcrodman/archon/server"
+	"github.com/dcrodman/archon/server/character"
 	"github.com/dcrodman/archon/server/login"
 	"github.com/dcrodman/archon/server/patch"
 	"github.com/spf13/viper"
@@ -80,13 +81,15 @@ func startServers() {
 		viper.GetString("patch_server.patch_port"),
 		dataServer.Port(),
 	)
-
+	characterServer := character.NewServer(
+		"CHARACTER",
+		viper.GetString("character_server.port"),
+	)
 	loginServer := login.NewServer(
 		"LOGIN",
-		viper.GetString("login_server.login_port"),
-		viper.GetString("login_server.character_port"),
+		viper.GetString("login_server.port"),
+		characterServer.Port(),
 	)
-	//character.NewServer(),
 	//ship.NewServer(),
 	//shipgate.NewServer(),
 
@@ -103,6 +106,7 @@ func startServers() {
 		patchServer,
 		dataServer,
 		loginServer,
+		characterServer,
 	}
 
 	var wg sync.WaitGroup

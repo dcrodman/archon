@@ -310,10 +310,10 @@ type SetFlagPacket struct {
 }
 
 // Sent to the client for the selection menu and received for updating a character.
-type CharPreviewPacket struct {
+type CharacterSummaryPacket struct {
 	Header    BBHeader
 	Slot      uint32
-	Character *CharacterPreview
+	Character CharacterSummary
 }
 
 // Message in a large text box, usually sent right before a disconnect.

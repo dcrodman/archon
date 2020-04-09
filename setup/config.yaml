@@ -43,9 +43,11 @@ patch_server:
 
 login_server:
   # Port on which the LOGIN server will listen.
-  login_port: 12000
+  port: 12000
+
+character_server:
   # Port on which the CHARACTER server will listen.
-  character_port: 12001
+  port: 12001
   # Full (or relative to the current directory) path to the directory containing your
   # parameter files (defaults to /usr/local/etc/archon/parameters).
   parameters_dir: "/usr/local/etc/archon/parameters"

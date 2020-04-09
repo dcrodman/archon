@@ -16,20 +16,20 @@ var (
 
 // VerifyAccount checks the Accounts table for the specified credentials
 // combination and validates that the account is accessible.
-func VerifyAccount(username, password string) error {
+func VerifyAccount(username, password string) (*data.Account, error) {
 	account, err := data.FindAccount(username)
 	if err != nil {
 		archon.Log.Warn("error in FindAccount: ", err)
-		return ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	if account == nil || account.Password != HashPassword(password) {
-		return ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	} else if account.Banned {
-		return ErrAccountBanned
+		return nil, ErrAccountBanned
 	}
 
-	return nil
+	return account, nil
 }
 
 // CreateAccount takes the specified credentials and creates a new record in

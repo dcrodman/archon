@@ -17,7 +17,7 @@ func Initialize(dataSource string) error {
 		return fmt.Errorf("failed to connect to database: %s", err)
 	}
 
-	db.AutoMigrate(&Account{})
+	db.AutoMigrate(&Account{}, &PlayerOptions{}, &Character{}, &GuildcardEntry{})
 
 	return nil
 }

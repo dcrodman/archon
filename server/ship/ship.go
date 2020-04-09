@@ -93,7 +93,7 @@ package ship
 //		// They can be at either the ship or block selection menu, so make sure we have the right one.
 //		if pkt.MenuId == character.ShipSelectionMenuId {
 //			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
-//			err = server.HandleShipSelection(c)
+//			err = server.handleShipSelection(c)
 //		} else {
 //			err = server.HandleBlockSelection(c, pkt)
 //		}
@@ -139,7 +139,7 @@ package ship
 //}
 //
 //// Player selected one of the items on the ship select screen.
-//func (server *ShipServer) HandleShipSelection(client *server.Client) error {
+//func (server *ShipServer) handleShipSelection(client *server.Client) error {
 //	var pkt archon.MenuSelectionPacket
 //	util.StructFromBytes(client.Data(), &pkt)
 //	selectedShip := pkt.ItemId - 1
@@ -182,7 +182,7 @@ package ship
 //		item := &pkt.ShipEntries[i]
 //		item.MenuId = character.ShipSelectionMenuId
 //		item.ShipId = ship.id
-//		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
+//		copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
 //	}
 //
 //	archon.Log.Debug("Sending Ship List Packet")

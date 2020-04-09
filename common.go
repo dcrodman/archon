@@ -31,19 +31,19 @@ type GuildcardData struct {
 // Per-player friend guildcard entries.
 type GuildcardDataEntry struct {
 	Guildcard   uint32
-	Name        [24]uint16
-	TeamName    [16]uint16
-	Description [88]uint16
+	Name        [48]byte
+	TeamName    [32]byte
+	Description [176]byte
 	Reserved    uint8
 	Language    uint8
 	SectionID   uint8
 	CharClass   uint8
 	padding     uint32
-	Comment     [88]uint16
+	Comment     [176]byte
 }
 
 // Struct used by Character Info packet.
-type CharacterPreview struct {
+type CharacterSummary struct {
 	Experience     uint32
 	Level          uint32
 	GuildcardStr   [16]byte
@@ -67,65 +67,7 @@ type CharacterPreview struct {
 	HairBlue       uint16
 	PropX          float32
 	PropY          float32
-	Name           [24]uint8
-	Playtime       uint32
+	// In reality this is [12]uint16 but uint8 is more convenient to work with.
+	Name     [24]uint8
+	Playtime uint32
 }
-
-// Copyright message expected by the client when connecting.
-var LoginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
-
-//
-//// VerifyAccount performs all account verification tasks.
-//func VerifyAccount(client *server.Client) (*LoginPkt, error) {
-//	var loginPkt LoginPkt
-//	util.StructFromBytes(client.Data(), &loginPkt)
-//
-//	pktUsername := string(util.StripPadding(loginPkt.Username[:]))
-//	pktPassword := hashPassword(loginPkt.Password[:])
-//	account, err := database.FindAccount(pktUsername)
-//
-//	switch {
-//	case err != nil:
-//		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-//			"database.\n\nPlease contact your server administrator.")
-//		Log.Error(err.Error())
-//	case account == nil:
-//	case account.Password != pktPassword:
-//		// The same error is returned for invalid passwords as attempts to Log in
-//		// with a nonexistent username as some measure of account security.
-//		SendSecurity(client, BBLoginErrorPassword, 0, 0)
-//		return nil, errors.New("Account does not exist for username: " + pktUsername)
-//	case !account.Active:
-//		SendClientMessage(client, "Encountered an unexpected error while accessing the "+
-//			"database.\n\nPlease contact your server administrator.")
-//		return nil, errors.New("Account must be activated for username: " + pktUsername)
-//	case account.Banned:
-//		SendSecurity(client, BBLoginErrorBanned, 0, 0)
-//		return nil, errors.New("Account banned: " + pktUsername)
-//	}
-//	// Copy over the config, which should indicate how far they are in the login flow.
-//	util.StructFromBytes(loginPkt.Security[:], &client.config)
-//
-//	// TODO: Account, hardware, and IP ban checks.
-//	return &loginPkt, nil
-//}
-//
-//// Passwords are stored as sha256 hashes, so hash what the client sent us for the query.
-//func hashPassword(password []byte) string {
-//	hasher := sha256.New()
-//	hasher.Write(util.StripPadding(password))
-//	return hex.EncodeToString(hasher.Sum(nil)[:])
-//}
-//
-//// SendClientMessage is used for error messages to the client, usually used before disconnecting.
-//func SendClientMessage(client *server.Client, message string) error {
-//	pkt := &LoginClientMessagePacket{
-//		Header: BBHeader{Type: LoginClientMessageType},
-//		// English? Tethealla sets this.
-//		Language: 0x00450009,
-//		Message:  util.ConvertToUtf16(message),
-//	}
-//	Log.Debug("Sending Client Message Packet")
-//	return EncryptAndSend(client, pkt)
-//}
-//

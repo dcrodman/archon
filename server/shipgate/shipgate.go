@@ -184,7 +184,7 @@ type Ship struct {
 // 					// TODO: Does this have any actual significance? Will the possibility
 // 					// of a ship id changing for the same ship break things?
 // 					ship.Id = uint32(i)
-// 					ship.Shipname = ships[i].Shipname
+// 					ship.ShipName = ships[i].ShipName
 // 				}
 // 			}
 // 			shipListMutex.Unlock()

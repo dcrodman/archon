@@ -17,6 +17,9 @@ import (
 var (
 	messageBytes []byte
 	messageInit  sync.Once
+
+	// Copyright message expected by the client for the patch welcome.
+	copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 )
 
 func GetWelcomeMessage() ([]byte, uint16) {
@@ -33,9 +36,6 @@ func GetWelcomeMessage() ([]byte, uint16) {
 
 	return messageBytes, uint16(len(messageBytes))
 }
-
-// Copyright message expected by the client for the patch welcome.
-var copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 
 // PatchServer is the sub-server that acts as the first point of contact for a client. Its
 // only real job is to send the client a welcome message and then send the address of DataServer.

@@ -85,7 +85,7 @@ func (s *LoginServer) handleLogin(c *Client) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if err := auth.VerifyAccount(username, password); err != nil {
+	if _, err := auth.VerifyAccount(username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, archon.BBLoginErrorPassword)
@@ -120,7 +120,7 @@ func (s *LoginServer) handleLogin(c *Client) error {
 	return s.sendCharacterRedirect(c)
 }
 
-// SendSecurity transmits initialization packet with information about the user's
+// sendSecurity transmits initialization packet with information about the user's
 // authentication status.
 func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
 	// Constants set according to how Newserv does it.
@@ -135,6 +135,8 @@ func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
 	})
 }
 
+// Sends a message to the client. In this case whatever message is sent
+// here will be displayed in a dialog box after the patch screen.
 func (s *LoginServer) sendMessage(c *Client, message string) error {
 	return c.send(&archon.LoginClientMessagePacket{
 		Header:   archon.BBHeader{Type: archon.LoginClientMessageType},
@@ -143,6 +145,8 @@ func (s *LoginServer) sendMessage(c *Client, message string) error {
 	})
 }
 
+// Send the IP address and port of the character server to  which the client will
+// connect after disconnecting from this server.
 func (s *LoginServer) sendCharacterRedirect(c *Client) error {
 	pkt := &archon.RedirectPacket{
 		Header: archon.BBHeader{Type: archon.RedirectType},

@@ -2,652 +2,674 @@
 package character
 
 import (
+	"errors"
+	"fmt"
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/data"
+	"github.com/dcrodman/archon/internal/auth"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/server/internal/cache"
+	"github.com/dcrodman/archon/server/internal/relay"
+	"github.com/dcrodman/archon/server/shipgate"
 	"github.com/spf13/viper"
+	"hash/crc32"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+	"unicode/utf16"
 )
 
-var cachedScrollMsg = internal.ConvertToUtf16(viper.GetString("login_server.scroll_message"))
+const (
+	// Maximum size of a block of parameter or guildcard data.
+	MaxDataChunkSize = 0x6800
+	// Expected format of the timestamp sent to the client.
+	TimeFormat = "2006:01:02: 15:05:05"
+	// Id sent in the menu selection packet to tell the client
+	// that the selection was made on the ship menu.
+	ShipSelectionMenuId uint16 = 0x13
+)
 
-//
-//import (
-//	"errors"
-//	"fmt"
-//	"github.com/dcrodman/archon"
-//	"github.com/dcrodman/archon/server"
-//	"github.com/dcrodman/archon/server/login"
-//	"github.com/dcrodman/archon/server/shipgate"
-//	"hash/crc32"
-//	"io/ioutil"
-//	"net"
-//	"os"
-//	"syscall"
-//	"time"
-//
-//	"github.com/dcrodman/archon/util"
-//	"github.com/dcrodman/archon/util/prs"
-//)
-//
-//const (
-//	// Maximum size of a block of parameter or guildcard data.
-//	MaxChunkSize = 0x6800
-//	// Expected format of the timestamp sent to the client.
-//	TimeFormat = "2006:01:02: 15:05:05"
-//	// Id sent in the menu selection packet to tell the client
-//	// that the selection was made on the ship menu.
-//	ShipSelectionMenuId uint16 = 0x13
-//)
-//
-//var (
-//	// Connected ships. Each Ship's id corresponds to its position in the array - 1.
-//	shipList = make([]shipgate.Ship, 1)
-//
-//	// Parameter files we're expecting. I still don't really know what they're
-//	// for yet, so emulating what I've seen others do.
-//	paramFiles = []string{
-//		"ItemMagEdit.prs",
-//		"ItemPMT.prs",
-//		"BattleParamEntry.dat",
-//		"BattleParamEntry_on.dat",
-//		"BattleParamEntry_lab.dat",
-//		"BattleParamEntry_lab_on.dat",
-//		"BattleParamEntry_ep4.dat",
-//		"BattleParamEntry_ep4_on.dat",
-//		"PlyLevelTbl.prs",
-//	}
-//)
-// Struct for caching the parameter chunk data and header so
-// that the param files aren't re-read every time.
-//type parameterEntry struct {
-//	Size     uint32
-//	Checksum uint32
-//	Offset   uint32
-//	Filename [0x40]uint8
-//}
-//
-//// Entry in the available ships lis on the ship selection menu.
-//type ShipMenuEntry struct {
-//	MenuId  uint16
-//	ShipId  uint32
-//	Padding uint16
-//
-//	Shipname [23]byte
-//}
-//
-//// Per-character stats as stored in config files.
-//type CharacterStats struct {
-//	ATP uint16
-//	MST uint16
-//	EVP uint16
-//	HP  uint16
-//	DFP uint16
-//	ATA uint16
-//	LCK uint16
-//}
-//
-//type CharacterServer struct {
-//	// Cached parameter data to avoid computing it every time.
-//	paramHeaderData []byte
-//	paramChunkData  map[int][]byte
-//
-//	// Starting stats for any new character. The CharClass constants can be used
-//	// to index into this array to obtain the base stats for each class.
-//	BaseStats [12]CharacterStats
-//}
-//
-//func NewServer() server.Server {
-//	return &CharacterServer{}
-//}
-//
-//func (server CharacterServer) Name() string { return "CHARACTER" }
-//
-//func (server CharacterServer) Port() string { return archon.Config.LoginServer.CharacterPort }
-//
-//func (server *CharacterServer) Init() error {
-//	if err := server.loadParameterFiles(); err != nil {
-//		return err
-//	}
-//
-//	// Load the base stats for creating new characters. Newserv, Sylverant, and Tethealla
-//	// all seem to rely on this file, so we'll do the same.
-//	paramDir := archon.Config.LoginServer.ParametersDir
-//	statsFile, _ := os.Open(paramDir + "/PlyLevelTbl.prs")
-//	compressed, err := ioutil.ReadAll(statsFile)
-//	if err != nil {
-//		return errors.New("Error reading stats file: " + err.Error())
-//	}
-//
-//	decompressedSize := prs.DecompressSize(compressed)
-//	decompressed := make([]byte, decompressedSize)
-//	prs.Decompress(compressed, decompressed)
-//
-//	for i := 0; i < 12; i++ {
-//		util.StructFromBytes(decompressed[i*14:], &server.BaseStats[i])
-//	}
-//
-//	fmt.Println()
-//	return nil
-//}
-//
-//// Load the PSOBB parameter files, build the parameter header,
-//// and init/cache the param file chunks for the EB packets.
-//func (server *CharacterServer) loadParameterFiles() error {
-//	offset := 0
-//	var tmpChunkData []byte
-//
-//	paramDir := archon.Config.LoginServer.ParametersDir
-//	fmt.Printf("Loading parameters from %s...\n", paramDir)
-//	for _, paramFile := range paramFiles {
-//		data, err := ioutil.ReadFile(paramDir + "/" + paramFile)
-//		if err != nil {
-//			return errors.New("Error reading parameter file: " + err.Error())
-//		}
-//		fileSize := len(data)
-//
-//		entry := new(archon.parameterEntry)
-//		entry.Size = uint32(fileSize)
-//		entry.Checksum = crc32.ChecksumIEEE(data)
-//		entry.Offset = uint32(offset)
-//		copy(entry.Filename[:], []uint8(paramFile))
-//
-//		offset += fileSize
-//
-//		// We don't care what the actual entries are for the packet, so just append
-//		// the bytes to save us having to do the conversion every time.
-//		bytes, _ := util.BytesFromStruct(entry)
-//		server.paramHeaderData = append(server.paramHeaderData, bytes...)
-//
-//		tmpChunkData = append(tmpChunkData, data...)
-//		fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
-//	}
-//
-//	// Offset should at this point be the total size of the files
-//	// to send - break it all up into indexable chunks.
-//	server.paramChunkData = make(map[int][]byte)
-//	chunks := offset / MaxChunkSize
-//	for i := 0; i < chunks; i++ {
-//		dataOff := i * MaxChunkSize
-//		server.paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxChunkSize]
-//		offset -= MaxChunkSize
-//	}
-//	// Add any remaining data
-//	if offset > 0 {
-//		server.paramChunkData[chunks] = tmpChunkData[chunks*MaxChunkSize:]
-//	}
-//	return nil
-//}
-//
-//func (server *CharacterServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
-//	return login.NewLoginClient(conn)
-//}
-//
-//func (server *CharacterServer) Handle(c *server.Client) error {
-//	var hdr archon.BBHeader
-//	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
-//
-//	var err error
-//	switch hdr.Type {
-//	case archon.LoginType:
-//		err = server.HandleCharLogin(c)
-//	case archon.LoginOptionsRequestType:
-//		err = server.HandleOptionsRequest(c)
-//	case archon.LoginCharPreviewReqType:
-//		err = server.HandleCharacterSelect(c)
-//	case archon.LoginChecksumType:
-//		// Everybody else seems to ignore this, so...
-//		err = server.sendChecksumAck(c)
-//	case archon.LoginGuildcardReqType:
-//		err = server.HandleGuildcardDataStart(c)
-//	case archon.LoginGuildcardChunkReqType:
-//		server.HandleGuildcardChunk(c)
-//	case archon.LoginParameterHeaderReqType:
-//		err = server.sendParameterHeader(c, uint32(len(paramFiles)), server.paramHeaderData)
-//	case archon.LoginParameterChunkReqType:
-//		var pkt archon.BBHeader
-//		util.StructFromBytes(c.Data(), &pkt)
-//		err = server.sendParameterChunk(c, server.paramChunkData[int(pkt.Flags)], pkt.Flags)
-//	case archon.LoginSetFlagType:
-//		var pkt archon.SetFlagPacket
-//		util.StructFromBytes(c.Data(), &pkt)
-//		c.flag = pkt.Flag
-//	case archon.LoginCharPreviewType:
-//		err = server.HandleCharacterUpdate(c)
-//	case archon.MenuSelectType:
-//		err = server.HandleShipSelection(c)
-//	case archon.DisconnectType:
-//		// Just wait until we recv 0 from the client to d/c.
-//		break
-//	default:
-//		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.IPAddr())
-//	}
-//	return err
-//}
-//
-//func (server *CharacterServer) HandleCharLogin(client *server.Client) error {
-//	var err error
-//	if pkt, err := archon.VerifyAccount(client); err == nil {
-//		err = server.sendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
-//		if err != nil {
-//			return err
-//		}
-//		// At this point, if we've chosen (or created) a character then the
-//		// client will send us the slot number and the corresponding phase.
-//		if pkt.SlotNum >= 0 && pkt.Phase == 4 {
-//			if err = server.sendTimestamp(client); err != nil {
-//				return err
-//			}
-//			if err = server.sendShipList(client, shipList); err != nil {
-//				return err
-//			}
-//			if err = server.sendScrollMessage(client); err != nil {
-//				return err
-//			}
-//		}
-//	}
-//	return err
-//}
-//
-//// send the security initialization packet with information about the user's
-//// authentication status.
-//func (server *CharacterServer) sendSecurity(client *server.Client, errorCode archon.BBLoginError,
-//	guildcard uint32, teamId uint32) error {
-//
-//	// Constants set according to how Newserv does it.
-//	pkt := &archon.SecurityPacket{
-//		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
-//		ErrorCode:    uint32(errorCode),
-//		PlayerTag:    0x00010000,
-//		Guildcard:    guildcard,
-//		TeamId:       teamId,
-//		Config:       &client.config,
-//		Capabilities: 0x00000102,
-//	}
-//
-//	archon.Log.Debug("Sending Security Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send a timestamp packet in order to indicate the server's current time.
-//func (server *CharacterServer) sendTimestamp(client *server.Client) error {
-//	pkt := new(archon.TimestampPacket)
-//	pkt.Header.Type = archon.LoginTimestampType
-//
-//	var tv syscall.Timeval
-//	syscall.Gettimeofday(&tv)
-//	t := time.Now().Format(TimeFormat)
-//	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
-//	copy(pkt.Timestamp[:], stamp)
-//
-//	archon.Log.Debug("Sending Timestamp Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send the menu items for the ship select screen.
-//func (server *CharacterServer) sendShipList(client *server.Client, ships []shipgate.Ship) error {
-//	pkt := &archon.ShipListPacket{
-//		Header:      archon.BBHeader{Type: archon.LoginShipListType, Flags: 0x01},
-//		Unknown:     0x02,
-//		Unknown2:    0xFFFFFFF4,
-//		Unknown3:    0x04,
-//		ShipEntries: make([]ShipMenuEntry, len(ships)),
-//	}
-//	copy(pkt.ServerName[:], "Archon")
-//
-//	// TODO: Will eventually need a mutex for read.
-//	for i, ship := range ships {
-//		item := &pkt.ShipEntries[i]
-//		item.MenuId = ShipSelectionMenuId
-//		item.ShipId = ship.id
-//		copy(item.Shipname[:], util.ConvertToUtf16(string(ship.name[:])))
-//	}
-//
-//	archon.Log.Debug("Sending Ship List Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send whatever scrolling message was read out of the config file for the login screen.
-//
-//func (server *CharacterServer) sendScrollMessage(client *server.Client) error {
-//	pkt := &archon.ScrollMessagePacket{
-//		Header:  archon.BBHeader{Type: archon.LoginScrollMessageType},
-//		Message: archon.cachedScrollMsg[:],
-//	}
-//
-//	data, size := util.BytesFromStruct(pkt)
-//	// The end of the message appears to be garbled unless
-//	// there is a block of extra bytes on the end; add an extra
-//	// and let fixLength add the rest.
-//	data = append(data, 0x00)
-//	archon.Log.Debug("Sending Scroll Message Packet")
-//	return client.SendEncrypted(data, size+1)
-//}
-//
-//// Load key config and other option data from the database or provide defaults for new accounts.
-//func (server *CharacterServer) HandleOptionsRequest(client *server.Client) error {
-//	playerOptions, err := archon.database.FindPlayerOptions(client.guildcard)
-//	if playerOptions == nil {
-//		// We don't have any saved key config - give them the defaults.
-//		playerOptions = &archon.PlayerOptions{
-//			Guildcard: client.guildcard,
-//			KeyConfig: make([]byte, 420),
-//		}
-//		copy(playerOptions.KeyConfig, archon.baseKeyConfig[:])
-//		archon.database.UpdatePlayerOptions(playerOptions)
-//	} else if err != nil {
-//		archon.Log.Error(err.Error())
-//		return err
-//	}
-//	return server.sendOptions(client, playerOptions.KeyConfig)
-//}
-//
-//// send the client's configuration options. keyConfig should be 420 bytes long and either
-//// point to the default keys array or loaded from the database.
-//func (server *CharacterServer) sendOptions(client *server.Client, keyConfig []byte) error {
-//	if len(keyConfig) != 420 {
-//		panic("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
-//	}
-//	pkt := new(archon.OptionsPacket)
-//	pkt.Header.Type = archon.LoginOptionsType
-//
-//	pkt.PlayerKeyConfig.Guildcard = client.guildcard
-//	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
-//	copy(pkt.PlayerKeyConfig.JoystickConfig[:], keyConfig[0x16C:])
-//
-//	// Sylverant sets these to enable all team rewards? Not sure what this means yet.
-//	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
-//	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
-//
-//	archon.Log.Debug("Sending Key Config Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// Handle the character select/preview request. Will either return information
-//// about a character given a particular slot in via 0xE5 response or ack the
-//// selection with an 0xE4 (also used for an empty slot).
-//func (server *CharacterServer) HandleCharacterSelect(client *server.Client) error {
-//	var pkt archon.CharSelectionPacket
-//	util.StructFromBytes(client.Data(), &pkt)
-//
-//	character, err := archon.database.FindCharacter(client.guildcard, pkt.Slot)
-//	if character == nil {
-//		// We don't have a character for this slot.
-//		return server.sendCharacterAck(client, pkt.Slot, 2)
-//	} else if err != nil {
-//		archon.Log.Error(err.Error())
-//		return err
-//	}
-//
-//	if pkt.Selecting == 0x01 {
-//		// They've selected a character from the menu.
-//		client.config.SlotNum = uint8(pkt.Slot)
-//		server.sendSecurity(client, archon.BBLoginErrorNone, client.guildcard, client.teamId)
-//		return server.sendCharacterAck(client, pkt.Slot, 1)
-//	}
-//	// They have a character in that slot; send the character preview.
-//	return server.sendCharacterPreview(client, character)
-//}
-//
-//// send the character acknowledgement packet. 0 indicates a creation ack, 1 is
-//// ack'ing a selected character, and 2 indicates that a character doesn't exist
-//// in the slot requested via preview request.
-//func (server *CharacterServer) sendCharacterAck(client *server.Client, slotNum uint32, flag uint32) error {
-//	pkt := &archon.CharAckPacket{
-//		Header: archon.BBHeader{Type: archon.LoginCharAckType},
-//		Slot:   slotNum,
-//		Flag:   flag,
-//	}
-//	archon.Log.Debug("Sending Character Ack Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send the preview packet containing basic details about a character in the selected slot.
-//func (server *CharacterServer) sendCharacterPreview(client *server.Client, character *archon.Character) error {
-//	charPreview := &archon.CharacterPreview{
-//		Experience:     character.Experience,
-//		Level:          character.Level,
-//		NameColor:      character.NameColor,
-//		Model:          character.Model,
-//		NameColorChksm: character.NameColorChecksum,
-//		SectionID:      character.SectionID,
-//		Class:          character.Class,
-//		V2Flags:        character.V2Flags,
-//		Version:        character.Version,
-//		V1Flags:        character.V1Flags,
-//		Costume:        character.Costume,
-//		Skin:           character.Skin,
-//		Face:           character.Face,
-//		Head:           character.Head,
-//		Hair:           character.Hair,
-//		HairRed:        character.HairRed,
-//		HairGreen:      character.HairGreen,
-//		HairBlue:       character.HairBlue,
-//		PropX:          character.ProportionX,
-//		PropY:          character.ProportionY,
-//		Playtime:       character.Playtime,
-//	}
-//	copy(charPreview.GuildcardStr[:], character.GuildcardStr[:])
-//	copy(charPreview.Name[:], character.Name[:])
-//
-//	pkt := &archon.CharPreviewPacket{
-//		Header:    archon.BBHeader{Type: archon.LoginCharPreviewType},
-//		Slot:      0,
-//		Character: charPreview,
-//	}
-//	archon.Log.Debug("Sending Character Preview Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// Acknowledge the checksum the client sent us. We don't actually do
-//// anything with it but the client won't proceed otherwise.
-//func (server *CharacterServer) sendChecksumAck(client *server.Client) error {
-//	pkt := new(archon.ChecksumAckPacket)
-//	pkt.Header.Type = archon.LoginChecksumAckType
-//	pkt.Ack = uint32(1)
-//
-//	archon.Log.Debug("Sending Checksum Ack Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// Load the player's saved guildcards, build the chunk data, and send the chunk header.
-//func (server *CharacterServer) HandleGuildcardDataStart(client *server.Client) error {
-//	guildcards, err := archon.database.FindGuildcardData(client.guildcard)
-//	if err != nil {
-//		return err
-//	}
-//
-//	gcData := new(archon.GuildcardData)
-//	// Maximum of 140 entries can be sent.
-//	for i, entry := range guildcards {
-//		// TODO: This may not actually work yet, but I haven't gotten to
-//		// figuring out how the other servers use it.
-//		pktEntry := gcData.Entries[i]
-//		pktEntry.Guildcard = uint32(entry.Guildcard)
-//		copy(pktEntry.Name[:], entry.Name)
-//		copy(pktEntry.TeamName[:], entry.TeamName)
-//		copy(pktEntry.Description[:], entry.Description)
-//		pktEntry.Language = entry.Language
-//		pktEntry.SectionID = entry.SectionID
-//		pktEntry.CharClass = entry.Class
-//		copy(pktEntry.Comment[:], entry.Comment)
-//	}
-//	var size int
-//	client.gcData, size = util.BytesFromStruct(gcData)
-//	checksum := crc32.ChecksumIEEE(client.gcData)
-//	client.gcDataSize = uint16(size)
-//
-//	return server.sendGuildcardHeader(client, checksum, client.gcDataSize)
-//}
-//
-//// send the header containing metadata about the guildcard chunk.
-//func (server *CharacterServer) sendGuildcardHeader(client *server.Client, checksum uint32, dataLen uint16) error {
-//	pkt := &archon.GuildcardHeaderPacket{
-//		Header:   archon.BBHeader{Type: archon.LoginGuildcardHeaderType},
-//		Unknown:  0x00000001,
-//		Length:   dataLen,
-//		Checksum: checksum,
-//	}
-//	archon.Log.Debug("Sending Guildcard Header Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send another chunk of the client's guildcard data.
-//func (server *CharacterServer) HandleGuildcardChunk(client *server.Client) {
-//	var chunkReq archon.GuildcardChunkReqPacket
-//	util.StructFromBytes(client.Data(), &chunkReq)
-//	if chunkReq.Continue == 0x01 {
-//		server.sendGuildcardChunk(client, chunkReq.ChunkRequested)
-//	}
-//	// Anything else is a request to cancel sending guildcard chunks.
-//}
-//
-//// send the specified chunk of guildcard data.
-//func (server *CharacterServer) sendGuildcardChunk(client *server.Client, chunkNum uint32) error {
-//	pkt := new(archon.GuildcardChunkPacket)
-//	pkt.Header.Type = archon.LoginGuildcardChunkType
-//	pkt.Chunk = chunkNum
-//
-//	// The client will only accept 0x6800 bytes of a chunk per packet.
-//	offset := uint16(chunkNum) * MaxChunkSize
-//	remaining := client.gcDataSize - offset
-//	if remaining > MaxChunkSize {
-//		pkt.Data = client.gcData[offset : offset+MaxChunkSize]
-//	} else {
-//		pkt.Data = client.gcData[offset:]
-//	}
-//
-//	archon.Log.Debug("Sending Guildcard Chunk Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send the header for the parameter files we're about to start sending.
-//func (server *CharacterServer) sendParameterHeader(client *server.Client, numEntries uint32, entries []byte) error {
-//	pkt := &archon.ParameterHeaderPacket{
-//		Header:  archon.BBHeader{Type: archon.LoginParameterHeaderType, Flags: numEntries},
-//		Entries: entries,
-//	}
-//	archon.Log.Debug("Sending Parameter Header Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// Index into chunkData and send the specified chunk of parameter data.
-//func (server *CharacterServer) sendParameterChunk(client *server.Client, chunkData []byte, chunk uint32) error {
-//	pkt := &archon.ParameterChunkPacket{
-//		Header: archon.BBHeader{Type: archon.LoginParameterChunkType},
-//		Chunk:  chunk,
-//		Data:   chunkData,
-//	}
-//	archon.Log.Debug("Sending Parameter Chunk Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// Player has modified a character via the dressing room or selected the recreate option.
-//// Recreate or update a character in a slot depending on which it was.
-//func (server *CharacterServer) HandleCharacterUpdate(client *server.Client) error {
-//	var charPkt archon.CharPreviewPacket
-//	charPkt.Character = new(archon.CharacterPreview)
-//	util.StructFromBytes(client.Data(), &charPkt)
-//
-//	if client.flag == 0x02 {
-//		if err := server.updateCharacter(client.guildcard, &charPkt); err != nil {
-//			archon.Log.Error(err.Error())
-//			return err
-//		}
-//	} else {
-//		// Recreating; delete the existing character and start from scratch.
-//		if err := archon.database.DeleteCharacter(client.guildcard, charPkt.Slot); err != nil {
-//			archon.Log.Error(err.Error())
-//			return err
-//		}
-//
-//		p := charPkt.Character
-//		// Grab our base stats for this character class.
-//		stats := server.BaseStats[p.Class]
-//
-//		character := &archon.Character{
-//			Experience:        0,
-//			Level:             0,
-//			GuildcardStr:      p.GuildcardStr[:],
-//			NameColor:         p.NameColor,
-//			Model:             p.Model,
-//			NameColorChecksum: p.NameColorChksm,
-//			SectionID:         p.SectionID,
-//			Class:             p.Class,
-//			V2Flags:           p.V2Flags,
-//			Version:           p.Version,
-//			V1Flags:           p.V1Flags,
-//			Costume:           p.Costume,
-//			Skin:              p.Skin,
-//			Face:              p.Face,
-//			Head:              p.Head,
-//			Hair:              p.Hair,
-//			HairRed:           p.HairRed,
-//			HairGreen:         p.HairGreen,
-//			HairBlue:          p.HairBlue,
-//			ProportionX:       p.PropX,
-//			ProportionY:       p.PropY,
-//			Name:              p.Name[:],
-//			ATP:               stats.ATP,
-//			MST:               stats.MST,
-//			EVP:               stats.EVP,
-//			HP:                stats.HP,
-//			DFP:               stats.DFP,
-//			ATA:               stats.ATA,
-//			LCK:               stats.LCK,
-//			Meseta:            300,
-//		}
-//		/* TODO: Add the rest of these.
-//		--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
-//		--techniques blob,
-//		--options blob,
-//		*/
-//
-//		err := archon.database.CreateCharacter(client.guildcard, charPkt.Slot, character)
-//		if err != nil {
-//			archon.Log.Error(err.Error())
-//			return err
-//		}
-//	}
-//	// send the security packet with the updated state and slot number so that
-//	// we know a character has been selected.
-//	client.config.SlotNum = uint8(charPkt.Slot)
-//	return server.sendCharacterAck(client, charPkt.Slot, 0)
-//}
-//
-//func (server *CharacterServer) updateCharacter(guildcard uint32, pkt *archon.CharPreviewPacket) error {
-//	// Player is using the dressing room; update the character.
-//	character, err := archon.database.FindCharacter(guildcard, pkt.Slot)
-//	if character == nil {
-//		err = fmt.Errorf("Character does not exist in slot %d for guildcard %d",
-//			pkt.Slot, guildcard)
-//	} else if err == nil {
-//		p := pkt.Character
-//		character.NameColor = p.NameColor
-//		character.Model = p.Model
-//		character.NameColorChecksum = p.NameColorChksm
-//		character.SectionID = p.SectionID
-//		character.Class = p.Class
-//		character.Costume = p.Costume
-//		character.Skin = p.Skin
-//		character.Head = p.Head
-//		character.HairRed = p.HairRed
-//		character.HairGreen = p.HairGreen
-//		character.HairBlue = p.HairBlue
-//		character.ProportionX = p.PropX
-//		character.ProportionY = p.PropY
-//		copy(character.Name, p.Name[:])
-//
-//		err = archon.database.UpdateCharacter(guildcard, pkt.Slot, character)
-//	}
-//	return err
-//}
-//
-//// Player selected one of the items on the ship select screen.
-//func (server *CharacterServer) HandleShipSelection(client *server.Client) error {
-//	var pkt archon.MenuSelectionPacket
-//	util.StructFromBytes(client.Data(), &pkt)
-//	selectedShip := pkt.ItemId - 1
-//	if selectedShip < 0 || selectedShip >= uint32(len(shipList)) {
-//		return errors.New("Invalid ship selection: " + string(selectedShip))
-//	}
-//	s := &shipList[selectedShip]
-//	return archon.SendRedirect(client, s.ipAddr[:], s.port)
-//}
+var (
+	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
+
+	cachedScrollMessage     []byte
+	cachedScrollMessageInit sync.Once
+)
+
+func GetScrollMessage() []byte {
+	cachedScrollMessageInit.Do(func() {
+		cachedScrollMessage = internal.ConvertToUtf16(viper.GetString("character_server.scroll_message"))
+	})
+	return cachedScrollMessage
+}
+
+// Entry in the available ships lis on the ship selection menu.
+type ShipMenuEntry struct {
+	MenuId  uint16
+	ShipId  uint32
+	Padding uint16
+
+	ShipName [23]byte
+}
+
+type CharacterServer struct {
+	name string
+	port string
+
+	kvCache *cache.Cache
+
+	// Connected ships. Each Ship's id corresponds to its position in the array - 1.
+	shipList []shipgate.Ship
+}
+
+func NewServer(name, port string) server.Server {
+	initParameterData()
+	return &CharacterServer{
+		name:    name,
+		port:    port,
+		kvCache: cache.New(),
+	}
+}
+
+func (s *CharacterServer) Name() string       { return s.name }
+func (s *CharacterServer) Port() string       { return s.port }
+func (s *CharacterServer) HeaderSize() uint16 { return archon.BBHeaderSize }
+
+func (s *CharacterServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+	c := &Client{
+		cs:          cs,
+		serverCrypt: crypto.NewBBCrypt(),
+		clientCrypt: crypto.NewBBCrypt(),
+	}
+
+	if err := s.SendWelcome(c); err != nil {
+		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
+	}
+	return c, nil
+}
+
+func (s *CharacterServer) SendWelcome(c *Client) error {
+	pkt := &archon.WelcomePkt{
+		Header:       archon.BBHeader{Type: archon.LoginWelcomeType, Size: 0xC8},
+		Copyright:    [96]byte{},
+		ServerVector: [48]byte{},
+		ClientVector: [48]byte{},
+	}
+	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.ServerVector[:], c.serverVector())
+	copy(pkt.ClientVector[:], c.clientVector())
+
+	return c.sendRaw(pkt)
+}
+
+func (s *CharacterServer) Handle(client server.Client2) error {
+	c := client.(*Client)
+
+	var packetHeader archon.BBHeader
+	internal.StructFromBytes(c.ConnectionState().Data()[:archon.BBHeaderSize], &packetHeader)
+
+	var err error
+	switch packetHeader.Type {
+	case archon.LoginType:
+		err = s.handleLogin(c)
+	case archon.LoginOptionsRequestType:
+		err = s.handleOptionsRequest(c)
+	case archon.LoginCharPreviewReqType:
+		err = s.handleCharacterSelect(c)
+	case archon.LoginChecksumType:
+		// Everybody else seems to ignore this, so...
+		err = s.sendChecksumAck(c)
+	case archon.LoginGuildcardReqType:
+		err = s.HandleGuildcardDataStart(c)
+	case archon.LoginGuildcardChunkReqType:
+		err = s.handleGuildcardChunk(c)
+	case archon.LoginParameterHeaderReqType:
+		err = s.sendParameterHeader(c, uint32(len(paramFiles)), paramHeaderData)
+	case archon.LoginParameterChunkReqType:
+		var pkt archon.BBHeader
+		internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+		err = s.sendParameterChunk(c, paramChunkData[int(pkt.Flags)], pkt.Flags)
+	case archon.LoginSetFlagType:
+		s.setClientFlag(c)
+	case archon.LoginCharPreviewType:
+		err = s.handleCharacterUpdate(c)
+	case archon.MenuSelectType:
+		err = s.handleShipSelection(c)
+	case archon.DisconnectType:
+		// Just wait until we recv 0 from the client to disconnect.
+		break
+	default:
+		archon.Log.Infof("Received unknown packet %x from %s", packetHeader.Type, c.ConnectionState().IPAddr())
+	}
+	return err
+}
+
+func (s *CharacterServer) handleLogin(c *Client) error {
+	var loginPkt archon.LoginPkt
+	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
+
+	account, err := auth.VerifyAccount(
+		string(internal.StripPadding(loginPkt.Username[:])),
+		string(internal.StripPadding(loginPkt.Password[:])),
+	)
+
+	if err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return s.sendSecurity(c, archon.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return s.sendSecurity(c, archon.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return sendErr
+			}
+			return err
+		}
+	}
+
+	c.account = account
+	c.TeamId = uint32(account.TeamID)
+	c.Guildcard = uint32(account.Guildcard)
+
+	if err = s.sendSecurity(c, archon.BBLoginErrorNone); err != nil {
+		return err
+	}
+
+	// At this point, if we've chosen (or created) a character then the
+	// client will send us the slot number and the corresponding phase.
+	if loginPkt.SlotNum >= 0 && loginPkt.Phase == 4 {
+		if err = s.sendTimestamp(c); err != nil {
+			return err
+		}
+		if err = s.sendShipList(c); err != nil {
+			return err
+		}
+		if err = s.sendScrollMessage(c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// send the security initialization packet with information about the user's
+// authentication status.
+func (s *CharacterServer) sendSecurity(c *Client, errorCode uint32) error {
+	// Constants set according to how Newserv does it.
+	return c.send(&archon.SecurityPacket{
+		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamId:       c.TeamId,
+		Config:       &c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+// Sends a message to the client. In this case whatever message is sent
+// here will be displayed in a dialog box after the patch screen.
+func (s *CharacterServer) sendMessage(c *Client, message string) error {
+	return c.send(&archon.LoginClientMessagePacket{
+		Header:   archon.BBHeader{Type: archon.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
+}
+
+// send a timestamp packet in order to indicate the server's current time.
+func (s *CharacterServer) sendTimestamp(client *Client) error {
+	pkt := &archon.TimestampPacket{
+		Header:    archon.BBHeader{Type: archon.LoginTimestampType},
+		Timestamp: [28]byte{},
+	}
+
+	var tv syscall.Timeval
+	syscall.Gettimeofday(&tv)
+	t := time.Now().Format(TimeFormat)
+	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
+	copy(pkt.Timestamp[:], stamp)
+
+	return client.send(pkt)
+}
+
+// send the menu items for the ship select screen.
+func (s *CharacterServer) sendShipList(c *Client) error {
+	pkt := &archon.ShipListPacket{
+		Header:   archon.BBHeader{Type: archon.LoginShipListType, Flags: 0x01},
+		Unknown:  0x02,
+		Unknown2: 0xFFFFFFF4,
+		Unknown3: 0x04,
+		//ShipEntries: make([]ShipMenuEntry, len(ships)),
+	}
+	copy(pkt.ServerName[:], "Archon")
+
+	// TODO: Will eventually need a mutex for read.
+	//for i, ship := range ships {
+	//	item := &pkt.ShipEntries[i]
+	//	item.MenuId = ShipSelectionMenuId
+	//	item.ShipId = ship.id
+	//	copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
+	//}
+
+	return c.send(pkt)
+}
+
+// send whatever scrolling message was read out of the config file for the login screen.
+
+func (s *CharacterServer) sendScrollMessage(c *Client) error {
+	pkt := &archon.ScrollMessagePacket{
+		Header:  archon.BBHeader{Type: archon.LoginScrollMessageType},
+		Message: GetScrollMessage(),
+	}
+
+	// The end of the message appears to be garbled unless there is a block of extra bytes
+	// on the end; add an extra and let fixLength add the rest.
+	pktData, size := internal.BytesFromStruct(pkt)
+	pktData = append(pktData, 0x00)
+
+	return relay.SendRaw(c, pktData, uint16(size+1))
+}
+
+// Load key config and other option data from the database or provide defaults for new accounts.
+func (s *CharacterServer) handleOptionsRequest(c *Client) error {
+	playerOptions, err := data.FindPlayerOptions(c.account)
+	if err != nil {
+		return err
+	}
+
+	if playerOptions == nil {
+		// We don't have any saved key config - give them the defaults.
+		playerOptions = &data.PlayerOptions{
+			Account:   *c.account,
+			KeyConfig: make([]byte, 420),
+		}
+		copy(playerOptions.KeyConfig, archon.BaseKeyConfig[:])
+
+		if err = data.UpdatePlayerOptions(playerOptions); err != nil {
+			return err
+		}
+	}
+
+	return s.sendOptions(c, playerOptions.KeyConfig)
+}
+
+// send the client's configuration options. keyConfig should be 420 bytes long and either
+// point to the default keys array or loaded from the database.
+func (s *CharacterServer) sendOptions(c *Client, keyConfig []byte) error {
+	if len(keyConfig) != 420 {
+		return fmt.Errorf("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
+	}
+
+	pkt := &archon.OptionsPacket{
+		Header:          archon.BBHeader{Type: archon.LoginOptionsType},
+		PlayerKeyConfig: archon.KeyTeamConfig{Guildcard: c.Guildcard},
+	}
+	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
+	copy(pkt.PlayerKeyConfig.JoystickConfig[:], keyConfig[0x16C:])
+
+	// Sylverant sets these to enable all team rewards? Not sure what this means yet.
+	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
+	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
+
+	return c.send(pkt)
+}
+
+// Handle the character select/preview request. Will either return information
+// about a character given a particular slot in an 0xE5 response or ack the
+// selection with an 0xE4 (also used for an empty slot). The client will send
+// one of these packets for each of the character slots (i.e. 4 times).
+func (s *CharacterServer) handleCharacterSelect(c *Client) error {
+	var pkt archon.CharSelectionPacket
+	internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+
+	character, err := data.FindCharacter(c.account, int(pkt.Slot))
+
+	if character == nil {
+		// We don't have a character for this slot.
+		return s.sendCharacterAck(c, pkt.Slot, 2)
+	} else if err != nil {
+		archon.Log.Error(err.Error())
+		return err
+	}
+
+	if pkt.Selecting == 0x01 {
+		// They've selected a character from the menu.
+		c.Config.SlotNum = uint8(pkt.Slot)
+		if err := s.sendSecurity(c, archon.BBLoginErrorNone); err != nil {
+			return err
+		}
+		return s.sendCharacterAck(c, pkt.Slot, 1)
+	}
+
+	// They have a character in that slot; send the character preview.
+	return s.sendCharacterPreview(c, character)
+}
+
+// Send the character acknowledgement packet. Setting flag to 0 indicates a creation
+// ack, 1 acks a selected character, and 2 indicates that a character doesn't exist
+// in the slot requested via preview request.
+func (s *CharacterServer) sendCharacterAck(c *Client, slotNum uint32, flag uint32) error {
+	return c.send(&archon.CharAckPacket{
+		Header: archon.BBHeader{Type: archon.LoginCharAckType},
+		Slot:   slotNum,
+		Flag:   flag,
+	})
+}
+
+// send the preview packet containing basic details about a character in the selected slot.
+func (s *CharacterServer) sendCharacterPreview(c *Client, character *data.Character) error {
+	previewPacket := &archon.CharacterSummaryPacket{
+		Header: archon.BBHeader{Type: archon.LoginCharPreviewType},
+		Slot:   0,
+		Character: archon.CharacterSummary{
+			Experience:     character.Experience,
+			Level:          character.Level,
+			NameColor:      character.NameColor,
+			Model:          character.ModelType,
+			NameColorChksm: character.NameColorChecksum,
+			SectionID:      character.SectionID,
+			Class:          character.Class,
+			V2Flags:        character.V2Flags,
+			Version:        character.Version,
+			V1Flags:        character.V1Flags,
+			Costume:        character.Costume,
+			Skin:           character.Skin,
+			Face:           character.Face,
+			Head:           character.Head,
+			Hair:           character.Hair,
+			HairRed:        character.HairRed,
+			HairGreen:      character.HairGreen,
+			HairBlue:       character.HairBlue,
+			PropX:          character.ProportionX,
+			PropY:          character.ProportionY,
+			Playtime:       character.Playtime,
+		},
+	}
+	copy(previewPacket.Character.GuildcardStr[:], character.GuildcardStr[:])
+	copy(previewPacket.Character.Name[:], character.Name[:])
+
+	return c.send(previewPacket)
+}
+
+// Acknowledge the checksum the client sent us. We don't actually do
+// anything with it but the client won't proceed otherwise.
+func (s *CharacterServer) sendChecksumAck(c *Client) error {
+	return c.send(&archon.ChecksumAckPacket{
+		Header: archon.BBHeader{Type: archon.LoginChecksumAckType},
+		Ack:    1,
+	})
+}
+
+// Load the player's saved guildcards, build the chunk data, and send the chunk header.
+func (s *CharacterServer) HandleGuildcardDataStart(c *Client) error {
+	guildcards, err := data.FindGuildcardEntries(c.account)
+	if err != nil {
+		return err
+	}
+
+	gcData := new(archon.GuildcardData)
+	// Maximum of 140 entries can be sent.
+	for i, entry := range guildcards {
+		// TODO: This may not actually work yet, but I haven't gotten to
+		// figuring out how the other servers use it.
+		pktEntry := gcData.Entries[i]
+		pktEntry.Guildcard = uint32(entry.Guildcard)
+		copy(pktEntry.Name[:], entry.Name)
+		copy(pktEntry.TeamName[:], entry.TeamName)
+		copy(pktEntry.Description[:], entry.Description)
+		pktEntry.Language = entry.Language
+		pktEntry.SectionID = entry.SectionID
+		pktEntry.CharClass = entry.Class
+		copy(pktEntry.Comment[:], entry.Comment)
+	}
+
+	var size int
+	c.GuildcardData, size = internal.BytesFromStruct(gcData)
+	checksum := crc32.ChecksumIEEE(c.GuildcardData)
+
+	return s.sendGuildcardHeader(c, checksum, uint16(size))
+}
+
+// send the header containing metadata about the guildcard chunk.
+func (s *CharacterServer) sendGuildcardHeader(c *Client, checksum uint32, dataLen uint16) error {
+	return c.send(&archon.GuildcardHeaderPacket{
+		Header:   archon.BBHeader{Type: archon.LoginGuildcardHeaderType},
+		Unknown:  0x00000001,
+		Length:   dataLen,
+		Checksum: checksum,
+	})
+}
+
+// send another chunk of the client's guildcard data.
+func (s *CharacterServer) handleGuildcardChunk(c *Client) error {
+	var chunkReq archon.GuildcardChunkReqPacket
+	internal.StructFromBytes(c.ConnectionState().Data(), &chunkReq)
+
+	if chunkReq.Continue == 0x01 {
+		return s.sendGuildcardChunk(c, chunkReq.ChunkRequested)
+	}
+	// Anything else is a request to cancel sending guildcard chunks.
+	return nil
+}
+
+// send the specified chunk of guildcard data.
+func (s *CharacterServer) sendGuildcardChunk(c *Client, chunkNum uint32) error {
+	pkt := &archon.GuildcardChunkPacket{
+		Header: archon.BBHeader{Type: archon.LoginGuildcardChunkType},
+		Chunk:  chunkNum,
+	}
+
+	// The client will only accept 0x6800 bytes of a chunk per packet.
+	offset := uint16(chunkNum) * MaxDataChunkSize
+	remaining := uint16(len(c.GuildcardData)) - offset
+
+	if remaining > MaxDataChunkSize {
+		pkt.Data = c.GuildcardData[offset : offset+MaxDataChunkSize]
+	} else {
+		pkt.Data = c.GuildcardData[offset:]
+	}
+
+	return c.send(pkt)
+}
+
+// send the header for the parameter files we're about to start sending.
+func (s *CharacterServer) sendParameterHeader(c *Client, numEntries uint32, entries []byte) error {
+	return c.send(&archon.ParameterHeaderPacket{
+		Header: archon.BBHeader{
+			Type:  archon.LoginParameterHeaderType,
+			Flags: numEntries,
+		},
+		Entries: entries,
+	})
+}
+
+// Index into chunkData and send the specified chunk of parameter data.
+func (s *CharacterServer) sendParameterChunk(c *Client, chunkData []byte, chunk uint32) error {
+	return c.send(&archon.ParameterChunkPacket{
+		Header: archon.BBHeader{Type: archon.LoginParameterChunkType},
+		Chunk:  chunk,
+		Data:   chunkData,
+	})
+}
+
+// The client may send us flags as a result of user actions in order to indicate
+// a change in state or desired behavior. For instance, setting 0x02 indicates
+// that the character dressing room has been opened.
+func (s *CharacterServer) setClientFlag(c *Client) {
+	var pkt archon.SetFlagPacket
+	internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+
+	c.Flag = c.Flag | pkt.Flag
+	// Some flags are set right before the client disconnects, which means saving them
+	// on the Client alone isn't safe since the state is lost. To fix this the flags are
+	// also kept in memory to avoid bugs like accidentally recreating characters.
+	s.kvCache.Set(clientFlagKey(c), c.Flag, -1)
+}
+
+func clientFlagKey(c *Client) string {
+	return fmt.Sprintf("client-flags-%d", c.account.ID)
+}
+
+// Performs a create or update/delete depending on whether the user followed the
+// "dressing room" or "recreate" flows (as indicated by a client flag).
+func (s *CharacterServer) handleCharacterUpdate(c *Client) error {
+	var charPkt archon.CharacterSummaryPacket
+	internal.StructFromBytes(c.ConnectionState().Data(), &charPkt)
+
+	if s.hasDressingRoomFlag(c) {
+		// "Dressing room"; a request to update an existing character.
+		if err := s.updateCharacter(c, &charPkt); err != nil {
+			archon.Log.Error(err.Error())
+			return err
+		}
+	} else {
+		// The "recreate" option. This is a request to create a character in a slot and is used
+		// for both creating new characters and replacing existing ones.
+		existingCharacter, err := c.account.FindCharacterInSlot(int(charPkt.Slot))
+		if err != nil {
+			msg := fmt.Errorf("failed to locate character in slot %d for account %d", charPkt.Slot, c.account.ID)
+			archon.Log.Error(msg)
+			return msg
+		}
+		if existingCharacter != nil {
+			if err := data.DeleteCharacter(existingCharacter); err != nil {
+				archon.Log.Error(err.Error())
+				return err
+			}
+		}
+
+		p := charPkt.Character
+		stats := BaseStats[p.Class]
+
+		newCharacter := &data.Character{
+			Account:           c.account,
+			Guildcard:         c.account.Guildcard,
+			GuildcardStr:      p.GuildcardStr[:],
+			Slot:              charPkt.Slot,
+			Experience:        0,
+			Level:             0,
+			NameColor:         p.NameColor,
+			ModelType:         p.Model,
+			NameColorChecksum: p.NameColorChksm,
+			SectionID:         p.SectionID,
+			Class:             p.Class,
+			V2Flags:           p.V2Flags,
+			Version:           p.Version,
+			V1Flags:           p.V1Flags,
+			Costume:           p.Costume,
+			Skin:              p.Skin,
+			Face:              p.Face,
+			Head:              p.Head,
+			Hair:              p.Hair,
+			HairRed:           p.HairRed,
+			HairGreen:         p.HairGreen,
+			HairBlue:          p.HairBlue,
+			ProportionX:       p.PropX,
+			ProportionY:       p.PropY,
+			Name:              p.Name[:],
+			ATP:               stats.ATP,
+			MST:               stats.MST,
+			EVP:               stats.EVP,
+			HP:                stats.HP,
+			DFP:               stats.DFP,
+			ATA:               stats.ATA,
+			LCK:               stats.LCK,
+			Meseta:            StartingMeseta,
+		}
+		// The string is UTF-16LE encoded and it needs to be converted from []uint8 to
+		// a []uint16 slice with the bytes reversed.
+		// Also drops what is presumably the language code (0x09006900) off of the front.
+		cleanedName := p.Name[4:]
+		utfName := make([]uint16, 0)
+		for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
+			if cleanedName[i]|cleanedName[i+1] == 0 {
+				break
+			}
+			utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<8))
+			j += 1
+		}
+		newCharacter.ReadableName = string(utf16.Decode(utfName))
+
+		/* TODO: Add the rest of these.
+		--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
+		--techniques blob,
+		--options blob,
+		*/
+
+		if err := data.CreateCharacter(newCharacter); err != nil {
+			return err
+		}
+	}
+
+	c.Config.SlotNum = uint8(charPkt.Slot)
+	return s.sendCharacterAck(c, charPkt.Slot, 0)
+}
+
+func (s *CharacterServer) hasDressingRoomFlag(c *Client) bool {
+	if (c.Flag & 0x02) != 0 {
+		return true
+	}
+
+	flags, found := s.kvCache.Get(clientFlagKey(c))
+	if found {
+		return (flags.(uint32) & 0x02) != 0
+	}
+	return false
+}
+
+func (s *CharacterServer) updateCharacter(c *Client, pkt *archon.CharacterSummaryPacket) error {
+	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
+	flags, _ := s.kvCache.Get(clientFlagKey(c))
+	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
+
+	character, err := c.account.FindCharacterInSlot(int(pkt.Slot))
+	if err != nil {
+		return err
+	} else if character == nil {
+		return fmt.Errorf("character does not exist in slot %d for guildcard %d", pkt.Slot, c.Guildcard)
+	}
+
+	p := pkt.Character
+	character.NameColor = p.NameColor
+	character.ModelType = p.Model
+	character.NameColorChecksum = p.NameColorChksm
+	character.SectionID = p.SectionID
+	character.Class = p.Class
+	character.Costume = p.Costume
+	character.Skin = p.Skin
+	character.Head = p.Head
+	character.HairRed = p.HairRed
+	character.HairGreen = p.HairGreen
+	character.HairBlue = p.HairBlue
+	character.ProportionX = p.PropX
+	character.ProportionY = p.PropY
+	copy(character.Name, p.Name[:])
+
+	return data.UpdateCharacter(character)
+}
+
+// Player selected one of the items on the ship select screen; respond with the
+// IP address and port of the ship server to  which the client will connect after
+// disconnecting from this server.
+func (s *CharacterServer) handleShipSelection(c *Client) error {
+	var pkt archon.MenuSelectionPacket
+	internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+
+	selectedShip := pkt.ItemId - 1
+	if selectedShip < 0 || selectedShip >= uint32(len(s.shipList)) {
+		return errors.New("Invalid ship selection: " + string(selectedShip))
+	}
+
+	//ship := &s.shipList[selectedShip]
+
+	return c.send(&archon.RedirectPacket{
+		Header: archon.BBHeader{Type: archon.RedirectType},
+		// TODO: Ship IP address and port
+		//IPAddr: [4]uint8{},
+		//Port:   s.charRedirectPort,
+	})
+}

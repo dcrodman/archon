@@ -60,7 +60,6 @@ type CommonClient struct {
 	TeamId uint32
 	IsGm   bool
 
-	Guildcard         uint32
-	GuildcardData     []byte
-	GuildcardDataSize uint16
+	Guildcard     uint32
+	GuildcardData []byte
 }
