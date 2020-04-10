@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/data"
+	"github.com/dcrodman/archon/debug"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/character"
 	"github.com/dcrodman/archon/server/login"
 	"github.com/dcrodman/archon/server/patch"
 	"github.com/spf13/viper"
-	"net/http"
-	"runtime/pprof"
 	"sync"
 )
 
@@ -28,8 +27,8 @@ func main() {
 
 	fmt.Println("configuration loaded from", archon.ConfigFileUsed())
 
-	if viper.GetBool("debug_mode") {
-		startDebugServer()
+	if debug.Enabled() {
+		go debug.StartPprofServer()
 	}
 
 	archon.InitLogger()
@@ -51,19 +50,6 @@ func main() {
 	fmt.Printf("connected to database %s:%d\n", viper.GetString("database.host"), viper.GetInt("database.port"))
 
 	startServers()
-}
-
-// If the server was configured in debug mode, this function will launch an HTTP server
-// that responds with pprof output containing the stack traces of all running goroutines.
-func startDebugServer() {
-	webPort := viper.GetString("web.http_port")
-
-	fmt.Println("opening debug port on " + webPort)
-	http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
-		pprof.Lookup("goroutine").WriteTo(resp, 1)
-	})
-
-	go http.ListenAndServe(":"+webPort, nil)
 }
 
 // Register all of the server handlers and their corresponding ports. This runner
