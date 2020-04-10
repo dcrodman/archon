@@ -1,7 +1,7 @@
 # Archon
 
 Private server implementation for Sega's Phantasy Star Online Blue Burst. 
-Credit is owed to the authors of [Tethealla](http://pioneer2.net), 
+Credit is due to the authors of [Tethealla](http://pioneer2.net), 
 [Sylverant](http://sylverant.net), and [Newserv](http://www.fuzziqersoftware.com), 
 whose servers I'm studying as I write Archon.
 
@@ -21,12 +21,16 @@ questions feel free to open an issue.
     * [4. Add files the patch directory](#4-add-files-the-patch-directory)
 - [Developing](#developing)
 
-
 ## Installation
+
+Prerequisites:
+* [Go](https://golang.org)
+* [Git](https://git-scm.com/)
+* [PostgreSQL](https://www.postgresql.org/)
 
 ### 1. Compile the code
 
-With Go 1.12 or later installed:
+Assuming Go installed:
 
     git clone https://github.com/dcrodman/archon.git
     cd archon
@@ -53,15 +57,16 @@ files in this directory in order to keep everything together.
 
 ### 3. Create the database
 
-Feel free to choose your own credentials or database location, just make sure the 
-settings in your `config.yaml` reflect them. 
+Archon uses Postgres for persistent storage, which means you'll need to set up a Postgres database
+for it to use. Once you have one ready to go: 
 
     createdb archondb
     psql archondb
     > CREATE USER archonadmin WITH ENCRYPTED PASSWORD 'psoadminpassword';
     > GRANT ALL ON ALL TABLES IN SCHEMA public TO archonadmin;
 
-Archon takes care of creating the tables and performing any migrations.
+Feel free to choose your own credentials or database location, just make sure the settings in your 
+`config.yaml` reflect them. Archon takes care of creating the tables and performing any migrations.
  
 ### 4. Add files the patch directory
 
