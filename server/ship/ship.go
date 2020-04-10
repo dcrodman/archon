@@ -1,190 +1,249 @@
-// The BLOCK and SHIP server logic.
+// The ship server logic.
 package ship
 
+import (
+	"fmt"
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/auth"
+	crypto "github.com/dcrodman/archon/encryption"
+	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/server"
+	"github.com/dcrodman/archon/server/block"
+	"github.com/dcrodman/archon/server/character"
+	"github.com/dcrodman/archon/server/internal"
+	"strings"
+)
+
+// BackMenuItem is the block ID reserved for returning to the ship select menu.
+const BackMenuItem = 0xFF
+
+var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
+
+// ShipServer defines the operations for the gameplay servers.
+type ShipServer struct {
+	name string
+	port string
+
+	// Precomputed block packet.
+	blockListPkt *packets.BlockList
+}
+
+func NewServer(name, port string, blockServers []block.BlockServer) server.Server {
+	// The block list packet is recomputed since it's mildly expensive and
+	// (at least for now) shouldn't be changing without a restart.
+	blocks := make([]packets.Block, 0)
+	for i, blockServer := range blockServers {
+		b := packets.Block{
+			Unknown: 0x12,
+			BlockId: uint32(i + 1),
+		}
+		copy(b.BlockName[:], internal.ConvertToUtf16(blockServer.Name()))
+		blocks = append(blocks, b)
+	}
+
+	// The "back" menu item for returning to the ship select screen
+	// is sent to the client as another (final) block selection option.
+	blocks = append(blocks, packets.Block{
+		Unknown: 0x08,
+		BlockId: BackMenuItem,
+	})
+	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
+
+	blockListPkt := &packets.BlockList{
+		Header: packets.BBHeader{
+			Type:  packets.BlockListType,
+			Flags: uint32(len(blockServers)),
+		},
+		Unknown: 0x08,
+		Blocks:  blocks,
+	}
+	copy(blockListPkt.ShipName[:], name)
+
+	return &ShipServer{
+		name:         name,
+		port:         port,
+		blockListPkt: blockListPkt,
+	}
+}
+
+func (s *ShipServer) Name() string       { return s.name }
+func (s *ShipServer) Port() string       { return s.port }
+func (s *ShipServer) HeaderSize() uint16 { return packets.BBHeaderSize }
+
+func (s *ShipServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+	c := &Client{
+		cs:          cs,
+		clientCrypt: crypto.NewBBCrypt(),
+		serverCrypt: crypto.NewBBCrypt(),
+	}
+
+	if err := s.SendWelcome(c); err != nil {
+		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
+	}
+	return c, nil
+}
+
+func (s *ShipServer) SendWelcome(c *Client) error {
+	pkt := &packets.Welcome{
+		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
+		Copyright:    [96]byte{},
+		ServerVector: [48]byte{},
+		ClientVector: [48]byte{},
+	}
+	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.ServerVector[:], c.serverVector())
+	copy(pkt.ClientVector[:], c.clientVector())
+
+	return c.sendRaw(pkt)
+}
+
+func (s *ShipServer) Handle(client server.Client2) error {
+	c := client.(*Client)
+
+	var hdr packets.BBHeader
+	internal.StructFromBytes(c.ConnectionState().Data()[:packets.BBHeaderSize], &hdr)
+
+	var err error
+	switch hdr.Type {
+	case packets.LoginType:
+		err = s.handleShipLogin(c)
+	case packets.MenuSelectType:
+		var pkt packets.MenuSelection
+		internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+		// They can be at either the ship or block selection menu, so make sure we have the right one.
+		if pkt.MenuId == character.ShipSelectionMenuId {
+			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
+			err = s.handleShipSelection(c)
+		} else {
+			err = s.handleBlockSelection(c, pkt)
+		}
+	default:
+		archon.Log.Infof("received unknown packet %02x from %s", hdr.Type, c.ConnectionState().IPAddr())
+	}
+	return err
+}
+
+func (s *ShipServer) handleShipLogin(c *Client) error {
+	var loginPkt packets.Login
+	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
+
+	username := string(internal.StripPadding(loginPkt.Username[:]))
+	password := string(internal.StripPadding(loginPkt.Password[:]))
+
+	if _, err := auth.VerifyAccount(username, password); err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return sendErr
+			}
+			return err
+		}
+	}
+
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return err
+	}
+	return s.sendBlockList(c)
+}
+
+func (s *ShipServer) sendSecurity(c *Client, errorCode uint32) error {
+	return c.send(&packets.Security{
+		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamId:       c.TeamId,
+		Config:       c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+func (s *ShipServer) sendMessage(c *Client, message string) error {
+	return c.send(&packets.LoginClientMessage{
+		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
+}
+
+// send the client the block list on the selection screen.
+func (s *ShipServer) sendBlockList(c *Client) error {
+	return c.send(s.blockListPkt)
+}
+
+// Player selected one of the items on the ship select screen.
+func (s *ShipServer) handleShipSelection(client *Client) error {
+	//var pkt packets.MenuSelection
+	//internal.StructFromBytes(client.ConnectionState().Data(), &pkt)
+	//
+	//selectedShip := pkt.ItemId - 1
+	//
+	//if selectedShip < 0 || selectedShip >= uint32(len(character.shipList)) {
+	//	return errors.New("Invalid ship selection: " + string(selectedShip))
+	//}
+	//s := &character.shipList[selectedShip]
+	//
+	//return archon.SendRedirect(client, s.ipAddr[:], s.port)
+	return nil
+}
+
+// Send the IP address and port of the character server to  which the client will
+// connect after disconnecting from this server.
+func (s *ShipServer) sendBlockRedirect(c *Client) error {
+	//pkt := &packets.Redirect{
+	//	Header: packets.BBHeader{Type: packets.RedirectType},
+	//	IPAddr: [4]uint8{},
+	//	Port:   s.charRedirectPort,
+	//}
+	//ip := archon.BroadcastIP()
+	//copy(pkt.IPAddr[:], ip[:])
+	//
+	//return c.send(pkt)
+	return nil
+}
+
+// The player selected a block to join from the menu.
+func (s *ShipServer) handleBlockSelection(c *Client, pkt packets.MenuSelection) error {
+	// Grab the chosen block and redirect them to the selected block server.
+	//port, _ := strconv.ParseInt(s.port, 10, 16)
+	//selectedBlock := pkt.ItemId
+	//
+	//if selectedBlock == BackMenuItem {
+	//	s.SendShipList(sc, character.shipList)
+	//} else if int(selectedBlock) > archon.Config.ShipServer.NumBlocks {
+	//	return fmt.Errorf("Block selection %v out of range %v", selectedBlock, archon.Config.ShipServer.NumBlocks)
+	//}
+	//
+	//ipAddr := archon.BroadcastIP()
+	//return archon.SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
+	return nil
+}
+
+// send the menu items for the ship select screen.
+//func (s *ShipServer) SendShipList(client *Client, ships []shipgate.Ship) error {
+//pkt := &archon.ShipListPacket{
+//	Header:      archon.BBHeader{Type: archon.LoginShipListType, Flags: 0x01},
+//	Unknown:     0x02,
+//	Unknown2:    0xFFFFFFF4,
+//	Unknown3:    0x04,
+//	ShipEntries: make([]character.ShipMenuEntry, len(ships)),
+//}
+//copy(pkt.ServerName[:], "Archon")
 //
-//import (
-//	"errors"
-//	"fmt"
-//	"github.com/dcrodman/archon"
-//	"github.com/dcrodman/archon/server"
-//	"github.com/dcrodman/archon/server/character"
-//	"github.com/dcrodman/archon/server/shipgate"
-//	"net"
-//	"strconv"
-//
-//	"github.com/dcrodman/archon/util"
-//	crypto "github.com/dcrodman/archon/util/encryption"
-//)
-//
-//// BackMenuItem is the block ID reserved for returning to the ship select menu.
-//const BackMenuItem = 0xFF
-//
-//// ShipServer defines the operations for the gameplay servers.
-//type ShipServer struct {
-//	// Precomputed block packet.
-//	blockListPkt *archon.BlockListPacket
+//// TODO: Will eventually need a mutex for read.
+//for i, ship := range ships {
+//	item := &pkt.ShipEntries[i]
+//	item.MenuId = character.ShipSelectionMenuId
+//	item.ShipId = ship.id
+//	copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
 //}
 //
-//func NewServer() server.Server {
-//	return &ShipServer{}
-//}
-//
-//func (server *ShipServer) Name() string { return "SHIP" }
-//
-//func (server *ShipServer) Port() string { return archon.Config.ShipServer.Port }
-//
-//func (server *ShipServer) Init() error {
-//	// Precompute the block list packet since it's not going to change.
-//	numBlocks := archon.Config.ShipServer.NumBlocks
-//	ship := character.shipList[0]
-//
-//	server.blockListPkt = &archon.BlockListPacket{
-//		Header:  archon.BBHeader{Type: archon.BlockListType, Flags: uint32(numBlocks + 1)},
-//		Unknown: 0x08,
-//		Blocks:  make([]archon.Block, numBlocks+1),
-//	}
-//	shipName := fmt.Sprintf("%d:%s", ship.id, ship.name)
-//	copy(server.blockListPkt.ShipName[:], util.ConvertToUtf16(shipName))
-//
-//	for i := 0; i < numBlocks; i++ {
-//		b := &server.blockListPkt.Blocks[i]
-//		b.Unknown = 0x12
-//		b.BlockId = uint32(i + 1)
-//		blockName := fmt.Sprintf("BLOCK %02d", i+1)
-//		copy(b.BlockName[:], util.ConvertToUtf16(blockName))
-//	}
-//
-//	// Always append a menu item for returning to the ship select screen.
-//	b := &server.blockListPkt.Blocks[numBlocks]
-//	b.Unknown = 0x12
-//	b.BlockId = BackMenuItem
-//	copy(b.BlockName[:], util.ConvertToUtf16("Ship Selection"))
-//	return nil
-//}
-//
-//func (server *ShipServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
-//	return NewShipClient(conn)
-//}
-//
-//func NewShipClient(conn *net.TCPConn) (*server.Client, error) {
-//	cCrypt := crypto.NewBBCrypt()
-//	sCrypt := crypto.NewBBCrypt()
-//	sc := server.NewClient(conn, archon.BBHeaderSize, cCrypt, sCrypt)
-//
-//	err := error(nil)
-//	if archon.SendWelcome(sc) != nil {
-//		err = errors.New("Error sending welcome packet to: " + sc.IPAddr())
-//		sc = nil
-//	}
-//	return sc, err
-//}
-//
-//func (server *ShipServer) Handle(c *server.Client) error {
-//	var hdr archon.BBHeader
-//	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
-//
-//	var err error
-//	switch hdr.Type {
-//	case archon.LoginType:
-//		err = server.HandleShipLogin(c)
-//	case archon.MenuSelectType:
-//		var pkt archon.MenuSelectionPacket
-//		util.StructFromBytes(c.Data(), &pkt)
-//		// They can be at either the ship or block selection menu, so make sure we have the right one.
-//		if pkt.MenuId == character.ShipSelectionMenuId {
-//			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
-//			err = server.handleShipSelection(c)
-//		} else {
-//			err = server.HandleBlockSelection(c, pkt)
-//		}
-//	default:
-//		archon.Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
-//	}
-//	return err
-//}
-//
-//func (server *ShipServer) HandleShipLogin(sc *server.Client) error {
-//	if _, err := archon.VerifyAccount(sc); err != nil {
-//		return err
-//	}
-//	if err := server.sendSecurity(sc, archon.BBLoginErrorNone, sc.guildcard, sc.teamId); err != nil {
-//		return err
-//	}
-//	return server.sendBlockList(sc)
-//}
-//
-//// send the security initialization packet with information about the user's
-//// authentication status.
-//func (server *ShipServer) sendSecurity(client *server.Client, errorCode archon.BBLoginError,
-//	guildcard uint32, teamId uint32) error {
-//
-//	// Constants set according to how Newserv does it.
-//	pkt := &archon.SecurityPacket{
-//		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
-//		ErrorCode:    uint32(errorCode),
-//		PlayerTag:    0x00010000,
-//		Guildcard:    guildcard,
-//		TeamId:       teamId,
-//		Config:       &client.config,
-//		Capabilities: 0x00000102,
-//	}
-//	archon.Log.Debug("Sending Security Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send the client the block list on the selection screen.
-//func (server *ShipServer) sendBlockList(client *server.Client) error {
-//	archon.Log.Debug("Sending Block List Packet")
-//	return archon.EncryptAndSend(client, server.blockListPkt)
-//}
-//
-//// Player selected one of the items on the ship select screen.
-//func (server *ShipServer) handleShipSelection(client *server.Client) error {
-//	var pkt archon.MenuSelectionPacket
-//	util.StructFromBytes(client.Data(), &pkt)
-//	selectedShip := pkt.ItemId - 1
-//	if selectedShip < 0 || selectedShip >= uint32(len(character.shipList)) {
-//		return errors.New("Invalid ship selection: " + string(selectedShip))
-//	}
-//	s := &character.shipList[selectedShip]
-//	return archon.SendRedirect(client, s.ipAddr[:], s.port)
-//}
-//
-//// The player selected a block to join from the menu.
-//func (server *ShipServer) HandleBlockSelection(sc *server.Client, pkt archon.MenuSelectionPacket) error {
-//	// Grab the chosen block and redirect them to the selected block server.
-//	port, _ := strconv.ParseInt(archon.Config.ShipServer.Port, 10, 16)
-//	selectedBlock := pkt.ItemId
-//
-//	if selectedBlock == BackMenuItem {
-//		server.SendShipList(sc, character.shipList)
-//	} else if int(selectedBlock) > archon.Config.ShipServer.NumBlocks {
-//		return fmt.Errorf("Block selection %v out of range %v", selectedBlock, archon.Config.ShipServer.NumBlocks)
-//	}
-//
-//	ipAddr := archon.BroadcastIP()
-//	return archon.SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
-//}
-//
-//// send the menu items for the ship select screen.
-//func (server *ShipServer) SendShipList(client *server.Client, ships []shipgate.Ship) error {
-//	pkt := &archon.ShipListPacket{
-//		Header:      archon.BBHeader{Type: archon.LoginShipListType, Flags: 0x01},
-//		Unknown:     0x02,
-//		Unknown2:    0xFFFFFFF4,
-//		Unknown3:    0x04,
-//		ShipEntries: make([]character.ShipMenuEntry, len(ships)),
-//	}
-//	copy(pkt.ServerName[:], "Archon")
-//
-//	// TODO: Will eventually need a mutex for read.
-//	for i, ship := range ships {
-//		item := &pkt.ShipEntries[i]
-//		item.MenuId = character.ShipSelectionMenuId
-//		item.ShipId = ship.id
-//		copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
-//	}
-//
-//	archon.Log.Debug("Sending Ship List Packet")
-//	return archon.EncryptAndSend(client, pkt)
+//archon.Log.Debug("Sending Ship List Packet")
+//return archon.EncryptAndSend(client, pkt)
+//return nil
 //}

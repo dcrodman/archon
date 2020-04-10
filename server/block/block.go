@@ -3,6 +3,8 @@
  */
 package block
 
+import "github.com/dcrodman/archon/packets"
+
 //
 //import (
 //	"fmt"
@@ -14,12 +16,16 @@ package block
 //	"strconv"
 //)
 //
-//type BlockServer struct {
-//	name string
-//	port string
-//
-//	lobbyPkt archon.LobbyListPacket
-//}
+type BlockServer struct {
+	name string
+	port string
+
+	lobbyPkt packets.LobbyList
+}
+
+func (s *BlockServer) Name() string { return s.name }
+func (s *BlockServer) Port() string { return s.port }
+
 //
 //func NewServer(name string, port int64) server.Server {
 //	return &BlockServer{
@@ -63,14 +69,14 @@ package block
 //	var err error
 //	switch hdr.Type {
 //	case archon.LoginType:
-//		err = server.HandleShipLogin(c)
+//		err = server.handleShipLogin(c)
 //	default:
 //		archon.Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 //	}
 //	return err
 //}
 //
-//func (server *BlockServer) HandleShipLogin(c *server.Client) error {
+//func (server *BlockServer) handleShipLogin(c *server.Client) error {
 //	if _, err := archon.VerifyAccount(c); err != nil {
 //		return err
 //	}
