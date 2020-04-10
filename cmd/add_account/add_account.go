@@ -1,33 +1,18 @@
+// This script is a small convenience tool for creating user accounts in the
+// configured server database.
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
 	_ "github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/auth"
 	"github.com/dcrodman/archon/data"
 	"github.com/spf13/viper"
+	"os"
 )
 
 func main() {
-	flag.Parse()
-	if flag.NArg() < 3 {
-		fmt.Println("Usage: add_account [username] [password] [email]")
-		return
-	}
-
-	initializeDB()
-	defer data.Shutdown()
-
-	account, err := auth.CreateAccount(flag.Arg(0), flag.Arg(1), flag.Arg(2))
-	if err == nil {
-		fmt.Println("created account with ID", account.ID)
-	} else {
-		fmt.Println("failed to create account:", err)
-	}
-}
-
-func initializeDB() {
 	dataSource := fmt.Sprintf(
 		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
 		viper.GetString("database.host"),
@@ -39,5 +24,28 @@ func initializeDB() {
 	)
 	if err := data.Initialize(dataSource); err != nil {
 		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	defer data.Shutdown()
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Printf("Username: ")
+	scanner.Scan()
+	username := scanner.Text()
+
+	fmt.Printf("Password: ")
+	scanner.Scan()
+	password := scanner.Text()
+
+	fmt.Printf("Email: ")
+	scanner.Scan()
+	email := scanner.Text()
+
+	account, err := auth.CreateAccount(username, password, email)
+	if err == nil {
+		fmt.Println("created account with ID", account.ID)
+	} else {
+		fmt.Println("failed to create account:", err)
 	}
 }

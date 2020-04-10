@@ -1,15 +1,13 @@
-/*
- * Utility script that can be used to patch unpacked PSOBB executables
- * in order to force them to connect to a different IP address.
- *
- * For CLI usage instructions:
- *    patcher -help
- *
- * Before running the tool you may need to uncomment one of the offset
- * blocks at the top (or define your own). These offsets are the addresses
- * of the hardcoded IP addresses to which the client will attempt to connect,
- * they can be found with a hex editor.
- */
+// Utility script that can be used to patch unpacked PSOBB executables
+// in order to force them to connect to a different IP address.
+//
+// For CLI usage instructions:
+//     patcher -help
+//
+// Before running the tool you may need to uncomment one of the offset
+// blocks at the top (or define your own). These offsets are the addresses
+// of the hardcoded IP addresses to which the client will attempt to connect,
+// they can be found with a hex editor.
 package main
 
 import (

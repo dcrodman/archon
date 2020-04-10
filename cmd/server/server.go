@@ -1,3 +1,6 @@
+// The server command is the main entrypoint for running archon. It takes
+// care of initializing everything as well as running as many servers are
+// needed for a fully functional server backend.
 package main
 
 import (
