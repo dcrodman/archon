@@ -17,6 +17,9 @@ log_file_path: ""
 log_level: debug
 # Enable extra info-providing mechanisms for the server. Only enable for development.
 debug_mode: true
+# For use with the packet_analyzer command (see cmd.packet_analyzer). Leave this blank
+# unless you're developing against Archon.
+packet_analyzer_address: ""
 
 database:
   # Hostname of the Postgres database instance.
