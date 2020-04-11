@@ -30,7 +30,7 @@ func startCapturing() {
 
 	http.HandleFunc("/", packetHandler)
 
-	serverAddr := fmt.Sprintf("%s:7000", viper.GetString("external_ip"))
+	serverAddr := viper.GetString("packet_analyzer_address")
 	fmt.Println("starting session_server on", serverAddr)
 
 	if err := http.ListenAndServe(serverAddr, nil); err != nil {
@@ -71,8 +71,6 @@ func packetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("error reading JSON from data: %s\n", err.Error())
 		return
 	}
-
-	fmt.Println("received packet from", p.ServerName)
 
 	channelKey := key(p.ServerName, p.SessionID)
 	pc, ok := packetChannels[channelKey]
@@ -116,6 +114,8 @@ func processPackets(pc chan *PacketRequest) {
 			Contents:          pr.Contents,
 			PrintableContents: convertPrintableContents(pr.Contents),
 		}
+
+		fmt.Printf("received packet %s from %s\n", p.Type, pr.ServerName)
 
 		channelKey := key(pr.ServerName, pr.SessionID)
 		if _, ok := packetQueues[channelKey]; !ok {

@@ -14,7 +14,7 @@ const PacketLineLength = 16
 
 func compactFiles() {
 	if flag.NArg() == 1 {
-		fmt.Println("usage: diff [file1.session] [file2.session]")
+		fmt.Println("usage: compact [file1.session] [file2.session]")
 		return
 	}
 
@@ -44,8 +44,8 @@ func parseSessionDataFromFile(filename string) (*SessionFile, error) {
 	return &s, nil
 }
 
-func generateCompactedFile(s1 *SessionFile) string {
-	filename := fmt.Sprintf("%s.diff", s1.SessionID)
+func generateCompactedFile(session *SessionFile) string {
+	filename := fmt.Sprintf("%s_compact.txt", session.SessionID)
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -53,7 +53,7 @@ func generateCompactedFile(s1 *SessionFile) string {
 		os.Exit(1)
 	}
 
-	for _, p := range s1.Packets {
+	for _, p := range session.Packets {
 		if err := writePacketToFile(f, &p); err != nil {
 			fmt.Printf("unable to write packet to %s: %s\n", filename, err)
 			os.Exit(1)
@@ -67,10 +67,7 @@ func writePacketToFile(f *os.File, p *Packet) error {
 	data := packetToBytes(p.Contents)
 	pktLen := len(p.Contents)
 
-	size, _ := strconv.ParseInt(p.Size, 10, 16)
-	header := fmt.Sprintf("Type: %s\nSize: %s (%d) bytes\n", p.Type, p.Size, size)
-
-	if _, err := f.WriteString(header); err != nil {
+	if err := writePacketHeaderToFile(f, p); err != nil {
 		return err
 	}
 
@@ -89,7 +86,17 @@ func writePacketToFile(f *os.File, p *Packet) error {
 		}
 	}
 
+	_, _ = f.WriteString("\n\n")
+
 	return nil
+}
+
+func writePacketHeaderToFile(f *os.File, p *Packet) error {
+	size, _ := strconv.ParseInt(p.Size, 10, 16)
+	header := fmt.Sprintf("Type: %s\nSize: %s (%d) bytes\n", p.Type, p.Size, size)
+
+	_, err := f.WriteString(header)
+	return err
 }
 
 // Build one line of formatted packet data.

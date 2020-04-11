@@ -9,8 +9,11 @@
 //
 // Commands:
 //     capture (default): starts a server waiting for packets to be submitted
-//	   compact: generates a compacted form of the session date (useful for tools like diff)
+//	   compact: generates a more human-readable version of session data (useful for tools like diff)
+//	   summarize: similar to compact but only the packet types are included
 //
+// In order to use the capture utility, there must be a value set for packet_analyzer_address
+// in Archon's config.yaml.
 package main
 
 import (
@@ -61,6 +64,8 @@ func main() {
 	switch command {
 	case "compact":
 		compactFiles()
+	case "summarize":
+		summarizeFiles()
 	default:
 		startCapturing()
 	}
