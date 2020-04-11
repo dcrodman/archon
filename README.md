@@ -1,14 +1,15 @@
 # Archon
 
-Private server implementation for Sega's Phantasy Star Online Blue Burst. 
+Private server implementation for Phantasy Star Online Blue Burst by SEGA.
+
+The goal of the Archon project is to build a modern, easy-to-use, customizable, and 
+high-performing PSOBB server that can be run across multiple platforms with little 
+setup overhead. The project is currently in development and changing rapidly while I 
+piece together the PSO protocol and develop a core architecture.
+
 Credit is due to the authors of [Tethealla](http://pioneer2.net), 
 [Sylverant](http://sylverant.net), and [Newserv](http://www.fuzziqersoftware.com), 
 whose servers I'm studying as I write Archon.
-
-The goal of this project is to build a configurable, high-performing, and scalable
-PSOBB server that can be run across multiple platforms with little setup overhead. 
-The project is currently in development and changing rapidly while I piece together 
-the PSO protocol and develop a core architecture.
 
 Forks, bug fixes, issue reports, explanations of some of the client's bizarre behavior, 
 etc. are more than welcome! I try to keep the development pretty open but if you have
@@ -74,4 +75,10 @@ TODO
 
 ## Developing
 
+This is a pretty large project and pull requests, issues, and discussions are greatly appreciated!
+
+### Suggested Development Setup
 TODO
+
+### Whirlwind tour
+   TODO
