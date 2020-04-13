@@ -34,11 +34,17 @@ func (c Client) Decrypt(bytes []byte, length uint32) {
 	c.clientCrypt.Decrypt(bytes, length)
 }
 
+func (c Client) DebugInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"server_type": "character",
+	}
+}
+
 func (c *Client) send(packet interface{}) error {
 	return relay.SendPacket(c, packet, packets.BBHeaderSize)
 }
 
 func (c *Client) sendRaw(packet interface{}) error {
-	data, size := internal.BytesFromStruct(packet)
-	return relay.SendRaw(c, data, uint16(size))
+	bytes, size := internal.BytesFromStruct(packet)
+	return relay.SendRaw(c, bytes, uint16(size))
 }

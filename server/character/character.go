@@ -8,6 +8,7 @@ import (
 	"github.com/dcrodman/archon/auth"
 	"github.com/dcrodman/archon/characters"
 	"github.com/dcrodman/archon/data"
+	"github.com/dcrodman/archon/debug"
 	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
@@ -109,9 +110,14 @@ func (s *CharacterServer) SendWelcome(c *Client) error {
 
 func (s *CharacterServer) Handle(client server.Client2) error {
 	c := client.(*Client)
+	packetData := c.ConnectionState().Data()
 
 	var packetHeader packets.BBHeader
-	internal.StructFromBytes(c.ConnectionState().Data()[:packets.BBHeaderSize], &packetHeader)
+	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &packetHeader)
+
+	if debug.Enabled() {
+		debug.SendClientPacketToAnalyzer(client, packetData, packetHeader.Size)
+	}
 
 	var err error
 	switch packetHeader.Type {
@@ -132,7 +138,7 @@ func (s *CharacterServer) Handle(client server.Client2) error {
 		err = s.sendParameterHeader(c, uint32(len(paramFiles)), paramHeaderData)
 	case packets.LoginParameterChunkReqType:
 		var pkt packets.BBHeader
-		internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+		internal.StructFromBytes(packetData, &pkt)
 		err = s.sendParameterChunk(c, paramChunkData[int(pkt.Flags)], pkt.Flags)
 	case packets.LoginSetFlagType:
 		s.setClientFlag(c)

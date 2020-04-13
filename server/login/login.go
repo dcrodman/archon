@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/auth"
+	"github.com/dcrodman/archon/debug"
 	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
@@ -62,18 +63,24 @@ func (s *LoginServer) SendWelcome(c *Client) error {
 
 func (s *LoginServer) Handle(client server.Client2) error {
 	c := client.(*Client)
-	var hdr packets.BBHeader
-	internal.StructFromBytes(c.ConnectionState().Data()[:packets.BBHeaderSize], &hdr)
+	packetData := c.ConnectionState().Data()
+
+	var header packets.BBHeader
+	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &header)
+
+	if debug.Enabled() {
+		debug.SendClientPacketToAnalyzer(client, packetData, header.Size)
+	}
 
 	var err error
-	switch hdr.Type {
+	switch header.Type {
 	case packets.LoginType:
 		err = s.handleLogin(c)
 	case packets.DisconnectType:
 		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
-		archon.Log.Infof("Received unknown packet %x from %s", hdr.Type, c.ConnectionState().IPAddr())
+		archon.Log.Infof("Received unknown packet %x from %s", header.Type, c.ConnectionState().IPAddr())
 	}
 
 	return err

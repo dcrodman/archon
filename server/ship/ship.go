@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/auth"
+	"github.com/dcrodman/archon/debug"
 	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
@@ -99,17 +100,22 @@ func (s *ShipServer) SendWelcome(c *Client) error {
 
 func (s *ShipServer) Handle(client server.Client2) error {
 	c := client.(*Client)
+	packetData := c.ConnectionState().Data()
 
-	var hdr packets.BBHeader
-	internal.StructFromBytes(c.ConnectionState().Data()[:packets.BBHeaderSize], &hdr)
+	var header packets.BBHeader
+	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &header)
+
+	if debug.Enabled() {
+		debug.SendClientPacketToAnalyzer(client, packetData, header.Size)
+	}
 
 	var err error
-	switch hdr.Type {
+	switch header.Type {
 	case packets.LoginType:
 		err = s.handleShipLogin(c)
 	case packets.MenuSelectType:
 		var pkt packets.MenuSelection
-		internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
+		internal.StructFromBytes(packetData, &pkt)
 		// They can be at either the ship or block selection menu, so make sure we have the right one.
 		if pkt.MenuId == character.ShipSelectionMenuId {
 			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
@@ -118,7 +124,7 @@ func (s *ShipServer) Handle(client server.Client2) error {
 			err = s.handleBlockSelection(c, pkt)
 		}
 	default:
-		archon.Log.Infof("received unknown packet %02x from %s", hdr.Type, c.ConnectionState().IPAddr())
+		archon.Log.Infof("received unknown packet %02x from %s", header.Type, c.ConnectionState().IPAddr())
 	}
 	return err
 }

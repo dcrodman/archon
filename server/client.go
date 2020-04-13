@@ -49,6 +49,8 @@ type Client2 interface {
 
 	// Encrypt decrypts bytes in place with the encryption key for the client.
 	Decrypt(bytes []byte, length uint32)
+
+	DebugInfo() map[string]interface{}
 }
 
 // CommonClient encapsulates the user-specific information common to several server
