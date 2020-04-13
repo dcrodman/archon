@@ -6,11 +6,28 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"unicode"
 )
+
+// HTTP request from the server implementations containing the packet data.
+type PacketRequest struct {
+	// The server from which this request has originated.
+	ServerName string
+	// (Optional) identifier to append for this session.
+	SessionID string
+	// The origin of the packet. This will usually be "client" or one of the server names.
+	Source string
+	// The destination of the packet. This will usually be "client" or one of the server names.
+	Destination string
+	// The contents of the packet.
+	Contents []int
+}
 
 var (
 	// Mapping of server names to channels of PacketRequests acting as queues.
@@ -28,14 +45,9 @@ func startCapturing() {
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
 	go captureExitHandler(signalChan)
 
-	http.HandleFunc("/", packetHandler)
-
 	serverAddr := viper.GetString("packet_analyzer_address")
-	fmt.Println("starting session_server on", serverAddr)
-
-	if err := http.ListenAndServe(serverAddr, nil); err != nil {
-		fmt.Println(err)
-	}
+	go listenForTCPPackets(serverAddr)
+	listenForHTTPPackets(serverAddr)
 }
 
 // Write all of our current session information to files in the local directory.
@@ -50,9 +62,9 @@ func captureExitHandler(c chan os.Signal) {
 		}
 
 		filename := sessionName + ".session"
-		bytes, _ := json.MarshalIndent(sessionFile, "", "\t")
+		b, _ := json.MarshalIndent(sessionFile, "", "\t")
 
-		if err := ioutil.WriteFile(filename, bytes, 0666); err != nil {
+		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
 			fmt.Printf("failed to save session data: %s\n", err.Error())
 			break
 		}
@@ -61,6 +73,86 @@ func captureExitHandler(c chan os.Signal) {
 	}
 
 	os.Exit(0)
+}
+
+func listenForTCPPackets(serverAddr string) {
+	splitAddr := strings.Split(serverAddr, ":")
+	tcpPort, _ := strconv.ParseInt(splitAddr[1], 10, 32)
+	tcpAddr := fmt.Sprintf("%s:%d", splitAddr[0], tcpPort+1)
+
+	fmt.Println("listening for packets via TCP on", tcpAddr)
+
+	l, err := net.Listen("tcp", tcpAddr)
+	if err != nil {
+		fmt.Println("failed to start TCP listener: ", err)
+	}
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("failed to accept connection:", err.Error())
+			continue
+		}
+
+		// Sloppily grab the data out of the packet and convert it into a
+		// PacketRequest so that the handler paths converge.
+		packet := readData(conn)
+		packetContents := packet[40:]
+		contents := make([]int, len(packetContents))
+
+		for i := 0; i < len(packetContents); i++ {
+			contents[i] = int(packetContents[i])
+		}
+
+		recordPacket(&PacketRequest{
+			ServerName:  readStringFromData(packet[0:10]),
+			SessionID:   readStringFromData(packet[10:20]),
+			Source:      readStringFromData(packet[20:30]),
+			Destination: readStringFromData(packet[30:40]),
+			Contents:    contents,
+		})
+		_ = conn.Close()
+	}
+}
+
+func readData(conn net.Conn) []byte {
+	read := 0
+	packet := make([]byte, 1024)
+
+	for {
+		n, err := conn.Read(packet[read:])
+		read += n
+
+		if err != nil {
+			fmt.Println("failed to read from client:", err.Error())
+			break
+		}
+
+		if n >= len(packet) {
+			b := make([]byte, len(packet)*2)
+			copy(b, packet)
+			packet = b
+		} else {
+			break
+		}
+	}
+
+	return packet[:read]
+}
+
+// Returns the byte-encoded string without the zero padding.
+func readStringFromData(data []byte) string {
+	return strings.TrimRight(string(data), "�")
+}
+
+func listenForHTTPPackets(serverAddr string) {
+	fmt.Println("listening for packets via HTTP on", serverAddr)
+
+	http.HandleFunc("/", packetHandler)
+
+	if err := http.ListenAndServe(serverAddr, nil); err != nil {
+		fmt.Println(err)
+	}
 }
 
 // Request handler responsible only for parsing the packet request and then
@@ -72,6 +164,10 @@ func packetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recordPacket(p)
+}
+
+func recordPacket(p *PacketRequest) {
 	channelKey := key(p.ServerName, p.SessionID)
 	pc, ok := packetChannels[channelKey]
 

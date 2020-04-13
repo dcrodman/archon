@@ -21,20 +21,6 @@ import (
 	_ "github.com/dcrodman/archon"
 )
 
-// Requests from the server implementations containing the packet data.
-type PacketRequest struct {
-	// The server from which this request has originated.
-	ServerName string
-	// (Optional) identifier to append for this session.
-	SessionID string
-	// The origin of the packet. This will usually be "client" or one of the server names.
-	Source string
-	// The destination of the packet. This will usually be "client" or one of the server names.
-	Destination string
-	// The contents of the packet.
-	Contents []int
-}
-
 // This tool's representation of a packet received from a server.
 type Packet struct {
 	Source      string

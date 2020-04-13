@@ -92,8 +92,11 @@ func writePacketToFile(f *os.File, p *Packet) error {
 }
 
 func writePacketHeaderToFile(f *os.File, p *Packet) error {
-	size, _ := strconv.ParseInt(p.Size, 10, 16)
-	header := fmt.Sprintf("Type: %s\nSize: %s (%d) bytes\n", p.Type, p.Size, size)
+	size, _ := strconv.ParseInt(p.Size, 16, 16)
+	header := fmt.Sprintf(
+		"%s -> %s\nType: %s\nSize: %s (%d) bytes\n",
+		p.Source, p.Destination, p.Type, p.Size, size,
+	)
 
 	_, err := f.WriteString(header)
 	return err
