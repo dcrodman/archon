@@ -31,7 +31,7 @@ questions feel free to open an issue.
 
 ## Installation
 
-*Note*: The provided commands are aimed at MacOS/Linux but running their Windows
+**Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
 
 ### Prerequisites:
@@ -117,6 +117,10 @@ step above:
 
 A copy of the PSOBB client can be found here (as well as some additional instructions if they're helpful):
 https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1/
+
+**Note**: If you use a client other than the TethVer12513 executables, you may need to uncomment lines
+in `patcher.go` that correspond to your client. If none exist, you'll have to find the offsets with a
+hex editor.
 
 ### 7. Add files the patch directory
 
