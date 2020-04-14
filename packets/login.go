@@ -94,7 +94,7 @@ type Options struct {
 		TeamPrivilegeLevel uint16
 		Reserved           uint16
 		Teamname           [0x10]uint16
-		TeamFlag           [0x0800]uint8
+		TeamFlag           [0x800]uint8
 		TeamRewards        [2]uint32
 	}
 }
@@ -180,15 +180,23 @@ type Timestamp struct {
 	Timestamp [28]byte
 }
 
+type ShipListEntry struct {
+	MenuId   uint16
+	ShipId   uint32
+	Padding  uint16
+	ShipName [23]byte
+}
+
 // The list of menu items to display to the client.
 type ShipList struct {
 	Header     BBHeader
 	Padding    uint16
-	Unknown    uint16 // set to 0xFFFFFFF4
-	Unknown2   uint32 // set to 0x02
+	Unknown    uint16 // set to 0x02
+	Unknown2   uint32 // set to 0xFFFFFFF4
 	Unknown3   uint16 // set to 0x04
 	ServerName [36]byte
-	//ShipEntries []character.ShipMenuEntry
+
+	ShipEntries []ShipListEntry
 }
 
 // Scroll message the client should display on the ship select screen.

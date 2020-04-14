@@ -2,7 +2,6 @@
 package character
 
 import (
-	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/auth"
@@ -15,7 +14,6 @@ import (
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/dcrodman/archon/server/internal/cache"
 	"github.com/dcrodman/archon/server/internal/relay"
-	"github.com/dcrodman/archon/server/shipgate"
 	"github.com/spf13/viper"
 	"hash/crc32"
 	"strings"
@@ -63,9 +61,6 @@ type CharacterServer struct {
 	port string
 
 	kvCache *cache.Cache
-
-	// Connected ships. Each Ship's id corresponds to its position in the array - 1.
-	shipList []shipgate.Ship
 }
 
 func NewServer(name, port string) server.Server {
@@ -131,7 +126,7 @@ func (s *CharacterServer) Handle(client server.Client2) error {
 		// Everybody else seems to ignore this, so...
 		err = s.sendChecksumAck(c)
 	case packets.LoginGuildcardReqType:
-		err = s.HandleGuildcardDataStart(c)
+		err = s.handleGuildcardDataStart(c)
 	case packets.LoginGuildcardChunkReqType:
 		err = s.handleGuildcardChunk(c)
 	case packets.LoginParameterHeaderReqType:
@@ -200,6 +195,7 @@ func (s *CharacterServer) handleLogin(c *Client) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -236,38 +232,34 @@ func (s *CharacterServer) sendTimestamp(client *Client) error {
 	}
 
 	var tv syscall.Timeval
-	syscall.Gettimeofday(&tv)
-	t := time.Now().Format(TimeFormat)
-	stamp := fmt.Sprintf("%s.%03d", t, uint64(tv.Usec/1000))
+	_ = syscall.Gettimeofday(&tv)
+	stamp := fmt.Sprintf("%s.%03d", time.Now().Format(TimeFormat), uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
 	return client.send(pkt)
 }
 
-// send the menu items for the ship select screen.
+// Send the menu items for the ship select screen.
 func (s *CharacterServer) sendShipList(c *Client) error {
 	pkt := &packets.ShipList{
 		Header:   packets.BBHeader{Type: packets.LoginShipListType, Flags: 0x01},
 		Unknown:  0x02,
 		Unknown2: 0xFFFFFFF4,
 		Unknown3: 0x04,
-		//ShipEntries: make([]ShipMenuEntry, len(ships)),
 	}
 	copy(pkt.ServerName[:], "Archon")
 
-	// TODO: Will eventually need a mutex for read.
-	//for i, ship := range ships {
-	//	item := &pkt.ShipEntries[i]
-	//	item.MenuId = ShipSelectionMenuId
-	//	item.ShipId = ship.id
-	//	copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
-	//}
-
+	pkt.ShipEntries = []packets.ShipListEntry{
+		{
+			MenuId: 0xFF,
+			ShipId: 0xFF,
+		},
+	}
+	copy(pkt.ShipEntries[0].ShipName[:], internal.ConvertToUtf16("No Ships!")[:])
 	return c.send(pkt)
 }
 
 // send whatever scrolling message was read out of the config file for the login screen.
-
 func (s *CharacterServer) sendScrollMessage(c *Client) error {
 	pkt := &packets.ScrollMessagePacket{
 		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
@@ -326,35 +318,38 @@ func (s *CharacterServer) sendOptions(c *Client, keyConfig []byte) error {
 	return c.send(pkt)
 }
 
-// Handle the character select/preview request. Will either return information
-// about a character given a particular slot in an 0xE5 response or ack the
-// selection with an 0xE4 (also used for an empty slot). The client will send
-// one of these packets for each of the character slots (i.e. 4 times).
+// Handle the character select/preview request. For the preview request, this
+//method will either send info about a character given a particular slot in an
+// 0xE5 response or ack the selection with an 0xE4 (also used for an empty slot).
+// The client will send one of these preview request packets for each of the character
+// slots (i.e. 4 times). The client also sends this packet when a character has
+// been selected from the list and the Selecting flag will be set.
 func (s *CharacterServer) handleCharacterSelect(c *Client) error {
 	var pkt packets.CharacterSelection
 	internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
 
 	character, err := data.FindCharacter(c.account, int(pkt.Slot))
-
-	if character == nil {
-		// We don't have a character for this slot.
-		return s.sendCharacterAck(c, pkt.Slot, 2)
-	} else if err != nil {
-		archon.Log.Error(err.Error())
+	if err != nil {
 		return err
 	}
 
 	if pkt.Selecting == 0x01 {
+		if character == nil {
+			return fmt.Errorf("attempted to select nonexistent character in slot: %d", pkt.Slot)
+		}
+
 		// They've selected a character from the menu.
 		c.Config.SlotNum = uint8(pkt.Slot)
-		if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
-			return err
-		}
 		return s.sendCharacterAck(c, pkt.Slot, 1)
-	}
+	} else {
+		if character == nil {
+			// We don't have a character for this slot.
+			return s.sendCharacterAck(c, pkt.Slot, 2)
+		}
 
-	// They have a character in that slot; send the character preview.
-	return s.sendCharacterPreview(c, character)
+		// They have a character in that slot; send the character preview.
+		return s.sendCharacterPreview(c, character)
+	}
 }
 
 // Send the character acknowledgement packet. Setting flag to 0 indicates a creation
@@ -413,7 +408,7 @@ func (s *CharacterServer) sendChecksumAck(c *Client) error {
 }
 
 // Load the player's saved guildcards, build the chunk data, and send the chunk header.
-func (s *CharacterServer) HandleGuildcardDataStart(c *Client) error {
+func (s *CharacterServer) handleGuildcardDataStart(c *Client) error {
 	guildcards, err := data.FindGuildcardEntries(c.account)
 	if err != nil {
 		return err
@@ -597,16 +592,15 @@ func (s *CharacterServer) handleCharacterUpdate(c *Client) error {
 			if cleanedName[i]|cleanedName[i+1] == 0 {
 				break
 			}
-			utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<8))
+			utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
 			j += 1
 		}
 		newCharacter.ReadableName = string(utf16.Decode(utfName))
 
-		/* TODO: Add the rest of these.
-		--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
-		--techniques blob,
-		--options blob,
-		*/
+		// TODO: Add the rest of these.
+		//--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
+		//--techniques blob,
+		//--options blob,
 
 		if err := data.CreateCharacter(newCharacter); err != nil {
 			return err
@@ -667,17 +661,18 @@ func (s *CharacterServer) handleShipSelection(c *Client) error {
 	var pkt packets.MenuSelection
 	internal.StructFromBytes(c.ConnectionState().Data(), &pkt)
 
-	selectedShip := pkt.ItemId - 1
-	if selectedShip < 0 || selectedShip >= uint32(len(s.shipList)) {
-		return errors.New("Invalid ship selection: " + string(selectedShip))
-	}
+	//selectedShip := pkt.ItemId - 1
+	//if selectedShip < 0 || selectedShip >= uint32(len(s.shipList)) {
+	//	return errors.New("Invalid ship selection: " + string(selectedShip))
+	//}
 
 	//ship := &s.shipList[selectedShip]
 
-	return c.send(&packets.Redirect{
-		Header: packets.BBHeader{Type: packets.RedirectType},
-		// TODO: Ship IP address and port
-		//IPAddr: [4]uint8{},
-		//Port:   s.charRedirectPort,
-	})
+	//return c.send(&packets.Redirect{
+	//	Header: packets.BBHeader{Type: packets.RedirectType},
+	//	// TODO: Ship IP address and port
+	//	//IPAddr: [4]uint8{},
+	//	//Port:   s.charRedirectPort,
+	//})
+	return nil
 }
