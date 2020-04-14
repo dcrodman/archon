@@ -1,3 +1,8 @@
+// The login package contains the implementation of the LOGIN server.
+//
+// Clients connect to LOGIN after going through the patch server. This server's
+// main responsibility is to authenticate the client's username/password and
+// set some initial state on the client before sending them to the CHARACTER server.
 package login
 
 import (

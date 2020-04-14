@@ -1,4 +1,11 @@
-// The CHARACTER server logic.
+// The character package contains the implementation of the CHARACTER server.
+//
+// Clients are sent to the CHARACTER server after authenticating with LOGIN. This
+// server serves four main purposes: character selection, character creation/modification,
+// guildcard data sync, and ship selection.
+//
+// The ship list is obtained by communicating with the shipgate server since ships
+// do not directly connect to this server.
 package character
 
 import (

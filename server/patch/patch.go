@@ -1,3 +1,14 @@
+// The patch package contains the implementations of the PATCH and DATA servers.
+//
+// PATCH is extremely simple and for the most part only exists as a first point
+// of contact for the client, its chief responsibility being to send clients the
+// address of the DATA server.
+//
+// DATA is responsible for exchanging file metadata with game clients in order to
+// determine whether or not the client's files match the known patch files. If any
+// of the patch file checksums do not equal the checksums of their corresponding
+// client files (or do not exist), the DATA server sends the full file contents
+// back to the client and forces a restart.
 package patch
 
 import (
