@@ -15,21 +15,20 @@ Forks, bug fixes, issue reports, explanations of some of the client's bizarre be
 etc. are more than welcome! I try to keep the development pretty open but if you have
 questions feel free to open an issue.
 
-- [Archon](#archon)
-  * [Installation](#installation)
-    + [Prerequisites:](#prerequisites-)
-    + [1. Compile the code](#1-compile-the-code)
-    + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
-    + [3. Copy the server config file](#3-copy-the-server-config-file)
-    + [3. Create the database](#3-create-the-database)
-    + [4. Add files the patch directory](#4-add-files-the-patch-directory)
-    + [5. Copy the support files](#5-copy-the-support-files)
-    + [5. Set the hostname](#5-set-the-hostname)
-    + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
-    + [7. Run the server](#7-run-the-server)
-  * [Administration](#administration)
-    + [Updating the server](#updating-the-server)
-  * [Contributing](#contributing)
+* [Installation](#installation)
+  + [Prerequisites:](#prerequisites-)
+  + [1. Compile the code](#1-compile-the-code)
+  + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
+  + [3. Copy the server config file](#3-copy-the-server-config-file)
+  + [3. Create the database](#3-create-the-database)
+  + [4. Add files the patch directory](#4-add-files-the-patch-directory)
+  + [5. Copy the support files](#5-copy-the-support-files)
+  + [5. Set the hostname](#5-set-the-hostname)
+  + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
+  + [7. Run the server](#7-run-the-server)
+* [Administration](#administration)
+  + [Updating the server](#updating-the-server)
+* [Contributing](#contributing)
 
 ## Installation
 
