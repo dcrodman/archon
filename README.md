@@ -19,13 +19,12 @@ questions feel free to open an issue.
   + [Prerequisites:](#prerequisites-)
   + [1. Compile the code](#1-compile-the-code)
   + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
-  + [3. Copy the server config file](#3-copy-the-server-config-file)
-  + [3. Create the database](#3-create-the-database)
-  + [4. Add files the patch directory](#4-add-files-the-patch-directory)
-  + [5. Copy the support files](#5-copy-the-support-files)
+  + [3. Copy the supporting files](#3-copy-the-supporting-files)
+  + [4. Create the database](#4-create-the-database)
   + [5. Set the hostname](#5-set-the-hostname)
   + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
-  + [7. Run the server](#7-run-the-server)
+  + [7. Add files the patch directory](#7-add-files-the-patch-directory)
+  + [8. Run the server](#8-run-the-server)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 * [Contributing](#contributing)
@@ -66,16 +65,19 @@ go this route then from the directory in which you want the server files to resi
 In the following steps you'll need to update `config.yaml` with the full path to
 any subdirectories you create (for instance, `patch_server.patch_dir`).
 
-### 3. Copy the server config file
+### 3. Copy the supporting files
+
+Archon expects a few files in order to run. To
+
+    cp -r path-to-cloned-code/setup/* .
 
 The `setup/config.yaml` file contains all configuration options available to Archon, 
-set to (hopefully) sane defaults. Assuming you've followed the optional step above:
-
-    cp path-to-cloned-code/setup/config.yaml .
+set to (hopefully) sane defaults.
    
-Archon will also look for the config file in `/usr/local/etc/archon`.
+Archon will also look for the config file in `/usr/local/etc/archon` if you're running
+the server binary separately from the of the support files.
 
-### 3. Create the database
+### 4. Create the database
 
 Archon uses Postgres for persistent storage, which means you'll need to have a PostgreSQL
 database instance running. Once you have one ready to go (assuming you have the Postgres
@@ -89,20 +91,6 @@ CLI tools available on your PATH):
 Feel free to choose your own credentials or database location, just make sure the settings in your 
 `config.yaml` reflect them. Archon takes care of creating the tables and performing any migrations.
  
-### 4. Add files the patch directory
-
-It's recommended that you take the critical files from the copy of the client you intend for people to
-use and put the majority of them in the patch directory (`patch_server.patch_dir` in the config file).
-Archon will load these files and verify that they haven't been tampered with when the client connects,
-which can help improve stability as well as make cheating harder.
-
-### 5. Copy the support files
-
-The character server requires some support files to run. To add them:
-
-    mkdir parameters
-    cp -r path-to-cloned-code/setup/parameters .
-
 ### 5. Set the hostname
 
 In order for clients outside your network to connect, Archon needs to listen on a network interface. Once
@@ -130,7 +118,17 @@ step above:
 A copy of the PSOBB client can be found here (as well as some additional instructions if they're helpful):
 https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1/
 
-### 7. Run the server
+### 7. Add files the patch directory
+
+It's recommended that you take the critical files from the copy of the client you intend for people to
+use and put the majority of them in the patch directory (`patch_server.patch_dir` in the config file).
+Archon will load these files and verify that they haven't been tampered with when the client connects,
+which can help improve stability as well as make cheating harder.
+
+    mkdir patches
+    # copy your client files into ^
+
+### 8. Run the server
 
 The moment of truth; run the server by running this from your server directory:
 
