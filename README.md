@@ -16,7 +16,7 @@ etc. are more than welcome! I try to keep the development pretty open but if you
 questions feel free to open an issue.
 
 * [Installation](#installation)
-  + [Prerequisites:](#prerequisites-)
+  + [Prerequisites:](#prerequisites)
   + [1. Compile the code](#1-compile-the-code)
   + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
   + [3. Copy the supporting files](#3-copy-the-supporting-files)
@@ -24,7 +24,8 @@ questions feel free to open an issue.
   + [5. Set the hostname](#5-set-the-hostname)
   + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
   + [7. Add files the patch directory](#7-add-files-the-patch-directory)
-  + [8. Run the server](#8-run-the-server)
+  + [8. Add the first player account](#8-add-the-first-player-account)
+  + [9. Run the server](#9-run-the-server)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 * [Contributing](#contributing)
@@ -132,7 +133,13 @@ which can help improve stability as well as make cheating harder.
     mkdir patches
     # copy your client files into ^
 
-### 8. Run the server
+### 8. Add the first player account
+
+You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
+
+    ./add_account
+
+### 9. Run the server
 
 The moment of truth; run the server by running this from your server directory:
 
