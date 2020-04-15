@@ -1,13 +1,13 @@
-/*
-* Handles the connection initialization and management for connected
-* ships. This module handles all of its own connection logic since the
-* shipgate protocol differs from the way game clients are processed.
- */
 package shipgate
 
-type ship struct {
-	name string
-	ip   string
-	port string
-	id   int
+import (
+	"context"
+	"github.com/dcrodman/archon/server/shipgate/api"
+	"github.com/golang/protobuf/ptypes/empty"
+)
+
+type shipServiceServer struct{}
+
+func (s *shipServiceServer) GetActiveShips(ctx context.Context, empty *empty.Empty) (*api.ShipList, error) {
+	return &api.ShipList{}, nil
 }

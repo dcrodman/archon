@@ -61,14 +61,18 @@ server executable, tools, and supporting files all in once place. If you choose 
 go this route then from the directory in which you want the server files to reside:
 
     mkdir archon_server
+    cd archon_server
     cp path-to-cloned-code/.bin/* .
 
 In the following steps you'll need to update `config.yaml` with the full path to
 any subdirectories you create (for instance, `patch_server.patch_dir`).
 
+**Note**: For the remainder of this guide, the commands assume that your current working
+directory is the server directory you've just created. 
+
 ### 3. Copy the supporting files
 
-Archon expects a few files in order to run. To
+Archon expects a few files in order to run, which can be retrieved from the setip directory:
 
     cp -r path-to-cloned-code/setup/* .
 
@@ -133,13 +137,24 @@ which can help improve stability as well as make cheating harder.
     mkdir patches
     # copy your client files into ^
 
-### 8. Add the first player account
+## Generate the shipgate SSL certificates
+
+The shipgate API server requires clients to connect over SSL as both a form of security as well as
+mutual authentication. Archon includes a tool for generating these certificates, which need to be
+be present in the server's config directory:
+
+    ./generate_cert
+
+The tool will prompt you for your server's external_ip (which should be the same as `external_ip`
+in `config.yaml`). You may also provide a CIDR block.
+
+### 9. Add the first player account
 
 You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
 
     ./add_account
 
-### 9. Run the server
+### 10. Run the server
 
 The moment of truth; run the server by running this from your server directory:
 

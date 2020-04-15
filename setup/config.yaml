@@ -20,6 +20,8 @@ debug_mode: true
 # For use with the packet_analyzer command (see cmd.packet_analyzer). Leave this blank
 # unless you're developing against Archon.
 packet_analyzer_address: ""
+# X.509 certificate for the shipgate server.
+shipgate_certificate_file: "certificate.pem"
 
 database:
   # Hostname of the Postgres database instance.
@@ -60,6 +62,8 @@ character_server:
 shipgate_server:
   # Port on which the SHIPGATE server will listen.
   port: 13000
+  # Private key file corresponding to shipgate_certificate_file (above).
+  ssl_key_file: "key.pem"
 
 ship_server:
   # Port on which the SHIP server will listen.

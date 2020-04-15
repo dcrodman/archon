@@ -13,7 +13,9 @@ import (
 	"github.com/dcrodman/archon/server/character"
 	"github.com/dcrodman/archon/server/login"
 	"github.com/dcrodman/archon/server/patch"
+	"github.com/dcrodman/archon/server/shipgate"
 	"github.com/spf13/viper"
+	"os"
 	"sync"
 )
 
@@ -59,7 +61,10 @@ func main() {
 // assumes one instance of each type of server will be deployed on this host (with
 // the exception of the Block server since the number is configurable).
 func startServers() {
-	server.SetHostname(viper.GetString("hostname"))
+	hostname := viper.GetString("hostname")
+	server.SetHostname(hostname)
+
+	shipgateAddr := fmt.Sprintf("%s:%s", hostname, viper.GetString("shipgate_server.port"))
 
 	dataServer := patch.NewDataServer(
 		"DATA",
@@ -73,15 +78,15 @@ func startServers() {
 	characterServer := character.NewServer(
 		"CHARACTER",
 		viper.GetString("character_server.port"),
+		shipgateAddr,
 	)
 	loginServer := login.NewServer(
 		"LOGIN",
 		viper.GetString("login_server.port"),
 		characterServer.Port(),
 	)
-	//ship.NewServer(),
-	//shipgate.NewServer(),
 
+	//ship.NewServer(),
 	//shipPort, _ := strconv.ParseInt(archon.Config.ShipServer.Port, 10, 16)
 
 	// The available block ports will depend on how the server is configured,
@@ -99,8 +104,11 @@ func startServers() {
 	}
 
 	var wg sync.WaitGroup
+	wg.Add(len(servers) + 1)
+
+	go startShipgate(shipgateAddr, &wg)
+
 	for _, s := range servers {
-		wg.Add(1)
 		startBlockingServer(s, &wg)
 	}
 
@@ -112,4 +120,12 @@ func startBlockingServer(s server.Server, wg *sync.WaitGroup) {
 		server.Start(s)
 		wg.Done()
 	}(s)
+}
+
+func startShipgate(shipgateAddr string, wg *sync.WaitGroup) {
+	if err := shipgate.StartAPIServer(shipgateAddr); err != nil {
+		fmt.Println("failed to start ship server:", err)
+		os.Exit(1)
+	}
+	wg.Done()
 }

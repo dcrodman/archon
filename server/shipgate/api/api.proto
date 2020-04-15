@@ -1,0 +1,19 @@
+syntax = "proto3";
+option go_package = ".;api";
+
+import "google/protobuf/empty.proto";
+
+package api;
+
+message ShipList {
+  message Ship {
+    string name = 1;
+    string ip = 2;
+    string port = 3;
+  }
+  repeated Ship ships = 1;
+}
+
+service ShipService {
+  rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
+}
