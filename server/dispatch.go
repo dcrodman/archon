@@ -31,7 +31,7 @@ func (c *clientList) add(cl *ConnectionState) {
 
 func (c *clientList) remove(cl *ConnectionState) {
 	clAddr := cl.IPAddr()
-	c.RLock()
+	c.Lock()
 	for clientElem := c.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
 		client := clientElem.Value.(*ConnectionState)
 		if client.IPAddr() == clAddr {
@@ -39,7 +39,7 @@ func (c *clientList) remove(cl *ConnectionState) {
 			break
 		}
 	}
-	c.RUnlock()
+	c.Unlock()
 }
 
 // Note: this comparison is by IP address, not element value.
@@ -121,6 +121,7 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 
 			// Prevent multiple clients from connecting from the same IP address.
 			if cl.has(cs) {
+				archon.Log.Infof("rejected second %s connection from %s", server.Name(), cs.IPAddr())
 				cs.connection.Close()
 				return
 			}
