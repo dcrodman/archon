@@ -65,21 +65,23 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData() {
+func initParameterData() error {
+	var initErr error
+
 	paramInitLock.Do(func() {
 		paramFileDir := viper.GetString("character_server.parameters_dir")
 
 		if err := loadParameterFiles(paramFileDir); err != nil {
-			fmt.Println("failed to load parameter files:" + err.Error())
-			os.Exit(1)
+			initErr = fmt.Errorf("failed to load parameter files:" + err.Error())
+			return
 		}
 
 		// Load the base stats for creating new characters.
 		statsFile, _ := os.Open(filepath.Join(paramFileDir, "PlyLevelTbl.prs"))
 		compressedStatsFile, err := ioutil.ReadAll(statsFile)
 		if err != nil {
-			fmt.Println("failed to load PlyLevelTbl.prs:" + err.Error())
-			os.Exit(1)
+			initErr = fmt.Errorf("failed to load PlyLevelTbl.prs:" + err.Error())
+			return
 		}
 
 		decompressedStatsFile := make([]byte, prs.DecompressSize(compressedStatsFile))
@@ -90,6 +92,8 @@ func initParameterData() {
 			internal.StructFromBytes(decompressedStatsFile[i*14:], &BaseStats[i])
 		}
 	})
+
+	return initErr
 }
 
 // Load the PSOBB parameter files, build the parameter header,

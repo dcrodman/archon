@@ -21,9 +21,6 @@ import (
 // Copyright message expected by the client when connecting.
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-// LoginServer is the client's first point of contact with the account/character
-// part of the flow. Its main purpose is to authenticate the client and send them
-// on to the CHARACTER server.
 type LoginServer struct {
 	name             string
 	port             string
@@ -38,6 +35,7 @@ func NewServer(name, port, characterPort string) server.Server {
 func (s *LoginServer) Name() string       { return s.name }
 func (s *LoginServer) Port() string       { return s.port }
 func (s *LoginServer) HeaderSize() uint16 { return packets.BBHeaderSize }
+func (s *LoginServer) Init() error        { return nil }
 
 func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{

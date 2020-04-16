@@ -43,15 +43,19 @@ const (
 var (
 	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-	cachedScrollMessage     []byte
-	cachedScrollMessageInit sync.Once
+	shipSelectionScrollMessage     []byte
+	shipSelectionScrollMessageInit sync.Once
 )
 
-func GetScrollMessage() []byte {
-	cachedScrollMessageInit.Do(func() {
-		cachedScrollMessage = internal.ConvertToUtf16(viper.GetString("character_server.scroll_message"))
+// Returns the scroll message displayed along the top of the ship selection screen,
+// lazily computing it from the config file and storing it in a package var.
+func getScrollMessage() []byte {
+	shipSelectionScrollMessageInit.Do(func() {
+		shipSelectionScrollMessage = internal.ConvertToUtf16(
+			viper.GetString("character_server.scroll_message"),
+		)
 	})
-	return cachedScrollMessage
+	return shipSelectionScrollMessage
 }
 
 // Entry in the available ships lis on the ship selection menu.
@@ -82,6 +86,17 @@ func NewServer(name, port string) server.Server {
 func (s *CharacterServer) Name() string       { return s.name }
 func (s *CharacterServer) Port() string       { return s.port }
 func (s *CharacterServer) HeaderSize() uint16 { return packets.BBHeaderSize }
+
+func (s *CharacterServer) Init() error {
+	if err := initParameterData(); err != nil {
+		return err
+	}
+
+	//if err := s.refreshShipList(); err != nil {
+	//	return err
+	//}
+	return nil
+}
 
 func (s *CharacterServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{
@@ -270,7 +285,7 @@ func (s *CharacterServer) sendShipList(c *Client) error {
 func (s *CharacterServer) sendScrollMessage(c *Client) error {
 	pkt := &packets.ScrollMessagePacket{
 		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
-		Message: GetScrollMessage(),
+		Message: getScrollMessage(),
 	}
 
 	// The end of the message appears to be garbled unless there is a block of extra bytes

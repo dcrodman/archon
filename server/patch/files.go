@@ -54,31 +54,34 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData() {
+func initializePatchData() error {
+	var initErr error
+
 	patchInitLock.Do(func() {
 		dir := viper.GetString("patch_server.patch_dir")
+
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			fmt.Println("error loading patch files: directory does not exist: ", dir)
-			os.Exit(1)
+			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", dir)
+			return
 		}
 
 		rootNode = &directoryNode{path: dir, clientPath: "./"}
 
 		fmt.Println("loading patch files from", dir)
 		if err := buildPatchFileTree(rootNode); err != nil {
-			fmt.Println("error loading patch files: ", err)
-			os.Exit(1)
+			initErr = fmt.Errorf("error loading patch files: ", err)
 		}
 
 		buildPatchIndex(rootNode)
 
 		if len(patchIndex) < 1 {
-			fmt.Println("error loading patch files: at least one patch file must be present")
-			os.Exit(1)
+			initErr = fmt.Errorf("error loading patch files: at least one patch file must be present")
 		}
 
 		fmt.Println()
 	})
+
+	return initErr
 }
 
 // Build the list of patch files present in the patch directory too sync with the

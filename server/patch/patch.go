@@ -50,8 +50,6 @@ func GetWelcomeMessage() ([]byte, uint16) {
 	return messageBytes, uint16(len(messageBytes))
 }
 
-// PatchServer is the sub-server that acts as the first point of contact for a client. Its
-// only real job is to send the client a welcome message and then send the address of DataServer.
 type PatchServer struct {
 	name string
 	port string
@@ -74,6 +72,7 @@ func NewPatchServer(name, port, dataPort string) server.Server {
 func (s *PatchServer) Name() string       { return s.name }
 func (s *PatchServer) Port() string       { return s.port }
 func (s *PatchServer) HeaderSize() uint16 { return packets.PCHeaderSize }
+func (s *PatchServer) Init() error        { return nil }
 
 func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{

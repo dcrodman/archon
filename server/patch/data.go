@@ -12,16 +12,12 @@ import (
 	"os"
 )
 
-// DataServer is responsible for verifying the client's local files to make sure everything
-// is up to date and/or hasn't been tampered with. If "out of date" files are detected, this
-// server also takes care of sending the client the correct file(s).
 type DataServer struct {
 	name string
 	port string
 }
 
 func NewDataServer(name, port string) server.Server {
-	initializePatchData()
 	return &DataServer{
 		name: name,
 		port: port,
@@ -31,6 +27,7 @@ func NewDataServer(name, port string) server.Server {
 func (s DataServer) Name() string        { return s.name }
 func (s DataServer) Port() string        { return s.port }
 func (s *DataServer) HeaderSize() uint16 { return packets.PCHeaderSize }
+func (s *DataServer) Init() error        { return initializePatchData() }
 
 func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
 	c := &Client{
