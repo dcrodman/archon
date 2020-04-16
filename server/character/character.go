@@ -336,17 +336,19 @@ func (s *CharacterServer) sendTimestamp(client *Client) error {
 // Send the menu items for the ship select screen.
 func (s *CharacterServer) sendShipList(c *Client) error {
 	var shipList []packets.ShipListEntry
+	numShips := len(s.ships)
 
-	if len(s.ships) > 0 {
-		shipList := make([]packets.ShipListEntry, len(s.ships))
+	if numShips > 0 {
+		shipList = make([]packets.ShipListEntry, len(s.ships))
 
 		s.shipsMutex.RLock()
 
 		for i, ship := range s.ships {
 			shipList[i] = packets.ShipListEntry{
-				MenuId:   uint16(i),
+				MenuId: uint16(i + 1),
+				//MenuId:   0x12,
 				ShipId:   uint32(ship.id),
-				ShipName: [23]byte{},
+				ShipName: [36]byte{},
 			}
 			copy(shipList[i].ShipName[:], ship.name)
 		}
@@ -362,13 +364,16 @@ func (s *CharacterServer) sendShipList(c *Client) error {
 	}
 
 	pkt := &packets.ShipList{
-		Header:      packets.BBHeader{Type: packets.LoginShipListType, Flags: 0x01},
-		Unknown:     0x02,
+		Header: packets.BBHeader{
+			Type:  packets.LoginShipListType,
+			Flags: uint32(numShips),
+		},
+		Unknown:     0x20,
 		Unknown2:    0xFFFFFFF4,
 		Unknown3:    0x04,
 		ShipEntries: shipList,
 	}
-	copy(pkt.ServerName[:], "Archon")
+	copy(pkt.ServerName[:], internal.ConvertToUtf16("Archon"))
 
 	return c.send(pkt)
 }

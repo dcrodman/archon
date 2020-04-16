@@ -184,18 +184,18 @@ type ShipListEntry struct {
 	MenuId   uint16
 	ShipId   uint32
 	Padding  uint16
-	ShipName [23]byte
+	ShipName [36]byte
 }
 
 // The list of menu items to display to the client.
 type ShipList struct {
-	Header     BBHeader
-	Padding    uint16
-	Unknown    uint16 // set to 0x02
-	Unknown2   uint32 // set to 0xFFFFFFF4
-	Unknown3   uint16 // set to 0x04
-	ServerName [36]byte
-
+	Header      BBHeader
+	Padding     uint16
+	Unknown     uint16 // Always 0x20
+	Unknown2    uint32 // Always 0xFFFFFFF4
+	Unknown3    uint16 // Always 0x04
+	ServerName  [32]byte
+	Padding2    uint32
 	ShipEntries []ShipListEntry
 }
 
