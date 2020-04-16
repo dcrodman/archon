@@ -19,13 +19,15 @@ func compactFiles() {
 	}
 
 	for i := 1; i < flag.NArg(); i++ {
-		session, err := parseSessionDataFromFile(flag.Arg(i))
+		sessionFile := flag.Arg(i)
+		session, err := parseSessionDataFromFile(sessionFile)
 		if err != nil {
-			fmt.Printf("unable read file %s: %s\n", flag.Arg(i), err)
+			fmt.Printf("unable read file %s: %s\n", sessionFile, err)
 			os.Exit(1)
 		}
 
-		filename := generateCompactedFile(session)
+		filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFile, ".session", "", 1))
+		generateCompactedFile(filename, session)
 
 		fmt.Println("wrote", filename)
 	}
@@ -44,9 +46,7 @@ func parseSessionDataFromFile(filename string) (*SessionFile, error) {
 	return &s, nil
 }
 
-func generateCompactedFile(session *SessionFile) string {
-	filename := fmt.Sprintf("%s_compact.txt", session.SessionID)
-
+func generateCompactedFile(filename string, session *SessionFile) {
 	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("unable to write to %s: %s\n", filename, err)
@@ -59,8 +59,6 @@ func generateCompactedFile(session *SessionFile) string {
 			os.Exit(1)
 		}
 	}
-
-	return filename
 }
 
 func writePacketToFile(f *os.File, p *Packet) error {

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 func summarizeFiles() {
@@ -13,21 +14,21 @@ func summarizeFiles() {
 	}
 
 	for i := 1; i < flag.NArg(); i++ {
-		session, err := parseSessionDataFromFile(flag.Arg(i))
+		sessionFilename := flag.Arg(i)
+		session, err := parseSessionDataFromFile(sessionFilename)
 		if err != nil {
-			fmt.Printf("unable read file %s: %s\n", flag.Arg(i), err)
+			fmt.Printf("unable read file %s: %s\n", sessionFilename, err)
 			os.Exit(1)
 		}
 
-		filename := generateSummaryFile(session)
+		filename := fmt.Sprintf("%s_summary.txt", strings.Replace(sessionFilename, ".session", "", 1))
+		generateSummaryFile(filename, session)
 
 		fmt.Println("wrote", filename)
 	}
 }
 
-func generateSummaryFile(session *SessionFile) string {
-	filename := fmt.Sprintf("%s_summary.txt", session.SessionID)
-
+func generateSummaryFile(filename string, session *SessionFile) {
 	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("unable to write to %s: %s\n", filename, err)
@@ -40,6 +41,4 @@ func generateSummaryFile(session *SessionFile) string {
 			os.Exit(1)
 		}
 	}
-
-	return filename
 }
