@@ -21,20 +21,20 @@ type Client struct {
 	account *data.Account
 }
 
-func (c Client) ConnectionState() *server.ConnectionState { return c.cs }
+func (c *Client) ConnectionState() *server.ConnectionState { return c.cs }
 
 func (c *Client) clientVector() []uint8 { return c.clientCrypt.Vector }
 func (c *Client) serverVector() []uint8 { return c.serverCrypt.Vector }
 
-func (c Client) Encrypt(bytes []byte, length uint32) {
+func (c *Client) Encrypt(bytes []byte, length uint32) {
 	c.serverCrypt.Encrypt(bytes, length)
 }
 
-func (c Client) Decrypt(bytes []byte, length uint32) {
+func (c *Client) Decrypt(bytes []byte, length uint32) {
 	c.clientCrypt.Decrypt(bytes, length)
 }
 
-func (c Client) DebugInfo() map[string]interface{} {
+func (c *Client) DebugInfo() map[string]interface{} {
 	return map[string]interface{}{
 		"server_type": "character",
 	}

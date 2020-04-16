@@ -29,12 +29,12 @@ func newConnectionState(conn *net.TCPConn) *ConnectionState {
 	}
 }
 
-func (c *ConnectionState) IPAddr() string { return c.ipAddr }
-func (c *ConnectionState) Port() string   { return c.port }
-func (c *ConnectionState) Data() []byte   { return c.buffer }
+func (cs *ConnectionState) IPAddr() string { return cs.ipAddr }
+func (cs *ConnectionState) Port() string   { return cs.port }
+func (cs *ConnectionState) Data() []byte   { return cs.buffer }
 
-func (c *ConnectionState) WriteBytes(bytes []byte) (int, error) {
-	return c.connection.Write(bytes)
+func (cs *ConnectionState) WriteBytes(bytes []byte) (int, error) {
+	return cs.connection.Write(bytes)
 }
 
 // Client2 is a wrapper interface that allows the server package functions to
