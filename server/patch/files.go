@@ -77,8 +77,6 @@ func initializePatchData() error {
 		if len(patchIndex) < 1 {
 			initErr = fmt.Errorf("error loading patch files: at least one patch file must be present")
 		}
-
-		fmt.Println()
 	})
 
 	return initErr

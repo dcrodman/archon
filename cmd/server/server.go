@@ -109,6 +109,15 @@ func startServers() {
 	go startShipgate(shipgateAddr, &wg)
 
 	for _, s := range servers {
+		if err := s.Init(); err != nil {
+			fmt.Printf("failed to initialize %s server: %s\n", s.Name(), err)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println()
+
+	for _, s := range servers {
 		startBlockingServer(s, &wg)
 	}
 

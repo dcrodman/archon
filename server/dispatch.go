@@ -87,11 +87,6 @@ func Start(s Server) {
 		os.Exit(1)
 	}
 
-	if err := s.Init(); err != nil {
-		fmt.Printf("failed to start %s server: %s\n", s.Name(), err)
-		os.Exit(1)
-	}
-
 	fmt.Printf("waiting for %s connections on %v:%v\n", s.Name(), hostname, s.Port())
 
 	startListenerLoop(s, socket)
