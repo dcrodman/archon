@@ -1,8 +1,11 @@
 // The character package contains the implementation of the CHARACTER server.
 //
-// Clients are sent to the CHARACTER server after authenticating with LOGIN. This
-// server serves four main purposes: character selection, character creation/modification,
-// guildcard data sync, and ship selection.
+// Clients are sent to the CHARACTER server after authenticating with LOGIN. Each client
+// connects to the server in four different phases (each one is a new connection):
+//  1. Data download (login options, guildcard, and character previews).
+//  2. Character selection
+//  3. (Optional) Character creation/modification (recreate and dressing room)
+//  4. Confirmation and ship selection
 //
 // The ship list is obtained by communicating with the shipgate server since ships
 // do not directly connect to this server.
@@ -236,7 +239,7 @@ func (s *CharacterServer) Handle(client server.Client2) error {
 	case packets.MenuSelectType:
 		err = s.handleShipSelection(c)
 	case packets.DisconnectType:
-		// Just wait until we recv 0 from the client to disconnect.
+		// Just wait for the client to disconnect.
 		break
 	default:
 		archon.Log.Infof("Received unknown packet %x from %s", packetHeader.Type, c.ConnectionState().IPAddr())
@@ -335,13 +338,14 @@ func (s *CharacterServer) sendTimestamp(client *Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *CharacterServer) sendShipList(c *Client) error {
+	s.shipsMutex.RLock()
+	defer s.shipsMutex.RUnlock()
+
 	var shipList []packets.ShipListEntry
 	numShips := len(s.ships)
 
 	if numShips > 0 {
 		shipList = make([]packets.ShipListEntry, len(s.ships))
-
-		s.shipsMutex.RLock()
 
 		for i, ship := range s.ships {
 			shipList[i] = packets.ShipListEntry{
@@ -352,8 +356,6 @@ func (s *CharacterServer) sendShipList(c *Client) error {
 			}
 			copy(shipList[i].ShipName[:], ship.name)
 		}
-
-		s.shipsMutex.RUnlock()
 	} else {
 		// A "No Ships!" entry is shown if we either can't connect to the shipgate or
 		// the shipgate doesn't report any connected ships.
