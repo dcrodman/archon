@@ -7,9 +7,10 @@ package api;
 
 message ShipList {
   message Ship {
-    string name = 1;
-    string ip = 2;
-    string port = 3;
+    int32  id = 1;
+    string name = 2;
+    string ip = 3;
+    string port = 4;
   }
   repeated Ship ships = 1;
 }

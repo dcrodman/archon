@@ -8,6 +8,10 @@ import (
 
 type shipServiceServer struct{}
 
-func (s *shipServiceServer) GetActiveShips(ctx context.Context, empty *empty.Empty) (*api.ShipList, error) {
-	return &api.ShipList{}, nil
+func (s *shipServiceServer) GetActiveShips(ctx context.Context, _ *empty.Empty) (*api.ShipList, error) {
+	return &api.ShipList{
+		Ships: []*api.ShipList_Ship{
+			{Id: 1, Name: "Test", Ip: "192.168.1.4", Port: "15001"},
+		},
+	}, nil
 }
