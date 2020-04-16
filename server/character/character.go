@@ -358,7 +358,7 @@ func (s *CharacterServer) sendShipList(c *Client) error {
 		// A "No Ships!" entry is shown if we either can't connect to the shipgate or
 		// the shipgate doesn't report any connected ships.
 		shipList = []packets.ShipListEntry{
-			{MenuId: 0xFF, ShipId: 0xFF},
+			{MenuId: 0xFF, ShipId: 0xFF, ShipName: [36]byte{}},
 		}
 		copy(shipList[0].ShipName[:], internal.ConvertToUtf16("No Ships!")[:])
 	}
