@@ -107,7 +107,7 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 	for cl.len() < maxConnections {
 		conn, err := socket.AcceptTCP()
 		if err != nil {
-			archon.Log.Warnf("failed to accept connection: %v", err.Error())
+			archon.Log.Warnf("failed to accept connection: %s", err.Error())
 			continue
 		}
 
@@ -247,7 +247,7 @@ func closeClientConnection(s Server, c Client2) {
 	}
 
 	if err := cs.connection.Close(); err != nil {
-		archon.Log.Warnf("failed to close client connection: ", err)
+		archon.Log.Warnf("failed to close client connection: %s", err)
 	}
 
 	archon.Log.Infof("disconnected %s client %s", s.Name(), cs.IPAddr())
