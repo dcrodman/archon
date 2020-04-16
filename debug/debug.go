@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	"net/http"
 	"runtime/pprof"
+	"time"
 )
 
 // Enabled returns whether or not the server was set to debug mode.
@@ -64,17 +65,18 @@ func sendToPacketAnalyzer(c server.Client2, packetBytes []byte, size int, source
 	}
 
 	reqBytes, _ := json.Marshal(&packet)
+	httpClient := http.Client{Timeout: time.Second}
 
 	// We don't care if the packets don't get through.
-	r, err := http.Post(
+	r, err := httpClient.Post(
 		"http://"+viper.GetString("packet_analyzer_address"),
 		"application/json",
 		bytes.NewBuffer(reqBytes),
 	)
 
 	if err != nil {
-		archon.Log.Warn("failed to send packet to analyzer:", err)
+		archon.Log.Warn("failed to send packet to analyzer: ", err)
 	} else if r.StatusCode != 200 {
-		archon.Log.Warn("failed to send packet to analyzer:", r.Body)
+		archon.Log.Warn("failed to send packet to analyzer: ", r.Body)
 	}
 }
