@@ -18,7 +18,7 @@ func SendPacket(c server.Client2, packet interface{}, lenDivisor uint16) error {
 	}
 
 	c.Encrypt(b, uint32(n))
-	return SendRaw(c, b, n)
+	return transmit(c, b, n)
 }
 
 // adjustPacketLength pads the length of a packet to a multiple of the header
