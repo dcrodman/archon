@@ -113,10 +113,6 @@ func startClientLoop(s Server, c Client2) {
 			archon.Log.Warn("error in client communication: " + err.Error())
 			return
 		}
-
-		if c.ConnectionState().closed {
-			break
-		}
 	}
 }
 
@@ -128,10 +124,8 @@ func closeConnectionAndRecover(s Server, c Client2) {
 			cs.IPAddr(), err, debug.Stack())
 	}
 
-	if !cs.closed {
-		if err := cs.connection.Close(); err != nil {
-			archon.Log.Warnf("failed to close client connection: %s", err)
-		}
+	if err := cs.connection.Close(); err != nil {
+		archon.Log.Warnf("failed to close client connection: %s", err)
 	}
 
 	archon.Log.Infof("disconnected %s client %s", s.Name(), cs.IPAddr())
