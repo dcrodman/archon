@@ -3,6 +3,7 @@ package character
 import (
 	"errors"
 	"fmt"
+	"github.com/dcrodman/archon/debug"
 	"github.com/dcrodman/archon/prs"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/spf13/viper"
@@ -127,7 +128,7 @@ func loadParameterFiles(paramFileDir string) error {
 		paramHeaderData = append(paramHeaderData, bytes...)
 		tmpChunkData = append(tmpChunkData, data...)
 
-		if viper.GetBool("debug_mode") {
+		if debug.Enabled() {
 			fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
 		}
 	}
