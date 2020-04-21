@@ -154,7 +154,7 @@ func (s *CharacterServer) getActiveShipList() ([]*ship, error) {
 	}
 	defer conn.Close()
 
-	shipgateClient := api.NewShipServiceClient(conn)
+	shipgateClient := api.NewShipMetadataServiceClient(conn)
 	response, err := shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch ships from shipgate: %s", err)

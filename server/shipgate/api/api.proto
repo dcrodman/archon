@@ -11,10 +11,20 @@ message ShipList {
     string name = 2;
     string ip = 3;
     string port = 4;
+    int32 playerCount = 5;
   }
   repeated Ship ships = 1;
 }
 
-service ShipService {
+// ShipMetadataService is intended for clients that need to know information
+// about the registered ships but not change state (like the character server).
+service ShipMetadataService {
+  // GetActiveShips returns the list of Ships that currently connected to the
+  // shipgate and ready to receive players.
   rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
+}
+
+// ShipgateService provides game functionality and is intended for use by
+// ship servers serving players.
+service ShipgateService{
 }

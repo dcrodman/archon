@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"sync"
+	"time"
 )
 
 func main() {
@@ -52,7 +53,10 @@ func main() {
 	}
 	defer data.Shutdown()
 
-	fmt.Printf("connected to database %s:%d\n", viper.GetString("database.host"), viper.GetInt("database.port"))
+	fmt.Printf("connected to database %s:%d\n\n",
+		viper.GetString("database.host"),
+		viper.GetInt("database.port"),
+	)
 
 	startServers()
 }
@@ -64,7 +68,10 @@ func startServers() {
 	hostname := viper.GetString("hostname")
 	server.SetHostname(hostname)
 
-	shipgateAddr := fmt.Sprintf("%s:%s", hostname, viper.GetString("shipgate_server.port"))
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	shipgateMetaAddr, _ := startShipgate(hostname, &wg)
 
 	dataServer := patch.NewDataServer(
 		"DATA",
@@ -78,7 +85,7 @@ func startServers() {
 	characterServer := character.NewServer(
 		"CHARACTER",
 		viper.GetString("character_server.port"),
-		shipgateAddr,
+		shipgateMetaAddr,
 	)
 	loginServer := login.NewServer(
 		"LOGIN",
@@ -103,11 +110,14 @@ func startServers() {
 		characterServer,
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(servers) + 1)
+	wg.Add(len(servers))
 
-	go startShipgate(shipgateAddr, &wg)
+	launchBlockingServers(servers, &wg)
 
+	wg.Wait()
+}
+
+func launchBlockingServers(servers []server.Server, wg *sync.WaitGroup) {
 	for _, s := range servers {
 		if err := s.Init(); err != nil {
 			fmt.Printf("failed to initialize %s server: %s\n", s.Name(), err)
@@ -118,23 +128,31 @@ func startServers() {
 	fmt.Println()
 
 	for _, s := range servers {
-		startBlockingServer(s, &wg)
+		go func(s server.Server) {
+			server.Start(s)
+			wg.Done()
+		}(s)
 	}
-
-	wg.Wait()
 }
 
-func startBlockingServer(s server.Server, wg *sync.WaitGroup) {
-	go func(s server.Server) {
-		server.Start(s)
+func startShipgate(hostname string, wg *sync.WaitGroup) (string, string) {
+	shipgateMetaAddr := fmt.Sprintf(
+		"%s:%s", hostname, viper.GetString("shipgate_server.meta_service_port"))
+	shipgateAddr := fmt.Sprintf(
+		"%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
+
+	go func() {
+		if err := shipgate.Start(shipgateMetaAddr, shipgateAddr); err != nil {
+			fmt.Println("failed to start ship server:", err)
+			os.Exit(1)
+		}
+
 		wg.Done()
-	}(s)
-}
+	}()
 
-func startShipgate(shipgateAddr string, wg *sync.WaitGroup) {
-	if err := shipgate.StartAPIServer(shipgateAddr); err != nil {
-		fmt.Println("failed to start ship server:", err)
-		os.Exit(1)
-	}
-	wg.Done()
+	// Hack in a second for the shipgate to initialize.
+	time.Sleep(time.Second)
+	fmt.Println()
+
+	return shipgateMetaAddr, shipgateAddr
 }

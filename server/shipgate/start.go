@@ -11,8 +11,8 @@ import (
 	"net"
 )
 
-// StartAPIServer starts the gRPC API server on the specified address.
-func StartAPIServer(addr string) error {
+// Start starts the gRPC API server on the specified address.
+func Start(metaAddr string, shipAddr string) error {
 	cert, err := loadX509Certificate()
 	if err != nil {
 		return err
@@ -20,21 +20,16 @@ func StartAPIServer(addr string) error {
 
 	creds := credentials.NewServerTLSFromCert(cert)
 	opts := []grpc.ServerOption{grpc.Creds(creds)}
-	grpcServer := grpc.NewServer(opts...)
 
-	s := shipServiceServer{}
-	api.RegisterShipServiceServer(grpcServer, &s)
+	mec := startMetadataService(metaAddr, opts)
+	sec := startShipService(shipAddr, opts)
 
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("failed to start shigate on %s: %s\n", addr, err)
+	select {
+	case err := <-mec:
+		return err
+	case err := <-sec:
+		return err
 	}
-
-	if err := grpcServer.Serve(l); err != nil {
-		return fmt.Errorf("failed to start shipgate on %s: %s\n", addr, err)
-	}
-
-	return nil
 }
 
 func loadX509Certificate() (*tls.Certificate, error) {
@@ -54,4 +49,54 @@ func loadX509Certificate() (*tls.Certificate, error) {
 	}
 
 	return &cert, nil
+}
+
+func startMetadataService(addr string, opts []grpc.ServerOption) <-chan error {
+	errChan := make(chan error)
+
+	go func() {
+		grpcServer := grpc.NewServer(opts...)
+		s := shipMetadataServiceServer{}
+		api.RegisterShipMetadataServiceServer(grpcServer, &s)
+
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to start shigate metadata service on %s: %s\n", addr, err)
+		}
+
+		fmt.Printf("waiting for ShipMetadataService requests on %s\n", addr)
+
+		if err := grpcServer.Serve(l); err != nil {
+			errChan <- fmt.Errorf("failed to start shipgate metadata service on %s: %s\n", addr, err)
+		}
+
+		close(errChan)
+	}()
+
+	return errChan
+}
+
+func startShipService(addr string, opts []grpc.ServerOption) <-chan error {
+	errChan := make(chan error)
+
+	go func() {
+		grpcServer := grpc.NewServer(opts...)
+		s := shipgateServiceServer{}
+		api.RegisterShipgateServiceServer(grpcServer, &s)
+
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to start shigate ship service on %s: %s\n", addr, err)
+		}
+
+		fmt.Printf("waiting for ShipgateService requests on %s\n", addr)
+
+		if err := grpcServer.Serve(l); err != nil {
+			errChan <- fmt.Errorf("failed to start shipgate ship service on %s: %s\n", addr, err)
+		}
+
+		close(errChan)
+	}()
+
+	return errChan
 }
