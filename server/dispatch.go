@@ -2,64 +2,18 @@ package server
 
 import (
 	"bytes"
-	"container/list"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/spf13/viper"
 	"io"
 	"net"
 	"os"
 	"runtime/debug"
-	"sync"
+	"time"
 )
 
 var hostname string
-
-// A concurrency-safe wrapper around container/list for maintaining a collection of connected clients.
-type clientList struct {
-	clients *list.List
-	sync.RWMutex
-}
-
-func (c *clientList) add(cl *ConnectionState) {
-	c.Lock()
-	c.clients.PushBack(cl)
-	c.Unlock()
-}
-
-func (c *clientList) remove(cl *ConnectionState) {
-	clAddr := cl.IPAddr()
-	c.Lock()
-	for clientElem := c.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
-		client := clientElem.Value.(*ConnectionState)
-		if client.IPAddr() == clAddr {
-			c.clients.Remove(clientElem)
-			break
-		}
-	}
-	c.Unlock()
-}
-
-// Note: this comparison is by IP address, not element value.
-func (c *clientList) has(cl *ConnectionState) bool {
-	clAddr := cl.IPAddr()
-	c.RLock()
-	defer c.RUnlock()
-	for clientElem := c.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
-		if cl.IPAddr() == clAddr {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *clientList) len() int {
-	c.RLock()
-	defer c.RUnlock()
-	return c.clients.Len()
-}
 
 // SetHostname sets the address to which any server instances launched with Start() will be bound.
 func SetHostname(h string) {
@@ -97,14 +51,12 @@ func Start(s Server) {
 func startListenerLoop(server Server, socket *net.TCPListener) {
 	defer fmt.Println(server.Name() + " exiting")
 
-	cl := clientList{
-		clients: list.New(),
-		RWMutex: sync.RWMutex{},
-	}
-	maxConnections := viper.GetInt("max_connections")
+	for {
+		// Poll until we can accept more clients.
+		for isServerFull() {
+			time.Sleep(time.Second)
+		}
 
-	// Poll until we can accept more clients.
-	for cl.len() < maxConnections {
 		conn, err := socket.AcceptTCP()
 		if err != nil {
 			archon.Log.Warnf("failed to accept connection: %s", err.Error())
@@ -120,7 +72,7 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 			cs := newConnectionState(conn)
 
 			// Prevent multiple clients from connecting from the same IP address.
-			if cl.has(cs) {
+			if globalClientList.has(cs) {
 				archon.Log.Infof("rejected second %s connection from %s", server.Name(), cs.IPAddr())
 				cs.connection.Close()
 				return
@@ -130,9 +82,9 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 
 			if err == nil {
 				archon.Log.Infof("accepted %s connection from %s", server.Name(), cs.IPAddr())
-				cl.add(cs)
+				globalClientList.add(cs)
 				startClientLoop(s, c)
-				cl.remove(cs)
+				globalClientList.remove(cs)
 			} else {
 				archon.Log.Warn(err.Error())
 			}
@@ -145,7 +97,7 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 func startClientLoop(s Server, c Client2) {
 	// Defer so that we catch any panics, disconnect the client, and
 	// remove them from the list regardless of the connection state.
-	defer closeClientConnection(s, c)
+	defer closeConnectionAndRecover(s, c)
 
 	for {
 		err := ReadNextPacket(c, s.HeaderSize())
@@ -161,7 +113,28 @@ func startClientLoop(s Server, c Client2) {
 			archon.Log.Warn("error in client communication: " + err.Error())
 			return
 		}
+
+		if c.ConnectionState().closed {
+			break
+		}
 	}
+}
+
+func closeConnectionAndRecover(s Server, c Client2) {
+	cs := c.ConnectionState()
+
+	if err := recover(); err != nil {
+		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
+			cs.IPAddr(), err, debug.Stack())
+	}
+
+	if !cs.closed {
+		if err := cs.connection.Close(); err != nil {
+			archon.Log.Warnf("failed to close client connection: %s", err)
+		}
+	}
+
+	archon.Log.Infof("disconnected %s client %s", s.Name(), cs.IPAddr())
 }
 
 // ReadNextPacket is a blocking call that only returns once the client has
@@ -237,18 +210,4 @@ func getPacketSize(data []byte) (uint16, error) {
 	err := binary.Read(reader, binary.LittleEndian, &size)
 
 	return size, err
-}
-
-func closeClientConnection(s Server, c Client2) {
-	cs := c.ConnectionState()
-	if err := recover(); err != nil {
-		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
-			cs.IPAddr(), err, debug.Stack())
-	}
-
-	if err := cs.connection.Close(); err != nil {
-		archon.Log.Warnf("failed to close client connection: %s", err)
-	}
-
-	archon.Log.Infof("disconnected %s client %s", s.Name(), cs.IPAddr())
 }
