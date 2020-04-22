@@ -9,7 +9,7 @@
 
 package encryption
 
-func expandKey(key []byte, c *Cipher) {
+func expandKey(key []byte, c *blowfishCipher) {
 	keyCopy := make([]byte, len(key))
 	copy(keyCopy, key)
 	// PSO applies a fixed salt to its encryption keys.
@@ -72,7 +72,7 @@ func expandKey(key []byte, c *Cipher) {
 }
 
 // PSO uses the standard Blowfish rounds for P table scheduling.
-func encryptPBlock(l, r uint32, c *Cipher) (uint32, uint32) {
+func encryptPBlock(l, r uint32, c *blowfishCipher) (uint32, uint32) {
 	xl, xr := l, r
 	xl ^= c.p[0]
 	xr ^= ((c.s0[byte(xl>>24)] + c.s1[byte(xl>>16)]) ^ c.s2[byte(xl>>8)]) + c.s3[byte(xl)] ^ c.p[1]
@@ -96,7 +96,7 @@ func encryptPBlock(l, r uint32, c *Cipher) (uint32, uint32) {
 }
 
 // Mostly the same as standard Blowfish, but with some customization at the end.
-func encryptSBlock(l, r uint32, c *Cipher) (uint32, uint32) {
+func encryptSBlock(l, r uint32, c *blowfishCipher) (uint32, uint32) {
 	xl, xr := l, r
 	xl ^= c.p[0]
 	xr ^= ((c.s0[byte(xl>>24)] + c.s1[byte(xl>>16)]) ^ c.s2[byte(xl>>8)]) + c.s3[byte(xl)] ^ c.p[1]
@@ -126,7 +126,7 @@ func encryptSBlock(l, r uint32, c *Cipher) (uint32, uint32) {
 	return xl, xr
 }
 
-func encryptData(l, r uint32, c *Cipher) (uint32, uint32) {
+func encryptData(l, r uint32, c *blowfishCipher) (uint32, uint32) {
 	xl, xr := l, r
 	xl ^= c.p[0]
 	xr ^= ((c.s0[byte(xl>>24)] + c.s1[byte(xl>>16)]) ^ c.s2[byte(xl>>8)]) + c.s3[byte(xl)] ^ c.p[1]
@@ -137,7 +137,7 @@ func encryptData(l, r uint32, c *Cipher) (uint32, uint32) {
 	return xr, xl
 }
 
-func decryptData(l, r uint32, c *Cipher) (uint32, uint32) {
+func decryptData(l, r uint32, c *blowfishCipher) (uint32, uint32) {
 	xl, xr := l, r
 	xl ^= c.p[5]
 	xr ^= ((c.s0[byte(xl>>24)] + c.s1[byte(xl>>16)]) ^ c.s2[byte(xl>>8)]) + c.s3[byte(xl)] ^ c.p[4]

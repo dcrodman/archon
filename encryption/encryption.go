@@ -22,12 +22,14 @@ type PSOCrypt struct {
 	Vector []uint8
 }
 
-// Generate a cryptographially secure random string of bytes.
+// Generate a cryptographically secure random string of bytes.
 func createKey(size int) []byte {
 	key := make([]byte, size)
+
 	for i := 0; i < size; i++ {
 		binary.Read(rand.Reader, binary.LittleEndian, &key[i])
 	}
+
 	return key
 }
 
@@ -44,9 +46,11 @@ func le(b []byte) uint32 {
 func NewPCCrypt() *PSOCrypt {
 	crypt := &PSOCrypt{Vector: createKey(4)}
 	var err error
+
 	if crypt.cipher, err = newPCCipher(crypt.Vector); err != nil {
 		panic(err)
 	}
+
 	return crypt
 }
 
@@ -55,15 +59,18 @@ func NewPCCrypt() *PSOCrypt {
 func NewBBCrypt() *PSOCrypt {
 	crypt := &PSOCrypt{Vector: createKey(48)}
 	var err error
+
 	if crypt.cipher, err = newCipher(crypt.Vector); err != nil {
 		panic(err)
 	}
+
 	return crypt
 }
 
 // Encrypt a block of data in place.
 func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
 	blockSize := crypt.cipher.blockSize()
+
 	for i := 0; i < int(size); i += blockSize {
 		block := data[i : i+blockSize]
 		crypt.cipher.encrypt(block)
@@ -73,6 +80,7 @@ func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
 // Decrypt a block of data in place.
 func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
 	blockSize := crypt.cipher.blockSize()
+
 	for i := 0; i < int(size); i += blockSize {
 		block := data[i : i+blockSize]
 		crypt.cipher.decrypt(block)

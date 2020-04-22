@@ -1,12 +1,9 @@
-/* Copyright 2010 The Go Authors. All rights reserved.
-* Use of this source code is governed by a BSD-style
-* license that can be found in the LICENSE file.
-*
-* PSOPC encryption algorithm. Implementation based on (and
-* in some cases basically copied from) the encryption
-* library included with Fuzziqer Software's newserv code.
- */
-
+// PSOPC encryption algorithm. Implementation based on (and in some cases basically
+// copied from) the encryption library included with Fuzziqer Software's newserv code.
+//
+// Note: The cipher used PC/Gamecrube is not symmetrical in that decrypting a block
+// previously encrypted with this cipher will not yield the same result due (I think)
+// to the key rotations.
 package encryption
 
 import "strconv"
@@ -42,6 +39,7 @@ func (crypt *PCCrypt) createKeys() {
 	x := uint32(1)
 	key := crypt.seed
 	crypt.keys[56], crypt.keys[55] = key, key
+
 	for i := 0x15; i <= 0x46E; i += 0x15 {
 		j := i % 55
 		key -= x
@@ -49,9 +47,11 @@ func (crypt *PCCrypt) createKeys() {
 		x = key
 		key = crypt.keys[j]
 	}
+
 	for i := 0; i < 4; i++ {
 		crypt.mixKeys()
 	}
+
 	crypt.position = 56
 }
 
@@ -93,7 +93,7 @@ func (crypt *PCCrypt) decrypt(src []byte) {
 	crypt.process(src, len(src))
 }
 
-// Perfrorm the actual encryption/decryption. The operation is
+// Perform the actual encryption/decryption. The operation is
 // symmetrical, so the same algorithm can be applied for both.
 func (crypt *PCCrypt) process(data []byte, size int) {
 	for x := 0; x < size; x += 4 {
