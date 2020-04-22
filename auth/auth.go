@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/data"
 )
 
@@ -17,9 +16,8 @@ var (
 // VerifyAccount checks the Accounts table for the specified credentials
 // combination and validates that the account is accessible.
 func VerifyAccount(username, password string) (*data.Account, error) {
-	account, err := data.FindAccount(username)
+	account, err := findAccount(username)
 	if err != nil {
-		archon.Log.Warn("error in FindAccount: ", err)
 		return nil, ErrUnknown
 	}
 
@@ -32,8 +30,12 @@ func VerifyAccount(username, password string) (*data.Account, error) {
 	return account, nil
 }
 
+var findAccount = func(username string) (*data.Account, error) {
+	return data.FindAccount(username)
+}
+
 // CreateAccount takes the specified credentials and creates a new record in
-// the database, returning either the result or any errors encountered.
+// the database, returning either the expected or any errors encountered.
 func CreateAccount(username, password, email string) (*data.Account, error) {
 	account := &data.Account{
 		Username: username,
@@ -41,11 +43,15 @@ func CreateAccount(username, password, email string) (*data.Account, error) {
 		Email:    email,
 	}
 
-	if err := data.CreateAccount(account); err != nil {
+	if err := createAccount(account); err != nil {
 		return nil, err
 	}
 
 	return account, nil
+}
+
+var createAccount = func(account *data.Account) error {
+	return data.CreateAccount(account)
 }
 
 // HashPassword returns a version of password with Archon's chosen hashing strategy.
