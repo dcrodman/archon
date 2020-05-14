@@ -1,4 +1,4 @@
-package characters
+package character
 
 // CharClass is an enumeration of the possible character classes.
 type CharClass uint8

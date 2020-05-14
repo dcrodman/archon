@@ -7,10 +7,10 @@ import (
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/block"
-	"github.com/dcrodman/archon/server/character"
-	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/block"
+	"github.com/dcrodman/archon/internal/server/character"
+	"github.com/dcrodman/archon/internal/server/internal"
 	"strings"
 )
 

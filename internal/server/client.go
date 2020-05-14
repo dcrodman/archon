@@ -54,7 +54,8 @@ type Client interface {
 }
 
 // CommonClient encapsulates the user-specific information common to several server
-// implementations and is intended to be embedded by any Client instance that needs it.
+// implementations and is intended to be embedded by any Client instance that needs
+// this common data rather than redefining it.
 type CommonClient struct {
 	Config packets.ClientConfig
 

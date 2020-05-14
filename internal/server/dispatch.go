@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
-	archon_debug "github.com/dcrodman/archon/internal/debug"
+	archdebug "github.com/dcrodman/archon/internal/debug"
 	"io"
 	"net"
 	"os"
@@ -110,8 +110,8 @@ func startClientLoop(s Server, c Client) {
 			break
 		}
 
-		if archon_debug.Enabled() {
-			archon_debug.SendClientPacketToAnalyzer(c, c.ConnectionState().Data(), uint16(packetSize))
+		if archdebug.Enabled() {
+			archdebug.SendClientPacketToAnalyzer(c, c.ConnectionState().Data(), uint16(packetSize))
 		}
 
 		if err = s.Handle(c); err != nil {

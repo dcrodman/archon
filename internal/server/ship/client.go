@@ -1,14 +1,15 @@
-package login
+package ship
 
 import (
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/internal"
-	"github.com/dcrodman/archon/server/internal/relay"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/internal/relay"
 )
 
-// Client implementation for the LOGIN server.
+// Client implementation for the SHIP server.
 type Client struct {
 	cs *server.ConnectionState
 
@@ -16,6 +17,8 @@ type Client struct {
 	serverCrypt *encryption.PSOCrypt
 
 	server.CommonClient
+
+	account *data.Account
 }
 
 func (c *Client) ConnectionState() *server.ConnectionState { return c.cs }
@@ -33,7 +36,7 @@ func (c *Client) Decrypt(bytes []byte, length uint32) {
 
 func (c *Client) DebugInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"server_type": "login",
+		"server_type": "ship",
 	}
 }
 

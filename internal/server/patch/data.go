@@ -5,8 +5,8 @@ import (
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/internal"
 	"hash/crc32"
 	"io"
 	"os"
@@ -30,7 +30,7 @@ func (s *DataServer) HeaderSize() uint16 { return packets.PCHeaderSize }
 func (s *DataServer) Init() error        { return initializePatchData() }
 
 func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
-	c := &Client{
+	c := &client{
 		cs:            cs,
 		clientCrypt:   crypto.NewPCCrypt(),
 		serverCrypt:   crypto.NewPCCrypt(),
@@ -38,7 +38,7 @@ func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client, err
 	}
 
 	var err error
-	if SendPCWelcome(c) != nil {
+	if sendPCWelcome(c) != nil {
 		err = errors.New("Error sending welcome packet to: " + c.ConnectionState().IPAddr())
 		c = nil
 	}
@@ -46,7 +46,7 @@ func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client, err
 }
 
 func (s DataServer) Handle(client server.Client) error {
-	c := client.(*Client)
+	c := client.(*client)
 	var hdr packets.PCHeader
 
 	internal.StructFromBytes(c.ConnectionState().Data()[:packets.PCHeaderSize], &hdr)
@@ -68,7 +68,7 @@ func (s DataServer) Handle(client server.Client) error {
 }
 
 // Simple acknowledgement to the welcome response.
-func (s *DataServer) sendWelcomeAck(client *Client) error {
+func (s *DataServer) sendWelcomeAck(client *client) error {
 	return client.send(packets.PCHeader{
 		Size: 0x04,
 		Type: packets.PatchHandshakeType,
@@ -76,7 +76,7 @@ func (s *DataServer) sendWelcomeAck(client *Client) error {
 }
 
 // Once the client has authenticated, send them the list of files to update.
-func (s *DataServer) handlePatchLogin(c *Client) error {
+func (s *DataServer) handlePatchLogin(c *client) error {
 	if err := s.sendDataAck(c); err != nil {
 		return err
 	}
@@ -87,12 +87,12 @@ func (s *DataServer) handlePatchLogin(c *Client) error {
 }
 
 // Acknowledgement sent after the DATA connection handshake.
-func (s *DataServer) sendDataAck(client *Client) error {
+func (s *DataServer) sendDataAck(client *client) error {
 	return client.send(packets.PCHeader{Type: packets.PatchDataAckType, Size: 0x04})
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
-func (s *DataServer) sendFileList(client *Client, node *directoryNode) error {
+func (s *DataServer) sendFileList(client *client, node *directoryNode) error {
 	if err := s.sendChangeDir(client, node.clientPath); err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (s *DataServer) sendFileList(client *Client, node *directoryNode) error {
 }
 
 // Tell the client to change to some directory within its file tree.
-func (s *DataServer) sendChangeDir(client *Client, dir string) error {
+func (s *DataServer) sendChangeDir(client *client, dir string) error {
 	pkt := packets.ChangeDir{
 		Header:  packets.PCHeader{Type: packets.PatchChangeDirType},
 		Dirname: [64]byte{},
@@ -128,7 +128,7 @@ func (s *DataServer) sendChangeDir(client *Client, dir string) error {
 }
 
 // Tell the client to check a file in its current working directory.
-func (s *DataServer) sendCheckFile(client *Client, index uint32, filename string) error {
+func (s *DataServer) sendCheckFile(client *client, index uint32, filename string) error {
 	pkt := packets.CheckFile{
 		Header:  packets.PCHeader{Type: packets.PatchCheckFileType},
 		PatchId: index,
@@ -139,18 +139,18 @@ func (s *DataServer) sendCheckFile(client *Client, index uint32, filename string
 }
 
 // Tell the client to change to one directory above.
-func (s *DataServer) sendDirAbove(client *Client) error {
+func (s *DataServer) sendDirAbove(client *client) error {
 	return client.send(packets.PCHeader{Type: packets.PatchDirAboveType, Size: 0x04})
 }
 
 // Tell the client that we've finished sending the patch list.
-func (s *DataServer) sendFileListDone(client *Client) error {
+func (s *DataServer) sendFileListDone(client *client) error {
 	return client.send(packets.PCHeader{Type: packets.PatchFileListDoneType, Size: 0x04})
 }
 
 // The client sent us a checksum for one of the patch files. Compare it to what we
 // have and add it to the list of files to update if there is any discrepancy.
-func (s *DataServer) handleFileStatus(client *Client) {
+func (s *DataServer) handleFileStatus(client *client) {
 	var fileStatus packets.FileStatus
 	internal.StructFromBytes(client.ConnectionState().Data(), &fileStatus)
 
@@ -163,7 +163,7 @@ func (s *DataServer) handleFileStatus(client *Client) {
 
 // The client finished sending all of the file check packets. If they have
 // any files that need updating, now's the time to do it.
-func (s *DataServer) updateClientFiles(client *Client) error {
+func (s *DataServer) updateClientFiles(client *client) error {
 	var numFiles, totalSize uint32 = 0, 0
 
 	for _, patch := range client.filesToUpdate {
@@ -184,7 +184,7 @@ func (s *DataServer) updateClientFiles(client *Client) error {
 }
 
 // Send the total number and cumulative size of files that need updating.
-func (s *DataServer) sendStartFileUpdate(client *Client, num, totalSize uint32) error {
+func (s *DataServer) sendStartFileUpdate(client *client, num, totalSize uint32) error {
 	return client.send(packets.StartFileUpdate{
 		Header:    packets.PCHeader{Type: packets.PatchUpdateFilesType},
 		NumFiles:  num,
@@ -194,7 +194,7 @@ func (s *DataServer) sendStartFileUpdate(client *Client, num, totalSize uint32) 
 
 // Recursively traverse our tree of patch files, sending the file data to the client
 // when an out of date file is encountered.
-func (s *DataServer) traverseAndUpdate(client *Client, node *directoryNode) error {
+func (s *DataServer) traverseAndUpdate(client *client, node *directoryNode) error {
 	if err := s.sendChangeDir(client, node.name); err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (s *DataServer) traverseAndUpdate(client *Client, node *directoryNode) erro
 	return s.sendDirAbove(client)
 }
 
-func (s *DataServer) updateClientFile(client *Client, patch *fileEntry) error {
+func (s *DataServer) updateClientFile(client *client, patch *fileEntry) error {
 	if err := s.sendFileHeader(client, patch); err != nil {
 		return nil
 	}
@@ -253,7 +253,7 @@ func (s *DataServer) updateClientFile(client *Client, patch *fileEntry) error {
 }
 
 // send the header for a file we're about to update.
-func (s *DataServer) sendFileHeader(client *Client, patch *fileEntry) error {
+func (s *DataServer) sendFileHeader(client *client, patch *fileEntry) error {
 	pkt := packets.FileHeader{
 		Header:   packets.PCHeader{Type: packets.PatchFileHeaderType},
 		FileSize: patch.fileSize,
@@ -265,7 +265,7 @@ func (s *DataServer) sendFileHeader(client *Client, patch *fileEntry) error {
 }
 
 // send a chunk of file data.
-func (s *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
+func (s *DataServer) sendFileChunk(client *client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > maxFileChunkSize {
 		archon.Log.Errorf("Attempted to send %v byte chunk; max is %v",
 			string(chunkSize), string(maxFileChunkSize))
@@ -282,11 +282,11 @@ func (s *DataServer) sendFileChunk(client *Client, chunk, chksm, chunkSize uint3
 }
 
 // Finished sending a particular file.
-func (s *DataServer) sendFileComplete(client *Client) error {
+func (s *DataServer) sendFileComplete(client *client) error {
 	return client.send(packets.PCHeader{Type: packets.PatchFileCompleteType, Size: 0x04})
 }
 
 // We've finished updating files.
-func (s *DataServer) sendUpdateComplete(client *Client) error {
+func (s *DataServer) sendUpdateComplete(client *client) error {
 	return client.send(packets.PCHeader{Type: packets.PatchUpdateCompleteType, Size: 0x04})
 }

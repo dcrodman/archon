@@ -17,8 +17,8 @@ type Server interface {
 	Init() error
 
 	// AcceptClient should perform whatever initialization is needed to accept a client
-	//connection and return a Client that wraps the provided ConnectionSate instance.
-	//Note that this initialization may involve sending packets to the client.
+	// connection and return a Client that wraps the provided ConnectionSate instance.
+	// Note that this initialization may involve sending packets to the client.
 	AcceptClient(cs *ConnectionState) (Client, error)
 
 	// Handle is the main entry point for processing client packets. It's responsible

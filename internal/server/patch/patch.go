@@ -16,8 +16,8 @@ import (
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/spf13/viper"
 	"strconv"
 	"sync"
@@ -34,7 +34,7 @@ var (
 	copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 )
 
-func GetWelcomeMessage() ([]byte, uint16) {
+func getWelcomeMessage() ([]byte, uint16) {
 	messageInit.Do(func() {
 		messageBytes = internal.ConvertToUtf16(viper.GetString("patch_server.welcome_message"))
 
@@ -74,20 +74,20 @@ func (s *PatchServer) HeaderSize() uint16 { return packets.PCHeaderSize }
 func (s *PatchServer) Init() error        { return nil }
 
 func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
-	c := &Client{
+	c := &client{
 		cs:          cs,
 		clientCrypt: crypto.NewPCCrypt(),
 		serverCrypt: crypto.NewPCCrypt(),
 	}
 
-	if err := SendPCWelcome(c); err != nil {
+	if err := sendPCWelcome(c); err != nil {
 		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
 	}
 	return c, nil
 }
 
 // send the welcome packet to a client with the copyright message and encryption vectors.
-func SendPCWelcome(client *Client) error {
+func sendPCWelcome(client *client) error {
 	pkt := packets.PatchWelcome{
 		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
 	}
@@ -99,7 +99,7 @@ func SendPCWelcome(client *Client) error {
 }
 
 func (s *PatchServer) Handle(client server.Client) error {
-	c := client.(*Client)
+	c := client.(*client)
 	packetData := c.ConnectionState().Data()
 
 	var header packets.PCHeader
@@ -119,7 +119,7 @@ func (s *PatchServer) Handle(client server.Client) error {
 	return err
 }
 
-func (s *PatchServer) sendWelcomeAck(client *Client) error {
+func (s *PatchServer) sendWelcomeAck(client *client) error {
 	// PatchHandshakeType is treated as an ack in this case.
 	return client.send(&packets.PCHeader{
 		Size: 0x04,
@@ -128,8 +128,8 @@ func (s *PatchServer) sendWelcomeAck(client *Client) error {
 }
 
 // Message displayed on the patch download screen.
-func (s *PatchServer) sendWelcomeMessage(client *Client) error {
-	message, size := GetWelcomeMessage()
+func (s *PatchServer) sendWelcomeMessage(client *client) error {
+	message, size := getWelcomeMessage()
 	pkt := &packets.PatchWelcomeMessage{
 		Header: packets.PCHeader{
 			Size: packets.PCHeaderSize + size,
@@ -142,7 +142,7 @@ func (s *PatchServer) sendWelcomeMessage(client *Client) error {
 }
 
 // send the redirect packet, providing the IP and port of the next server.
-func (s *PatchServer) sendPatchRedirect(client *Client) error {
+func (s *PatchServer) sendPatchRedirect(client *client) error {
 	pkt := packets.PatchRedirect{
 		Header:  packets.PCHeader{Type: packets.PatchRedirectType},
 		IPAddr:  [4]uint8{},

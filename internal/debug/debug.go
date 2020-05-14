@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/server"
+	"github.com/dcrodman/archon/internal/server"
 	"github.com/spf13/viper"
 	"net/http"
 	"runtime/pprof"

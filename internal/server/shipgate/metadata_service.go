@@ -2,7 +2,7 @@ package shipgate
 
 import (
 	"context"
-	"github.com/dcrodman/archon/server/shipgate/api"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 

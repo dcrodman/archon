@@ -11,8 +11,8 @@ import (
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/internal"
 	"strconv"
 	"strings"
 )
@@ -37,7 +37,7 @@ func (s *LoginServer) HeaderSize() uint16 { return packets.BBHeaderSize }
 func (s *LoginServer) Init() error        { return nil }
 
 func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
-	c := &Client{
+	c := &client{
 		cs:          cs,
 		serverCrypt: crypto.NewBBCrypt(),
 		clientCrypt: crypto.NewBBCrypt(),
@@ -49,7 +49,7 @@ func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client, e
 	return c, nil
 }
 
-func (s *LoginServer) SendWelcome(c *Client) error {
+func (s *LoginServer) SendWelcome(c *client) error {
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -64,7 +64,7 @@ func (s *LoginServer) SendWelcome(c *Client) error {
 }
 
 func (s *LoginServer) Handle(client server.Client) error {
-	c := client.(*Client)
+	c := client.(*client)
 	packetData := c.ConnectionState().Data()
 
 	var header packets.BBHeader
@@ -84,7 +84,7 @@ func (s *LoginServer) Handle(client server.Client) error {
 	return err
 }
 
-func (s *LoginServer) handleLogin(c *Client) error {
+func (s *LoginServer) handleLogin(c *client) error {
 	var loginPkt packets.Login
 	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
 
@@ -128,7 +128,7 @@ func (s *LoginServer) handleLogin(c *Client) error {
 
 // sendSecurity transmits initialization packet with information about the user's
 // authentication status.
-func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
+func (s *LoginServer) sendSecurity(c *client, errorCode uint32) error {
 	// Constants set according to how Newserv does it.
 	return c.send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
@@ -143,7 +143,7 @@ func (s *LoginServer) sendSecurity(c *Client, errorCode uint32) error {
 
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
-func (s *LoginServer) sendMessage(c *Client, message string) error {
+func (s *LoginServer) sendMessage(c *client, message string) error {
 	return c.send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -153,7 +153,7 @@ func (s *LoginServer) sendMessage(c *Client, message string) error {
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *LoginServer) sendCharacterRedirect(c *Client) error {
+func (s *LoginServer) sendCharacterRedirect(c *client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},

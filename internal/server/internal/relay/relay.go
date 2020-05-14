@@ -3,8 +3,8 @@ package relay
 import (
 	"fmt"
 	"github.com/dcrodman/archon/internal/debug"
-	"github.com/dcrodman/archon/server"
-	"github.com/dcrodman/archon/server/internal"
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/internal"
 )
 
 // send converts a packet struct to bytes and encrypts it before  using the

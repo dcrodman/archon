@@ -3,7 +3,7 @@ package shipgate
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/dcrodman/archon/server/shipgate/api"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
