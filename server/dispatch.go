@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
+	archon_debug "github.com/dcrodman/archon/debug"
 	"io"
 	"net"
 	"os"
@@ -100,13 +101,17 @@ func startClientLoop(s Server, c Client2) {
 	defer closeConnectionAndRecover(s, c)
 
 	for {
-		err := ReadNextPacket(c, s.HeaderSize())
+		packetSize, err := ReadNextPacket(c, s.HeaderSize())
 
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			archon.Log.Warn(err.Error())
 			break
+		}
+
+		if archon_debug.Enabled() {
+			archon_debug.SendClientPacketToAnalyzer(c, c.ConnectionState().Data(), uint16(packetSize))
 		}
 
 		if err = s.Handle(c); err != nil {
@@ -134,21 +139,20 @@ func closeConnectionAndRecover(s Server, c Client2) {
 // ReadNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func ReadNextPacket(c Client2, headerSize uint16) error {
-	var recvSize int = 0
-	var packetSize uint16 = 0
+func ReadNextPacket(c Client2, headerSize uint16) (int, error) {
+	recvSize, packetSize := 0, 0
 	cs := c.ConnectionState()
 
-	// Wait for the packet header.
+	// Read the packet header.
 	for recvSize < int(headerSize) {
-		bytes, err := cs.connection.Read(cs.buffer[recvSize:headerSize])
+		bytesRead, err := cs.connection.Read(cs.buffer[recvSize:headerSize])
+		recvSize += bytesRead
 
-		if bytes == 0 || err == io.EOF {
-			return err
+		if bytesRead == 0 || err == io.EOF {
+			return -1, err
 		} else if err != nil {
-			return errors.New("socket Error (" + cs.IPAddr() + ") " + err.Error())
+			return -1, errors.New("socket Error (" + cs.IPAddr() + ") " + err.Error())
 		}
-		recvSize += bytes
 
 		if recvSize >= int(headerSize) {
 			// At this point the full header has arrived and needs to be decrypted.
@@ -162,39 +166,40 @@ func ReadNextPacket(c Client2, headerSize uint16) error {
 			// The PSO client occasionally sends packets that are longer than their declared
 			// size, but are always a multiple of the length of the packet header. Adjust the
 			// expected length just in case in order to avoid leaving stray bytes in the buffer.
-			packetSize += packetSize % headerSize
+			packetSize += packetSize % int(headerSize)
 		}
 	}
-	pktSize := int(packetSize)
 
 	// Grow the client's receive buffer if they send us a packet bigger than its current capacity.
-	if pktSize > cap(cs.buffer) {
-		newSize := pktSize + len(cs.buffer)
+	if packetSize > cap(cs.buffer) {
+		newSize := packetSize + len(cs.buffer)
 		newBuf := make([]byte, newSize)
 		copy(newBuf, cs.buffer)
 		cs.buffer = newBuf
 	}
 
-	// Read in the rest of the packet.
-	for recvSize < pktSize {
-		remaining := pktSize - recvSize
-		bytes, err := cs.connection.Read(cs.buffer[recvSize : recvSize+remaining])
+	// Read the rest of the packet.
+	for recvSize < packetSize {
+		remaining := packetSize - recvSize
+		bytesRead, err := cs.connection.Read(cs.buffer[recvSize : recvSize+remaining])
+
 		if err != nil {
-			return errors.New("socket Error (" + cs.IPAddr() + ") " + err.Error())
+			return -1, errors.New("socket Error (" + cs.IPAddr() + ") " + err.Error())
 		}
-		recvSize += bytes
+
+		recvSize += bytesRead
 	}
 
 	// We have the whole thing; decrypt the rest of it.
-	if packetSize > headerSize {
-		c.Decrypt(cs.buffer[headerSize:packetSize], uint32(packetSize-headerSize))
+	if packetSize > int(headerSize) {
+		c.Decrypt(cs.buffer[headerSize:packetSize], uint32(packetSize-int(headerSize)))
 	}
 
-	return nil
+	return packetSize, nil
 }
 
 // Extract the packet length from the first two bytes of data.
-func getPacketSize(data []byte) (uint16, error) {
+func getPacketSize(data []byte) (int, error) {
 	if len(data) < 2 {
 		return 0, errors.New("getSize(): data must be at least two bytes")
 	}
@@ -203,5 +208,5 @@ func getPacketSize(data []byte) (uint16, error) {
 	reader := bytes.NewReader(data)
 	err := binary.Read(reader, binary.LittleEndian, &size)
 
-	return size, err
+	return int(size), err
 }

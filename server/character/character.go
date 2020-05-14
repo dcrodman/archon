@@ -18,7 +18,6 @@ import (
 	"github.com/dcrodman/archon/auth"
 	"github.com/dcrodman/archon/characters"
 	"github.com/dcrodman/archon/data"
-	"github.com/dcrodman/archon/debug"
 	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
@@ -206,10 +205,6 @@ func (s *CharacterServer) Handle(client server.Client2) error {
 
 	var packetHeader packets.BBHeader
 	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &packetHeader)
-
-	if debug.Enabled() {
-		debug.SendClientPacketToAnalyzer(client, packetData, packetHeader.Size)
-	}
 
 	var err error
 	switch packetHeader.Type {

@@ -105,10 +105,6 @@ func (s *ShipServer) Handle(client server.Client2) error {
 	var header packets.BBHeader
 	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &header)
 
-	if debug.Enabled() {
-		debug.SendClientPacketToAnalyzer(client, packetData, header.Size)
-	}
-
 	var err error
 	switch header.Type {
 	case packets.LoginType:

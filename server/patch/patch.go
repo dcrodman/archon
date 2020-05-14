@@ -14,7 +14,6 @@ package patch
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/debug"
 	crypto "github.com/dcrodman/archon/encryption"
 	"github.com/dcrodman/archon/packets"
 	"github.com/dcrodman/archon/server"
@@ -105,10 +104,6 @@ func (s *PatchServer) Handle(client server.Client2) error {
 
 	var header packets.PCHeader
 	internal.StructFromBytes(packetData[:packets.PCHeaderSize], &header)
-
-	if debug.Enabled() {
-		debug.SendClientPacketToAnalyzer(client, packetData, header.Size)
-	}
 
 	var err error
 	switch header.Type {
