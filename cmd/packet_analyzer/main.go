@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	_ "github.com/dcrodman/archon"
 )
 
@@ -52,7 +53,9 @@ func main() {
 		compactFiles()
 	case "summarize":
 		summarizeFiles()
-	default:
+	case "", "capture":
 		startCapturing()
+	default:
+		fmt.Printf("unrecognized command %s; use -help for options", command)
 	}
 }

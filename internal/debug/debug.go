@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/server"
 	"github.com/spf13/viper"
 	"net/http"
 	"runtime/pprof"
@@ -32,17 +31,17 @@ func StartPprofServer() {
 
 // SendServerPacketToAnalyzer makes an http request to a packet_analyzer
 // instance with the packet data, reporting it as a server to client message.
-func SendServerPacketToAnalyzer(c server.Client, packetBytes []byte, size uint16) {
-	sendToPacketAnalyzer(c, packetBytes, int(size), "server", "client")
+func SendServerPacketToAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, size uint16) {
+	sendToPacketAnalyzer(debugInfo, packetBytes, int(size), "server", "client")
 }
 
 // SendServerPacketToAnalyzer makes an http request to a packet_analyzer
 // instance with the packet data, reporting it as a client to server message.
-func SendClientPacketToAnalyzer(c server.Client, packetBytes []byte, size uint16) {
-	sendToPacketAnalyzer(c, packetBytes, int(size), "client", "server")
+func SendClientPacketToAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, size uint16) {
+	sendToPacketAnalyzer(debugInfo, packetBytes, int(size), "client", "server")
 }
 
-func sendToPacketAnalyzer(c server.Client, packetBytes []byte, size int, source, destination string) {
+func sendToPacketAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, size int, source, destination string) {
 	if !viper.IsSet("packet_analyzer_address") {
 		return
 	}
@@ -52,7 +51,7 @@ func sendToPacketAnalyzer(c server.Client, packetBytes []byte, size int, source,
 		cbytes[i] = int(packetBytes[i])
 	}
 
-	serverType := c.DebugInfo()["server_type"].(string)
+	serverName := debugInfo["server_type"].(string)
 
 	packet := struct {
 		ServerName  string
@@ -61,7 +60,7 @@ func sendToPacketAnalyzer(c server.Client, packetBytes []byte, size int, source,
 		Destination string
 		Contents    []int
 	}{
-		"archon", serverType, source, destination, cbytes[:size],
+		"archon", serverName, source, destination, cbytes[:size],
 	}
 
 	reqBytes, _ := json.Marshal(&packet)

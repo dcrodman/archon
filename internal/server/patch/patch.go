@@ -12,7 +12,6 @@
 package patch
 
 import (
-	"fmt"
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
@@ -49,61 +48,47 @@ func getWelcomeMessage() ([]byte, uint16) {
 	return messageBytes, uint16(len(messageBytes))
 }
 
-type PatchServer struct {
+type Server struct {
 	name string
-	port string
 	// Parsed representation of the login port.
 	dataRedirectPort uint16
 }
 
-func NewPatchServer(name, port, dataPort string) server.Server {
+func NewServer(name, dataPort string) server.Backend {
 	// Convert the data port to a BE uint for the redirect packet.
 	parsedDataPort, _ := strconv.ParseUint(dataPort, 10, 16)
 	dataRedirectPort := uint16((parsedDataPort >> 8) | (parsedDataPort << 8))
 
-	return &PatchServer{
-		name:             name,
-		port:             port,
-		dataRedirectPort: dataRedirectPort,
-	}
+	return &Server{name: name, dataRedirectPort: dataRedirectPort}
 }
 
-func (s *PatchServer) Name() string       { return s.name }
-func (s *PatchServer) Port() string       { return s.port }
-func (s *PatchServer) HeaderSize() uint16 { return packets.PCHeaderSize }
-func (s *PatchServer) Init() error        { return nil }
+func (s *Server) Name() string { return s.name }
+func (s *Server) Init() error  { return nil }
 
-func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
-	c := &client{
-		cs:          cs,
+func (s *Server) CreateExtension() server.ClientExtension {
+	return &patchClientExtension{
 		clientCrypt: crypto.NewPCCrypt(),
 		serverCrypt: crypto.NewPCCrypt(),
 	}
-
-	if err := sendPCWelcome(c); err != nil {
-		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
-	}
-	return c, nil
 }
 
-// send the welcome packet to a client with the copyright message and encryption vectors.
-func sendPCWelcome(client *client) error {
+func (s *Server) StartSession(c *server.Client) error {
+	ext := c.Extension.(*patchClientExtension)
+
+	// Send the welcome packet to a client with the copyright message and encryption vectors.
 	pkt := packets.PatchWelcome{
 		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
-	copy(pkt.ClientVector[:], client.clientVector())
-	copy(pkt.ServerVector[:], client.serverVector())
+	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
+	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
 
-	return client.sendRaw(pkt)
+	return c.SendRaw(pkt)
 }
 
-func (s *PatchServer) Handle(client server.Client) error {
-	c := client.(*client)
-	packetData := c.ConnectionState().Data()
-
+func (s *Server) Handle(c *server.Client, data []byte) error {
 	var header packets.PCHeader
-	internal.StructFromBytes(packetData[:packets.PCHeaderSize], &header)
+	internal.StructFromBytes(data[:packets.PCHeaderSize], &header)
 
 	var err error
 	switch header.Type {
@@ -114,21 +99,21 @@ func (s *PatchServer) Handle(client server.Client) error {
 			err = s.sendPatchRedirect(c)
 		}
 	default:
-		archon.Log.Infof("Received unknown packet %2x from %s", header.Type, c.ConnectionState().IPAddr())
+		archon.Log.Infof("Received unknown packet %2x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (s *PatchServer) sendWelcomeAck(client *client) error {
+func (s *Server) sendWelcomeAck(c *server.Client) error {
 	// PatchHandshakeType is treated as an ack in this case.
-	return client.send(&packets.PCHeader{
+	return c.Send(&packets.PCHeader{
 		Size: 0x04,
 		Type: packets.PatchHandshakeType,
 	})
 }
 
 // Message displayed on the patch download screen.
-func (s *PatchServer) sendWelcomeMessage(client *client) error {
+func (s *Server) sendWelcomeMessage(c *server.Client) error {
 	message, size := getWelcomeMessage()
 	pkt := &packets.PatchWelcomeMessage{
 		Header: packets.PCHeader{
@@ -138,11 +123,11 @@ func (s *PatchServer) sendWelcomeMessage(client *client) error {
 		Message: message,
 	}
 
-	return client.send(pkt)
+	return c.Send(pkt)
 }
 
 // send the redirect packet, providing the IP and port of the next server.
-func (s *PatchServer) sendPatchRedirect(client *client) error {
+func (s *Server) sendPatchRedirect(c *server.Client) error {
 	pkt := packets.PatchRedirect{
 		Header:  packets.PCHeader{Type: packets.PatchRedirectType},
 		IPAddr:  [4]uint8{},
@@ -153,5 +138,5 @@ func (s *PatchServer) sendPatchRedirect(client *client) error {
 	hostnameBytes := archon.BroadcastIP()
 	copy(pkt.IPAddr[:], hostnameBytes[:])
 
-	return client.send(pkt)
+	return c.Send(pkt)
 }

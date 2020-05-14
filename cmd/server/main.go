@@ -9,8 +9,8 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
-	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/character"
+	"github.com/dcrodman/archon/internal/server/launcher"
 	"github.com/dcrodman/archon/internal/server/login"
 	"github.com/dcrodman/archon/internal/server/patch"
 	"github.com/dcrodman/archon/internal/server/shipgate"
@@ -22,7 +22,7 @@ import (
 func main() {
 	flag.Parse()
 
-	fmt.Printf("Archon PSO Server, Copyright (C) 2014 Andrew Rodman\n" +
+	fmt.Printf("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
 		"This program is free software: you can redistribute it and/or\n" +
 		"modify it under the terms of the GNU General Public License as\n" +
@@ -49,6 +49,7 @@ func main() {
 	)
 	if err := data.Initialize(dataSource); err != nil {
 		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 	defer data.Shutdown()
 
@@ -65,63 +66,28 @@ func main() {
 // the exception of the Block server since the number is configurable).
 func startServers() {
 	hostname := viper.GetString("hostname")
-	server.SetHostname(hostname)
+	shipgateMetaServiceAddr := fmt.Sprintf(
+		"%s:%s", hostname, viper.GetString("shipgate_server.meta_service_port"))
+	shipgateServiceAddr := fmt.Sprintf(
+		"%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	shipgateWg := startShipgate(shipgateMetaServiceAddr, shipgateServiceAddr)
 
-	shipgateMetaAddr, _ := startShipgate(hostname, &wg)
+	registerServers(shipgateMetaServiceAddr, shipgateServiceAddr)
 
-	dataServer := patch.NewDataServer(
-		"DATA",
-		viper.GetString("patch_server.data_port"),
-	)
-	patchServer := patch.NewPatchServer(
-		"PATCH",
-		viper.GetString("patch_server.patch_port"),
-		dataServer.Port(),
-	)
-	characterServer := character.NewServer(
-		"CHARACTER",
-		viper.GetString("character_server.port"),
-		shipgateMetaAddr,
-	)
-	loginServer := login.NewServer(
-		"LOGIN",
-		viper.GetString("login_server.port"),
-		characterServer.Port(),
-	)
+	launcher.SerHostname(hostname)
+	serverWg := launcher.Start()
 
-	//ship.NewServer(),
-	//shipPort, _ := strconv.ParseInt(archon.Config.ShipServer.Port, 10, 16)
-
-	// The available block ports will depend on how the server is configured,
-	// so once we've read the config then add the server entries on the fly.
-	//for i := 1; i <= archon.Config.ShipServer.NumBlocks; i++ {
-	//	blockServer := block.NewServer(fmt.Sprintf("BLOCK%d", i), shipPort+int64(i))
-	//	startBlockingServer(blockServer, &wg)
-	//}
-
-	servers := []server.Server{
-		patchServer,
-		dataServer,
-		loginServer,
-		characterServer,
-	}
-
-	wg.Add(len(servers))
-
-	launchBlockingServers(servers, &wg)
-
-	wg.Wait()
+	shipgateWg.Wait()
+	serverWg.Wait()
 }
 
-func startShipgate(hostname string, wg *sync.WaitGroup) (string, string) {
-	shipgateMetaAddr := fmt.Sprintf("%s:%s", hostname, viper.GetString("shipgate_server.meta_service_port"))
-	shipgateAddr := fmt.Sprintf("%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
+func startShipgate(metaServiceAddress, serviceAddress string) (wg *sync.WaitGroup) {
+	var shipgateWg sync.WaitGroup
+	shipgateWg.Add(1)
 
 	go func() {
-		err := shipgate.Start(shipgateMetaAddr, shipgateAddr)
+		err := shipgate.Start(metaServiceAddress, serviceAddress)
 
 		if err != nil {
 			fmt.Println("failed to start ship server:", err)
@@ -131,23 +97,15 @@ func startShipgate(hostname string, wg *sync.WaitGroup) (string, string) {
 		wg.Done()
 	}()
 
-	return shipgateMetaAddr, shipgateAddr
+	return &shipgateWg
 }
 
-func launchBlockingServers(servers []server.Server, wg *sync.WaitGroup) {
-	for _, s := range servers {
-		if err := s.Init(); err != nil {
-			fmt.Printf("failed to initialize %s server: %s\n", s.Name(), err)
-			os.Exit(1)
-		}
-	}
+func registerServers(shipgateMetaServiceAddress, shipgateServiceAddress string) {
+	dataPort := viper.GetString("patch_server.data_port")
+	launcher.AddServer(dataPort, patch.NewDataServer("DATA"))
+	launcher.AddServer(viper.GetString("patch_server.patch_port"), patch.NewServer("PATCH", dataPort))
 
-	fmt.Println()
-
-	for _, s := range servers {
-		go func(s server.Server) {
-			server.Start(s)
-			wg.Done()
-		}(s)
-	}
+	characterPort := viper.GetString("character_server.port")
+	launcher.AddServer(characterPort, character.NewServer("CHARACTER", shipgateMetaServiceAddress))
+	launcher.AddServer(viper.GetString("login_server.port"), login.NewServer("LOGIN", characterPort))
 }
