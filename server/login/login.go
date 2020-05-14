@@ -8,9 +8,9 @@ package login
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/auth"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/auth"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"strconv"
@@ -36,7 +36,7 @@ func (s *LoginServer) Port() string       { return s.port }
 func (s *LoginServer) HeaderSize() uint16 { return packets.BBHeaderSize }
 func (s *LoginServer) Init() error        { return nil }
 
-func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+func (s *LoginServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
 	c := &Client{
 		cs:          cs,
 		serverCrypt: crypto.NewBBCrypt(),
@@ -63,7 +63,7 @@ func (s *LoginServer) SendWelcome(c *Client) error {
 	return c.sendRaw(pkt)
 }
 
-func (s *LoginServer) Handle(client server.Client2) error {
+func (s *LoginServer) Handle(client server.Client) error {
 	c := client.(*Client)
 	packetData := c.ConnectionState().Data()
 

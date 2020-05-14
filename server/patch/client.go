@@ -1,14 +1,14 @@
 package patch
 
 import (
-	"github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/dcrodman/archon/server/internal/relay"
 )
 
-// Client2 implementation for the PATCH and DATA servers.
+// Client implementation for the PATCH and DATA servers.
 type Client struct {
 	cs *server.ConnectionState
 

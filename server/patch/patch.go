@@ -14,8 +14,8 @@ package patch
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/spf13/viper"
@@ -73,7 +73,7 @@ func (s *PatchServer) Port() string       { return s.port }
 func (s *PatchServer) HeaderSize() uint16 { return packets.PCHeaderSize }
 func (s *PatchServer) Init() error        { return nil }
 
-func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+func (s *PatchServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
 	c := &Client{
 		cs:          cs,
 		clientCrypt: crypto.NewPCCrypt(),
@@ -98,7 +98,7 @@ func SendPCWelcome(client *Client) error {
 	return client.sendRaw(pkt)
 }
 
-func (s *PatchServer) Handle(client server.Client2) error {
+func (s *PatchServer) Handle(client server.Client) error {
 	c := client.(*Client)
 	packetData := c.ConnectionState().Data()
 

@@ -2,7 +2,7 @@ package auth
 
 import (
 	"fmt"
-	"github.com/dcrodman/archon/data"
+	"github.com/dcrodman/archon/internal/data"
 	"testing"
 )
 

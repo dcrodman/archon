@@ -15,11 +15,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/auth"
-	"github.com/dcrodman/archon/characters"
-	"github.com/dcrodman/archon/data"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/auth"
+	"github.com/dcrodman/archon/internal/characters"
+	"github.com/dcrodman/archon/internal/data"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/dcrodman/archon/server/internal/cache"
@@ -172,7 +172,7 @@ func (s *CharacterServer) getActiveShipList() ([]*ship, error) {
 	return ships, nil
 }
 
-func (s *CharacterServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+func (s *CharacterServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
 	c := &Client{
 		cs:          cs,
 		serverCrypt: crypto.NewBBCrypt(),
@@ -199,7 +199,7 @@ func (s *CharacterServer) SendWelcome(c *Client) error {
 	return c.sendRaw(pkt)
 }
 
-func (s *CharacterServer) Handle(client server.Client2) error {
+func (s *CharacterServer) Handle(client server.Client) error {
 	c := client.(*Client)
 	packetData := c.ConnectionState().Data()
 

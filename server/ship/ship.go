@@ -4,10 +4,9 @@ package ship
 import (
 	"fmt"
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/auth"
-	"github.com/dcrodman/archon/debug"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/auth"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/block"
 	"github.com/dcrodman/archon/server/character"
@@ -29,7 +28,7 @@ type ShipServer struct {
 	blockListPkt *packets.BlockList
 }
 
-func NewServer(name, port string, blockServers []block.BlockServer) server.Server {
+func NewServer(name, port string, blockServers []block.BlockServer) *ShipServer {
 	// The block list packet is recomputed since it's mildly expensive and
 	// (at least for now) shouldn't be changing without a restart.
 	blocks := make([]packets.Block, 0)
@@ -71,7 +70,7 @@ func (s *ShipServer) Name() string       { return s.name }
 func (s *ShipServer) Port() string       { return s.port }
 func (s *ShipServer) HeaderSize() uint16 { return packets.BBHeaderSize }
 
-func (s *ShipServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+func (s *ShipServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
 	c := &Client{
 		cs:          cs,
 		clientCrypt: crypto.NewBBCrypt(),
@@ -98,7 +97,7 @@ func (s *ShipServer) SendWelcome(c *Client) error {
 	return c.sendRaw(pkt)
 }
 
-func (s *ShipServer) Handle(client server.Client2) error {
+func (s *ShipServer) Handle(client server.Client) error {
 	c := client.(*Client)
 	packetData := c.ConnectionState().Data()
 
@@ -225,27 +224,3 @@ func (s *ShipServer) handleBlockSelection(c *Client, pkt packets.MenuSelection) 
 	//return archon.SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
 	return nil
 }
-
-// send the menu items for the ship select screen.
-//func (s *ShipServer) SendShipList(client *Client, ships []shipgate.Ship) error {
-//pkt := &archon.ShipListPacket{
-//	Header:      archon.BBHeader{Type: archon.LoginShipListType, Flags: 0x01},
-//	Unknown:     0x02,
-//	Unknown2:    0xFFFFFFF4,
-//	Unknown3:    0x04,
-//	ShipEntries: make([]character.ShipMenuEntry, len(ships)),
-//}
-//copy(pkt.ServerName[:], "Archon")
-//
-//// TODO: Will eventually need a mutex for read.
-//for i, ship := range ships {
-//	item := &pkt.ShipEntries[i]
-//	item.MenuId = character.ShipSelectionMenuId
-//	item.ShipId = ship.id
-//	copy(item.ShipName[:], util.ConvertToUtf16(string(ship.name[:])))
-//}
-//
-//archon.Log.Debug("Sending Ship List Packet")
-//return archon.EncryptAndSend(client, pkt)
-//return nil
-//}

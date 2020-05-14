@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"github.com/dcrodman/archon/data"
+	"github.com/dcrodman/archon/internal/data"
 )
 
 var (

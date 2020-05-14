@@ -3,8 +3,8 @@ package patch
 import (
 	"errors"
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	crypto "github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"hash/crc32"
@@ -29,7 +29,7 @@ func (s DataServer) Port() string        { return s.port }
 func (s *DataServer) HeaderSize() uint16 { return packets.PCHeaderSize }
 func (s *DataServer) Init() error        { return initializePatchData() }
 
-func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client2, error) {
+func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
 	c := &Client{
 		cs:            cs,
 		clientCrypt:   crypto.NewPCCrypt(),
@@ -45,7 +45,7 @@ func (s DataServer) AcceptClient(cs *server.ConnectionState) (server.Client2, er
 	return c, err
 }
 
-func (s DataServer) Handle(client server.Client2) error {
+func (s DataServer) Handle(client server.Client) error {
 	c := client.(*Client)
 	var hdr packets.PCHeader
 

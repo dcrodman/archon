@@ -2,14 +2,14 @@ package relay
 
 import (
 	"fmt"
-	"github.com/dcrodman/archon/debug"
+	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 )
 
 // send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
-func SendPacket(c server.Client2, packet interface{}, lenDivisor uint16) error {
+func SendPacket(c server.Client, packet interface{}, lenDivisor uint16) error {
 	data, size := internal.BytesFromStruct(packet)
 	b, n := adjustPacketLength(data, uint16(size), lenDivisor)
 
@@ -39,14 +39,14 @@ func adjustPacketLength(data []byte, length uint16, divisor uint16) ([]byte, uin
 
 // SendRaw writes all data contained in the slice to the client
 // as-is (e.g. without encrypting it first).
-func SendRaw(c server.Client2, data []byte, length uint16) error {
+func SendRaw(c server.Client, data []byte, length uint16) error {
 	if debug.Enabled() {
 		debug.SendServerPacketToAnalyzer(c, data, length)
 	}
 	return transmit(c, data, length)
 }
 
-func transmit(c server.Client2, data []byte, length uint16) error {
+func transmit(c server.Client, data []byte, length uint16) error {
 	bytesSent := 0
 
 	for bytesSent < int(length) {

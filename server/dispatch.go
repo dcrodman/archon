@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dcrodman/archon"
-	archon_debug "github.com/dcrodman/archon/debug"
+	archon_debug "github.com/dcrodman/archon/internal/debug"
 	"io"
 	"net"
 	"os"
@@ -95,7 +95,7 @@ func startListenerLoop(server Server, socket *net.TCPListener) {
 
 // startClientLoop starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func startClientLoop(s Server, c Client2) {
+func startClientLoop(s Server, c Client) {
 	// Defer so that we catch any panics, disconnect the client, and
 	// remove them from the list regardless of the connection state.
 	defer closeConnectionAndRecover(s, c)
@@ -121,7 +121,7 @@ func startClientLoop(s Server, c Client2) {
 	}
 }
 
-func closeConnectionAndRecover(s Server, c Client2) {
+func closeConnectionAndRecover(s Server, c Client) {
 	cs := c.ConnectionState()
 
 	if err := recover(); err != nil {
@@ -139,7 +139,7 @@ func closeConnectionAndRecover(s Server, c Client2) {
 // ReadNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func ReadNextPacket(c Client2, headerSize uint16) (int, error) {
+func ReadNextPacket(c Client, headerSize uint16) (int, error) {
 	recvSize, packetSize := 0, 0
 	cs := c.ConnectionState()
 

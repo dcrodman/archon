@@ -32,17 +32,17 @@ func StartPprofServer() {
 
 // SendServerPacketToAnalyzer makes an http request to a packet_analyzer
 // instance with the packet data, reporting it as a server to client message.
-func SendServerPacketToAnalyzer(c server.Client2, packetBytes []byte, size uint16) {
+func SendServerPacketToAnalyzer(c server.Client, packetBytes []byte, size uint16) {
 	sendToPacketAnalyzer(c, packetBytes, int(size), "server", "client")
 }
 
 // SendServerPacketToAnalyzer makes an http request to a packet_analyzer
 // instance with the packet data, reporting it as a client to server message.
-func SendClientPacketToAnalyzer(c server.Client2, packetBytes []byte, size uint16) {
+func SendClientPacketToAnalyzer(c server.Client, packetBytes []byte, size uint16) {
 	sendToPacketAnalyzer(c, packetBytes, int(size), "client", "server")
 }
 
-func sendToPacketAnalyzer(c server.Client2, packetBytes []byte, size int, source, destination string) {
+func sendToPacketAnalyzer(c server.Client, packetBytes []byte, size int, source, destination string) {
 	if !viper.IsSet("packet_analyzer_address") {
 		return
 	}

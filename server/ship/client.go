@@ -1,15 +1,15 @@
 package ship
 
 import (
-	"github.com/dcrodman/archon/data"
-	"github.com/dcrodman/archon/encryption"
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/data"
+	"github.com/dcrodman/archon/internal/encryption"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/server"
 	"github.com/dcrodman/archon/server/internal"
 	"github.com/dcrodman/archon/server/internal/relay"
 )
 
-// Client2 implementation for the SHIP server.
+// Client implementation for the SHIP server.
 type Client struct {
 	cs *server.ConnectionState
 

@@ -3,7 +3,7 @@
  */
 package block
 
-import "github.com/dcrodman/archon/packets"
+import "github.com/dcrodman/archon/internal/packets"
 
 //
 //import (

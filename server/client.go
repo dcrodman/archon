@@ -4,7 +4,7 @@
 package server
 
 import (
-	"github.com/dcrodman/archon/packets"
+	"github.com/dcrodman/archon/internal/packets"
 	"net"
 	"strings"
 )
@@ -37,10 +37,10 @@ func (cs *ConnectionState) WriteBytes(bytes []byte) (int, error) {
 	return cs.connection.Write(bytes)
 }
 
-// Client2 is a wrapper interface that allows the server package functions to
+// Client is a wrapper interface that allows the server package functions to
 // perform the generic client communication while allowing the Server implementations
 // to maintain session-specific data.
-type Client2 interface {
+type Client interface {
 	// ConnectionState returns a pointer to the internal client state.
 	ConnectionState() *ConnectionState
 
@@ -54,7 +54,7 @@ type Client2 interface {
 }
 
 // CommonClient encapsulates the user-specific information common to several server
-// implementations and is intended to be embedded by any Client2 instance that needs it.
+// implementations and is intended to be embedded by any Client instance that needs it.
 type CommonClient struct {
 	Config packets.ClientConfig
 
