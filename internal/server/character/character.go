@@ -12,7 +12,6 @@
 package character
 
 import (
-	"context"
 	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
@@ -23,11 +22,7 @@ import (
 	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/internal/cache"
-	"github.com/dcrodman/archon/internal/server/shipgate/api"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"hash/crc32"
 	"net"
 	"strconv"
@@ -66,31 +61,17 @@ func getScrollMessage() []byte {
 	return shipSelectionScrollMessage
 }
 
-// Server's internal representation of Ship connection information for
-// the ship selection screen.
-type ship struct {
-	id   int
-	name []byte
-	ip   string
-	port string
-}
-
 type Server struct {
-	name            string
-	port            string
-	shipgateAddress string
-
-	ships      []*ship
-	shipsMutex sync.RWMutex
-
-	kvCache *cache.Cache
+	name           string
+	shipgateClient shipgateClient
+	kvCache        *cache.Cache
 }
 
 func NewServer(name, shipgateAddress string) *Server {
 	return &Server{
-		name:            name,
-		shipgateAddress: shipgateAddress,
-		kvCache:         cache.New(),
+		name:           name,
+		shipgateClient: shipgateClient{shipgateAddress: shipgateAddress},
+		kvCache:        cache.New(),
 	}
 }
 
@@ -101,71 +82,12 @@ func (s *Server) Init() error {
 		return err
 	}
 
-	if err := s.refreshShipList(); err != nil {
+	if err := s.shipgateClient.refreshShipList(); err != nil {
 		return err
 	}
-	s.startShipRefreshLoop()
-	return nil
-}
-
-// Starts a loop that makes an API request to the shipgate server over an interval
-// in order to query the list of active ships. The result is parsed and stored in
-// the Server's ships field.
-func (s *Server) startShipRefreshLoop() {
-	go func() {
-		for {
-			timer := time.Tick(time.Second * 30)
-			<-timer
-
-			if err := s.refreshShipList(); err != nil {
-				archon.Log.Errorf(err.Error())
-			}
-		}
-	}()
-}
-
-func (s *Server) refreshShipList() error {
-	activeShips, err := s.getActiveShipList()
-	if err != nil {
-		return fmt.Errorf("%s: failed to connect to shipgate: %s", s.name, err)
-	}
-
-	s.shipsMutex.Lock()
-	s.ships = activeShips
-	s.shipsMutex.Unlock()
+	go s.shipgateClient.startShipListRefreshLoop()
 
 	return nil
-}
-
-func (s *Server) getActiveShipList() ([]*ship, error) {
-	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
-	}
-
-	conn, err := grpc.Dial(s.shipgateAddress, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to shipgate: %s", err)
-	}
-	defer conn.Close()
-
-	shipgateClient := api.NewShipMetadataServiceClient(conn)
-	response, err := shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch ships from shipgate: %s", err)
-	}
-
-	ships := make([]*ship, 0)
-	for _, s := range response.Ships {
-		ships = append(ships, &ship{
-			id:   int(s.Id),
-			name: internal.ConvertToUtf16(s.Name),
-			ip:   s.Ip,
-			port: s.Port,
-		})
-	}
-
-	return ships, nil
 }
 
 func (s *Server) CreateExtension() server.ClientExtension {
@@ -331,16 +253,14 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *server.Client) error {
-	s.shipsMutex.RLock()
-	defer s.shipsMutex.RUnlock()
-
 	var shipList []packets.ShipListEntry
-	numShips := len(s.ships)
+	activeShips := s.shipgateClient.getActiveShips()
+	numShips := len(activeShips)
 
 	if numShips > 0 {
-		shipList = make([]packets.ShipListEntry, len(s.ships))
+		shipList = make([]packets.ShipListEntry, numShips)
 
-		for i, ship := range s.ships {
+		for i, ship := range activeShips {
 			shipList[i] = packets.ShipListEntry{
 				MenuId: uint16(i + 1),
 				//MenuId:   0x12,
@@ -765,17 +685,15 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
-	s.shipsMutex.RLock()
-
+	activeShips := s.shipgateClient.getActiveShips()
 	selectedShip := menuSelectionPkt.ItemId - 1
-	if selectedShip < 0 || selectedShip >= uint32(len(s.ships)) {
+
+	if selectedShip < 0 || selectedShip >= uint32(len(activeShips)) {
 		return fmt.Errorf("Invalid ship selection: " + string(selectedShip))
 	}
 
-	shipIP, _ := net.ParseIP(s.ships[selectedShip].ip).MarshalText()
-	shipPort, _ := strconv.ParseInt(s.ships[selectedShip].port, 10, 16)
-
-	s.shipsMutex.RUnlock()
+	shipIP, _ := net.ParseIP(activeShips[selectedShip].ip).MarshalText()
+	shipPort, _ := strconv.ParseInt(activeShips[selectedShip].port, 10, 16)
 
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
