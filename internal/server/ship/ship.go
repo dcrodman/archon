@@ -2,7 +2,6 @@
 package ship
 
 import (
-	"fmt"
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
@@ -19,8 +18,7 @@ const BackMenuItem = 0xFF
 
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
 
-// ShipServer defines the operations for the gameplay servers.
-type ShipServer struct {
+type Server struct {
 	name string
 	port string
 
@@ -28,7 +26,7 @@ type ShipServer struct {
 	blockListPkt *packets.BlockList
 }
 
-func NewServer(name, port string, blockServers []block.BlockServer) *ShipServer {
+func NewServer(name, port string, blockServers []block.BlockServer) *Server {
 	// The block list packet is recomputed since it's mildly expensive and
 	// (at least for now) shouldn't be changing without a restart.
 	blocks := make([]packets.Block, 0)
@@ -59,31 +57,30 @@ func NewServer(name, port string, blockServers []block.BlockServer) *ShipServer 
 	}
 	copy(blockListPkt.ShipName[:], name)
 
-	return &ShipServer{
+	return &Server{
 		name:         name,
 		port:         port,
 		blockListPkt: blockListPkt,
 	}
 }
 
-func (s *ShipServer) Name() string       { return s.name }
-func (s *ShipServer) Port() string       { return s.port }
-func (s *ShipServer) HeaderSize() uint16 { return packets.BBHeaderSize }
+func (s *Server) Name() string { return s.name }
+func (s *Server) Port() string { return s.port }
 
-func (s *ShipServer) AcceptClient(cs *server.ConnectionState) (server.Client, error) {
-	c := &Client{
-		cs:          cs,
+func (s *Server) Init() error {
+	return nil
+}
+
+func (s *Server) CreateExtension() server.ClientExtension {
+	return &shipClientExtension{
 		clientCrypt: crypto.NewBBCrypt(),
 		serverCrypt: crypto.NewBBCrypt(),
 	}
-
-	if err := s.SendWelcome(c); err != nil {
-		return nil, fmt.Errorf("error sending welcome packet to %s: %s", cs.IPAddr(), err)
-	}
-	return c, nil
 }
 
-func (s *ShipServer) SendWelcome(c *Client) error {
+func (s *Server) StartSession(c *server.Client) error {
+	ext := c.Extension.(*shipClientExtension)
+
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -91,26 +88,25 @@ func (s *ShipServer) SendWelcome(c *Client) error {
 		ClientVector: [48]byte{},
 	}
 	copy(pkt.Copyright[:], loginCopyright)
-	copy(pkt.ServerVector[:], c.serverVector())
-	copy(pkt.ClientVector[:], c.clientVector())
+	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
+	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
 
-	return c.sendRaw(pkt)
+	return c.SendRaw(pkt)
 }
 
-func (s *ShipServer) Handle(client server.Client) error {
-	c := client.(*Client)
-	packetData := c.ConnectionState().Data()
-
+func (s *Server) Handle(c *server.Client, data []byte) error {
 	var header packets.BBHeader
-	internal.StructFromBytes(packetData[:packets.BBHeaderSize], &header)
+	internal.StructFromBytes(data[:packets.BBHeaderSize], &header)
 
 	var err error
 	switch header.Type {
 	case packets.LoginType:
-		err = s.handleShipLogin(c)
+		var loginPkt packets.Login
+		internal.StructFromBytes(data, &loginPkt)
+		err = s.handleShipLogin(c, &loginPkt)
 	case packets.MenuSelectType:
 		var pkt packets.MenuSelection
-		internal.StructFromBytes(packetData, &pkt)
+		internal.StructFromBytes(data, &pkt)
 		// They can be at either the ship or block selection menu, so make sure we have the right one.
 		if pkt.MenuId == character.ShipSelectionMenuId {
 			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
@@ -119,15 +115,12 @@ func (s *ShipServer) Handle(client server.Client) error {
 			err = s.handleBlockSelection(c, pkt)
 		}
 	default:
-		archon.Log.Infof("received unknown packet %02x from %s", header.Type, c.ConnectionState().IPAddr())
+		archon.Log.Infof("received unknown packet %02x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (s *ShipServer) handleShipLogin(c *Client) error {
-	var loginPkt packets.Login
-	internal.StructFromBytes(c.ConnectionState().Data(), &loginPkt)
-
+func (s *Server) handleShipLogin(c *server.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
@@ -152,8 +145,8 @@ func (s *ShipServer) handleShipLogin(c *Client) error {
 	return s.sendBlockList(c)
 }
 
-func (s *ShipServer) sendSecurity(c *Client, errorCode uint32) error {
-	return c.send(&packets.Security{
+func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
+	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
@@ -164,8 +157,8 @@ func (s *ShipServer) sendSecurity(c *Client, errorCode uint32) error {
 	})
 }
 
-func (s *ShipServer) sendMessage(c *Client, message string) error {
-	return c.send(&packets.LoginClientMessage{
+func (s *Server) sendMessage(c *server.Client, message string) error {
+	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  internal.ConvertToUtf16(message),
@@ -173,12 +166,12 @@ func (s *ShipServer) sendMessage(c *Client, message string) error {
 }
 
 // send the client the block list on the selection screen.
-func (s *ShipServer) sendBlockList(c *Client) error {
-	return c.send(s.blockListPkt)
+func (s *Server) sendBlockList(c *server.Client) error {
+	return c.Send(s.blockListPkt)
 }
 
 // Player selected one of the items on the ship select screen.
-func (s *ShipServer) handleShipSelection(client *Client) error {
+func (s *Server) handleShipSelection(c *server.Client) error {
 	//var pkt packets.MenuSelection
 	//internal.StructFromBytes(client.ConnectionState().Data(), &pkt)
 	//
@@ -195,7 +188,7 @@ func (s *ShipServer) handleShipSelection(client *Client) error {
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *ShipServer) sendBlockRedirect(c *Client) error {
+func (s *Server) sendBlockRedirect(c *server.Client) error {
 	//pkt := &packets.Redirect{
 	//	Header: packets.BBHeader{Type: packets.RedirectType},
 	//	IPAddr: [4]uint8{},
@@ -209,15 +202,15 @@ func (s *ShipServer) sendBlockRedirect(c *Client) error {
 }
 
 // The player selected a block to join from the menu.
-func (s *ShipServer) handleBlockSelection(c *Client, pkt packets.MenuSelection) error {
+func (s *Server) handleBlockSelection(c *server.Client, pkt packets.MenuSelection) error {
 	// Grab the chosen block and redirect them to the selected block server.
 	//port, _ := strconv.ParseInt(s.port, 10, 16)
 	//selectedBlock := pkt.ItemId
 	//
 	//if selectedBlock == BackMenuItem {
 	//	s.SendShipList(sc, character.shipList)
-	//} else if int(selectedBlock) > archon.Config.ShipServer.NumBlocks {
-	//	return fmt.Errorf("Block selection %v out of range %v", selectedBlock, archon.Config.ShipServer.NumBlocks)
+	//} else if int(selectedBlock) > archon.Config.Server.NumBlocks {
+	//	return fmt.Errorf("Block selection %v out of range %v", selectedBlock, archon.Config.Server.NumBlocks)
 	//}
 	//
 	//ipAddr := archon.BroadcastIP()
