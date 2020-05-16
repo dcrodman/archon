@@ -20,12 +20,6 @@ var (
 	help       = flag.Bool("help", false, "Print this usage info.")
 )
 
-func flagsUnset() bool {
-	return add == nil && !*add &&
-		pd == nil && !*pd &&
-		softDelete == nil && !*softDelete
-}
-
 // initDataSource creates the connection to the database, and returns a func
 // which should be deferred for cleanup.
 func initDataSource() (func(), error) {
@@ -51,7 +45,7 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	}
-	if flagsUnset() || flag.NFlag() != 1 {
+	if flag.NFlag() != 1 {
 		flag.Usage()
 		os.Exit(1)
 	}
