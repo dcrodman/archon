@@ -38,7 +38,7 @@ func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 }
 
 // FindAccount searches for an account with the specified username, returning the
-// *Account instance if found or nil of there is no match.
+// *Account instance if found or nil if there is no match.
 func FindAccount(username string) (*Account, error) {
 	var account Account
 	err := db.Where("username = ?", username).Find(&account).Error
@@ -53,7 +53,34 @@ func FindAccount(username string) (*Account, error) {
 	return &account, nil
 }
 
+// FindUnscopedAccounts searches for a potentially soft-deleted account with the
+// specified username, returning the *Account instance if found or nil if
+// there is no match.
+func FindUnscopedAccounts(username string) (*Account, error) {
+	var account Account
+	err := db.Unscoped().Where("username = ?", username).Find(&account).Error
+
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &account, nil
+}
+
 // CreateAccount persists the Account record to the database.
 func CreateAccount(account *Account) error {
 	return db.Create(account).Error
+}
+
+// DeleteAccount soft-deletes an Account record from the database.
+func DeleteAccount(account *Account) error {
+	return db.Delete(account).Error
+}
+
+// PermanentlyDeleteAccount permanently deletes an Account record from the database.
+func PermanentlyDeleteAccount(account *Account) error {
+	return db.Unscoped().Delete(account).Error
 }
