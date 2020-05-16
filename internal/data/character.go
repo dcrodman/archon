@@ -71,8 +71,12 @@ func UpdateCharacter(character *Character) error {
 	return db.Update(&character).Error
 }
 
-// DeleteCharacter removes a character from the database.
-// TODO: Probably ought to soft-delete characters.
+// DeleteCharacter soft-deletes a character record from the database.
 func DeleteCharacter(character *Character) error {
 	return db.Delete(character).Error
+}
+
+// PermanentlyDeleteCharacter permanently deletes a character record from the database.
+func PermanentlyDeleteCharacter(character *Character) error {
+	return db.Unscoped().Delete(character).Error
 }

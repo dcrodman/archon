@@ -7,10 +7,11 @@ package archon
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // Filesystem locations that will be checked for a config file by default.

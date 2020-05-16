@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+
 	"github.com/dcrodman/archon/internal/data"
 )
 
@@ -52,6 +53,34 @@ func CreateAccount(username, password, email string) (*data.Account, error) {
 
 var createAccount = func(account *data.Account) error {
 	return data.CreateAccount(account)
+}
+
+// DeleteAccount takes the specified credentials and soft-deletes a record in
+// the database, returning any errors encountered.
+func DeleteAccount(username string) error {
+	return softDeleteAccount(username)
+}
+
+var softDeleteAccount = func(username string) error {
+	a, err := data.FindAccount(username)
+	if err != nil {
+		return err
+	}
+	return data.DeleteAccount(a)
+}
+
+// PermanentlyDeleteAccount takes the specified credentials and deletes a record in
+// the database, returning any errors encountered.
+func PermanentlyDeleteAccount(username string) error {
+	return permanentlyDeleteAccount(username)
+}
+
+var permanentlyDeleteAccount = func(username string) error {
+	a, err := data.FindUnscopedAccount(username)
+	if err != nil {
+		return err
+	}
+	return data.PermanentlyDeleteAccount(a)
 }
 
 // HashPassword returns a version of password with Archon's chosen hashing strategy.

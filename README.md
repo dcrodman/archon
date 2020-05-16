@@ -23,9 +23,10 @@ questions feel free to open an issue.
   + [4. Create the database](#4-create-the-database)
   + [5. Set the hostname](#5-set-the-hostname)
   + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
-  + [7. Add files the patch directory](#7-add-files-the-patch-directory)
-  + [8. Add the first player account](#8-add-the-first-player-account)
-  + [9. Run the server](#9-run-the-server)
+  + [7. Add files to the patch directory](#7-add-files-to-the-patch-directory)
+  + [8. Generate the shipgate SSL certificates](#8-generate-the-shipgate-ssl-certificates)
+  + [9. Add the first player account](#9-add-the-first-player-account)
+  + [10. Run the server](#10-run-the-server)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 * [Contributing](#contributing)
@@ -127,7 +128,7 @@ https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1
 in `patcher.go` that correspond to your client. If none exist, you'll have to find the offsets with a
 hex editor.
 
-### 7. Add files the patch directory
+### 7. Add files to the patch directory
 
 It's recommended that you take the critical files from the copy of the client you intend for people to
 use and put the majority of them in the patch directory (`patch_server.patch_dir` in the config file).
@@ -137,7 +138,7 @@ which can help improve stability as well as make cheating harder.
     mkdir patches
     # copy your client files into ^
 
-## Generate the shipgate SSL certificates
+### 8. Generate the shipgate SSL certificates
 
 The shipgate API server requires clients to connect over SSL as both a form of security as well as
 mutual authentication. Archon includes a tool for generating these certificates, which need to be
@@ -152,7 +153,7 @@ in `config.yaml`). You may also provide a CIDR block.
 
 You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
 
-    ./add_account
+    ./account add
 
 ### 10. Run the server
 
