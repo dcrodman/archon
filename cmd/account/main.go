@@ -63,6 +63,7 @@ func main() {
 	}
 	defer cleanup()
 
+	// defer so os.Exit doesn't prevent our clean up.
 	retCode := 0
 	defer func() {
 		if err != nil {
@@ -94,7 +95,7 @@ func main() {
 		}
 	default:
 		flag.Usage()
-		os.Exit(1)
+		retCode = 1
 	}
 }
 
