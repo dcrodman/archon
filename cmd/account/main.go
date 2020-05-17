@@ -6,11 +6,12 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"os"
+
 	_ "github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/spf13/viper"
-	"os"
 )
 
 var (
