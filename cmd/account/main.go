@@ -14,12 +14,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	add        = flag.Bool("add", false, "Add an account.")
-	pd         = flag.Bool("perm-delete", false, "Delete an account permanently.")
-	softDelete = flag.Bool("delete", false, "Soft delete an account.")
-	help       = flag.Bool("help", false, "Print this usage info.")
-)
+func usage() {
+	exName := os.Args[0]
+	fmt.Printf("%s <command>\n", exName)
+	fmt.Println("The commands are:")
+	prettyPrint("add", "add an account")
+	prettyPrint("delete", "soft delete an account")
+	prettyPrint("perm-delete", "permanently delete an account")
+	prettyPrint("help", "show this usage info")
+}
+
+func prettyPrint(arg, usage string) {
+	fmt.Printf("\t%-13s%s\n", arg, usage)
+}
 
 // initDataSource creates the connection to the database, and returns a func
 // which should be deferred for cleanup.
@@ -40,16 +47,10 @@ func initDataSource() (func(), error) {
 }
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
 
-	if help != nil && *help {
-		flag.Usage()
-		os.Exit(0)
-	}
-	if flag.NFlag() != 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
+	command := flag.Arg(0)
 
 	cleanup, err := initDataSource()
 	if err != nil {
@@ -67,8 +68,8 @@ func main() {
 		os.Exit(retCode)
 	}()
 
-	switch {
-	case add != nil && *add:
+	switch command {
+	case "add":
 		u := scanInput("Username")
 		p := scanInput("Password")
 		e := scanInput("Email")
@@ -76,13 +77,13 @@ func main() {
 			retCode = 1
 			fmt.Println(err.Error())
 		}
-	case softDelete != nil && *softDelete:
+	case "delete":
 		u := scanInput("Username")
 		if err = softDeleteAccount(u); err != nil {
 			retCode = 1
 			fmt.Println(err.Error())
 		}
-	case pd != nil && *pd:
+	case "perm-delete":
 		u := scanInput("Username")
 		if err = permanentlyDeleteAccount(u); err != nil {
 			retCode = 1

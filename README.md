@@ -153,7 +153,7 @@ in `config.yaml`). You may also provide a CIDR block.
 
 You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
 
-    ./account --add
+    ./account add
 
 ### 10. Run the server
 

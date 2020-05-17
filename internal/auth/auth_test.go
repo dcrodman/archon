@@ -32,8 +32,8 @@ func TestCreateAccount(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			originalCreateAccount := createAccount
 			defer func() {
-				originalCreateAccount := createAccount
 				createAccount = originalCreateAccount
 			}()
 			createAccount = tt.dbCreateFn
@@ -129,7 +129,9 @@ func TestVerifyAccount(t *testing.T) {
 				return tt.context.account, tt.context.err
 			}
 
-			if _, err := VerifyAccount(tt.args.username, tt.args.password); err != tt.result.err {
+			_, err := VerifyAccount(tt.args.username, tt.args.password)
+
+			if err != tt.result.err {
 				t.Errorf("expected wantedErr = %s, got = %s", tt.result.err, err)
 			}
 
