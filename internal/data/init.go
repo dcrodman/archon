@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+
 	"github.com/dcrodman/archon"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"

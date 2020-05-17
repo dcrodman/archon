@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/jinzhu/gorm"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 // Account contains the login information specific to each registered user.
@@ -53,10 +54,10 @@ func FindAccount(username string) (*Account, error) {
 	return &account, nil
 }
 
-// FindUnscopedAccounts searches for a potentially soft-deleted account with the
+// FindUnscopedAccount searches for a potentially soft-deleted account with the
 // specified username, returning the *Account instance if found or nil if
 // there is no match.
-func FindUnscopedAccounts(username string) (*Account, error) {
+func FindUnscopedAccount(username string) (*Account, error) {
 	var account Account
 	err := db.Unscoped().Where("username = ?", username).Find(&account).Error
 

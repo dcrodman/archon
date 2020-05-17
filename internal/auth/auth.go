@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+
 	"github.com/dcrodman/archon/internal/data"
 )
 
@@ -75,7 +76,7 @@ func PermanentlyDeleteAccount(username string) error {
 }
 
 var permanentlyDeleteAccount = func(username string) error {
-	a, err := data.FindUnscopedAccounts(username)
+	a, err := data.FindUnscopedAccount(username)
 	if err != nil {
 		return err
 	}

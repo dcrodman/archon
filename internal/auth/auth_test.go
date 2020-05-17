@@ -2,8 +2,9 @@ package auth
 
 import (
 	"fmt"
-	"github.com/dcrodman/archon/internal/data"
 	"testing"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 func TestCreateAccount(t *testing.T) {
@@ -31,11 +32,13 @@ func TestCreateAccount(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			originalCreateAccount := createAccount
+			defer func() {
+				originalCreateAccount := createAccount
+				createAccount = originalCreateAccount
+			}()
 			createAccount = tt.dbCreateFn
 
 			account, err := CreateAccount(tt.args.username, tt.args.password, tt.args.email)
-
 			if err != nil && err.Error() != tt.wantedErr.Error() {
 				t.Fatalf("expected error to = %s, got = %s", tt.wantedErr, err)
 			}
@@ -51,8 +54,6 @@ func TestCreateAccount(t *testing.T) {
 					t.Errorf("expected account emmail = %s, got = %s", tt.args.email, account.Email)
 				}
 			}
-
-			createAccount = originalCreateAccount
 		})
 	}
 }
@@ -66,8 +67,7 @@ func TestHashPassword(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		h := HashPassword(password)
-		if hashed != h {
+		if h := HashPassword(password); hashed != h {
 			t.Fatalf("password hashing is non-deterministic (expected %s, got %s)", hashed, h)
 		}
 	}
@@ -129,13 +129,79 @@ func TestVerifyAccount(t *testing.T) {
 				return tt.context.account, tt.context.err
 			}
 
-			_, err := VerifyAccount(tt.args.username, tt.args.password)
-
-			if err != tt.result.err {
+			if _, err := VerifyAccount(tt.args.username, tt.args.password); err != tt.result.err {
 				t.Errorf("expected wantedErr = %s, got = %s", tt.result.err, err)
 			}
 
 			findAccount = originalFindAccount
+		})
+	}
+}
+
+func TestSoftDeleteAccount(t *testing.T) {
+	type args struct {
+		username string
+	}
+	tests := map[string]struct {
+		dbDeleteFunc func(username string) error
+		args         args
+		wantedErr    error
+	}{
+		"database_error": {
+			dbDeleteFunc: func(username string) error { return fmt.Errorf("database error") },
+			args:         args{username: "test"},
+			wantedErr:    fmt.Errorf("database error"),
+		},
+		"happy_path": {
+			dbDeleteFunc: func(username string) error { return nil },
+			args:         args{username: "test"},
+			wantedErr:    nil,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			originalDeleteAccount := softDeleteAccount
+			softDeleteAccount = tt.dbDeleteFunc
+
+			if err := DeleteAccount(tt.args.username); err != nil && err.Error() != tt.wantedErr.Error() {
+				t.Errorf("expected error to = %s, got = %s", tt.wantedErr, err)
+			}
+
+			softDeleteAccount = originalDeleteAccount
+		})
+	}
+}
+
+func TestPermanentlyDeleteAccount(t *testing.T) {
+	type args struct {
+		username string
+	}
+	tests := map[string]struct {
+		dbDeleteFunc func(username string) error
+		args         args
+		wantedErr    error
+	}{
+		"database_error": {
+			dbDeleteFunc: func(username string) error { return fmt.Errorf("database error") },
+			args:         args{username: "test"},
+			wantedErr:    fmt.Errorf("database error"),
+		},
+		"happy_path": {
+			dbDeleteFunc: func(username string) error { return nil },
+			args:         args{username: "test"},
+			wantedErr:    nil,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			originalDeleteAccount := permanentlyDeleteAccount
+			permanentlyDeleteAccount = tt.dbDeleteFunc
+
+			if err := PermanentlyDeleteAccount(tt.args.username); err != nil && err.Error() != tt.wantedErr.Error() {
+				t.Errorf("expected error to = %s, got = %s", tt.wantedErr, err)
+			}
+
+			permanentlyDeleteAccount = originalDeleteAccount
 		})
 	}
 }
