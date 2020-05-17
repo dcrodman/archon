@@ -138,7 +138,7 @@ which can help improve stability as well as make cheating harder.
     mkdir patches
     # copy your client files into ^
 
-## 8. Generate the shipgate SSL certificates
+### 8. Generate the shipgate SSL certificates
 
 The shipgate API server requires clients to connect over SSL as both a form of security as well as
 mutual authentication. Archon includes a tool for generating these certificates, which need to be
