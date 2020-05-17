@@ -16,9 +16,9 @@ message ShipList {
   repeated Ship ships = 1;
 }
 
-// ShipMetadataService is intended for clients that need to know information
+// ShipInfoService is intended for clients that need to know information
 // about the registered ships but not change state (like the character server).
-service ShipMetadataService {
+service ShipInfoService {
   // GetActiveShips returns the list of Ships that currently connected to the
   // shipgate and ready to receive players.
   rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);

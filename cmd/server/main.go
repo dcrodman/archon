@@ -66,14 +66,14 @@ func main() {
 // the exception of the Block server since the number is configurable).
 func startServers() {
 	hostname := viper.GetString("hostname")
-	shipgateMetaServiceAddr := fmt.Sprintf(
+	shipInfoServiceAddr := fmt.Sprintf(
 		"%s:%s", hostname, viper.GetString("shipgate_server.meta_service_port"))
 	shipgateServiceAddr := fmt.Sprintf(
 		"%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
 
-	shipgateWg := startShipgate(shipgateMetaServiceAddr, shipgateServiceAddr)
+	shipgateWg := startShipgate(shipInfoServiceAddr, shipgateServiceAddr)
 
-	registerServers(shipgateMetaServiceAddr, shipgateServiceAddr)
+	registerServers(shipInfoServiceAddr, shipgateServiceAddr)
 
 	launcher.SerHostname(hostname)
 	serverWg := launcher.Start()
@@ -82,12 +82,12 @@ func startServers() {
 	serverWg.Wait()
 }
 
-func startShipgate(metaServiceAddress, serviceAddress string) (wg *sync.WaitGroup) {
+func startShipgate(shipInfoServiceAddress, shipServiceAddress string) (wg *sync.WaitGroup) {
 	var shipgateWg sync.WaitGroup
 	shipgateWg.Add(1)
 
 	go func() {
-		err := shipgate.Start(metaServiceAddress, serviceAddress)
+		err := shipgate.Start(shipInfoServiceAddress, shipServiceAddress)
 
 		if err != nil {
 			fmt.Println("failed to start ship server:", err)
@@ -100,12 +100,12 @@ func startShipgate(metaServiceAddress, serviceAddress string) (wg *sync.WaitGrou
 	return &shipgateWg
 }
 
-func registerServers(shipgateMetaServiceAddress, shipgateServiceAddress string) {
+func registerServers(shipInfoServiceAddress, shipgateServiceAddress string) {
 	dataPort := viper.GetString("patch_server.data_port")
 	launcher.AddServer(dataPort, patch.NewDataServer("DATA"))
 	launcher.AddServer(viper.GetString("patch_server.patch_port"), patch.NewServer("PATCH", dataPort))
 
 	characterPort := viper.GetString("character_server.port")
-	launcher.AddServer(characterPort, character.NewServer("CHARACTER", shipgateMetaServiceAddress))
+	launcher.AddServer(characterPort, character.NewServer("CHARACTER", shipInfoServiceAddress))
 	launcher.AddServer(viper.GetString("login_server.port"), login.NewServer("LOGIN", characterPort))
 }

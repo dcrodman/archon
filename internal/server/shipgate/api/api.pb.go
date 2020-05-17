@@ -172,14 +172,14 @@ var file_api_proto_rawDesc = []byte{
 	0x12, 0x12, 0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
 	0x70, 0x6f, 0x72, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x43, 0x6f,
 	0x75, 0x6e, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0b, 0x70, 0x6c, 0x61, 0x79, 0x65,
-	0x72, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x32, 0x4e, 0x0a, 0x13, 0x53, 0x68, 0x69, 0x70, 0x4d, 0x65,
-	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x37, 0x0a,
-	0x0e, 0x47, 0x65, 0x74, 0x41, 0x63, 0x74, 0x69, 0x76, 0x65, 0x53, 0x68, 0x69, 0x70, 0x73, 0x12,
-	0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x0d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x68,
-	0x69, 0x70, 0x4c, 0x69, 0x73, 0x74, 0x32, 0x11, 0x0a, 0x0f, 0x53, 0x68, 0x69, 0x70, 0x67, 0x61,
-	0x74, 0x65, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x42, 0x07, 0x5a, 0x05, 0x2e, 0x3b, 0x61,
-	0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x72, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x32, 0x4a, 0x0a, 0x0f, 0x53, 0x68, 0x69, 0x70, 0x49, 0x6e,
+	0x66, 0x6f, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x37, 0x0a, 0x0e, 0x47, 0x65, 0x74,
+	0x41, 0x63, 0x74, 0x69, 0x76, 0x65, 0x53, 0x68, 0x69, 0x70, 0x73, 0x12, 0x16, 0x2e, 0x67, 0x6f,
+	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d,
+	0x70, 0x74, 0x79, 0x1a, 0x0d, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x68, 0x69, 0x70, 0x4c, 0x69,
+	0x73, 0x74, 0x32, 0x11, 0x0a, 0x0f, 0x53, 0x68, 0x69, 0x70, 0x67, 0x61, 0x74, 0x65, 0x53, 0x65,
+	0x72, 0x76, 0x69, 0x63, 0x65, 0x42, 0x07, 0x5a, 0x05, 0x2e, 0x3b, 0x61, 0x70, 0x69, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -202,8 +202,8 @@ var file_api_proto_goTypes = []interface{}{
 }
 var file_api_proto_depIdxs = []int32{
 	1, // 0: api.ShipList.ships:type_name -> api.ShipList.Ship
-	2, // 1: api.ShipMetadataService.GetActiveShips:input_type -> google.protobuf.Empty
-	0, // 2: api.ShipMetadataService.GetActiveShips:output_type -> api.ShipList
+	2, // 1: api.ShipInfoService.GetActiveShips:input_type -> google.protobuf.Empty
+	0, // 2: api.ShipInfoService.GetActiveShips:output_type -> api.ShipList
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -270,76 +270,76 @@ var _ grpc.ClientConnInterface
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion6
 
-// ShipMetadataServiceClient is the client API for ShipMetadataService service.
+// ShipInfoServiceClient is the client API for ShipInfoService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type ShipMetadataServiceClient interface {
+type ShipInfoServiceClient interface {
 	// GetActiveShips returns the list of Ships that currently connected to the
 	// shipgate and ready to receive players.
 	GetActiveShips(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ShipList, error)
 }
 
-type shipMetadataServiceClient struct {
+type shipInfoServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewShipMetadataServiceClient(cc grpc.ClientConnInterface) ShipMetadataServiceClient {
-	return &shipMetadataServiceClient{cc}
+func NewShipInfoServiceClient(cc grpc.ClientConnInterface) ShipInfoServiceClient {
+	return &shipInfoServiceClient{cc}
 }
 
-func (c *shipMetadataServiceClient) GetActiveShips(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ShipList, error) {
+func (c *shipInfoServiceClient) GetActiveShips(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*ShipList, error) {
 	out := new(ShipList)
-	err := c.cc.Invoke(ctx, "/api.ShipMetadataService/GetActiveShips", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/api.ShipInfoService/GetActiveShips", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// ShipMetadataServiceServer is the server API for ShipMetadataService service.
-type ShipMetadataServiceServer interface {
+// ShipInfoServiceServer is the server API for ShipInfoService service.
+type ShipInfoServiceServer interface {
 	// GetActiveShips returns the list of Ships that currently connected to the
 	// shipgate and ready to receive players.
 	GetActiveShips(context.Context, *empty.Empty) (*ShipList, error)
 }
 
-// UnimplementedShipMetadataServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedShipMetadataServiceServer struct {
+// UnimplementedShipInfoServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedShipInfoServiceServer struct {
 }
 
-func (*UnimplementedShipMetadataServiceServer) GetActiveShips(context.Context, *empty.Empty) (*ShipList, error) {
+func (*UnimplementedShipInfoServiceServer) GetActiveShips(context.Context, *empty.Empty) (*ShipList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetActiveShips not implemented")
 }
 
-func RegisterShipMetadataServiceServer(s *grpc.Server, srv ShipMetadataServiceServer) {
-	s.RegisterService(&_ShipMetadataService_serviceDesc, srv)
+func RegisterShipInfoServiceServer(s *grpc.Server, srv ShipInfoServiceServer) {
+	s.RegisterService(&_ShipInfoService_serviceDesc, srv)
 }
 
-func _ShipMetadataService_GetActiveShips_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ShipInfoService_GetActiveShips_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShipMetadataServiceServer).GetActiveShips(ctx, in)
+		return srv.(ShipInfoServiceServer).GetActiveShips(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/api.ShipMetadataService/GetActiveShips",
+		FullMethod: "/api.ShipInfoService/GetActiveShips",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShipMetadataServiceServer).GetActiveShips(ctx, req.(*empty.Empty))
+		return srv.(ShipInfoServiceServer).GetActiveShips(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _ShipMetadataService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "api.ShipMetadataService",
-	HandlerType: (*ShipMetadataServiceServer)(nil),
+var _ShipInfoService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "api.ShipInfoService",
+	HandlerType: (*ShipInfoServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetActiveShips",
-			Handler:    _ShipMetadataService_GetActiveShips_Handler,
+			Handler:    _ShipInfoService_GetActiveShips_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

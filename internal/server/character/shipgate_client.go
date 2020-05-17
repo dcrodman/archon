@@ -82,7 +82,7 @@ func (sc *shipgateClient) requestActiveShipList() ([]ship, error) {
 
 	defer conn.Close()
 
-	shipgateClient := api.NewShipMetadataServiceClient(conn)
+	shipgateClient := api.NewShipInfoServiceClient(conn)
 	response, err := shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch ships from shipgate: %sc", err)

@@ -11,8 +11,8 @@ import (
 	"net"
 )
 
-// Start starts the gRPC API server on the specified address.
-func Start(metaAddr string, shipAddr string) error {
+// Start starts the gRPC API servers on the specified addresses.
+func Start(shipInfoServiceAddr string, shipServiceAddr string) error {
 	cert, err := loadX509Certificate()
 	if err != nil {
 		return err
@@ -21,8 +21,8 @@ func Start(metaAddr string, shipAddr string) error {
 	creds := credentials.NewServerTLSFromCert(cert)
 	opts := []grpc.ServerOption{grpc.Creds(creds)}
 
-	mec := startMetadataService(metaAddr, opts)
-	sec := startShipService(shipAddr, opts)
+	mec := startShipInfoService(shipInfoServiceAddr, opts)
+	sec := startShipService(shipServiceAddr, opts)
 
 	select {
 	case err := <-mec:
@@ -51,23 +51,23 @@ func loadX509Certificate() (*tls.Certificate, error) {
 	return &cert, nil
 }
 
-func startMetadataService(addr string, opts []grpc.ServerOption) <-chan error {
+func startShipInfoService(addr string, opts []grpc.ServerOption) <-chan error {
 	errChan := make(chan error)
 
 	go func() {
 		grpcServer := grpc.NewServer(opts...)
-		s := shipMetadataServiceServer{}
-		api.RegisterShipMetadataServiceServer(grpcServer, &s)
+		s := shipInfoServiceServer{}
+		api.RegisterShipInfoServiceServer(grpcServer, &s)
 
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			errChan <- fmt.Errorf("failed to start shigate metadata service on %s: %s\n", addr, err)
+			errChan <- fmt.Errorf("failed to start ship info service on %s: %s\n", addr, err)
 		}
 
-		fmt.Printf("waiting for ShipMetadataService requests on %s\n", addr)
+		fmt.Printf("waiting for ShipInfoService requests on %s\n", addr)
 
 		if err := grpcServer.Serve(l); err != nil {
-			errChan <- fmt.Errorf("failed to start shipgate metadata service on %s: %s\n", addr, err)
+			errChan <- fmt.Errorf("failed to start ship info service on %s: %s\n", addr, err)
 		}
 
 		close(errChan)

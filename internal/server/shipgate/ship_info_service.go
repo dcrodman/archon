@@ -6,9 +6,9 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-type shipMetadataServiceServer struct{}
+type shipInfoServiceServer struct{}
 
-func (s *shipMetadataServiceServer) GetActiveShips(_ context.Context, _ *empty.Empty) (*api.ShipList, error) {
+func (s *shipInfoServiceServer) GetActiveShips(_ context.Context, _ *empty.Empty) (*api.ShipList, error) {
 	return &api.ShipList{
 		Ships: []*api.ShipList_Ship{
 			{Id: 1, Name: "Test 1", Ip: "192.168.1.4", Port: "15001"},
