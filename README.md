@@ -24,7 +24,7 @@ questions feel free to open an issue.
   + [5. Set the hostname](#5-set-the-hostname)
   + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
   + [7. Add files to the patch directory](#7-add-files-to-the-patch-directory)
-  + [8. Generate the shipgate SSL certificates](#8-generate-the-shipgate-SSL-certificates)
+  + [8. Generate the shipgate SSL certificates](#8-generate-the-shipgate-ssl-certificates)
   + [9. Add the first player account](#9-add-the-first-player-account)
   + [10. Run the server](#10-run-the-server)
 * [Administration](#administration)
@@ -44,7 +44,7 @@ equivalents on a Windows system should still set the server up correctly.
 
 ### 1. Compile the code
 
-Assuming Go is installed:
+Assuming Go installed:
 
     git clone https://github.com/dcrodman/archon.git
     cd archon
