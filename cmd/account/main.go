@@ -15,7 +15,7 @@ import (
 
 var (
 	add        = flag.Bool("add", false, "Add an account.")
-	pd     = flag.Bool("perm-delete", false, "Delete an account permanently.")
+	pd         = flag.Bool("perm-delete", false, "Delete an account permanently.")
 	softDelete = flag.Bool("delete", false, "Soft delete an account.")
 	help       = flag.Bool("help", false, "Print this usage info.")
 )
@@ -71,7 +71,7 @@ func main() {
 		u := scanInput("Username")
 		p := scanInput("Password")
 		e := scanInput("Email")
-		if err = addAccount(u,p,e); err != nil {
+		if err = addAccount(u, p, e); err != nil {
 			retCode = 1
 			fmt.Println(err.Error())
 		}
@@ -94,7 +94,7 @@ func main() {
 }
 
 func scanInput(prompt string) string {
-	fmt.Printf("%s: ",prompt)
+	fmt.Printf("%s: ", prompt)
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	return scanner.Text()
