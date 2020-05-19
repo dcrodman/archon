@@ -32,10 +32,6 @@ func main() {
 
 	fmt.Println("configuration loaded from", archon.ConfigFileUsed())
 
-	if debug.Enabled() {
-		go debug.StartPprofServer()
-	}
-
 	archon.InitLogger()
 
 	dataSource := fmt.Sprintf(
@@ -57,6 +53,10 @@ func main() {
 		viper.GetString("database.host"),
 		viper.GetInt("database.port"),
 	)
+
+	if debug.Enabled() {
+		debug.StartUtilities()
+	}
 
 	startServers()
 }

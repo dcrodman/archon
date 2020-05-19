@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
+	"github.com/dcrodman/archon/internal/debug"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -45,7 +45,7 @@ func startCapturing() {
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
 	go captureExitHandler(signalChan)
 
-	serverAddr := viper.GetString("packet_analyzer_address")
+	serverAddr := debug.PacketAnalyzerAddress()
 	go listenForTCPPackets(serverAddr)
 	listenForHTTPPackets(serverAddr)
 }

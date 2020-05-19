@@ -15,11 +15,6 @@ max_connections: 3000
 log_file_path: ""
 # Minimum level of a log required to be written. Options: debug, info, warn, error
 log_level: debug
-# Enable extra info-providing mechanisms for the server. Only enable for development.
-debug_mode: true
-# For use with the packet_analyzer command (see cmd.packet_analyzer). Leave this blank
-# unless you're developing against Archon.
-packet_analyzer_address: ""
 # X.509 certificate for the shipgate server.
 shipgate_certificate_file: "certificate.pem"
 
@@ -84,3 +79,12 @@ block_server:
 web:
   # HTTP endpoint port for publically accessible API endpoints.
   http_port: 14000
+
+debugging:
+  # Enable extra info-providing mechanisms for the server. Only enable for development.
+  enabled: true
+  # For use with the packet_analyzer command (see cmd.packet_analyzer). Leave this blank
+  # unless you're developing against Archon.
+  packet_analyzer_address: ""
+  # Port on which a pprof server will be started if debug mode is enabled.
+  pprof_port: 4000

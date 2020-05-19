@@ -7,26 +7,75 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/spf13/viper"
 	"net/http"
-	"runtime/pprof"
+	_ "net/http/pprof"
 	"time"
 )
 
-// Enabled returns whether or not the server was set to debug mode.
-func Enabled() bool {
-	return viper.GetBool("debug_mode")
+type packetAnalyzerRequest struct {
+	ServerName  string
+	SessionID   string
+	Source      string
+	Destination string
+	Contents    []int
 }
 
-// If the server was configured in debug mode, this function will launch an HTTP server
-// that responds with pprof output containing the stack traces of all running goroutines.
-func StartPprofServer() {
-	webPort := viper.GetString("web.http_port")
+var packetAnalyzerChan = make(chan packetAnalyzerRequest, 10)
 
-	fmt.Println("opening debug port on " + webPort)
-	http.HandleFunc("/", func(resp http.ResponseWriter, req *http.Request) {
-		pprof.Lookup("goroutine").WriteTo(resp, 1)
-	})
+// Enabled returns whether or not the server was set to debug mode.
+func Enabled() bool {
+	return viper.GetBool("debugging.enabled")
+}
 
-	http.ListenAndServe(":"+webPort, nil)
+// StartUtilities spins off the services associated with debug mode.
+func StartUtilities() {
+	startPprofServer()
+
+	if packetAnalyzerEnabled() {
+		go startAnalyzerExporter()
+	}
+}
+
+func packetAnalyzerEnabled() bool {
+	return PacketAnalyzerAddress() != ""
+}
+
+func PacketAnalyzerAddress() string {
+	return viper.GetString("debugging.packet_analyzer_address")
+}
+
+func startAnalyzerExporter() {
+	for {
+		packet := <-packetAnalyzerChan
+
+		reqBytes, _ := json.Marshal(&packet)
+		httpClient := http.Client{Timeout: time.Second}
+
+		// We don't care if the packets don't get through.
+		r, err := httpClient.Post(
+			"http://"+PacketAnalyzerAddress(),
+			"application/json",
+			bytes.NewBuffer(reqBytes),
+		)
+
+		if err != nil {
+			archon.Log.Warn("failed to send packet to analyzer: ", err)
+		} else if r.StatusCode != 200 {
+			archon.Log.Warn("failed to send packet to analyzer: ", r.Body)
+		}
+	}
+}
+
+// This function starts the default pprof HTTP server that can be accessed via localhost
+// to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
+func startPprofServer() {
+	listenerAddr := fmt.Sprintf("localhost:%s", viper.GetString("debugging.pprof_port"))
+	fmt.Printf("starting pprof server on %s\n", listenerAddr)
+
+	go func() {
+		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
+			fmt.Printf("error starting pprof server: %s\n", err)
+		}
+	}()
 }
 
 // SendServerPacketToAnalyzer makes an http request to a packet_analyzer
@@ -42,7 +91,7 @@ func SendClientPacketToAnalyzer(debugInfo map[string]interface{}, packetBytes []
 }
 
 func sendToPacketAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, size int, source, destination string) {
-	if !viper.IsSet("packet_analyzer_address") {
+	if !packetAnalyzerEnabled() {
 		return
 	}
 
@@ -53,29 +102,7 @@ func sendToPacketAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, 
 
 	serverName := debugInfo["server_type"].(string)
 
-	packet := struct {
-		ServerName  string
-		SessionID   string
-		Source      string
-		Destination string
-		Contents    []int
-	}{
+	packetAnalyzerChan <- packetAnalyzerRequest{
 		"archon", serverName, source, destination, cbytes[:size],
-	}
-
-	reqBytes, _ := json.Marshal(&packet)
-	httpClient := http.Client{Timeout: time.Second}
-
-	// We don't care if the packets don't get through.
-	r, err := httpClient.Post(
-		"http://"+viper.GetString("packet_analyzer_address"),
-		"application/json",
-		bytes.NewBuffer(reqBytes),
-	)
-
-	if err != nil {
-		archon.Log.Warn("failed to send packet to analyzer: ", err)
-	} else if r.StatusCode != 200 {
-		archon.Log.Warn("failed to send packet to analyzer: ", r.Body)
 	}
 }
