@@ -48,8 +48,7 @@ type Login struct {
 	Header        BBHeader
 	Unknown       [8]byte
 	ClientVersion uint16
-	Unknown2      [3]byte
-	SlotNum       int8
+	Unknown2      uint32
 	Phase         uint16 // differentiate login packet?
 	TeamId        uint32
 	Username      [16]byte
@@ -57,7 +56,8 @@ type Login struct {
 	Password      [16]byte
 	Unknown3      [40]byte
 	HardwareInfo  [8]byte
-	Security      [40]byte
+	Security      [48]byte
+	Padding2      uint32
 }
 
 // Security packet (0xE6) sent to the client to indicate the state of client login.

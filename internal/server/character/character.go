@@ -196,7 +196,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// At this point, if we've chosen (or created) a character then the
 	// client will send us the slot number and the corresponding phase.
-	if loginPkt.SlotNum >= 0 && loginPkt.Phase == 4 {
+	if loginPkt.Phase == 4 {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}

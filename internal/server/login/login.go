@@ -103,8 +103,8 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// Copy over the config, to indicate they've passed initial authentication.
 	internal.StructFromBytes(loginPkt.Security[:], &c.Config)
-	// Newserv sets this field when the loginClientExtension first connects. I think this is
-	// used to indicate that the loginClientExtension has made it through the LOGIN server,
+	// Newserv sets this field when the login client first connects. I think this is
+	// used to indicate that the client has made it through the LOGIN server,
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
