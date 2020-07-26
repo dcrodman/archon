@@ -30,6 +30,7 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n\n")
 
+	archon.Load()
 	fmt.Println("configuration loaded from", archon.ConfigFileUsed())
 
 	archon.InitLogger()

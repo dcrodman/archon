@@ -6,9 +6,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/dcrodman/archon"
 	"os"
 
-	_ "github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/spf13/viper"
@@ -52,6 +52,7 @@ func main() {
 
 	command := flag.Arg(0)
 
+	archon.Load()
 	cleanup, err := initDataSource()
 	if err != nil {
 		fmt.Println(err.Error())

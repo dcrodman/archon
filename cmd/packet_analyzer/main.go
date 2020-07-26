@@ -19,7 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	_ "github.com/dcrodman/archon"
+	"github.com/dcrodman/archon"
 )
 
 // This tool's representation of a packet received from a server.
@@ -47,6 +47,8 @@ func main() {
 	if flag.NArg() > 0 {
 		command = flag.Arg(0)
 	}
+
+	archon.Load()
 
 	switch command {
 	case "compact":

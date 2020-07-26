@@ -26,7 +26,7 @@ var (
 	cachedIPBytes [4]byte
 )
 
-func init() {
+func Load() {
 	viper.SetConfigName("config") // name of config file (without extension)
 	viper.SetConfigType("yaml")
 
