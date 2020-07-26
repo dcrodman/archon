@@ -1,6 +1,7 @@
 package shipgate
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
@@ -13,7 +14,7 @@ import (
 )
 
 // Start starts the gRPC API servers on the specified addresses.
-func Start(shipInfoServiceAddr string, shipServiceAddr string) error {
+func Start(ctx context.Context, shipInfoServiceAddr string, shipServiceAddr string) error {
 	cert, err := loadX509Certificate()
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/dcrodman/archon"
@@ -72,23 +73,24 @@ func startServers() {
 	shipgateServiceAddr := fmt.Sprintf(
 		"%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
 
-	shipgateWg := startShipgate(shipInfoServiceAddr, shipgateServiceAddr)
+	ctx, _ := context.WithCancel(context.Background())
+	shipgateWg := startShipgate(ctx, shipInfoServiceAddr, shipgateServiceAddr)
 
 	registerServers(shipInfoServiceAddr, shipgateServiceAddr)
 
 	launcher.SerHostname(hostname)
-	serverWg := launcher.Start()
+	serverWg := launcher.Start(ctx)
 
 	shipgateWg.Wait()
 	serverWg.Wait()
 }
 
-func startShipgate(shipInfoServiceAddress, shipServiceAddress string) (wg *sync.WaitGroup) {
+func startShipgate(ctx context.Context, shipInfoServiceAddress, shipServiceAddress string) (wg *sync.WaitGroup) {
 	var shipgateWg sync.WaitGroup
 	shipgateWg.Add(1)
 
 	go func() {
-		err := shipgate.Start(shipInfoServiceAddress, shipServiceAddress)
+		err := shipgate.Start(ctx, shipInfoServiceAddress, shipServiceAddress)
 
 		if err != nil {
 			fmt.Println("failed to start ship server:", err)
