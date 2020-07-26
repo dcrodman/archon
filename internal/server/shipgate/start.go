@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"io/ioutil"
+	"log"
 	"net"
 )
 
@@ -64,7 +65,7 @@ func startShipInfoService(addr string, opts []grpc.ServerOption) <-chan error {
 			errChan <- fmt.Errorf("failed to start ship info service on %s: %s\n", addr, err)
 		}
 
-		fmt.Printf("waiting for ShipInfoService requests on %s\n", addr)
+		log.Printf("waiting for ShipInfoService requests on %s\n", addr)
 
 		if err := grpcServer.Serve(l); err != nil {
 			errChan <- fmt.Errorf("failed to start ship info service on %s: %s\n", addr, err)
@@ -89,7 +90,7 @@ func startShipService(addr string, opts []grpc.ServerOption) <-chan error {
 			errChan <- fmt.Errorf("failed to start shigate ship service on %s: %s\n", addr, err)
 		}
 
-		fmt.Printf("waiting for ShipgateService requests on %s\n", addr)
+		log.Printf("waiting for ShipgateService requests on %s\n", addr)
 
 		if err := grpcServer.Serve(l); err != nil {
 			errChan <- fmt.Errorf("failed to start shipgate ship service on %s: %s\n", addr, err)

@@ -1,6 +1,7 @@
 package patch
 
 import (
+	"errors"
 	"fmt"
 	"github.com/spf13/viper"
 	"hash/crc32"
@@ -69,13 +70,13 @@ func initializePatchData() error {
 
 		fmt.Println("loading patch files from", dir)
 		if err := buildPatchFileTree(rootNode); err != nil {
-			initErr = fmt.Errorf("error loading patch files: ", err)
+			initErr = fmt.Errorf("error loading patch files: %s", err)
 		}
 
 		buildPatchIndex(rootNode)
 
 		if len(patchIndex) < 1 {
-			initErr = fmt.Errorf("error loading patch files: at least one patch file must be present")
+			initErr = errors.New("error loading patch files: at least one patch file must be present")
 		}
 	})
 
