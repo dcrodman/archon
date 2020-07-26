@@ -1,10 +1,9 @@
-package launcher_test
+package launcher
 
 import (
 	"context"
 	"flag"
 	"github.com/dcrodman/archon/internal/server"
-	"github.com/dcrodman/archon/internal/server/launcher"
 	"github.com/dcrodman/archon/internal/server/patch"
 	"net"
 	"sync"
@@ -16,40 +15,40 @@ const testPort = "0"
 
 var numConnections = flag.Int("numConnections", 10, "Number of connections to test per backend")
 
-func TestLauncher(t *testing.T) {
+func TestFrontend(t *testing.T) {
 	backends := []server.Backend{
 		patch.NewServer("Patch", testPort),
 		patch.NewServer("Data", testPort),
 	}
 
-	l, cancel := startServers(backends)
+	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg := sync.WaitGroup{}
-	for _, f := range l.GetFrontends() {
-		t.Run(f.Name(), func(t *testing.T) {
+	for _, backend := range backends {
+		t.Run(backend.Name(), func(t *testing.T) {
+			addr, err := net.ResolveTCPAddr("tcp", "localhost:"+testPort)
+			if err != nil {
+				t.Fatal("failed to resolve address:", err)
+			}
+
+			f := frontend{
+				addr:    addr,
+				backend: backend,
+			}
+
+			if err := f.StartListening(ctx); err != nil {
+				t.Fatal("failed to start frontend:", err)
+			}
+
 			for i := 0; i < *numConnections; i++ {
 				wg.Add(1)
-				go testConnection(t, &wg, f.Addr())
+				go testConnection(t, &wg, f.addr)
 			}
 		})
-
 	}
+
 	wg.Wait()
-}
-
-func startServers(backends []server.Backend) (*launcher.Launcher, func()) {
-	l := &launcher.Launcher{}
-	l.SetHostname("localhost")
-
-	for _, backend := range backends {
-		l.AddServer(testPort, backend)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	l.Start(ctx)
-
-	return l, cancel
 }
 
 func testConnection(t *testing.T, wg *sync.WaitGroup, addr net.Addr) {

@@ -3,8 +3,9 @@ package launcher
 import (
 	"context"
 	"fmt"
+	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/server"
-	"log"
+	"net"
 	"os"
 	"sync"
 )
@@ -12,8 +13,9 @@ import (
 var defaultLauncher Launcher
 
 type handler struct {
-	port    string
 	backend server.Backend
+	port    string
+	addr    *net.TCPAddr
 }
 
 // Launcher manages the association between Backends and their port bindings
@@ -22,7 +24,7 @@ type Launcher struct {
 	hostname string
 	servers  []handler
 
-	frontends []*frontend
+	addressOverrides map[server.Backend]*net.TCPAddr
 }
 
 // SetHostname sets the global hostname to which all registered servers will be bound.
@@ -35,6 +37,10 @@ func (l *Launcher) SetHostname(hostname string) {
 func AddServer(port string, backend server.Backend) { defaultLauncher.AddServer(port, backend) }
 func (l *Launcher) AddServer(port string, backend server.Backend) {
 	l.servers = append(l.servers, handler{port: port, backend: backend})
+}
+
+func (l *Launcher) AddServerWithAddress(addr *net.TCPAddr, backend server.Backend) {
+	l.servers = append(l.servers, handler{addr: addr, backend: backend})
 }
 
 // Start initializes all of the Backends and starts the set of registered servers
@@ -50,7 +56,17 @@ func (l *Launcher) Start(ctx context.Context) *sync.WaitGroup {
 
 	var wg sync.WaitGroup
 	for _, s := range l.servers {
-		l.startServer(ctx, &wg, s.port, s.backend)
+		addr := s.addr
+		if addr == nil {
+			var err error
+			addr, err = l.buildAddr(s.port)
+			if err != nil {
+				archon.Log.Error(err)
+				os.Exit(1)
+			}
+		}
+
+		l.startServer(ctx, &wg, addr, s.backend)
 	}
 	return &wg
 }
@@ -59,7 +75,7 @@ func (l *Launcher) initServers() {
 	for _, s := range l.servers {
 		// Failure to initialize one of the registered servers is considered terminal.
 		if err := s.backend.Init(); err != nil {
-			log.Printf("failed to initialize %s server: %s\n", s.backend.Name(), err)
+			archon.Log.Error("failed to initialize %s server: %s\n", s.backend.Name(), err)
 			os.Exit(1)
 		}
 	}
@@ -68,10 +84,18 @@ func (l *Launcher) initServers() {
 	fmt.Println()
 }
 
-func (l *Launcher) startServer(ctx context.Context, wg *sync.WaitGroup, port string, backend server.Backend) {
+func (l *Launcher) buildAddr(port string) (*net.TCPAddr, error) {
+	hostAddr, err := net.ResolveTCPAddr("tcp", l.hostname+":"+port)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve address %s", err.Error())
+	}
+
+	return hostAddr, nil
+}
+
+func (l *Launcher) startServer(ctx context.Context, wg *sync.WaitGroup, addr *net.TCPAddr, backend server.Backend) {
 	go func() {
-		frontend := newFrontend(l.hostname, port, backend)
-		l.frontends = append(l.frontends, frontend)
+		frontend := newFrontend(addr, backend)
 
 		// Failure to start one of the registered servers is considered terminal.
 		if err := frontend.StartListening(ctx); err != nil {

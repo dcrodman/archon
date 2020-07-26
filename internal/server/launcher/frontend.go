@@ -21,48 +21,26 @@ import (
 // Data is read from any connected clients and passed to a backend instance, abstracting
 // the lower level connection details away from the Backends.
 type frontend struct {
-	hostname string
-	port     string
-	backend  server.Backend
-
-	listenAddr net.Addr
+	addr    *net.TCPAddr
+	backend server.Backend
 }
 
-func newFrontend(hostname, port string, backend server.Backend) *frontend {
-	return &frontend{
-		hostname: hostname,
-		port:     port,
-		backend:  backend,
-	}
+func newFrontend(addr *net.TCPAddr, backend server.Backend) *frontend {
+	return &frontend{addr: addr, backend: backend}
 }
 
 // StartListening opens a TCP socket for the specified server and enters a blocking loop
 // for accepting client connections and dispatching them to the server.
 func (f *frontend) StartListening(ctx context.Context) error {
-	socket, err := f.openSocket()
+	socket, err := net.ListenTCP("tcp", f.addr)
 	if err != nil {
-		return err
+		return fmt.Errorf("error listening on socket: %s", err.Error())
 	}
-	f.listenAddr = socket.Addr()
 
-	log.Printf("waiting for %s connections on %v:%v\n", f.backend.Name(), f.hostname, f.port)
+	log.Printf("waiting for %s connections on %v\n", f.backend.Name(), f.addr.String())
 
 	f.startBlockingLoop(ctx, socket)
 	return nil
-}
-
-func (f *frontend) openSocket() (*net.TCPListener, error) {
-	hostAddr, err := net.ResolveTCPAddr("tcp", f.hostname+":"+f.port)
-	if err != nil {
-		return nil, fmt.Errorf("error creating socket: %s", err.Error())
-	}
-
-	socket, err := net.ListenTCP("tcp", hostAddr)
-	if err != nil {
-		return nil, fmt.Errorf("error listening on socket: %s", err.Error())
-	}
-
-	return socket, nil
 }
 
 // startBlockingLoop implements a connection handling loop that's purely responsible for
