@@ -3,6 +3,7 @@ package launcher
 import (
 	"fmt"
 	"github.com/dcrodman/archon/internal/server"
+	"log"
 	"os"
 	"sync"
 )
@@ -14,8 +15,8 @@ type handler struct {
 	backend server.Backend
 }
 
-// Launcher maps ports to Backends on a particular hostname and handles the client
-// connection logic for Backend instances.
+// Launcher manages the association between Backends and their port bindings
+// on a specified hostname.
 type Launcher struct {
 	hostname string
 	servers  []handler
@@ -45,7 +46,7 @@ func (l *Launcher) Start() *sync.WaitGroup {
 	for _, s := range l.servers {
 		// Failure to initialize one of the registered servers is considered terminal.
 		if err := s.backend.Init(); err != nil {
-			fmt.Printf("failed to initialize %s server: %s\n", s.backend.Name(), err)
+			log.Printf("failed to initialize %s server: %s\n", s.backend.Name(), err)
 			os.Exit(1)
 		}
 	}
@@ -55,8 +56,8 @@ func (l *Launcher) Start() *sync.WaitGroup {
 	var wg sync.WaitGroup
 
 	for _, s := range l.servers {
-		go func(port string, s server.Backend) {
-			frontend := newServerFrontend(l.hostname, port, s)
+		go func(p string, b server.Backend) {
+			frontend := newServerFrontend(l.hostname, p, b)
 
 			// Failure to start one of the registered servers is considered terminal.
 			if err := frontend.StartListening(); err != nil {

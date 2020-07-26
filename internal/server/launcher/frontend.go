@@ -9,23 +9,24 @@ import (
 	archdebug "github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/server"
 	"io"
+	"log"
 	"net"
 	"runtime/debug"
 	"time"
 )
 
-// serverFrontend implements the concurrent client connection logic.
+// frontend implements the concurrent client connection logic.
 //
 // Data is read from any connected clients and passed to a backend instance, abstracting
 // the lower level connection details away from the Backends.
-type serverFrontend struct {
+type frontend struct {
 	hostname string
 	port     string
 	backend  server.Backend
 }
 
-func newServerFrontend(hostname, port string, backend server.Backend) *serverFrontend {
-	return &serverFrontend{
+func newServerFrontend(hostname, port string, backend server.Backend) *frontend {
+	return &frontend{
 		hostname: hostname,
 		port:     port,
 		backend:  backend,
@@ -34,20 +35,20 @@ func newServerFrontend(hostname, port string, backend server.Backend) *serverFro
 
 // StartListening opens a TCP socket for the specified server and enters a blocking loop
 // for accepting client connections and dispatching them to the server.
-func (s *serverFrontend) StartListening() error {
-	socket, err := s.openSocket()
+func (f *frontend) StartListening() error {
+	socket, err := f.openSocket()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("waiting for %s connections on %v:%v\n", s.backend.Name(), s.hostname, s.port)
+	log.Printf("waiting for %s connections on %v:%v\n", f.backend.Name(), f.hostname, f.port)
 
-	s.startBlockingLoop(socket)
+	f.startBlockingLoop(socket)
 	return nil
 }
 
-func (s *serverFrontend) openSocket() (*net.TCPListener, error) {
-	hostAddr, err := net.ResolveTCPAddr("tcp", s.hostname+":"+s.port)
+func (f *frontend) openSocket() (*net.TCPListener, error) {
+	hostAddr, err := net.ResolveTCPAddr("tcp", f.hostname+":"+f.port)
 	if err != nil {
 		return nil, fmt.Errorf("error creating socket: %s", err.Error())
 	}
@@ -62,8 +63,8 @@ func (s *serverFrontend) openSocket() (*net.TCPListener, error) {
 
 // startBlockingLoop implements a connection handling loop that's purely responsible for
 // accepting new connections and spinning off goroutines for the Backend to handle them.
-func (s *serverFrontend) startBlockingLoop(socket *net.TCPListener) {
-	defer fmt.Println(s.backend.Name() + " exiting")
+func (f *frontend) startBlockingLoop(socket *net.TCPListener) {
+	defer log.Println(f.backend.Name() + " exiting")
 
 	for {
 		// Poll until we can accept more clients.
@@ -82,43 +83,43 @@ func (s *serverFrontend) startBlockingLoop(socket *net.TCPListener) {
 		//
 		// Note: If there is eventually a need to implement worker pooling rather than spawning
 		// new goroutines for each client, this is where it should be implemented.
-		go s.acceptClient(connection)
+		go f.acceptClient(connection)
 	}
 }
 
-func (s *serverFrontend) acceptClient(connection *net.TCPConn) {
+func (f *frontend) acceptClient(connection *net.TCPConn) {
 	c := server.NewClient(connection)
-	c.Extension = s.backend.CreateExtension()
+	c.Extension = f.backend.CreateExtension()
 
-	if err := s.backend.StartSession(c); err != nil {
-		archon.Log.Errorf("StartSession() failed for client %s:", c.IPAddr(), err)
+	if err := f.backend.StartSession(c); err != nil {
+		archon.Log.Errorf("StartSession() failed for client %s: %s", c.IPAddr(), err)
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
 	if globalClientList.has(c) {
-		archon.Log.Infof("rejected second %s connection from %s", s.backend.Name(), c.IPAddr())
+		archon.Log.Infof("rejected second %s connection from %s", f.backend.Name(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
 
-	archon.Log.Infof("accepted %s connection from %s", s.backend.Name(), c.IPAddr())
+	archon.Log.Infof("accepted %s connection from %s", f.backend.Name(), c.IPAddr())
 
 	globalClientList.add(c)
-	s.processPackets(c)
+	f.processPackets(c)
 }
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func (s *serverFrontend) processPackets(c *server.Client) {
+func (f *frontend) processPackets(c *server.Client) {
 	// Defer so that we catch any panics, disconnect the client, and
 	// remove them from the list regardless of the state of the connection.
-	defer s.closeConnectionAndRecover(s.backend.Name(), c)
+	defer f.closeConnectionAndRecover(f.backend.Name(), c)
 
 	buffer := make([]byte, 2048)
 	var err error
 
 	for {
-		buffer, err = s.readNextPacket(c, buffer)
+		buffer, err = f.readNextPacket(c, buffer)
 
 		if err == io.EOF {
 			break
@@ -132,14 +133,14 @@ func (s *serverFrontend) processPackets(c *server.Client) {
 			archdebug.SendClientPacketToAnalyzer(c.Extension.DebugInfo(), buffer, uint16(size))
 		}
 
-		if err = s.backend.Handle(c, buffer); err != nil {
+		if err = f.backend.Handle(c, buffer); err != nil {
 			archon.Log.Warn("error in client communication: " + err.Error())
 			return
 		}
 	}
 }
 
-func (*serverFrontend) closeConnectionAndRecover(serverName string, c *server.Client) {
+func (*frontend) closeConnectionAndRecover(serverName string, c *server.Client) {
 	if err := recover(); err != nil {
 		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
 			c.IPAddr(), err, debug.Stack())
@@ -157,11 +158,11 @@ func (*serverFrontend) closeConnectionAndRecover(serverName string, c *server.Cl
 // ReadNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func (s *serverFrontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, error) {
+func (f *frontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, error) {
 	headerSize := int(c.Extension.HeaderSize())
 
 	// Read and decrypt the packet header.
-	if err := s.readDataFromClient(c, headerSize, buffer); err != nil {
+	if err := f.readDataFromClient(c, headerSize, buffer); err != nil {
 		return buffer, err
 	}
 
@@ -177,7 +178,7 @@ func (s *serverFrontend) readNextPacket(c *server.Client, buffer []byte) ([]byte
 	}
 
 	// Read and decrypt the rest of the packet.
-	if err := s.readDataFromClient(c, packetSize-headerSize, buffer[headerSize:]); err != nil {
+	if err := f.readDataFromClient(c, packetSize-headerSize, buffer[headerSize:]); err != nil {
 		return buffer, err
 	}
 
@@ -186,7 +187,7 @@ func (s *serverFrontend) readNextPacket(c *server.Client, buffer []byte) ([]byte
 	return buffer, nil
 }
 
-func (s *serverFrontend) readDataFromClient(c *server.Client, n int, buffer []byte) error {
+func (f *frontend) readDataFromClient(c *server.Client, n int, buffer []byte) error {
 	received := 0
 
 	for received < n {
