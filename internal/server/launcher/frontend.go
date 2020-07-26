@@ -24,6 +24,8 @@ type frontend struct {
 	hostname string
 	port     string
 	backend  server.Backend
+
+	listenAddr net.Addr
 }
 
 func newFrontend(hostname, port string, backend server.Backend) *frontend {
