@@ -1,4 +1,4 @@
-package launcher
+package frontend
 
 import (
 	"bytes"

@@ -11,7 +11,7 @@ import (
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/server/character"
-	"github.com/dcrodman/archon/internal/server/launcher"
+	"github.com/dcrodman/archon/internal/server/frontend"
 	"github.com/dcrodman/archon/internal/server/login"
 	"github.com/dcrodman/archon/internal/server/patch"
 	"github.com/dcrodman/archon/internal/server/shipgate"
@@ -78,8 +78,8 @@ func startServers() {
 
 	registerServers(shipInfoServiceAddr, shipgateServiceAddr)
 
-	launcher.SerHostname(hostname)
-	serverWg := launcher.Start(ctx)
+	frontend.SerHostname(hostname)
+	serverWg := frontend.Start(ctx)
 
 	shipgateWg.Wait()
 	serverWg.Wait()
@@ -105,10 +105,10 @@ func startShipgate(ctx context.Context, shipInfoServiceAddress, shipServiceAddre
 
 func registerServers(shipInfoServiceAddress, shipgateServiceAddress string) {
 	dataPort := viper.GetString("patch_server.data_port")
-	launcher.AddServer(dataPort, patch.NewDataServer("DATA"))
-	launcher.AddServer(viper.GetString("patch_server.patch_port"), patch.NewServer("PATCH", dataPort))
+	frontend.AddServer(dataPort, patch.NewDataServer("DATA"))
+	frontend.AddServer(viper.GetString("patch_server.patch_port"), patch.NewServer("PATCH", dataPort))
 
 	characterPort := viper.GetString("character_server.port")
-	launcher.AddServer(characterPort, character.NewServer("CHARACTER", shipInfoServiceAddress))
-	launcher.AddServer(viper.GetString("login_server.port"), login.NewServer("LOGIN", characterPort))
+	frontend.AddServer(characterPort, character.NewServer("CHARACTER", shipInfoServiceAddress))
+	frontend.AddServer(viper.GetString("login_server.port"), login.NewServer("LOGIN", characterPort))
 }

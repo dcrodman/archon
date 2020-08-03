@@ -1,4 +1,4 @@
-package launcher
+package frontend
 
 import (
 	"context"
@@ -48,10 +48,6 @@ func (l *Launcher) AddServerWithAddress(addr *net.TCPAddr, backend server.Backen
 // until all servers have shut down.
 func Start(ctx context.Context) *sync.WaitGroup { return defaultLauncher.Start(ctx) }
 func (l *Launcher) Start(ctx context.Context) *sync.WaitGroup {
-	if l.hostname == "" {
-		panic("error initializing server: no hostname set")
-	}
-
 	l.initServers()
 
 	var wg sync.WaitGroup
@@ -85,6 +81,10 @@ func (l *Launcher) initServers() {
 }
 
 func (l *Launcher) buildAddr(port string) (*net.TCPAddr, error) {
+	if l.hostname == "" {
+		panic("error initializing server: no hostname set")
+	}
+
 	hostAddr, err := net.ResolveTCPAddr("tcp", l.hostname+":"+port)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve address %s", err.Error())
