@@ -146,7 +146,7 @@ which can help improve stability as well as make cheating harder.
 
 The shipgate API server requires clients to connect over SSL as both a form of security as well as
 mutual authentication. Archon includes a tool for generating these certificates, which need to be
-be present in the server's config directory:
+present in the server's config directory:
 
     ./generate_cert
 

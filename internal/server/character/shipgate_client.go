@@ -59,7 +59,7 @@ func (sc *shipgateClient) startShipListRefreshLoop() {
 func (sc *shipgateClient) refreshShipList() error {
 	activeShips, err := sc.requestActiveShipList()
 	if err != nil {
-		return fmt.Errorf("shipgateClient: failed to connect to shipgate: %sc", err)
+		return fmt.Errorf("shipgateClient: failed to connect to shipgate: %s", err)
 	}
 
 	sc.shipsMutex.Lock()
@@ -72,12 +72,12 @@ func (sc *shipgateClient) refreshShipList() error {
 func (sc *shipgateClient) requestActiveShipList() ([]ship, error) {
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load certificate file for shipgate: %sc", err)
+		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}
 
 	conn, err := grpc.Dial(sc.shipgateAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to shipgate: %sc", err)
+		return nil, fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
 
 	defer conn.Close()
@@ -85,7 +85,7 @@ func (sc *shipgateClient) requestActiveShipList() ([]ship, error) {
 	shipgateClient := api.NewShipInfoServiceClient(conn)
 	response, err := shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch ships from shipgate: %sc", err)
+		return nil, fmt.Errorf("failed to fetch ships from shipgate: %s", err)
 	}
 
 	ships := make([]ship, 0)
