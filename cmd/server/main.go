@@ -17,12 +17,13 @@ import (
 	"github.com/dcrodman/archon/internal/server/shipgate"
 	"github.com/spf13/viper"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
-func main() {
-	flag.Parse()
+var config = flag.String("config", "config.yaml", "Path to the config file for the server")
 
+func main() {
 	fmt.Printf("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
 		"This program is free software: you can redistribute it and/or\n" +
@@ -31,10 +32,17 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n\n")
 
-	archon.Load()
-	fmt.Println("configuration loaded from", archon.ConfigFileUsed())
+	flag.Parse()
 
+	fmt.Println("loading configuration from", *config)
+	archon.Load(*config)
 	archon.InitLogger()
+
+	// Change to the same directory as the config file so that any relative
+	// paths in the config file will resolve.
+	if err := os.Chdir(filepath.Dir(*config)); err != nil {
+		fmt.Println("error chdir", err)
+	}
 
 	dataSource := fmt.Sprintf(
 		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",

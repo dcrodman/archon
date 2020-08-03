@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/dcrodman/archon/internal/debug"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -39,13 +38,12 @@ var (
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing() {
+func startCapturing(serverAddr string) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
 	go captureExitHandler(signalChan)
 
-	serverAddr := debug.PacketAnalyzerAddress()
 	go listenForTCPPackets(serverAddr)
 	listenForHTTPPackets(serverAddr)
 }

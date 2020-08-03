@@ -71,7 +71,7 @@ func (l *Launcher) initServers() {
 	for _, s := range l.servers {
 		// Failure to initialize one of the registered servers is considered terminal.
 		if err := s.backend.Init(); err != nil {
-			archon.Log.Error("failed to initialize %s server: %s\n", s.backend.Name(), err)
+			archon.Log.Errorf("failed to initialize %s server: %s\n", s.backend.Name(), err)
 			os.Exit(1)
 		}
 	}

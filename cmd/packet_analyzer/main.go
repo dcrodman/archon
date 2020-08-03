@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/dcrodman/archon"
 )
 
 // This tool's representation of a packet received from a server.
@@ -40,6 +39,8 @@ type SessionFile struct {
 	Packets   []Packet
 }
 
+var address = flag.String("addr", "localhost:8081", "Address and port to which to bind")
+
 func main() {
 	flag.Parse()
 
@@ -48,15 +49,13 @@ func main() {
 		command = flag.Arg(0)
 	}
 
-	archon.Load()
-
 	switch command {
 	case "compact":
 		compactFiles()
 	case "summarize":
 		summarizeFiles()
 	case "", "capture":
-		startCapturing()
+		startCapturing(*address)
 	default:
 		fmt.Printf("unrecognized command %s; use -help for options", command)
 	}

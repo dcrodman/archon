@@ -14,45 +14,13 @@ import (
 	"github.com/spf13/viper"
 )
 
-func usage() {
-	exName := os.Args[0]
-	fmt.Printf("%s <command>\n", exName)
-	fmt.Println("The commands are:")
-	prettyPrint("add", "add an account")
-	prettyPrint("delete", "soft delete an account")
-	prettyPrint("perm-delete", "permanently delete an account")
-	prettyPrint("help", "show this usage info")
-}
-
-func prettyPrint(arg, usage string) {
-	fmt.Printf("\t%-13s%s\n", arg, usage)
-}
-
-// initDataSource creates the connection to the database, and returns a func
-// which should be deferred for cleanup.
-func initDataSource() (func(), error) {
-	dataSource := fmt.Sprintf(
-		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
-		viper.GetString("database.host"),
-		viper.GetInt("database.port"),
-		viper.GetString("database.name"),
-		viper.GetString("database.username"),
-		viper.GetString("database.password"),
-		viper.GetString("database.sslmode"),
-	)
-	if err := data.Initialize(dataSource); err != nil {
-		return nil, err
-	}
-	return data.Shutdown, nil
-}
+var config = flag.String("config", "config.yaml", "Path to the config file for the server")
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	command := flag.Arg(0)
-
-	archon.Load()
+	archon.Load(*config)
 	cleanup, err := initDataSource()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -69,7 +37,7 @@ func main() {
 		os.Exit(retCode)
 	}()
 
-	switch command {
+	switch flag.Arg(0) {
 	case "add":
 		u := scanInput("Username")
 		p := scanInput("Password")
@@ -94,6 +62,42 @@ func main() {
 		flag.Usage()
 		retCode = 1
 	}
+}
+
+func usage() {
+	exName := os.Args[0]
+	commands := map[string]string{
+		"add":         "add an account",
+		"delete":      "soft delete an account",
+		"perm-delete": "permanently delete an account",
+		"help":        "show this usage info",
+	}
+
+	fmt.Printf("%s <command>\n", exName)
+	fmt.Println("The commands are:")
+	for cmd, usage := range commands {
+		fmt.Printf("\t%-13s%s\n", cmd, usage)
+	}
+}
+
+// initDataSource creates the connection to the database, and returns a func
+// which should be deferred for cleanup.
+func initDataSource() (func(), error) {
+	dataSource := fmt.Sprintf(
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
+		viper.GetString("database.host"),
+		viper.GetInt("database.port"),
+		viper.GetString("database.name"),
+		viper.GetString("database.username"),
+		viper.GetString("database.password"),
+		viper.GetString("database.sslmode"),
+	)
+
+	if err := data.Initialize(dataSource); err != nil {
+		return nil, err
+	}
+
+	return data.Shutdown, nil
 }
 
 func scanInput(prompt string) string {

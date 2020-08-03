@@ -33,6 +33,10 @@ questions feel free to open an issue.
 
 ## Installation
 
+I promise a script to automate this is coming.
+
+### Manual
+
 **Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
 
@@ -153,13 +157,13 @@ in `config.yaml`). You may also provide a CIDR block.
 
 You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
 
-    ./account add
+    ./account -config /path/to/config add
 
 ### 10. Run the server
 
 The moment of truth; run the server by running this from your server directory:
 
-    ./server
+    ./server -config /path/to/config
 
 If everything's been configured correctly, you should get a bunch of messages about the different
 sub-servers waiting for connections on the configured ports.

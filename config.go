@@ -8,44 +8,32 @@ package archon
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 )
 
-// Filesystem locations that will be checked for a config file by default.
-var defaultSearchPaths = []string{
-	".",
-	"/usr/local/etc/archon",
-	"setup",
-}
-
 var (
 	// TODO: Remove these and put them closer to where they're actually used.
 	cachedIPBytes [4]byte
 )
 
-func Load() {
-	viper.SetConfigName("config") // name of config file (without extension)
+// Load initializes Viper with the contents of file.
+func Load(file string) {
+	viper.AddConfigPath(filepath.Dir(file))
+	viper.SetConfigName(filepath.Base(file))
 	viper.SetConfigType("yaml")
 
-	for _, path := range defaultSearchPaths {
-		viper.AddConfigPath(path)
-	}
-
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("unable to load config file. error: ", err)
-		fmt.Println("please check that one of these files exists and restart the server:")
-		for _, path := range defaultSearchPaths {
-			fmt.Printf("%s/config.yaml\n", path)
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			fmt.Println("error reading config file: file not found", file)
+		} else {
+			fmt.Println("error reading config file", err)
 		}
 		os.Exit(1)
 	}
-}
-
-func ConfigFileUsed() string {
-	return viper.ConfigFileUsed()
 }
 
 // Convert the broadcast IP string into 4 bytes to be used with the redirect packet.
