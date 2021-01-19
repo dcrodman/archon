@@ -13,12 +13,12 @@ import (
 const PacketLineLength = 16
 
 func compactFiles() {
-	if flag.NArg() == 1 {
-		fmt.Println("usage: compact [file1.session] [file2.session]")
+	if flag.NArg() == 0 {
+		fmt.Println("usage: -compact [file.session...]")
 		return
 	}
 
-	for i := 1; i < flag.NArg(); i++ {
+	for i := 0; i < flag.NArg(); i++ {
 		sessionFile := flag.Arg(i)
 		session, err := parseSessionDataFromFile(sessionFile)
 		if err != nil {

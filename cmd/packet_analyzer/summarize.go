@@ -8,12 +8,12 @@ import (
 )
 
 func summarizeFiles() {
-	if flag.NArg() == 1 {
-		fmt.Println("usage: summarize [file1.session] [file2.session]")
+	if flag.NArg() == 0 {
+		fmt.Println("usage: -summarize [file.session...]")
 		return
 	}
 
-	for i := 1; i < flag.NArg(); i++ {
+	for i := 0; i < flag.NArg(); i++ {
 		sessionFilename := flag.Arg(i)
 		session, err := parseSessionDataFromFile(sessionFilename)
 		if err != nil {

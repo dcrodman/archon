@@ -21,7 +21,7 @@ import (
 	"fmt"
 )
 
-// This tool's representation of a packet received from a server.
+// Packet is this tool's representation of a packet received from a server.
 type Packet struct {
 	Source      string
 	Destination string
@@ -33,30 +33,30 @@ type Packet struct {
 	PrintableContents []string
 }
 
-// File format of the persisted session data.
+// SessionFile represents the file format of the persisted session data.
 type SessionFile struct {
 	SessionID string
 	Packets   []Packet
 }
 
-var address = flag.String("addr", "localhost:8081", "Address and port to which to bind")
+var (
+	address   = flag.String("addr", "localhost:8081", "Address and port to which to bind")
+	summarize = flag.Bool("summarize", false, "Converts a session file to a shortened readable format")
+	compact   = flag.Bool("compact", false, "Converts a session file to a radable format")
+	capture   = flag.Bool("capture", true, "(Default) Start a server that listens for packet logs and writes them to a session file on exit")
+)
 
 func main() {
 	flag.Parse()
 
-	command := ""
-	if flag.NArg() > 0 {
-		command = flag.Arg(0)
-	}
-
-	switch command {
-	case "compact":
-		compactFiles()
-	case "summarize":
+	switch {
+	case *summarize:
 		summarizeFiles()
-	case "", "capture":
+	case *compact:
+		compactFiles()
+	case *capture:
 		startCapturing(*address)
 	default:
-		fmt.Printf("unrecognized command %s; use -help for options", command)
+		fmt.Printf("no command specified; use -help for options")
 	}
 }
