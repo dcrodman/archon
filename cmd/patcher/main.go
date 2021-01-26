@@ -18,39 +18,43 @@ import (
 
 const blockLen = 0x18
 
-// Use this block instead if you're using TethVer12510 executables.
-//var offsets = []int64{
-//	0x56b8eC,
-//	0x56B904,
-//	0x56B930,
-//	0x56B94C,
-//	0x56B968,
-//	0x56B984,
-//}
-
-// Use this block instead if you're using TethVer12513 executables.
-//var offsets = []int64{
-//	0x56d70c,
-//	0x56d724,
-//	0x56d76c,
-//	0x56d788,
-//	0x56d7a4,
-//}
-
-// Use this block instead if you're using the Ephinea executables.
-var offsets = []int64{
-	0x56D70C,
-	0x56D724,
-	0x56D750,
-	0x56D76C,
-	0x56D788,
-}
-
 var exePath = flag.String("exe", "Psobb.exe", "Path (full or relative) to the PSOBB executable")
 var newAddress = flag.String("address", "127.0.0.1", "The new address or IPv4 address")
+var provider = flag.String("provider", "Ephinea", "Executable provider")
 
 func main() {
 	flag.Parse()
+	var offsets []int64
+	switch *provider {
+	case "TethVer12510":
+		// Use this block instead if you're using TethVer12510 executables.
+		offsets = []int64{
+			0x56b8eC,
+			0x56B904,
+			0x56B930,
+			0x56B94C,
+			0x56B968,
+			0x56B984,
+		}
+	case "TethVer12513":
+		// Use this block instead if you're using TethVer12513 executables.
+		offsets = []int64{
+			0x56d70c,
+			0x56d724,
+			0x56d76c,
+			0x56d788,
+			0x56d7a4,
+		}
+	default:
+		// Use this block instead if you're using the Ephinea executables.
+		offsets = []int64{
+			0x56D70C,
+			0x56D724,
+			0x56D750,
+			0x56D76C,
+			0x56D788,
+		}
+	}
 
 	if len(*newAddress) > blockLen {
 		fmt.Printf("newAddress must be less than %d bytes long\n", blockLen)
