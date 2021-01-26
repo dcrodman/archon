@@ -8,13 +8,19 @@ services:
       - POSTGRES_PASSWORD=admin
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   account:
     build:
       context: ../
       dockerfile: ./build/Dockerfile
       target: account
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
   server:
     build:
       context: ../
@@ -28,4 +34,5 @@ services:
       - 13000:13000
       - 13001:13001
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
