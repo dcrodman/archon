@@ -14,8 +14,8 @@ whose servers I'm studying as I write Archon.
 Forks, bug fixes, issue reports, explanations of some of the client's bizarre behavior, 
 etc. are more than welcome! I try to keep the development pretty open but if you have
 questions feel free to open an issue.
-
-* [Installation](#installation)
+* [Installation](#Installation)
+* [Manual installation](#manual-installation)
   + [Prerequisites:](#prerequisites)
   + [1. Compile the code](#1-compile-the-code)
   + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
@@ -27,15 +27,25 @@ questions feel free to open an issue.
   + [8. Generate the shipgate SSL certificates](#8-generate-the-shipgate-ssl-certificates)
   + [9. Add the first player account](#9-add-the-first-player-account)
   + [10. Run the server](#10-run-the-server)
+* [Run in docker](#run-in-docker)
+  + [Prerequisites:](#prerequisites)
+  + [How-to](#how-to)  
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 * [Contributing](#contributing)
 
 ## Installation
 
-I promise a script to automate this is coming.
+There are two ways to run the existing server: **manually built** with `go` and connected to Postgres
+or a **dockerized** setup using docker VM.
 
-### Manual
+Consider using manual installation if you want to have a full control on the tools and server 
+you're running or if you want to change something on the fly faster.
+
+If you mostly need to run an existing version, want to test it out or just want to use less tools
+ - consider using dockerized setup.
+
+## Manual installation
 
 **Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
@@ -167,6 +177,26 @@ The moment of truth; run the server by running this from your server directory:
 
 If everything's been configured correctly, you should get a bunch of messages about the different
 sub-servers waiting for connections on the configured ports.
+
+## Run in docker
+
+### Prerequisites:
+* [Docker](https://www.docker.com)
+* Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
+
+### How-to
+
+Change your working directory to `build` e.g. run `cd build`.
+
+Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
+
+There are 3 services available in current docker-compose version:
+- `postgres` - PostgreSQL database with initial DB and tables created via script
+- `account` - account tool which creates initial account for login (can be disabled or commented out if not needed)
+- `server` - actual server running on 127.0.0.1 with PSO ports exposed
+
+In dockerized setup server is running same commands as in the manual setup so it contains 
+all the tools bundled in the container.
 
 ## Administration
 
