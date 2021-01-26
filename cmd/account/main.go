@@ -15,6 +15,9 @@ import (
 )
 
 var config = flag.String("config", "config.yaml", "Path to the config file for the server")
+var username = flag.String("username", "", "Username for user operation")
+var password = flag.String("password", "", "Password for user operation")
+var email = flag.String("email", "", "Email for user operation")
 
 func main() {
 	flag.Usage = usage
@@ -39,21 +42,21 @@ func main() {
 
 	switch flag.Arg(0) {
 	case "add":
-		u := scanInput("Username")
-		p := scanInput("Password")
-		e := scanInput("Email")
+		u := checkFlag(username, "Username")
+		p := checkFlag(password, "Password")
+		e := checkFlag(email, "Email")
 		if err = addAccount(u, p, e); err != nil {
 			retCode = 1
 			fmt.Println(err.Error())
 		}
 	case "delete":
-		u := scanInput("Username")
+		u := checkFlag(username, "Username")
 		if err = softDeleteAccount(u); err != nil {
 			retCode = 1
 			fmt.Println(err.Error())
 		}
 	case "perm-delete":
-		u := scanInput("Username")
+		u := checkFlag(username, "Username")
 		if err = permanentlyDeleteAccount(u); err != nil {
 			retCode = 1
 			fmt.Println(err.Error())
@@ -98,6 +101,13 @@ func initDataSource() (func(), error) {
 	}
 
 	return data.Shutdown, nil
+}
+
+func checkFlag(flag *string, prompt string) string {
+	if *flag == "" {
+		return scanInput(prompt)
+	}
+	return *flag
 }
 
 func scanInput(prompt string) string {

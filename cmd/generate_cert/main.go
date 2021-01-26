@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
@@ -32,12 +33,17 @@ const (
 	privateKeyFilename  = "key.pem"
 )
 
-func main() {
-	fmt.Print("server's external_ip (in config.yaml) or CIDR block: ")
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
+var ip = flag.String("ip", "", "Server's external_ip (in config.yaml) or CIDR block")
 
-	serverIp := scanner.Text()
+func main() {
+	flag.Parse()
+	serverIp := *ip
+	if serverIp == "" {
+		fmt.Print("server's external_ip (in config.yaml) or CIDR block: ")
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		serverIp = scanner.Text()
+	}
 
 	template, err := createX509Template(serverIp)
 	if err != nil {
