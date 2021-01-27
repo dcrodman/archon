@@ -74,7 +74,10 @@ func createX509Template(serverIP string) (*x509.Certificate, error) {
 
 	ip, ipnet, err := net.ParseCIDR(serverIP)
 	if err != nil {
-		return nil, err
+		ip = net.ParseIP(serverIP)
+		if ip == nil {
+			return nil, fmt.Errorf("%v is not a valid IP address or CIDR block", serverIP)
+		}
 	}
 
 	notBefore := time.Now()
@@ -93,7 +96,9 @@ func createX509Template(serverIP string) (*x509.Certificate, error) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		IPAddresses:           []net.IP{ip},
-		PermittedIPRanges:     []*net.IPNet{ipnet},
+	}
+	if ipnet != nil {
+		template.PermittedIPRanges = []*net.IPNet{ipnet}
 	}
 	return template, nil
 }
