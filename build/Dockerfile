@@ -15,14 +15,14 @@ WORKDIR archon_server
 RUN cp ../.bin/* .
 # Copy the supporting files
 RUN cp -r ../setup/* .
-# Overwrite config
-COPY /build/docker_config.yaml ./config.yaml
+# Add override config
+COPY /build/override.yaml ./override.yaml
 # Generate certificate
 RUN ./generate_cert -ip 0.0.0.0/32
 # Create test user account
 FROM builder as account
 # !!! This requires an existing postgres connection !!!
-CMD ["./account", "-config", "./config.yaml", "-username", "testuser", "-password", "testpass", "-email", "test@mail", "add"]
+CMD ["./account", "-username", "testuser", "-password", "testpass", "-email", "test@mail", "add"]
 
 FROM builder as server
-ENTRYPOINT ["./server", "-config", "./config.yaml"]
+ENTRYPOINT ["./server"]

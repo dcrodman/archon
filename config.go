@@ -6,12 +6,14 @@ package archon
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+const defaultConfigName = "config"
+const overrideConfigName = "override"
 
 var (
 	// TODO: Remove these and put them closer to where they're actually used.
@@ -19,19 +21,21 @@ var (
 )
 
 // Load initializes Viper with the contents of file.
-func Load(file string) {
-	viper.AddConfigPath(filepath.Dir(file))
-	viper.SetConfigName(filepath.Base(file))
+func Load(configPath string) {
+	viper.AddConfigPath(configPath)
+	viper.SetConfigName(defaultConfigName)
 	viper.SetConfigType("yaml")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			fmt.Println("error reading config file: file not found", file)
+			fmt.Println("error reading config file: no config file in path", configPath)
 		} else {
 			fmt.Println("error reading config file", err)
 		}
 		os.Exit(1)
 	}
+	viper.SetConfigName(overrideConfigName)
+	viper.MergeInConfig()
 }
 
 // BroadcastIP converts the configured broadcast IP string into 4 bytes to be used
