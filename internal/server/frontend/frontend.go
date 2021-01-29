@@ -6,47 +6,67 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"runtime/debug"
+	"sync"
+	"time"
+
 	"github.com/dcrodman/archon"
 	archdebug "github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/server"
-	"io"
-	"log"
-	"net"
-	"runtime/debug"
-	"time"
 )
 
-// frontend implements the concurrent client connection logic.
+// Frontend implements the concurrent client connection logic.
 //
 // Data is read from any connected clients and passed to a backend instance, abstracting
 // the lower level connection details away from the Backends.
-type frontend struct {
-	addr    *net.TCPAddr
-	backend server.Backend
+type Frontend struct {
+	Address string
+	Backend server.Backend
 }
 
-func newFrontend(addr *net.TCPAddr, backend server.Backend) *frontend {
-	return &frontend{addr: addr, backend: backend}
-}
-
-// StartListening opens a TCP socket for the specified server and enters a blocking loop
-// for accepting client connections and dispatching them to the server.
-func (f *frontend) StartListening(ctx context.Context) error {
-	socket, err := net.ListenTCP("tcp", f.addr)
-	if err != nil {
-		return fmt.Errorf("error listening on socket: %s", err.Error())
+// Start initializes the server backend and opens a TCP socket for the specified server.
+// A blocking loop for accepting client connections is spun off in its own goroutine and
+// added to the WaitGroup. Context cancellations will stop the server.
+func (f *Frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
+	if err := f.Backend.Init(ctx); err != nil {
+		return fmt.Errorf("failed to initialize %s server: %v", f.Backend.Name(), err)
 	}
 
-	log.Printf("waiting for %s connections on %v\n", f.backend.Name(), f.addr.String())
+	socket, err := f.createSocket()
+	if err != nil {
+		return fmt.Errorf("failed to open socket on %s: %v", f.Address, err)
+	}
 
-	f.startBlockingLoop(ctx, socket)
+	wg.Add(1)
+	go f.startBlockingLoop(ctx, socket, wg)
+
 	return nil
+}
+
+// createSocket opens a TCP socket to listen for client connections on the Address
+// provided to the Frontend.
+func (f *Frontend) createSocket() (*net.TCPListener, error) {
+	hostAddr, err := net.ResolveTCPAddr("tcp", f.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve address %s", err.Error())
+	}
+
+	socket, err := net.ListenTCP("tcp", hostAddr)
+	if err != nil {
+		return nil, fmt.Errorf("error listening on socket: %s", err.Error())
+	}
+
+	return socket, nil
 }
 
 // startBlockingLoop implements a connection handling loop that's purely responsible for
 // accepting new connections and spinning off goroutines for the Backend to handle them.
-func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener) {
-	defer log.Println(f.backend.Name() + " exiting")
+func (f *Frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	archon.Log.Printf("%s waiting for connections on %v\n", f.Backend.Name(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {
@@ -66,35 +86,37 @@ func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListene
 		}
 	}()
 
+handleLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			break handleLoop
 		case connection := <-connections:
 			// Note: If there is eventually a need to implement worker pooling rather than spawning
 			// new goroutines for each client, this is where it should be implemented.
-			clientCtx, _ := context.WithCancel(ctx)
-			go f.acceptClient(clientCtx, connection)
+			go f.acceptClient(ctx, connection)
 		}
 	}
+
+	archon.Log.Infof("%v server exited", f.Backend.Name())
 }
 
-func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
+func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
 	c := server.NewClient(connection)
-	c.Extension = f.backend.CreateExtension()
+	c.Extension = f.Backend.CreateExtension()
 
-	if err := f.backend.StartSession(c); err != nil {
+	if err := f.Backend.StartSession(c); err != nil {
 		archon.Log.Errorf("StartSession() failed for client %s: %s", c.IPAddr(), err)
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
 	if globalClientList.has(c) {
-		archon.Log.Infof("rejected second %s connection from %s", f.backend.Name(), c.IPAddr())
+		archon.Log.Infof("%s rejected second connection from %s", f.Backend.Name(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
 
-	archon.Log.Infof("accepted %s connection from %s", f.backend.Name(), c.IPAddr())
+	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
 
 	globalClientList.add(c)
 	f.processPackets(ctx, c)
@@ -102,8 +124,8 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func (f *frontend) processPackets(ctx context.Context, c *server.Client) {
-	defer f.closeConnectionAndRecover(f.backend.Name(), c)
+func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
+	defer f.closeConnectionAndRecover(f.Backend.Name(), c)
 
 	buffer := make([]byte, 2048)
 	var err error
@@ -128,7 +150,7 @@ func (f *frontend) processPackets(ctx context.Context, c *server.Client) {
 			// For now just allow the deferred function to close the connection.
 			break
 		default:
-			if err = f.backend.Handle(c, buffer); err != nil {
+			if err = f.Backend.Handle(ctx, c, buffer); err != nil {
 				archon.Log.Warn("error in client communication: " + err.Error())
 				return
 			}
@@ -138,7 +160,7 @@ func (f *frontend) processPackets(ctx context.Context, c *server.Client) {
 
 // Catch any panics, disconnect the client, and remove them from the list
 // regardless of the state of the connection.
-func (*frontend) closeConnectionAndRecover(serverName string, c *server.Client) {
+func (*Frontend) closeConnectionAndRecover(serverName string, c *server.Client) {
 	if err := recover(); err != nil {
 		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
 			c.IPAddr(), err, debug.Stack())
@@ -156,7 +178,7 @@ func (*frontend) closeConnectionAndRecover(serverName string, c *server.Client) 
 // ReadNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func (f *frontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, error) {
+func (f *Frontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, error) {
 	headerSize := int(c.Extension.HeaderSize())
 
 	// Read and decrypt the packet header.
@@ -185,7 +207,7 @@ func (f *frontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, erro
 	return buffer, nil
 }
 
-func (f *frontend) readDataFromClient(c *server.Client, n int, buffer []byte) error {
+func (f *Frontend) readDataFromClient(c *server.Client, n int, buffer []byte) error {
 	received := 0
 
 	for received < n {

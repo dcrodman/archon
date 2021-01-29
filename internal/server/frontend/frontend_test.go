@@ -3,11 +3,12 @@ package frontend
 import (
 	"context"
 	"flag"
-	"github.com/dcrodman/archon/internal/server"
-	"github.com/dcrodman/archon/internal/server/patch"
 	"net"
 	"sync"
 	"testing"
+
+	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/patch"
 )
 
 // Allow the OS to choose the port for us.
@@ -32,18 +33,18 @@ func TestFrontend(t *testing.T) {
 				t.Fatal("failed to resolve address:", err)
 			}
 
-			f := frontend{
-				addr:    addr,
-				backend: backend,
+			f := Frontend{
+				Address: addr,
+				Backend: backend,
 			}
 
-			if err := f.StartListening(ctx); err != nil {
+			if err := f.Start(ctx); err != nil {
 				t.Fatal("failed to start frontend:", err)
 			}
 
 			for i := 0; i < *numConnections; i++ {
 				wg.Add(1)
-				go testConnection(t, &wg, f.addr)
+				go testConnection(t, &wg, f.Address)
 			}
 		})
 	}

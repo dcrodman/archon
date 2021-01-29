@@ -12,14 +12,16 @@
 package patch
 
 import (
+	"context"
+	"strconv"
+	"sync"
+
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/spf13/viper"
-	"strconv"
-	"sync"
 )
 
 // Convert the welcome message to UTF-16LE and cache it. PSOBB expects this prefix to the message,
@@ -62,8 +64,8 @@ func NewServer(name, dataPort string) server.Backend {
 	return &Server{name: name, dataRedirectPort: dataRedirectPort}
 }
 
-func (s *Server) Name() string { return s.name }
-func (s *Server) Init() error  { return nil }
+func (s *Server) Name() string                   { return s.name }
+func (s *Server) Init(ctx context.Context) error { return nil }
 
 func (s *Server) CreateExtension() server.ClientExtension {
 	return &patchClientExtension{
@@ -86,7 +88,7 @@ func (s *Server) StartSession(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
 	var header packets.PCHeader
 	internal.StructFromBytes(data[:packets.PCHeaderSize], &header)
 

@@ -55,10 +55,8 @@ character_server:
   scroll_message: "Add a welcome message..."
 
 shipgate_server:
-  # Port on which the Shipgate's metadata service will listen.
-  meta_service_port: 13000
-  # Port on which the Shipgate's ship service will listen.
-  ship_service_port: 13001
+  # Port on which the Shipgate's gRPC server will listen.
+  port: 13000
   # Private key file corresponding to shipgate_certificate_file (above).
   ssl_key_file: "key.pem"
 
