@@ -26,7 +26,7 @@ import (
 
 const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
 
-var config = flag.String("config", "config.yaml", "Path to the config file for the server")
+var config = flag.String("config", "./", "Path to the config file for the server")
 
 func main() {
 	fmt.Printf("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +

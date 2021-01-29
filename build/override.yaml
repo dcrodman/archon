@@ -1,0 +1,8 @@
+database:
+  host: postgres
+
+patch_server:
+  patch_dir: "./patches"
+
+character_server:
+  parameters_dir: "./parameters"

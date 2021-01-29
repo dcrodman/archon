@@ -32,7 +32,6 @@ services:
       - 12000:12000
       - 12001:12001
       - 13000:13000
-      - 13001:13001
     depends_on:
       postgres:
         condition: service_healthy
