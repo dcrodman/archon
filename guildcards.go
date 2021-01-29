@@ -2,7 +2,7 @@ package archon
 
 // TODO: Move these somewhere more appropriate.
 
-// Per-player guildcard data chunk.
+// GuildcardData is the per-player guildcard data chunk.
 type GuildcardData struct {
 	Unknown  [0x114]uint8
 	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
@@ -11,7 +11,7 @@ type GuildcardData struct {
 	Unknown3 [0x1BC]uint8
 }
 
-// Per-player friend guildcard entries.
+// GuildcardDataEntry is the per-player friend guildcard entries.
 type GuildcardDataEntry struct {
 	Guildcard   uint32
 	Name        [48]byte

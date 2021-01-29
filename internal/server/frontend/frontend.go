@@ -101,6 +101,9 @@ handleLoop:
 	archon.Log.Infof("%v server exited", f.Backend.Name())
 }
 
+// acceptClient takes a connection and attempts to initiate a "session" by setting up
+// the Client and sending the welcome packets. If it succeeds, the goroutine moves
+// into the packet processing loop.
 func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
 	c := server.NewClient(connection)
 	c.Extension = f.Backend.CreateExtension()
@@ -158,8 +161,8 @@ func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
 	}
 }
 
-// Catch any panics, disconnect the client, and remove them from the list
-// regardless of the state of the connection.
+// closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
+// client, and removes them from the list regardless of the state of the connection.
 func (*Frontend) closeConnectionAndRecover(serverName string, c *server.Client) {
 	if err := recover(); err != nil {
 		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
@@ -175,7 +178,7 @@ func (*Frontend) closeConnectionAndRecover(serverName string, c *server.Client) 
 	archon.Log.Infof("disconnected %s client %s", serverName, c.IPAddr())
 }
 
-// ReadNextPacket is a blocking call that only returns once the client has
+// readNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
 func (f *Frontend) readNextPacket(c *server.Client, buffer []byte) ([]byte, error) {
