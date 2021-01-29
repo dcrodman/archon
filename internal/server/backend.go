@@ -1,5 +1,7 @@
 package server
 
+import "context"
+
 // Backend is an interface for a sub-server that handles a specific set of client
 // interactions as part of the game flow.
 type Backend interface {
@@ -8,7 +10,7 @@ type Backend interface {
 
 	// Init is called before a Backend is started as a hook for the Backend to
 	// perform any necessary initialization before it can accept clients.
-	Init() error
+	Init(ctx context.Context) error
 
 	// CreateExtension returns an implementation of the ClientExtension interface
 	// containing a fresh representation of Backend-specific state for a client.
@@ -20,5 +22,5 @@ type Backend interface {
 
 	// Handle is the main entry point for processing client packets. It's responsible
 	// for generally handling all packets from a client as well as sending any responses.
-	Handle(c *Client, data []byte) error
+	Handle(ctx context.Context, c *Client, data []byte) error
 }

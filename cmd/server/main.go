@@ -7,6 +7,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"sync"
+	"syscall"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
@@ -16,10 +22,9 @@ import (
 	"github.com/dcrodman/archon/internal/server/patch"
 	"github.com/dcrodman/archon/internal/server/shipgate"
 	"github.com/spf13/viper"
-	"os"
-	"path/filepath"
-	"sync"
 )
+
+const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
 
 var config = flag.String("config", "config.yaml", "Path to the config file for the server")
 
@@ -41,19 +46,12 @@ func main() {
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
 	if err := os.Chdir(filepath.Dir(*config)); err != nil {
-		fmt.Println("error chdir", err)
+		fmt.Printf("failed to change to config directory: %v\n", err)
+		os.Exit(1)
 	}
 
-	dataSource := fmt.Sprintf(
-		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
-		viper.GetString("database.host"),
-		viper.GetInt("database.port"),
-		viper.GetString("database.name"),
-		viper.GetString("database.username"),
-		viper.GetString("database.password"),
-		viper.GetString("database.sslmode"),
-	)
-	if err := data.Initialize(dataSource); err != nil {
+	// Connect to the database.
+	if err := data.Initialize(dataSource()); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
@@ -64,59 +62,98 @@ func main() {
 		viper.GetInt("database.port"),
 	)
 
+	// Start any debug utilities if we're configured to do so.
 	if debug.Enabled() {
 		debug.StartUtilities()
 	}
 
-	startServers()
-}
+	// Set up all of the servers we want to run.
+	patchPort := viper.GetString("patch_server.patch_port")
+	dataPort := viper.GetString("patch_server.data_port")
+	loginPort := viper.GetString("login_server.port")
+	characterPort := viper.GetString("character_server.port")
 
-// Register all of the server handlers and their corresponding ports. This runner
-// assumes one instance of each type of server will be deployed on this host (with
-// the exception of the Block server since the number is configurable).
-func startServers() {
-	hostname := viper.GetString("hostname")
-	shipInfoServiceAddr := fmt.Sprintf(
-		"%s:%s", hostname, viper.GetString("shipgate_server.meta_service_port"))
-	shipgateServiceAddr := fmt.Sprintf(
-		"%s:%s", hostname, viper.GetString("shipgate_server.ship_service_port"))
+	shipgateAddr := buildAddress(viper.GetString("shipgate_server.port"))
 
-	ctx, _ := context.WithCancel(context.Background())
-	shipgateWg := startShipgate(ctx, shipInfoServiceAddr, shipgateServiceAddr)
+	servers := []*frontend.Frontend{
+		{
+			Address: buildAddress(patchPort),
+			Backend: patch.NewServer("PATCH", dataPort),
+		},
+		{
+			Address: buildAddress(dataPort),
+			Backend: patch.NewDataServer("DATA"),
+		},
+		{
+			Address: buildAddress(loginPort),
+			Backend: login.NewServer("LOGIN", characterPort),
+		},
+		{
+			Address: buildAddress(characterPort),
+			Backend: character.NewServer("CHARACTER", shipgateAddr),
+		},
+	}
 
-	registerServers(shipInfoServiceAddr, shipgateServiceAddr)
+	// Bind the server loops to one top-level server context so that we can shut down cleanly.
+	ctx, cancel := context.WithCancel(context.Background())
 
-	frontend.SerHostname(hostname)
-	serverWg := frontend.Start(ctx)
+	// Start the shipgate gRPC server and make sure it launches before the other servers start.
+	readyChan := make(chan bool)
+	errChan := make(chan error)
+	go shipgate.Start(ctx, shipgateAddr, readyChan, errChan)
+	go func() {
+		if err := <-errChan; err != nil {
+			fmt.Printf("exiting due to SHIPGATE error: %v", err)
+			os.Exit(1)
+		}
+	}()
+	<-readyChan
 
-	shipgateWg.Wait()
+	// Start all of our servers. Failure to initialize one of the registered servers is considered terminal.
+	var serverWg sync.WaitGroup
+	for _, server := range servers {
+		if err := server.Start(ctx, &serverWg); err != nil {
+			fmt.Printf("failed to start %s server: %v\n", server.Backend.Name(), err)
+			os.Exit(1)
+		}
+	}
+
+	// Register a SIGTERM handler so that Ctrl-C will shut the servers down gracefully.
+	registerExitHandler(cancel, &serverWg)
+
 	serverWg.Wait()
 }
 
-func startShipgate(ctx context.Context, shipInfoServiceAddress, shipServiceAddress string) (wg *sync.WaitGroup) {
-	var shipgateWg sync.WaitGroup
-	shipgateWg.Add(1)
-
-	go func() {
-		err := shipgate.Start(ctx, shipInfoServiceAddress, shipServiceAddress)
-
-		if err != nil {
-			fmt.Println("failed to start ship server:", err)
-			os.Exit(1)
-		}
-
-		wg.Done()
-	}()
-
-	return &shipgateWg
+// Returns the database URI of the game database.
+func dataSource() string {
+	return fmt.Sprintf(
+		databaseURITemplate,
+		viper.GetString("database.host"),
+		viper.GetInt("database.port"),
+		viper.GetString("database.name"),
+		viper.GetString("database.username"),
+		viper.GetString("database.password"),
+		viper.GetString("database.sslmode"),
+	)
 }
 
-func registerServers(shipInfoServiceAddress, shipgateServiceAddress string) {
-	dataPort := viper.GetString("patch_server.data_port")
-	frontend.AddServer(dataPort, patch.NewDataServer("DATA"))
-	frontend.AddServer(viper.GetString("patch_server.patch_port"), patch.NewServer("PATCH", dataPort))
+func buildAddress(port string) string {
+	return fmt.Sprintf("%s:%s", viper.GetString("hostname"), port)
+}
 
-	characterPort := viper.GetString("character_server.port")
-	frontend.AddServer(characterPort, character.NewServer("CHARACTER", shipInfoServiceAddress))
-	frontend.AddServer(viper.GetString("login_server.port"), login.NewServer("LOGIN", characterPort))
+func registerExitHandler(cancelFn func(), wg ...*sync.WaitGroup) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("shutting down...")
+
+		cancelFn()
+		// TODO: add a timeout here.
+		for _, wg := range wg {
+			wg.Wait()
+		}
+
+		os.Exit(0)
+	}()
 }

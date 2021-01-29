@@ -1,15 +1,17 @@
 package patch
 
 import (
+	"context"
 	"errors"
+	"hash/crc32"
+	"io"
+	"os"
+
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"hash/crc32"
-	"io"
-	"os"
 )
 
 type DataServer struct {
@@ -22,7 +24,7 @@ func NewDataServer(name string) *DataServer {
 
 func (s DataServer) Name() string { return s.name }
 
-func (s *DataServer) Init() error {
+func (s *DataServer) Init(ctx context.Context) error {
 	return initializePatchData()
 }
 
@@ -48,7 +50,7 @@ func (s *DataServer) StartSession(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *DataServer) Handle(c *server.Client, data []byte) error {
+func (s *DataServer) Handle(ctx context.Context, c *server.Client, data []byte) error {
 	var hdr packets.PCHeader
 
 	internal.StructFromBytes(data[:packets.PCHeaderSize], &hdr)

@@ -1,17 +1,17 @@
 package character
 
 import (
-	"errors"
 	"fmt"
-	"github.com/dcrodman/archon/internal/debug"
-	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/dcrodman/archon/pkg/prs"
-	"github.com/spf13/viper"
 	"hash/crc32"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/dcrodman/archon/internal/debug"
+	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/pkg/prs"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -100,7 +100,7 @@ func initParameterData() error {
 // Load the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
 func loadParameterFiles(paramFileDir string) error {
-	fmt.Printf("loading parameters from %s...\n", paramFileDir)
+	fmt.Printf("loading parameters from %s\n", paramFileDir)
 
 	offset := 0
 	var tmpChunkData []byte
@@ -108,7 +108,7 @@ func loadParameterFiles(paramFileDir string) error {
 	for _, paramFile := range paramFiles {
 		data, err := ioutil.ReadFile(filepath.Join(paramFileDir, paramFile))
 		if err != nil {
-			return errors.New("Error reading parameter file: " + err.Error())
+			return fmt.Errorf("error reading parameter file: %v", err)
 		}
 
 		fileSize := len(data)
@@ -129,7 +129,7 @@ func loadParameterFiles(paramFileDir string) error {
 		tmpChunkData = append(tmpChunkData, data...)
 
 		if debug.Enabled() {
-			fmt.Printf("%s (%v bytes, checksum: %v)\n", paramFile, fileSize, entry.Checksum)
+			fmt.Printf("%s (%v bytes, checksum: 0x%x)\n", paramFile, fileSize, entry.Checksum)
 		}
 	}
 

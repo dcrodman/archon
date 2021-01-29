@@ -12,7 +12,17 @@
 package character
 
 import (
+	"context"
 	"fmt"
+	"hash/crc32"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+	"unicode/utf16"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/character"
@@ -23,14 +33,6 @@ import (
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/internal/cache"
 	"github.com/spf13/viper"
-	"hash/crc32"
-	"net"
-	"strconv"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
-	"unicode/utf16"
 )
 
 const (
@@ -77,7 +79,7 @@ func NewServer(name, shipgateAddress string) *Server {
 
 func (s *Server) Name() string { return s.name }
 
-func (s *Server) Init() error {
+func (s *Server) Init(ctx context.Context) error {
 	if err := initParameterData(); err != nil {
 		return err
 	}
@@ -113,7 +115,7 @@ func (s *Server) StartSession(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
 	var packetHeader packets.BBHeader
 	internal.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
 

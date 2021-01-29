@@ -2,14 +2,17 @@ package archon
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"io"
 	"os"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
+// Log is the global, threadsafe logger that can be used by any server instance.
 var Log *logrus.Logger
 
+// InitLogger configures the global logger and should be called on startup.
 func InitLogger() {
 	var w io.Writer
 	var err error

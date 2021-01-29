@@ -1,8 +1,6 @@
-/*
-* Singleton package for handling the global server configuration
-* and responsible for establishing a connection to the database
-* to be maintained during execution.
- */
+// Singleton package for handling the global server configuration
+// and responsible for establishing a connection to the database
+// to be maintained during execution.
 package archon
 
 import (
@@ -36,7 +34,8 @@ func Load(file string) {
 	}
 }
 
-// Convert the broadcast IP string into 4 bytes to be used with the redirect packet.
+// BroadcastIP converts the configured broadcast IP string into 4 bytes to be used
+// with the redirect packet common to several servers.
 func BroadcastIP() [4]byte {
 	// Hacky, but chances are the IP address isn't going to start with 0 and a
 	// fixed-length array can't be null.
