@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var config = flag.String("config", "./", "Path to the config file for the server")
+var config = flag.String("config", "./", "Path to the directory containing the server config file")
 var username = flag.String("username", "", "Username for user operation")
 var password = flag.String("password", "", "Password for user operation")
 var email = flag.String("email", "", "Email for user operation")
