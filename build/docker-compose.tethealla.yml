@@ -1,0 +1,21 @@
+version: '3.4'
+services:
+  mysql:
+    image: mysql:5.6
+    ports:
+      - 8306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=pass
+      - MYSQL_DATABASE=mysqldb
+      - MYSQL_USER=mysqluser
+      - MYSQL_PASSWORD=mysqlpw
+    volumes:
+      - ./tethealla.sql:/docker-entrypoint-initdb.d/dump.sql
+  packet_analyzer:
+    build:
+      context: ../
+      dockerfile: ./build/Dockerfile
+      target: packet_analyzer
+    ports:
+      - 8081:8081
+      - 8082:8082
