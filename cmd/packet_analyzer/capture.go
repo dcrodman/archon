@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"unicode"
@@ -59,7 +60,7 @@ func captureExitHandler(c chan os.Signal, folder string) {
 			Packets:   packetList,
 		}
 
-		filename := folder + sessionName + ".session"
+		filename := path.Join(".", folder, sessionName) + ".session"
 		b, _ := json.MarshalIndent(sessionFile, "", "\t")
 
 		if err := ioutil.WriteFile(filename, b, 0666); err != nil {

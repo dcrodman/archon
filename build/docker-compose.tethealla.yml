@@ -16,6 +16,8 @@ services:
       context: ../
       dockerfile: ./build/Dockerfile
       target: packet_analyzer
+    volumes:
+    - /tmp/sessions:/go/archon/archon_server/sessions
     ports:
       - 8081:8081
       - 8082:8082
