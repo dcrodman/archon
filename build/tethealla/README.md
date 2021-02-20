@@ -10,7 +10,7 @@ This compose runs MySQL server at 8306 and packet analyzer at 8082.
 
 Analyzer generated session files are stored in the volume which 
 is used for packet_analyzer container in compose file.
-E.g. by default it's `/tmp/sessions` - on windows you can change it to other path like `c:/tmp/sessions`
+E.g. by default it's `c:/tmp/sessions` - on unix you can change it to other path like `/tmp/sessions`
 
 After compose/analyzer is stopped - the folder should have session files which were generated 
 by the server if there were any packets received.
