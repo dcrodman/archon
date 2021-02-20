@@ -38,18 +38,18 @@ var (
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing(serverAddr string, httpPort, tcpPort int) {
+func startCapturing(serverAddr, folder string, httpPort, tcpPort int) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
-	go captureExitHandler(signalChan)
+	go captureExitHandler(signalChan, folder)
 
 	go listenForTCPPackets(serverAddr, tcpPort)
 	listenForHTTPPackets(serverAddr, httpPort)
 }
 
 // Write all of our current session information to files in the local directory.
-func captureExitHandler(c chan os.Signal) {
+func captureExitHandler(c chan os.Signal, folder string) {
 	<-c
 	fmt.Println("flushing session data to files...")
 
@@ -59,7 +59,7 @@ func captureExitHandler(c chan os.Signal) {
 			Packets:   packetList,
 		}
 
-		filename := sessionName + ".session"
+		filename := folder + sessionName + ".session"
 		b, _ := json.MarshalIndent(sessionFile, "", "\t")
 
 		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
