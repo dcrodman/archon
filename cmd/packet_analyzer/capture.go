@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -40,7 +41,7 @@ var (
 func startCapturing(serverAddr string, httpPort, tcpPort int) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, os.Kill)
+	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go captureExitHandler(signalChan)
 
 	go listenForTCPPackets(serverAddr, tcpPort)
