@@ -28,4 +28,4 @@ FROM builder as server
 ENTRYPOINT ["./server"]
 
 FROM builder as packet_analyzer
-ENTRYPOINT ["./packet_analyzer"]
+ENTRYPOINT ["./packet_analyzer", "--capture"]
