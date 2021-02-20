@@ -43,13 +43,38 @@ type Welcome struct {
 	ClientVector [48]byte
 }
 
+// LoginPhase is an identifier set by the client to distinguish the "phases" it passes
+// though with the Character server. The client disconnects and then reconnects between
+// each phase.
+type LoginPhase uint16
+
+const (
+	// Initialize represents the first connection with the Character server. The
+	// client expects to authenticate, download the parameter files, and get the
+	// previews of the account's characters.
+	Initialize LoginPhase = iota
+	// CharacterSelect is the second connection with the Character server and
+	// all the client seems to do is to set a flag indicating that the user is
+	// choosing a character.
+	CharacterSelect
+	// CharacterCreate is an optional connection with the Character server and indicates
+	// that the user has either created a new character or recreated an existing one.
+	CharacterCreate
+	// CharacterUpdate is another optional connection with the Character server and
+	// only appears when the user selects the Dressing Room during character selection.
+	CharacterUpdate
+	// ShipSelection is the final connection with the Character server. The client expects
+	// to receive the ship list and the IP address of the selected Ship server.
+	ShipSelection
+)
+
 // Login Packet (0x93) sent to both the login and character servers.
 type Login struct {
 	Header        BBHeader
 	Unknown       [8]byte
 	ClientVersion uint16
 	Unknown2      uint32
-	Phase         uint16 // differentiate login packet?
+	Phase         LoginPhase
 	TeamId        uint32
 	Username      [16]byte
 	Padding       [32]byte

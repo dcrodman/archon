@@ -151,7 +151,7 @@ func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
 		select {
 		case <-ctx.Done():
 			// For now just allow the deferred function to close the connection.
-			break
+			return
 		default:
 			if err = f.Backend.Handle(ctx, c, buffer); err != nil {
 				archon.Log.Warn("error in client communication: " + err.Error())

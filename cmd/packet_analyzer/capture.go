@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -38,14 +37,14 @@ var (
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing(serverAddr string) {
+func startCapturing(serverAddr string, httpPort, tcpPort int) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
 	go captureExitHandler(signalChan)
 
-	go listenForTCPPackets(serverAddr)
-	listenForHTTPPackets(serverAddr)
+	go listenForTCPPackets(serverAddr, tcpPort)
+	listenForHTTPPackets(serverAddr, httpPort)
 }
 
 // Write all of our current session information to files in the local directory.
@@ -73,10 +72,8 @@ func captureExitHandler(c chan os.Signal) {
 	os.Exit(0)
 }
 
-func listenForTCPPackets(serverAddr string) {
-	splitAddr := strings.Split(serverAddr, ":")
-	tcpPort, _ := strconv.ParseInt(splitAddr[1], 10, 32)
-	tcpAddr := fmt.Sprintf("%s:%d", splitAddr[0], tcpPort+1)
+func listenForTCPPackets(serverAddr string, tcpPort int) {
+	tcpAddr := fmt.Sprintf("%s:%d", serverAddr, tcpPort)
 
 	fmt.Println("listening for packets via TCP on", tcpAddr)
 
@@ -94,7 +91,12 @@ func listenForTCPPackets(serverAddr string) {
 
 		// Sloppily grab the data out of the packet and convert it into a
 		// PacketRequest so that the handler paths converge.
-		packet := readData(conn)
+		packet, err := ioutil.ReadAll(conn)
+		if err != nil {
+			fmt.Println("failed to read from client:", err.Error())
+			break
+		}
+
 		packetContents := packet[40:]
 		contents := make([]int, len(packetContents))
 
@@ -113,42 +115,18 @@ func listenForTCPPackets(serverAddr string) {
 	}
 }
 
-func readData(conn net.Conn) []byte {
-	read := 0
-	packet := make([]byte, 1024)
-
-	for {
-		n, err := conn.Read(packet[read:])
-		read += n
-
-		if err != nil {
-			fmt.Println("failed to read from client:", err.Error())
-			break
-		}
-
-		if n >= len(packet) {
-			b := make([]byte, len(packet)*2)
-			copy(b, packet)
-			packet = b
-		} else {
-			break
-		}
-	}
-
-	return packet[:read]
-}
-
 // Returns the byte-encoded string without the zero padding.
 func readStringFromData(data []byte) string {
 	return strings.TrimRight(string(data), "�")
 }
 
-func listenForHTTPPackets(serverAddr string) {
-	fmt.Println("listening for packets via HTTP on", serverAddr)
+func listenForHTTPPackets(serverAddr string, httpPort int) {
+	addr := fmt.Sprintf("%s:%d", serverAddr, httpPort)
+
+	fmt.Println("listening for packets via HTTP on", addr)
 
 	http.HandleFunc("/", packetHandler)
-
-	if err := http.ListenAndServe(serverAddr, nil); err != nil {
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		fmt.Println(err)
 	}
 }
