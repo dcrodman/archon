@@ -13,7 +13,7 @@ services:
       - ./tethealla.sql:/docker-entrypoint-initdb.d/dump.sql
   packet_analyzer:
     build:
-      context: ../
+      context: ../../
       dockerfile: ./build/Dockerfile
       target: packet_analyzer
     volumes:
