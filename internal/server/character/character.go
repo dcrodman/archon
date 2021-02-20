@@ -196,9 +196,9 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 		return err
 	}
 
-	// At this point, if we've chosen (or created) a character then the
-	// client will send us the slot number and the corresponding phase.
-	if loginPkt.Phase == 4 {
+	// At this point, the user has chosen (or created) a character and the
+	// client needs the ship list.
+	if loginPkt.Phase == packets.ShipSelection {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}
@@ -538,8 +538,8 @@ func (s *Server) sendParameterChunk(c *server.Client, chunkData []byte, chunk ui
 func (s *Server) setClientFlag(c *server.Client, pkt *packets.SetFlag) {
 	c.Flag = c.Flag | pkt.Flag
 	// Some flags are set right before the client disconnects, which means saving them
-	// on the client alone isn't safe since the state is lost. To fix this the flags are
-	// also kept in memory to avoid bugs like accidentally recreating characters.
+	// on the Client struct alone isn't safe since the state is lost. To fix this the
+	// flags are also kept in memory to avoid bugs like accidentally recreating characters.
 	s.kvCache.Set(clientFlagKey(c), c.Flag, -1)
 }
 
