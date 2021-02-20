@@ -26,3 +26,6 @@ CMD ["./account", "-username", "testuser", "-password", "testpass", "-email", "t
 
 FROM builder as server
 ENTRYPOINT ["./server"]
+
+FROM builder as packet_analyzer
+ENTRYPOINT ["./packet_analyzer", "-capture", "-addr", "0.0.0.0", "-folder", "sessions"]
