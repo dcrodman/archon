@@ -40,7 +40,9 @@ type SessionFile struct {
 }
 
 var (
-	address   = flag.String("addr", "localhost:8081", "Address and port to which to bind")
+	address   = flag.String("addr", "localhost", "Address and port on which to bind")
+	httpPort  = flag.Int("http", 8081, "Port on which the HTTP service should listen")
+	tcpPort   = flag.Int("tcp", 8082, "Port on which the raw TCP service should listen")
 	summarize = flag.Bool("summarize", false, "Converts a session file to a shortened readable format")
 	compact   = flag.Bool("compact", false, "Converts a session file to a radable format")
 	capture   = flag.Bool("capture", true, "(Default) Start a server that listens for packet logs and writes them to a session file on exit")
@@ -55,7 +57,7 @@ func main() {
 	case *compact:
 		compactFiles()
 	case *capture:
-		startCapturing(*address)
+		startCapturing(*address, *httpPort, *tcpPort)
 	default:
 		fmt.Printf("no command specified; use -help for options")
 	}
