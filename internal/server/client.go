@@ -2,11 +2,12 @@ package server
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"net"
-	"strings"
 )
 
 // ClientExtension is an interface for implementing Backend-specific behavior

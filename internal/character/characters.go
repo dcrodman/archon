@@ -45,7 +45,7 @@ type Summary struct {
 	HairBlue       uint16
 	PropX          float32
 	PropY          float32
-	// In reality this is [12]uint16 but []uint8 is more convenient to work with.
-	Name     [24]uint8
+	// In reality this is [16]uint16 but []uint8 is more convenient to work with.
+	Name     [32]uint8
 	Playtime uint32
 }
