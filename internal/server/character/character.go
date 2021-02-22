@@ -340,7 +340,7 @@ func (s *Server) handleOptionsRequest(c *server.Client) error {
 // point to the default keys array or loaded from the database.
 func (s *Server) sendOptions(c *server.Client, keyConfig []byte) error {
 	if len(keyConfig) != 420 {
-		return fmt.Errorf("Received keyConfig of length " + string(len(keyConfig)) + "; should be 420")
+		return fmt.Errorf("Received keyConfig of length %d; should be 420", len(keyConfig))
 	}
 
 	pkt := &packets.Options{

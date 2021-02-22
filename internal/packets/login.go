@@ -104,11 +104,15 @@ type Redirect struct {
 	Padding uint16
 }
 
-// Option packet containing keyboard and joystick config, team options, etc.
+// Options packet containing keyboard and joystick config, team options, etc.
 type Options struct {
 	Header BBHeader
 	// Based on the key config structure from sylverant and newserv. KeyConfig
 	// and JoystickConfig are saved in the database.
+	//
+	// Note: This packet is shortened by dropping 4 bytes from TeamFlag in order
+	// to align it with tethealla. Sylverant and Newserv do not do this and this
+	// may not actually be right.
 	PlayerKeyConfig struct {
 		Unknown            [0x114]uint8
 		KeyConfig          [0x16C]uint8
@@ -119,7 +123,7 @@ type Options struct {
 		TeamPrivilegeLevel uint16
 		Reserved           uint16
 		Teamname           [0x10]uint16
-		TeamFlag           [0x800]uint8
+		TeamFlag           [0x7FC]uint8
 		TeamRewards        [2]uint32
 	}
 }

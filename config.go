@@ -20,7 +20,7 @@ var (
 	cachedIPBytes [4]byte
 )
 
-// Load initializes Viper with the contents of file.
+// Load initializes Viper with the contents of the config file under configPath.
 func Load(configPath string) {
 	viper.AddConfigPath(configPath)
 	viper.SetConfigName(defaultConfigName)
