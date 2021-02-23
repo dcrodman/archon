@@ -112,7 +112,6 @@ func loadParameterFiles(paramFileDir string) error {
 		}
 
 		fileSize := len(data)
-		offset += fileSize
 
 		entry := &parameterEntry{
 			Size:     uint32(fileSize),
@@ -122,11 +121,11 @@ func loadParameterFiles(paramFileDir string) error {
 		}
 		copy(entry.Filename[:], paramFile)
 
-		// We don't care what the actual entries are for the packet, so just append
-		// the bytes to save us having to do the conversion every time.
 		bytes, _ := internal.BytesFromStruct(entry)
 		paramHeaderData = append(paramHeaderData, bytes...)
 		tmpChunkData = append(tmpChunkData, data...)
+
+		offset += fileSize
 
 		if debug.Enabled() {
 			fmt.Printf("%s (%v bytes, checksum: 0x%x)\n", paramFile, fileSize, entry.Checksum)
