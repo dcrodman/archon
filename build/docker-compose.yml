@@ -43,6 +43,8 @@ services:
     ports:
       - 8081:8081
       - 8082:8082
+    volumes:
+      - /tmp/sessions:/go/archon/archon_server/sessions
     depends_on:
       postgres:
         condition: service_healthy
