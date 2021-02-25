@@ -1,3 +1,7 @@
 #!/bin/bash
 
-go install ./cmd/*
+set -ex
+
+go build -v ./cmd/*
+
+echo "Build completed successfully"

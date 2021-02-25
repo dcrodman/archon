@@ -1,0 +1,6 @@
+steps:
+  - command: "build/buildkite-build.sh"
+    env:
+      BUILDKITE_GOLANG_IMPORT_PATH: "github.com/dcrodman/archon"
+      PATH: "$PATH:/usr/local/go/bin"
+    timeout: 5
