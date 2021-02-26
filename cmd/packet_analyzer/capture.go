@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -39,14 +40,43 @@ var (
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing(serverAddr, folder string, httpPort, tcpPort int) {
+func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go captureExitHandler(signalChan, folder)
 
 	go listenForTCPPackets(serverAddr, tcpPort)
+	if managePort != 0 {
+		go startManageServer(serverAddr, managePort)
+	}
 	listenForHTTPPackets(serverAddr, httpPort)
+}
+
+func startManageServer(serverAddr string, managePort int) {
+	addr := fmt.Sprintf("%s:%d", serverAddr, managePort)
+	http.HandleFunc("/manage", manage)
+	fmt.Println("manage API is listening on", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		fmt.Println(err)
+	}
+}
+
+func manage(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		for sessionName, packetList := range packetQueues {
+			for _, p := range packetList {
+				if err := writePacketToFile(bufio.NewWriter(w), &p); err != nil {
+					fmt.Printf("unable to write packet to %s: %s\n", sessionName, err)
+				}
+			}
+		}
+	case "DELETE":
+		packetQueues = make(map[string][]Packet)
+	default:
+		fmt.Fprintf(w, "Sorry, only GET and DELETE methods are supported.")
+	}
 }
 
 // Write all of our current session information to files in the local directory.

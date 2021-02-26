@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ func generateSummaryFile(filename string, session *SessionFile) {
 	}
 
 	for _, p := range session.Packets {
-		if err := writePacketHeaderToFile(f, &p); err != nil {
+		if err := writePacketHeaderToFile(bufio.NewWriter(f), &p); err != nil {
 			fmt.Printf("unable to write packet header to %s: %s\n", filename, err)
 			os.Exit(1)
 		}

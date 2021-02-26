@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -54,14 +55,14 @@ func generateCompactedFile(filename string, session *SessionFile) {
 	}
 
 	for _, p := range session.Packets {
-		if err := writePacketToFile(f, &p); err != nil {
+		if err := writePacketToFile(bufio.NewWriter(f), &p); err != nil {
 			fmt.Printf("unable to write packet to %s: %s\n", filename, err)
 			os.Exit(1)
 		}
 	}
 }
 
-func writePacketToFile(f *os.File, p *Packet) error {
+func writePacketToFile(f *bufio.Writer, p *Packet) error {
 	data := packetToBytes(p.Contents)
 	pktLen := len(p.Contents)
 
@@ -85,11 +86,11 @@ func writePacketToFile(f *os.File, p *Packet) error {
 	}
 
 	_, _ = f.WriteString("\n\n")
-
+	f.Flush()
 	return nil
 }
 
-func writePacketHeaderToFile(f *os.File, p *Packet) error {
+func writePacketHeaderToFile(f *bufio.Writer, p *Packet) error {
 	size, _ := strconv.ParseInt(p.Size, 16, 16)
 	header := fmt.Sprintf(
 		"%s -> %s\nType: %s\nSize: %s (%d) bytes\n",
