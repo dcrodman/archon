@@ -1,6 +1,5 @@
 steps:
-  - command: "build/buildkite-build.sh"
-    env:
-      BUILDKITE_GOLANG_IMPORT_PATH: "github.com/dcrodman/archon"
-      PATH: "$PATH:/usr/local/go/bin"
+  - command: go build -v ./cmd/*
+    timeout: 5
+  - command: golangci-lint run -E stylecheck -E goimports ./internal/* ./cmd/*
     timeout: 5
