@@ -19,6 +19,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	cert, err := loadX509Certificate()
 	if err != nil {
 		errChan <- err
+		return
 	}
 
 	creds := credentials.NewServerTLSFromCert(cert)
@@ -33,6 +34,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
+		return
 	}
 
 	// Spin off the listener in its own goroutine since we need to listen for context cancellations.
@@ -41,6 +43,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 
 		if err := grpcServer.Serve(l); err != nil {
 			errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
+			return
 		}
 
 		close(errChan)
