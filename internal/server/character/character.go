@@ -691,7 +691,7 @@ func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets
 	selectedShip := menuSelectionPkt.ItemId - 1
 
 	if selectedShip < 0 || selectedShip >= uint32(len(activeShips)) {
-		return fmt.Errorf("Invalid ship selection: " + string(selectedShip))
+		return fmt.Errorf("Invalid ship selection: %d", selectedShip)
 	}
 
 	shipIP, _ := net.ParseIP(activeShips[selectedShip].ip).MarshalText()

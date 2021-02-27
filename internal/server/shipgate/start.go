@@ -37,7 +37,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 
 	// Spin off the listener in its own goroutine since we need to listen for context cancellations.
 	go func() {
-		archon.Log.Printf("SHIPGATE waiting for requests on %s\n", addr)
+		archon.Log.Printf("SHIPGATE waiting for requests on %s", addr)
 
 		if err := grpcServer.Serve(l); err != nil {
 			errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)

@@ -66,7 +66,7 @@ func (f *Frontend) createSocket() (*net.TCPListener, error) {
 func (f *Frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	archon.Log.Printf("%s waiting for connections on %v\n", f.Backend.Name(), f.Address)
+	archon.Log.Printf("%s waiting for connections on %v", f.Backend.Name(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {
@@ -165,7 +165,7 @@ func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
 // client, and removes them from the list regardless of the state of the connection.
 func (*Frontend) closeConnectionAndRecover(serverName string, c *server.Client) {
 	if err := recover(); err != nil {
-		archon.Log.Errorf("error in client communication: %s: %s\n%s\n",
+		archon.Log.Errorf("error in client communication with %s: error=%s, trace: %s",
 			c.IPAddr(), err, debug.Stack())
 	}
 
