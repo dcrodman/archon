@@ -5,18 +5,18 @@ type CharClass uint8
 
 const (
 	// Possible character classes as defined by the game.
-	Humar     CharClass = 0x00
-	Hunewearl           = 0x01
-	Hucast              = 0x02
-	Ramar               = 0x03
-	Racast              = 0x04
-	Racaseal            = 0x05
-	Fomarl              = 0x06
-	Fonewm              = 0x07
-	Fonewearl           = 0x08
-	Hucaseal            = 0x09
-	Fomar               = 0x0A
-	Ramarl              = 0x0B
+	Humar CharClass = iota
+	Hunewearl
+	Hucast
+	Ramar
+	Racast
+	Racaseal
+	Fomarl
+	Fonewm
+	Fonewearl
+	Hucaseal
+	Fomar
+	Ramarl
 )
 
 // Common intermediate representation of a Character as it gets passed around

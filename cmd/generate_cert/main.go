@@ -37,15 +37,15 @@ var ip = flag.String("ip", "", "Server's external_ip (in config.yaml) or CIDR bl
 
 func main() {
 	flag.Parse()
-	serverIp := *ip
-	if serverIp == "" {
+	serverIP := *ip
+	if serverIP == "" {
 		fmt.Print("server's external_ip (in config.yaml) or CIDR block: ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
-		serverIp = scanner.Text()
+		serverIP = scanner.Text()
 	}
 
-	template, err := createX509Template(serverIp)
+	template, err := createX509Template(serverIP)
 	if err != nil {
 		fmt.Println("failed to create X.509 template:", err)
 		return

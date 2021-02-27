@@ -38,7 +38,7 @@ type Client struct {
 	Config packets.ClientConfig
 
 	Flag   uint32
-	TeamId uint32
+	TeamID uint32
 	IsGm   bool
 
 	Guildcard     uint32
