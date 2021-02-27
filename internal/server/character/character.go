@@ -46,7 +46,7 @@ const (
 )
 
 var (
-	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
+	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 	shipSelectionScrollMessage     []byte
 	shipSelectionScrollMessageInit sync.Once
