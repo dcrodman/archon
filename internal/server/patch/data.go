@@ -137,7 +137,7 @@ func (s *DataServer) sendChangeDir(c *server.Client, dir string) error {
 func (s *DataServer) sendCheckFile(c *server.Client, index uint32, filename string) error {
 	pkt := packets.CheckFile{
 		Header:  packets.PCHeader{Type: packets.PatchCheckFileType},
-		PatchId: index,
+		PatchID: index,
 	}
 	copy(pkt.Filename[:], filename)
 
@@ -157,11 +157,11 @@ func (s *DataServer) sendFileListDone(c *server.Client) error {
 // The client sent us a checksum for one of the patch files. Compare it to what we
 // have and add it to the list of files to update if there is any discrepancy.
 func (s *DataServer) handleFileStatus(c *server.Client, fileStatus *packets.FileStatus) {
-	patchFile := patchIndex[fileStatus.PatchId]
+	patchFile := patchIndex[fileStatus.PatchID]
 
 	if fileStatus.Checksum != patchFile.checksum || fileStatus.FileSize != patchFile.fileSize {
 		ext := c.Extension.(*patchClientExtension)
-		ext.filesToUpdate[int(fileStatus.PatchId)] = patchFile
+		ext.filesToUpdate[int(fileStatus.PatchID)] = patchFile
 	}
 }
 

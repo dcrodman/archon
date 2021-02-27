@@ -75,7 +75,7 @@ type Login struct {
 	ClientVersion uint16
 	Unknown2      uint32
 	Phase         LoginPhase
-	TeamId        uint32
+	TeamID        uint32
 	Username      [16]byte
 	Padding       [32]byte
 	Password      [16]byte
@@ -91,7 +91,7 @@ type Security struct {
 	ErrorCode    uint32
 	PlayerTag    uint32
 	Guildcard    uint32
-	TeamId       uint32
+	TeamID       uint32
 	Config       ClientConfig
 	Capabilities uint32
 }
@@ -118,7 +118,7 @@ type Options struct {
 		KeyConfig          [0x16C]uint8
 		JoystickConfig     [0x38]uint8
 		Guildcard          uint32
-		TeamId             uint32
+		TeamID             uint32
 		TeamInfo           [2]uint32
 		TeamPrivilegeLevel uint16
 		Reserved           uint16
@@ -210,8 +210,8 @@ type Timestamp struct {
 }
 
 type ShipListEntry struct {
-	MenuId   uint16
-	ShipId   uint32
+	MenuID   uint16
+	ShipID   uint32
 	Padding  uint16
 	ShipName [36]byte
 }
@@ -239,8 +239,8 @@ type ScrollMessagePacket struct {
 type MenuSelection struct {
 	Header  BBHeader
 	Unknown uint16
-	MenuId  uint16
-	ItemId  uint32
+	MenuID  uint16
+	ItemID  uint32
 }
 
 // List containing the available blocks on a ship.
@@ -255,7 +255,7 @@ type BlockList struct {
 // Info about the available block servers.
 type Block struct {
 	Unknown   uint16
-	BlockId   uint32
+	BlockID   uint32
 	Padding   uint16
 	BlockName [36]byte
 }
@@ -264,8 +264,8 @@ type Block struct {
 type LobbyList struct {
 	Header  BBHeader
 	Lobbies []struct {
-		MenuId  uint32
-		LobbyId uint32
+		MenuID  uint32
+		LobbyID uint32
 		Padding uint32
 	}
 }

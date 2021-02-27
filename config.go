@@ -1,6 +1,3 @@
-// Singleton package for handling the global server configuration
-// and responsible for establishing a connection to the database
-// to be maintained during execution.
 package archon
 
 import (
