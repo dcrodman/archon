@@ -6,12 +6,13 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/dcrodman/archon"
 	"os"
+
+	"github.com/dcrodman/archon"
+	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/data"
-	"github.com/spf13/viper"
 )
 
 var config = flag.String("config", "./", "Path to the directory containing the server config file")

@@ -3,12 +3,14 @@ package patch
 import (
 	"errors"
 	"fmt"
-	"github.com/spf13/viper"
 	"hash/crc32"
 	"io/ioutil"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/dcrodman/archon"
+	"github.com/spf13/viper"
 )
 
 // maxFileChunkSize is the maximum number of bytes we can send of a file at a time.
@@ -68,7 +70,7 @@ func initializePatchData() error {
 
 		rootNode = &directoryNode{path: dir, clientPath: "./"}
 
-		fmt.Println("loading patch files from", dir)
+		archon.Log.Infof("loading patch files from %s", dir)
 		if err := buildPatchFileTree(rootNode); err != nil {
 			initErr = fmt.Errorf("error loading patch files: %s", err)
 		}

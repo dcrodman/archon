@@ -46,7 +46,7 @@ const (
 )
 
 var (
-	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
+	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 	shipSelectionScrollMessage     []byte
 	shipSelectionScrollMessageInit sync.Once
@@ -188,7 +188,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 		}
 	}
 
-	c.TeamId = uint32(account.TeamID)
+	c.TeamID = uint32(account.TeamID)
 	c.Guildcard = uint32(account.Guildcard)
 	c.Extension.(*characterClientExtension).account = account
 
@@ -198,6 +198,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
+	archon.Log.Infof("phase: %v", loginPkt.Phase)
 	if loginPkt.Phase == packets.ShipSelection {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
@@ -222,7 +223,7 @@ func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
-		TeamId:       c.TeamId,
+		TeamID:       c.TeamID,
 		Config:       c.Config,
 		Capabilities: 0x00000102,
 	})
@@ -264,9 +265,9 @@ func (s *Server) sendShipList(c *server.Client) error {
 
 		for i, ship := range activeShips {
 			shipList[i] = packets.ShipListEntry{
-				MenuId: uint16(i + 1),
+				MenuID: uint16(i + 1),
 				//MenuId:   0x12,
-				ShipId:   uint32(ship.id),
+				ShipID:   uint32(ship.id),
 				ShipName: [36]byte{},
 			}
 			copy(shipList[i].ShipName[:], ship.name)
@@ -275,7 +276,7 @@ func (s *Server) sendShipList(c *server.Client) error {
 		// A "No Ships!" entry is shown if we either can't connect to the shipgate or
 		// the shipgate doesn't report any connected ships.
 		shipList = []packets.ShipListEntry{
-			{MenuId: 0xFF, ShipId: 0xFF, ShipName: [36]byte{}},
+			{MenuID: 0xFF, ShipID: 0xFF, ShipName: [36]byte{}},
 		}
 		copy(shipList[0].ShipName[:], internal.ConvertToUtf16("No Ships!")[:])
 	}
@@ -621,7 +622,7 @@ func (s *Server) handleCharacterUpdate(c *server.Client, charPkt *packets.Charac
 				break
 			}
 			utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
-			j += 1
+			j++
 		}
 		newCharacter.ReadableName = string(utf16.Decode(utfName))
 
@@ -688,10 +689,10 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
 	activeShips := s.shipgateClient.getActiveShips()
-	selectedShip := menuSelectionPkt.ItemId - 1
+	selectedShip := menuSelectionPkt.ItemID - 1
 
 	if selectedShip < 0 || selectedShip >= uint32(len(activeShips)) {
-		return fmt.Errorf("Invalid ship selection: " + string(selectedShip))
+		return fmt.Errorf("Invalid ship selection: %d", selectedShip)
 	}
 
 	shipIP, _ := net.ParseIP(activeShips[selectedShip].ip).MarshalText()

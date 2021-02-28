@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/dcrodman/archon"
-	"github.com/spf13/viper"
 	"net/http"
 	_ "net/http/pprof"
 	"time"
+
+	"github.com/dcrodman/archon"
+	"github.com/spf13/viper"
 )
 
 type packetAnalyzerRequest struct {
@@ -69,11 +70,11 @@ func startAnalyzerExporter() {
 // to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
 func startPprofServer() {
 	listenerAddr := fmt.Sprintf("localhost:%s", viper.GetString("debugging.pprof_port"))
-	fmt.Printf("starting pprof server on %s\n", listenerAddr)
+	archon.Log.Infof("starting pprof server on %s", listenerAddr)
 
 	go func() {
 		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
-			fmt.Printf("error starting pprof server: %s\n", err)
+			archon.Log.Infof("error starting pprof server: %s", err)
 		}
 	}()
 }

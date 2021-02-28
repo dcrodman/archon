@@ -53,14 +53,14 @@ type ChangeDir struct {
 // Request a check on a file in the client's working directory.
 type CheckFile struct {
 	Header   PCHeader
-	PatchId  uint32
+	PatchID  uint32
 	Filename [32]byte
 }
 
 // Response to CheckFile from the client with the properties of a file.
 type FileStatus struct {
 	Header   PCHeader
-	PatchId  uint32
+	PatchID  uint32
 	Checksum uint32
 	FileSize uint32
 }

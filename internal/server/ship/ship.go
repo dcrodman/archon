@@ -2,6 +2,8 @@
 package ship
 
 import (
+	"strings"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
@@ -10,7 +12,6 @@ import (
 	"github.com/dcrodman/archon/internal/server/block"
 	"github.com/dcrodman/archon/internal/server/character"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"strings"
 )
 
 // BackMenuItem is the block ID reserved for returning to the ship select menu.
@@ -33,7 +34,7 @@ func NewServer(name, port string, blockServers []block.BlockServer) *Server {
 	for i, blockServer := range blockServers {
 		b := packets.Block{
 			Unknown: 0x12,
-			BlockId: uint32(i + 1),
+			BlockID: uint32(i + 1),
 		}
 		copy(b.BlockName[:], internal.ConvertToUtf16(blockServer.Name()))
 		blocks = append(blocks, b)
@@ -43,7 +44,7 @@ func NewServer(name, port string, blockServers []block.BlockServer) *Server {
 	// is sent to the client as another (final) block selection option.
 	blocks = append(blocks, packets.Block{
 		Unknown: 0x08,
-		BlockId: BackMenuItem,
+		BlockID: BackMenuItem,
 	})
 	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
 
@@ -108,7 +109,7 @@ func (s *Server) Handle(c *server.Client, data []byte) error {
 		var pkt packets.MenuSelection
 		internal.StructFromBytes(data, &pkt)
 		// They can be at either the ship or block selection menu, so make sure we have the right one.
-		if pkt.MenuId == character.ShipSelectionMenuId {
+		if pkt.MenuID == character.ShipSelectionMenuId {
 			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
 			err = s.handleShipSelection(c)
 		} else {
@@ -151,7 +152,7 @@ func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
-		TeamId:       c.TeamId,
+		TeamID:       c.TeamID,
 		Config:       c.Config,
 		Capabilities: 0x00000102,
 	})
