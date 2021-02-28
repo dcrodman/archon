@@ -22,24 +22,29 @@ then
     exit 1
 fi
 
-read -rp "Please enter the database name for archon (default: archondb)" DB_NAME
+read -rp "Please enter the database name for archon (default: archondb): " DB_NAME
 if [ ! "$DB_NAME" ]; then
   DB_NAME="archondb"
 fi
 
-read -rp "Please enter the username for the archon database (default: archonadmin)" ARCHON_USER
+read -rp "Please enter the username for the archon database (default: archonadmin): " ARCHON_USER
 if [ ! "$ARCHON_USER" ]; then
   ARCHON_USER="archonadmin"
 fi
 
-read -rp "Please enter the password for the archon database (default: psoadminpassword)" ARCHON_PASSWORD
+read -rp "Please enter the password for the archon database (default: psoadminpassword): " ARCHON_PASSWORD
 if [ ! "$ARCHON_PASSWORD" ]; then
   ARCHON_PASSWORD="psoadminpassword"
 fi
 
-read -rp "Please enter the server address and port (default: 0.0.0.0/32)" SERVER_IP
+read -rp "Please enter the server address (default: 0.0.0.0/32): " SERVER_IP
 if [ ! "$SERVER_IP" ]; then
   SERVER_IP="0.0.0.0/32"
+fi
+
+read -rp "Please enter the external server address (default: 127.0.0.1): " EXTERNAL_ADDRESS
+if [ ! "$EXTERNAL_ADDRESS" ]; then
+  SERVER_IP="127.0.0.1"
 fi
 
 # No matter where we're calling this from, we're going to use
@@ -76,6 +81,26 @@ sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
 # Edit default parameters directory
 SEARCH='parameters_dir: "/usr/local/etc/archon/parameters"'
 REPLACE="parameters_dir: \"$(pwd)/parameters\""
+sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+
+# Edit hostname
+SEARCH='hostname: 0.0.0.0'
+REPLACE="hostname: $SERVER_IP"
+sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+
+# Edit external address
+SEARCH='external_ip: 127.0.0.1'
+REPLACE="external_ip: $EXTERNAL_ADDRESS"
+sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+
+# Edit certificate location
+SEARCH='shipgate_certificate_file: "certificate.pem"'
+REPLACE="shipgate_certificate_file: \"$(pwd)/certificate.pem\""
+sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+
+# Edit key location
+SEARCH='ssl_key_file: "key.pem"'
+REPLACE="ssl_key_file: \"$(pwd)/key.pem\""
 sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
 
 createdb "$DB_NAME"
