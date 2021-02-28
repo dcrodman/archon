@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -21,17 +22,26 @@ func compactFiles() {
 
 	for i := 0; i < flag.NArg(); i++ {
 		sessionFile := flag.Arg(i)
-		session, err := parseSessionDataFromFile(sessionFile)
+		compact, err := compactSession(sessionFile)
 		if err != nil {
-			fmt.Printf("unable read file %s: %s\n", sessionFile, err)
-			os.Exit(1)
+			fmt.Printf("unable to compact session %s: %s\n", sessionFile, err)
+			return
 		}
-
-		filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFile, ".session", "", 1))
-		generateCompactedFile(filename, session)
-
-		fmt.Println("wrote", filename)
+		fmt.Println("wrote", compact)
 	}
+}
+
+func compactSession(sessionFilename string) (string, error) {
+	session, err := parseSessionDataFromFile(sessionFilename)
+	if err != nil {
+		return "", errors.Wrap(err, "unable read file")
+	}
+	filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFilename, ".session", "", 1))
+	err = generateCompactedFile(filename, session)
+	if err != nil {
+		return "", errors.Wrap(err, "unable generate compact file")
+	}
+	return filename, nil
 }
 
 func parseSessionDataFromFile(filename string) (*SessionFile, error) {
@@ -47,19 +57,18 @@ func parseSessionDataFromFile(filename string) (*SessionFile, error) {
 	return &s, nil
 }
 
-func generateCompactedFile(filename string, session *SessionFile) {
+func generateCompactedFile(filename string, session *SessionFile) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		fmt.Printf("unable to write to %s: %s\n", filename, err)
-		os.Exit(1)
+		return errors.Wrap(err, "Unable to create file "+filename)
 	}
 
 	for _, p := range session.Packets {
 		if err := writePacketToFile(bufio.NewWriter(f), &p); err != nil {
-			fmt.Printf("unable to write packet to %s: %s\n", filename, err)
-			os.Exit(1)
+			return errors.Wrap(err, "unable to write packet to "+filename)
 		}
 	}
+	return nil
 }
 
 func writePacketToFile(f *bufio.Writer, p *Packet) error {
