@@ -125,7 +125,7 @@ func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
-		TeamId:       c.TeamId,
+		TeamID:       c.TeamID,
 		Config:       c.Config,
 		Capabilities: 0x00000102,
 	})

@@ -1,10 +1,6 @@
-// Singleton package for handling the global server configuration
-// and responsible for establishing a connection to the database
-// to be maintained during execution.
 package archon
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -28,9 +24,9 @@ func Load(configPath string) {
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			fmt.Println("error reading config file: no config file in path", configPath)
+			Log.Infof("error reading config file: no config file in path", configPath)
 		} else {
-			fmt.Println("error reading config file", err)
+			Log.Infof("error reading config file", err)
 		}
 		os.Exit(1)
 	}

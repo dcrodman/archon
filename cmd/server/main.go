@@ -29,35 +29,35 @@ const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmo
 var config = flag.String("config", "./", "Path to the directory containing the server config file")
 
 func main() {
-	fmt.Printf("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
+	archon.Log.Info("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
 		"This program is free software: you can redistribute it and/or\n" +
 		"modify it under the terms of the GNU General Public License as\n" +
 		"published by the Free Software Foundation, either version 3 of\n" +
 		"the License, or (at your option) any later version. This program\n" +
-		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.\n\n")
+		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
 
 	flag.Parse()
 
-	fmt.Println("loading configuration from", *config)
+	archon.Log.Infof("loading configuration from %s", *config)
 	archon.Load(*config)
 	archon.InitLogger()
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
 	if err := os.Chdir(filepath.Dir(*config)); err != nil {
-		fmt.Printf("failed to change to config directory: %v\n", err)
+		archon.Log.Errorf("failed to change to config directory: %v", err)
 		os.Exit(1)
 	}
 
 	// Connect to the database.
 	if err := data.Initialize(dataSource()); err != nil {
-		fmt.Println(err.Error())
+		archon.Log.Errorf(err.Error())
 		os.Exit(1)
 	}
 	defer data.Shutdown()
 
-	fmt.Printf("connected to database %s:%d\n\n",
+	archon.Log.Infof("connected to database %s:%d",
 		viper.GetString("database.host"),
 		viper.GetInt("database.port"),
 	)
@@ -103,7 +103,7 @@ func main() {
 	go shipgate.Start(ctx, shipgateAddr, readyChan, errChan)
 	go func() {
 		if err := <-errChan; err != nil {
-			fmt.Printf("exiting due to SHIPGATE error: %v", err)
+			archon.Log.Errorf("exiting due to SHIPGATE error: %v", err)
 			os.Exit(1)
 		}
 	}()
@@ -113,7 +113,7 @@ func main() {
 	var serverWg sync.WaitGroup
 	for _, server := range servers {
 		if err := server.Start(ctx, &serverWg); err != nil {
-			fmt.Printf("failed to start %s server: %v\n", server.Backend.Name(), err)
+			archon.Log.Errorf("failed to start %s server: %v\n", server.Backend.Name(), err)
 			os.Exit(1)
 		}
 	}
@@ -146,7 +146,7 @@ func registerExitHandler(cancelFn func(), wg ...*sync.WaitGroup) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println("shutting down...")
+		archon.Log.Infof("shutting down...")
 
 		cancelFn()
 		// TODO: add a timeout here.

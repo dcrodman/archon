@@ -6,6 +6,7 @@ package encryption
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 )
 
 // Internal representation of a cipher capable of performing
@@ -27,7 +28,9 @@ func createKey(size int) []byte {
 	key := make([]byte, size)
 
 	for i := 0; i < size; i++ {
-		binary.Read(rand.Reader, binary.LittleEndian, &key[i])
+		if err := binary.Read(rand.Reader, binary.LittleEndian, &key[i]); err != nil {
+			panic(fmt.Errorf("error creating key: %v", err))
+		}
 	}
 
 	return key

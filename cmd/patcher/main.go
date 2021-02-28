@@ -74,11 +74,14 @@ func main() {
 
 	for _, off := range offsets {
 		originalAddr := make([]byte, blockLen)
-		file.ReadAt(originalAddr, off)
+		if _, err := file.ReadAt(originalAddr, off); err != nil {
+			fmt.Printf("failed to read byte at %x, error: %v", off, err)
+			return
+		}
 
-		_, err := file.WriteAt(replacementAddress, off)
-		if err != nil {
-			panic(err)
+		if _, err := file.WriteAt(replacementAddress, off); err != nil {
+			fmt.Printf("failed to write byte at %x, error: %v", off, err)
+			return
 		}
 
 		fmt.Printf("replacing %s with %s\n", originalAddr, replacementAddress)

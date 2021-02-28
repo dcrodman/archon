@@ -42,7 +42,7 @@ var (
 func startCapturing(serverAddr, folder string, httpPort, tcpPort int) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGCONT, syscall.SIGTERM)
 	go captureExitHandler(signalChan, folder)
 
 	go listenForTCPPackets(serverAddr, tcpPort)

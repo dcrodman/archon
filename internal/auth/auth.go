@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/dcrodman/archon/internal/data"
 )
@@ -86,7 +87,9 @@ var permanentlyDeleteAccount = func(username string) error {
 // HashPassword returns a version of password with Archon's chosen hashing strategy.
 func HashPassword(password string) string {
 	hash := sha256.New()
-	hash.Write(stripPadding([]byte(password)))
+	if _, err := hash.Write(stripPadding([]byte(password))); err != nil {
+		panic(fmt.Errorf("error generating password hash: %v", err))
+	}
 	return hex.EncodeToString(hash.Sum(nil)[:])
 }
 

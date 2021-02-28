@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/pkg/prs"
@@ -100,7 +101,7 @@ func initParameterData() error {
 // Load the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
 func loadParameterFiles(paramFileDir string) error {
-	fmt.Printf("loading parameters from %s\n", paramFileDir)
+	archon.Log.Infof("loading parameters from %s", paramFileDir)
 
 	offset := 0
 	var tmpChunkData []byte
@@ -128,7 +129,7 @@ func loadParameterFiles(paramFileDir string) error {
 		offset += fileSize
 
 		if debug.Enabled() {
-			fmt.Printf("%s (%v bytes, checksum: 0x%x)\n", paramFile, fileSize, entry.Checksum)
+			archon.Log.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
 		}
 	}
 
