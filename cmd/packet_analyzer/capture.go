@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -59,6 +60,7 @@ func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int
 func startManageServer(serverAddr string, managePort int) {
 	addr := fmt.Sprintf("%s:%d", serverAddr, managePort)
 	http.HandleFunc("/manage", manage)
+	http.HandleFunc("/manage/ui", ui)
 	fmt.Println("manage API is listening on", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		fmt.Println(err)
@@ -69,15 +71,36 @@ func manage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		sessionName := r.FormValue("session")
-		for _, p := range packetQueues[sessionName] {
-			if err := writePacketToFile(bufio.NewWriter(w), &p); err != nil {
-				fmt.Printf("unable to write packet to %s: %s\n", sessionName, err)
+		if sessionName != "" {
+			for _, p := range packetQueues[sessionName] {
+				if err := writePacketToFile(bufio.NewWriter(w), &p); err != nil {
+					fmt.Printf("unable to write packet to %s: %s\n", sessionName, err)
+				}
 			}
+		} else {
+			var sessionNames []string
+			for k := range packetQueues {
+				sessionNames = append(sessionNames, k)
+			}
+			names, _ := json.Marshal(sessionNames)
+			w.Write(names)
 		}
 	case "DELETE":
 		packetQueues = make(map[string][]Packet)
 	default:
 		fmt.Fprintf(w, "Sorry, only GET and DELETE methods are supported.")
+	}
+}
+
+func ui(w http.ResponseWriter, r *http.Request) {
+	tmpl, _ := template.ParseFiles("./templates/index.html")
+	var sessionNames []string
+	for k := range packetQueues {
+		sessionNames = append(sessionNames, k)
+	}
+	err := tmpl.Execute(w, sessionNames)
+	if err != nil {
+		fmt.Printf("unable to execute template %v", err)
 	}
 }
 
