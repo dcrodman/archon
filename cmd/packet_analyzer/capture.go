@@ -126,8 +126,7 @@ func captureExitHandler(c chan os.Signal, folder string, auto bool) {
 		fmt.Println("wrote", filename)
 
 		if auto {
-			_, err := summarizeSession(filename)
-			if err != nil {
+			if _, err := summarizeSession(filename); err != nil {
 				fmt.Printf("unable to generate summary for session %s: %s\n", filename, err)
 			}
 			_, err = compactSession(filename)
