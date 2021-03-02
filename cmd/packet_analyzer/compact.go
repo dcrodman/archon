@@ -65,7 +65,7 @@ func generateCompactedFile(filename string, session *SessionFile) error {
 
 	for _, p := range session.Packets {
 		if err := writePacketToFile(bufio.NewWriter(f), &p); err != nil {
-			return errors.Wrap(err, "unable to write packet to "+filename)
+			return fmt.Erorrf("unable to write packet to file %s: %v", filename, err)
 		}
 	}
 	return nil
