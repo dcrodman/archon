@@ -1,5 +1,0 @@
-steps:
-  - command: go build -v ./cmd/*
-    timeout: 5
-  - command: golangci-lint run -E stylecheck -E goimports ./internal/* ./cmd/*
-    timeout: 5
