@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -34,12 +33,12 @@ func compactFiles() {
 func compactSession(sessionFilename string) (string, error) {
 	session, err := parseSessionDataFromFile(sessionFilename)
 	if err != nil {
-		return "", errors.Wrap(err, "unable read file")
+		return "", fmt.Errorf("unable to read file: %v", err)
 	}
 	filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFilename, ".session", "", 1))
 	err = generateCompactedFile(filename, session)
 	if err != nil {
-		return "", errors.Wrap(err, "unable generate compact file")
+		return "", fmt.Errorf("unable to generate compact file: %v", err)
 	}
 	return filename, nil
 }
@@ -65,7 +64,7 @@ func generateCompactedFile(filename string, session *SessionFile) error {
 
 	for _, p := range session.Packets {
 		if err := writePacketToFile(bufio.NewWriter(f), &p); err != nil {
-			return fmt.Erorrf("unable to write packet to file %s: %v", filename, err)
+			return fmt.Errorf("unable to write packet to file %s: %v", filename, err)
 		}
 	}
 	return nil

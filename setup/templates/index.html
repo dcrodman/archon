@@ -76,7 +76,7 @@ function diffUsingJS(viewType) {
 }
 
 function loadSession(sessionSelectId, id, checkId) {
-	fetch(host + '/manage?session=' + byId(sessionSelectId).value)
+	fetch(host + '/?session=' + byId(sessionSelectId).value)
 	.then(response => response.text())
 	.then(data => {
 		byId(id).value = data
@@ -118,14 +118,14 @@ function createSelect(id, parentId, sessions) {
 }
 
 function deleteAllSessions() {
-	fetch(host + '/manage', {method: 'DELETE'})
+	fetch(host + '/', {method: 'DELETE'})
 }
 
 window.addEventListener('load', function() {
 	loadFromFileListener('base-file', 'base', 'new')
 	loadFromFileListener('new-file', 'new', 'base')
 
-	fetch(host + '/manage')
+	fetch(host + '/')
 		.then(response => response.json())
 		.then(sessions => {
 			createSelect('base-select', 'base-select-parent', sessions)

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"strings"
 )
@@ -29,12 +28,12 @@ func summarizeFiles() {
 func summarizeSession(sessionFilename string) (string, error) {
 	session, err := parseSessionDataFromFile(sessionFilename)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to parse session file")
+		return "", fmt.Errorf("unable to parse session file: %v", err)
 	}
 	filename := fmt.Sprintf("%s_summary.txt", strings.Replace(sessionFilename, ".session", "", 1))
 	err = generateSummaryFile(filename, session)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to generate summary file")
+		return "", fmt.Errorf("unable to generate summary file %s: %v", filename, err)
 	}
 	return filename, nil
 }
@@ -42,12 +41,12 @@ func summarizeSession(sessionFilename string) (string, error) {
 func generateSummaryFile(filename string, session *SessionFile) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		return errors.Wrap(err, "Unable to create file "+filename)
+		return fmt.Errorf("unable to create file %s: %v", filename, err)
 	}
 
 	for _, p := range session.Packets {
 		if err := writePacketHeaderToFile(bufio.NewWriter(f), &p); err != nil {
-			return errors.Wrap(err, "unable to write packet header to "+filename)
+			return fmt.Errorf("unable to write packet header to %s: %v", filename, err)
 		}
 	}
 	return nil

@@ -59,10 +59,11 @@ func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int
 
 func startManageServer(serverAddr string, managePort int) {
 	addr := fmt.Sprintf("%s:%d", serverAddr, managePort)
-	http.HandleFunc("/manage", manage)
-	http.HandleFunc("/manage/ui", ui)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", manage)
+	mux.HandleFunc("/ui", ui)
 	fmt.Println("manage API is listening on", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -129,7 +130,7 @@ func captureExitHandler(c chan os.Signal, folder string, auto bool) {
 			if _, err := summarizeSession(filename); err != nil {
 				fmt.Printf("unable to generate summary for session %s: %s\n", filename, err)
 			}
-			if _, err = compactSession(filename); err != nil {
+			if _, err := compactSession(filename); err != nil {
 				fmt.Printf("unable to compact session %s: %s\n", filename, err)
 			}
 		}
