@@ -29,6 +29,10 @@ const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmo
 var config = flag.String("config", "./", "Path to the directory containing the server config file")
 
 func main() {
+	flag.Parse()
+	archon.Load(*config)
+	archon.InitLogger()
+
 	archon.Log.Info("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
 		"This program is free software: you can redistribute it and/or\n" +
@@ -37,11 +41,7 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
 
-	flag.Parse()
-
-	archon.Log.Infof("loading configuration from %s", *config)
-	archon.Load(*config)
-	archon.InitLogger()
+	archon.Log.Infof("loaded configuration from %s", *config)
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
