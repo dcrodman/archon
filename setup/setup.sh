@@ -37,35 +37,39 @@ if [ ! "$ARCHON_PASSWORD" ]; then
   ARCHON_PASSWORD="psoadminpassword"
 fi
 
-read -rp "Please enter the server address (default: 0.0.0.0/32): " SERVER_IP
+read -rp "Please enter the server address (default: 0.0.0.0): " SERVER_IP
 if [ ! "$SERVER_IP" ]; then
-  SERVER_IP="0.0.0.0/32"
+  SERVER_IP="0.0.0.0"
 fi
 
 read -rp "Please enter the external server address (default: 127.0.0.1): " EXTERNAL_ADDRESS
 if [ ! "$EXTERNAL_ADDRESS" ]; then
-  SERVER_IP="127.0.0.1"
+  EXTERNAL_ADDRESS="127.0.0.1"
 fi
 
-# No matter where we're calling this from, we're going to use
-# The root archon directory as our install location.
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+SETUP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-# Go to the root archon directory.
-pushd "$SCRIPT_DIR"/.. > /dev/null 2>&1
+# The user can provide the install location as the first option
+# If it's not provided, we'll use the root archon dir.
+if [ -z "$1" ]; then
+  INSTALL_DIR="$ARCHON_ROOT"
+else
+  INSTALL_DIR="$1"
+fi
 
-SETUP_DIR="$(pwd)/setup"
+if [ ! -d "$INSTALL_DIR" ]; then
+  mkdir -p "$INSTALL_DIR" || echo "Please enter a valid directory."
+fi
+pushd "$INSTALL_DIR" > /dev/null 2>&1
 
-echo "Please edit the config file: $SETUP_DIR/config.yaml"
-echo "This script will edit the parameters_dir and patch_dir appropriately."
-read -rp "Press enter when you're done to continue."
-echo "Continuing..."
-
-mkdir .bin
 export GOBIN="$(pwd)/.bin"
-go install ./cmd/*
+mkdir -p .bin
 
-mkdir archon_server
+pushd "$SETUP_DIR"/.. > /dev/null 2>&1
+go install ./cmd/*
+popd > /dev/null 2>&1
+
+mkdir -p archon_server
 # Copy compiled binaries to the server folder.
 cp .bin/* archon_server/.
 
@@ -113,10 +117,6 @@ if [ ! -d patches ]; then
   cp -r patches/* patches/.
 fi
 
-echo "If there are patch files you would like the server to verify, please copy them into:"
-echo "$(pwd)/patches"
-read -rp "Press enter when you're done to continue."
-echo "Continuing..."
 
 echo "Generating certificates..."
 ./generate_cert --ip "$SERVER_IP" > /dev/null 2>&1
@@ -126,5 +126,12 @@ echo "Adding account..."
 ./account --config . add
 echo "Done."
 
-echo "Starting server..."
-./server --config .
+echo
+echo "Archon setup is complete."
+echo "If there are patch files you would like the server to verify, please copy them into:"
+echo "  $(pwd)/patches"
+echo
+echo "Please verify the config file has the correct settings before running."
+echo "To run the server, execute the following:"
+echo "  $(pwd)/server --config $(pwd)"
+echo
