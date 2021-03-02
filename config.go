@@ -1,6 +1,7 @@
 package archon
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -24,9 +25,9 @@ func Load(configPath string) {
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			Log.Infof("error reading config file: no config file in path", configPath)
+			fmt.Printf("error reading config file: no config file in path %s", configPath)
 		} else {
-			Log.Infof("error reading config file", err)
+			fmt.Printf("error reading config file: %v", err)
 		}
 		os.Exit(1)
 	}
