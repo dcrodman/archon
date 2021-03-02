@@ -20,7 +20,19 @@ var (
 	patchInitLock sync.Once
 
 	// File names that should be ignored when searching for patch files.
-	pathsToSkip = map[string]bool{".": true, "..": true, ".DS_Store": true, ".rid": true}
+	pathsToSkip = map[string]bool{
+		".":         true,
+		"..":        true,
+		".DS_Store": true,
+		".rid":      true,
+	}
+
+	// Files or directories which, when present, will result in unexpected client
+	// behavior (crashing, etc). The paths will be ignored, and a warning will be
+	// generated suggesting the removal of the path.
+	problematicPaths = map[string]bool{
+		"GameGuard": true,
+	}
 
 	// The top of our tree of patch files.
 	rootNode *directoryNode
@@ -73,6 +85,7 @@ func initializePatchData() error {
 		archon.Log.Infof("loading patch files from %s", dir)
 		if err := buildPatchFileTree(rootNode); err != nil {
 			initErr = fmt.Errorf("error loading patch files: %s", err)
+			return
 		}
 
 		buildPatchIndex(rootNode)
@@ -85,7 +98,7 @@ func initializePatchData() error {
 	return initErr
 }
 
-// Build the list of patch files present in the patch directory too sync with the
+// Build the list of patch files present in the patch directory to sync with the
 // client. Files are represented in a tree, directories act as nodes (directoryNode)
 // and each keeps a list of patchFiles/subdirectories.
 //
@@ -111,6 +124,14 @@ func buildPatchFileTree(rootNode *directoryNode) error {
 		for _, file := range files {
 			filename := file.Name()
 			if _, ok := pathsToSkip[filename]; ok {
+				continue
+			}
+			// ignore and warn if a directory we shouldn't parse exists
+			if _, ok := problematicPaths[filename]; ok {
+				archon.Log.Warnf(
+					"ignoring %q - consider removing this directory from the patch folder",
+					filename,
+				)
 				continue
 			}
 

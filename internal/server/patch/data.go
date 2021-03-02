@@ -6,6 +6,7 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
@@ -274,7 +275,7 @@ func (s *DataServer) sendFileHeader(c *server.Client, patch *fileEntry) error {
 func (s *DataServer) sendFileChunk(c *server.Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > maxFileChunkSize {
 		archon.Log.Errorf("Attempted to send %v byte chunk; max is %v",
-			string(chunkSize), string(maxFileChunkSize))
+			strconv.Itoa(int(chunkSize)), string(rune(maxFileChunkSize)))
 		panic(errors.New("file chunk size exceeds maximum"))
 	}
 
