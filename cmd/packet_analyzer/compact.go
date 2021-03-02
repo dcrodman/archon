@@ -60,7 +60,7 @@ func parseSessionDataFromFile(filename string) (*SessionFile, error) {
 func generateCompactedFile(filename string, session *SessionFile) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		return errors.Wrap(err, "Unable to create file "+filename)
+		return fmt.Errorf("unable to create file %s: %v", filename, err)
 	}
 
 	for _, p := range session.Packets {
