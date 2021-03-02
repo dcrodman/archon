@@ -84,7 +84,9 @@ func manage(w http.ResponseWriter, r *http.Request) {
 				sessionNames = append(sessionNames, k)
 			}
 			names, _ := json.Marshal(sessionNames)
-			w.Write(names)
+			if _, err := w.Write(names); err != nil {
+				fmt.Println(err)
+			}
 		}
 	case "DELETE":
 		packetQueues = make(map[string][]Packet)
