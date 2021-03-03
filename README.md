@@ -15,8 +15,10 @@ Forks, bug fixes, issue reports, explanations of some of the client's bizarre be
 etc. are more than welcome! I try to keep the development pretty open but if you have
 questions feel free to open an issue.
 * [Installation](#Installation)
+* [Setup Script](#setup-script)
+  + [Script Prerequisites](#script-prerequisites)
 * [Manual installation](#manual-installation)
-  + [Prerequisites:](#prerequisites)
+  + [Manual Prerequisites](#manual-prerequisites)
   + [1. Compile the code](#1-compile-the-code)
   + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
   + [3. Copy the supporting files](#3-copy-the-supporting-files)
@@ -28,7 +30,7 @@ questions feel free to open an issue.
   + [9. Add the first player account](#9-add-the-first-player-account)
   + [10. Run the server](#10-run-the-server)
 * [Run in docker](#run-in-docker)
-  + [Prerequisites:](#prerequisites)
+  + [Docker Prerequisites](#docker-prerequisites)
   + [How-to](#how-to)  
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
@@ -36,21 +38,53 @@ questions feel free to open an issue.
 
 ## Installation
 
-There are two ways to run the existing server: **manually built** with `go` and connected to Postgres
-or a **dockerized** setup using docker VM.
+There are three ways to run the existing server:
+- manually build the server
+- running the server in docker
+- using the setup script
 
-Consider using manual installation if you want to have a full control on the tools and server 
-you're running or if you want to change something on the fly faster.
+Consider using manual installation, or the setup script if you want to have full control on the tools and server 
+you're running or if you want to change something on the fly.
 
-If you mostly need to run an existing version, want to test it out or just want to use less tools
- - consider using dockerized setup.
+If you mostly need to run an existing version, want to test it out or just want to use less 
+tools - consider using dockerized setup.
 
-## Manual installation
+## Setup Script
+
+### Script Prerequisites
+
+* [Go](https://golang.org)
+* [Git](https://git-scm.com/)
+* [PostgreSQL](https://www.postgresql.org/)
+
+### 1. Clone Archon
+
+    git clone https://github.com/dcrodman/archon.git
+
+### 2. Run the setup script
+
+The setup script is located in the `setup` directory. To run the script, execute the following with an optional
+parameter specifying the install path:
+
+    path-to-cloned-code/setup/setup.sh [install-path]
+
+If the last directory in the install path does not exist, it will be created. 
+If the install-path is omitted, the setup script will install to:
+
+    path-to-cloned-code/archon_server
+
+### 3. Follow the prompts
+
+The script will guide you through the initial server configuration as well as prompt for credentials for the first PSO
+account. Once the setup is complete, the script will provide additional configuration scripts, and a command to run the
+server.
+
+## Manual Installation
 
 **Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
 
-### Prerequisites:
+### Manual Prerequisites:
 * [Go](https://golang.org)
 * [Git](https://git-scm.com/)
 * [PostgreSQL](https://www.postgresql.org/)
@@ -180,7 +214,7 @@ sub-servers waiting for connections on the configured ports.
 
 ## Run in docker
 
-### Prerequisites:
+### Docker Prerequisites:
 * [Docker](https://www.docker.com)
 * Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
 
