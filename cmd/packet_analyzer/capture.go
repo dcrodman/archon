@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	_ "embed"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -39,6 +40,8 @@ var (
 	packetChannels = make(map[string]chan *PacketRequest)
 	// Mapping of server names to the ordered packets.
 	packetQueues = make(map[string][]Packet)
+	//go:embed "templates/index.html"
+	uiTemplate string
 )
 
 // startCapturing spins up an HTTP handler to await packet submissions from one
@@ -96,7 +99,7 @@ func manage(w http.ResponseWriter, r *http.Request) {
 }
 
 func ui(w http.ResponseWriter, r *http.Request) {
-	tmpl, _ := template.ParseFiles("./templates/index.html")
+	tmpl, _ := template.New("index").Parse(uiTemplate)
 	var sessionNames []string
 	for k := range packetQueues {
 		sessionNames = append(sessionNames, k)
