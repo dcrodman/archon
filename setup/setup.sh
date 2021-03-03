@@ -52,28 +52,31 @@ SETUP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # The user can provide the install location as the first option
 # If it's not provided, we'll use the root archon dir.
 if [ -z "$1" ]; then
-  INSTALL_DIR="$ARCHON_ROOT"
+  pushd "$SETUP_DIR" > /dev/null 2>&1
+  cd ..
+  mkdir archon_server
+  cd archon_server
+  INSTALL_DIR=$(pwd)
 else
   INSTALL_DIR="$1"
 fi
 
 if [ ! -d "$INSTALL_DIR" ]; then
-  mkdir -p "$INSTALL_DIR" || echo "Please enter a valid directory."
+  mkdir "$INSTALL_DIR" || echo "Please enter a valid directory."
 fi
+
 pushd "$INSTALL_DIR" > /dev/null 2>&1
 
+mkdir .bin
 export GOBIN="$(pwd)/.bin"
-mkdir -p .bin
 
 pushd "$SETUP_DIR"/.. > /dev/null 2>&1
 go install ./cmd/*
 popd > /dev/null 2>&1
 
-mkdir -p archon_server
 # Copy compiled binaries to the server folder.
-cp .bin/* archon_server/.
+cp .bin/* "$INSTALL_DIR"
 
-pushd archon_server > /dev/null 2>&1
 # Copy all setup files to the server folder.
 cp -r "$SETUP_DIR"/* .
 
@@ -128,6 +131,7 @@ echo "Done."
 
 echo
 echo "Archon setup is complete."
+echo
 echo "If there are patch files you would like the server to verify, please copy them into:"
 echo "  $(pwd)/patches"
 echo
