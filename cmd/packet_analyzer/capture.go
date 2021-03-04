@@ -60,6 +60,40 @@ func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int
 	listenForHTTPPackets(serverAddr, httpPort)
 }
 
+// Write all of our current session information to files in the local directory.
+func captureExitHandler(c chan os.Signal, folder string, auto bool) {
+	<-c
+	fmt.Println("flushing session data to files...")
+
+	for sessionName, packetList := range packetQueues {
+		sessionFile := SessionFile{
+			SessionID: sessionName,
+			Packets:   packetList,
+		}
+
+		filename := path.Join(".", folder, sessionName) + ".session"
+		b, _ := json.MarshalIndent(sessionFile, "", "\t")
+
+		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
+			fmt.Printf("failed to save session data: %s\n", err.Error())
+			break
+		}
+
+		fmt.Println("wrote", filename)
+
+		if auto {
+			if _, err := summarizeSession(filename); err != nil {
+				fmt.Printf("unable to generate summary for session %s: %s\n", filename, err)
+			}
+			if _, err := compactSession(filename); err != nil {
+				fmt.Printf("unable to compact session %s: %s\n", filename, err)
+			}
+		}
+	}
+
+	os.Exit(0)
+}
+
 func startManageServer(serverAddr string, managePort int) {
 	addr := fmt.Sprintf("%s:%d", serverAddr, managePort)
 	mux := http.NewServeMux()
@@ -108,40 +142,6 @@ func ui(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("unable to execute template %v", err)
 	}
-}
-
-// Write all of our current session information to files in the local directory.
-func captureExitHandler(c chan os.Signal, folder string, auto bool) {
-	<-c
-	fmt.Println("flushing session data to files...")
-
-	for sessionName, packetList := range packetQueues {
-		sessionFile := SessionFile{
-			SessionID: sessionName,
-			Packets:   packetList,
-		}
-
-		filename := path.Join(".", folder, sessionName) + ".session"
-		b, _ := json.MarshalIndent(sessionFile, "", "\t")
-
-		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
-			fmt.Printf("failed to save session data: %s\n", err.Error())
-			break
-		}
-
-		fmt.Println("wrote", filename)
-
-		if auto {
-			if _, err := summarizeSession(filename); err != nil {
-				fmt.Printf("unable to generate summary for session %s: %s\n", filename, err)
-			}
-			if _, err := compactSession(filename); err != nil {
-				fmt.Printf("unable to compact session %s: %s\n", filename, err)
-			}
-		}
-	}
-
-	os.Exit(0)
 }
 
 func listenForTCPPackets(serverAddr string, tcpPort int) {
