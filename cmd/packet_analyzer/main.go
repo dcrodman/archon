@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"time"
 )
 
 // Packet is this tool's representation of a packet received from a server.
@@ -31,6 +32,8 @@ type Packet struct {
 
 	Contents          []int
 	PrintableContents []string
+
+	Timestamp time.Time
 }
 
 // SessionFile represents the file format of the persisted session data.
@@ -40,13 +43,15 @@ type SessionFile struct {
 }
 
 var (
-	address   = flag.String("addr", "localhost", "Address and port on which to bind")
-	folder    = flag.String("folder", "", "Folder to put resulting session files into")
-	httpPort  = flag.Int("http", 8081, "Port on which the HTTP service should listen")
-	tcpPort   = flag.Int("tcp", 8082, "Port on which the raw TCP service should listen")
-	summarize = flag.Bool("summarize", false, "Converts a session file to a shortened readable format")
-	compact   = flag.Bool("compact", false, "Converts a session file to a radable format")
-	capture   = flag.Bool("capture", true, "(Default) Start a server that listens for packet logs and writes them to a session file on exit")
+	address    = flag.String("addr", "localhost", "Address and port on which to bind")
+	folder     = flag.String("folder", "", "Folder to put resulting session files into")
+	httpPort   = flag.Int("http", 8081, "Port on which the HTTP service should listen")
+	tcpPort    = flag.Int("tcp", 8082, "Port on which the raw TCP service should listen")
+	managePort = flag.Int("manage", 0, "Port on which HTTP manage API is listening - disabled if not specified")
+	summarize  = flag.Bool("summarize", false, "Converts a session file to a shortened readable format")
+	compact    = flag.Bool("compact", false, "Converts a session file to a radable format")
+	auto       = flag.Bool("auto", false, "Automatically runs both compact and summarize on generated session file")
+	capture    = flag.Bool("capture", true, "(Default) Start a server that listens for packet logs and writes them to a session file on exit")
 )
 
 func main() {
@@ -58,7 +63,7 @@ func main() {
 	case *compact:
 		compactFiles()
 	case *capture:
-		startCapturing(*address, *folder, *httpPort, *tcpPort)
+		startCapturing(*address, *folder, *httpPort, *tcpPort, *managePort, *auto)
 	default:
 		fmt.Printf("no command specified; use -help for options")
 	}

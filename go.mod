@@ -1,6 +1,6 @@
 module github.com/dcrodman/archon
 
-go 1.14
+go 1.16
 
 require (
 	github.com/golang/protobuf v1.4.0-rc.4.0.20200313231945-b860323f09d0

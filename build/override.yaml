@@ -6,3 +6,7 @@ patch_server:
 
 character_server:
   parameters_dir: "./parameters"
+
+debugging:
+  enabled: true
+  packet_analyzer_address: packet_analyzer:8081

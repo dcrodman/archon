@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -20,17 +21,26 @@ func compactFiles() {
 
 	for i := 0; i < flag.NArg(); i++ {
 		sessionFile := flag.Arg(i)
-		session, err := parseSessionDataFromFile(sessionFile)
+		compact, err := compactSession(sessionFile)
 		if err != nil {
-			fmt.Printf("unable read file %s: %s\n", sessionFile, err)
-			os.Exit(1)
+			fmt.Printf("unable to compact session %s: %s\n", sessionFile, err)
+			return
 		}
-
-		filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFile, ".session", "", 1))
-		generateCompactedFile(filename, session)
-
-		fmt.Println("wrote", filename)
+		fmt.Println("wrote", compact)
 	}
+}
+
+func compactSession(sessionFilename string) (string, error) {
+	session, err := parseSessionDataFromFile(sessionFilename)
+	if err != nil {
+		return "", fmt.Errorf("unable to read file: %v", err)
+	}
+	filename := fmt.Sprintf("%s_compact.txt", strings.Replace(sessionFilename, ".session", "", 1))
+	err = generateCompactedFile(filename, session)
+	if err != nil {
+		return "", fmt.Errorf("unable to generate compact file: %v", err)
+	}
+	return filename, nil
 }
 
 func parseSessionDataFromFile(filename string) (*SessionFile, error) {
@@ -46,22 +56,21 @@ func parseSessionDataFromFile(filename string) (*SessionFile, error) {
 	return &s, nil
 }
 
-func generateCompactedFile(filename string, session *SessionFile) {
+func generateCompactedFile(filename string, session *SessionFile) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		fmt.Printf("unable to write to %s: %s\n", filename, err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create file %s: %v", filename, err)
 	}
 
 	for _, p := range session.Packets {
-		if err := writePacketToFile(f, &p); err != nil {
-			fmt.Printf("unable to write packet to %s: %s\n", filename, err)
-			os.Exit(1)
+		if err := writePacketToFile(bufio.NewWriter(f), &p); err != nil {
+			return fmt.Errorf("unable to write packet to file %s: %v", filename, err)
 		}
 	}
+	return nil
 }
 
-func writePacketToFile(f *os.File, p *Packet) error {
+func writePacketToFile(f *bufio.Writer, p *Packet) error {
 	data := packetToBytes(p.Contents)
 	pktLen := len(p.Contents)
 
@@ -85,11 +94,11 @@ func writePacketToFile(f *os.File, p *Packet) error {
 	}
 
 	_, _ = f.WriteString("\n\n")
-
+	f.Flush()
 	return nil
 }
 
-func writePacketHeaderToFile(f *os.File, p *Packet) error {
+func writePacketHeaderToFile(f *bufio.Writer, p *Packet) error {
 	size, _ := strconv.ParseInt(p.Size, 16, 16)
 	header := fmt.Sprintf(
 		"%s -> %s\nType: %s\nSize: %s (%d) bytes\n",

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	_ "embed"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -12,6 +15,7 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 )
 
@@ -27,6 +31,8 @@ type PacketRequest struct {
 	Destination string
 	// The contents of the packet.
 	Contents []int
+	// Packet timestamp
+	Timestamp time.Time
 }
 
 var (
@@ -34,23 +40,28 @@ var (
 	packetChannels = make(map[string]chan *PacketRequest)
 	// Mapping of server names to the ordered packets.
 	packetQueues = make(map[string][]Packet)
+	//go:embed "templates/index.html"
+	uiTemplate string
 )
 
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing(serverAddr, folder string, httpPort, tcpPort int) {
+func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int, auto bool) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGCONT, syscall.SIGTERM)
-	go captureExitHandler(signalChan, folder)
+	go captureExitHandler(signalChan, folder, auto)
 
 	go listenForTCPPackets(serverAddr, tcpPort)
+	if managePort != 0 {
+		go startManageServer(serverAddr, managePort)
+	}
 	listenForHTTPPackets(serverAddr, httpPort)
 }
 
 // Write all of our current session information to files in the local directory.
-func captureExitHandler(c chan os.Signal, folder string) {
+func captureExitHandler(c chan os.Signal, folder string, auto bool) {
 	<-c
 	fmt.Println("flushing session data to files...")
 
@@ -69,9 +80,68 @@ func captureExitHandler(c chan os.Signal, folder string) {
 		}
 
 		fmt.Println("wrote", filename)
+
+		if auto {
+			if _, err := summarizeSession(filename); err != nil {
+				fmt.Printf("unable to generate summary for session %s: %s\n", filename, err)
+			}
+			if _, err := compactSession(filename); err != nil {
+				fmt.Printf("unable to compact session %s: %s\n", filename, err)
+			}
+		}
 	}
 
 	os.Exit(0)
+}
+
+func startManageServer(serverAddr string, managePort int) {
+	addr := fmt.Sprintf("%s:%d", serverAddr, managePort)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", manage)
+	mux.HandleFunc("/ui", ui)
+	fmt.Println("manage API is listening on", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		fmt.Println(err)
+	}
+}
+
+func manage(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		sessionName := r.FormValue("session")
+		if sessionName != "" {
+			for _, p := range packetQueues[sessionName] {
+				if err := writePacketToFile(bufio.NewWriter(w), &p); err != nil {
+					fmt.Printf("unable to write packet to %s: %s\n", sessionName, err)
+				}
+			}
+		} else {
+			var sessionNames []string
+			for k := range packetQueues {
+				sessionNames = append(sessionNames, k)
+			}
+			names, _ := json.Marshal(sessionNames)
+			if _, err := w.Write(names); err != nil {
+				fmt.Println(err)
+			}
+		}
+	case "DELETE":
+		packetQueues = make(map[string][]Packet)
+	default:
+		fmt.Fprintf(w, "Sorry, only GET and DELETE methods are supported.")
+	}
+}
+
+func ui(w http.ResponseWriter, r *http.Request) {
+	tmpl, _ := template.New("index").Parse(uiTemplate)
+	var sessionNames []string
+	for k := range packetQueues {
+		sessionNames = append(sessionNames, k)
+	}
+	err := tmpl.Execute(w, sessionNames)
+	if err != nil {
+		fmt.Printf("unable to execute template %v", err)
+	}
 }
 
 func listenForTCPPackets(serverAddr string, tcpPort int) {
@@ -112,6 +182,7 @@ func listenForTCPPackets(serverAddr string, tcpPort int) {
 			Source:      readStringFromData(packet[20:30]),
 			Destination: readStringFromData(packet[30:40]),
 			Contents:    contents,
+			Timestamp:   time.Now(),
 		})
 		_ = conn.Close()
 	}
@@ -141,7 +212,7 @@ func packetHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("error reading JSON from data: %s\n", err.Error())
 		return
 	}
-
+	p.Timestamp = time.Now()
 	recordPacket(p)
 }
 
@@ -187,6 +258,7 @@ func processPackets(pc chan *PacketRequest) {
 			Size:              fmt.Sprintf("%04X", pSize),
 			Contents:          pr.Contents,
 			PrintableContents: convertPrintableContents(pr.Contents),
+			Timestamp:         pr.Timestamp,
 		}
 
 		fmt.Printf("received packet %s from %s\n", p.Type, pr.ServerName)

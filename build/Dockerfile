@@ -1,4 +1,4 @@
-FROM golang:alpine as builder
+FROM golang:1.16-alpine as builder
 
 RUN apk add gcc libc-dev
 # Create initial dir
@@ -28,4 +28,4 @@ FROM builder as server
 ENTRYPOINT ["./server"]
 
 FROM builder as packet_analyzer
-ENTRYPOINT ["./packet_analyzer", "-capture", "-addr", "0.0.0.0", "-folder", "sessions"]
+ENTRYPOINT ["./packet_analyzer", "-capture", "-addr", "0.0.0.0", "-folder", "sessions", "-manage", "8083", "-auto"]
