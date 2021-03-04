@@ -111,8 +111,8 @@ REPLACE="ssl_key_file: \"$(pwd)/key.pem\""
 sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
 
 createdb "$DB_NAME"
-psql archondb -c "CREATE USER $ARCHON_USER WITH ENCRYPTED PASSWORD '$ARCHON_PASSWORD';"
-psql archondb -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $ARCHON_USER;"
+psql $DB_NAME -c "CREATE USER $ARCHON_USER WITH ENCRYPTED PASSWORD '$ARCHON_PASSWORD';"
+psql $DB_NAME -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $ARCHON_USER;"
 
 # This should exist, but let's verify just in case.
 if [ ! -d patches ]; then
