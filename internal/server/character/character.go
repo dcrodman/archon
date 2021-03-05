@@ -254,8 +254,8 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *server.Client) error {
-	s.connectedShipsMutex.Lock()
-	defer s.connectedShipsMutex.Unlock()
+	s.connectedShipsMutex.RLock()
+	defer s.connectedShipsMutex.RUnlock()
 
 	shipList := make([]packets.ShipListEntry, 0)
 	for i, ship := range s.connectedShips {
