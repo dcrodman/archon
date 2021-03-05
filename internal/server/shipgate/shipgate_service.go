@@ -50,6 +50,9 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 	// Ships are never cleared from the map so that we can keep the IDs relatively
 	// stable and allow for brief interruptions while preserving idempotency.
 	if _, ok := s.connectedShips[req.Name]; ok {
+		if !s.connectedShips[req.Name].active {
+			archon.Log.Infof("SHIPGATE reactivated ship %s at %s:%s", req.Name, req.Address, req.Port)
+		}
 		s.connectedShips[req.Name].active = true
 		s.connectedShips[req.Name].ip = req.Address
 		s.connectedShips[req.Name].port = req.Port
