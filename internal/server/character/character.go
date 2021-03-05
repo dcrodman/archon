@@ -32,6 +32,7 @@ import (
 	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/internal/cache"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
 )
 
@@ -56,16 +57,20 @@ var (
 )
 
 type Server struct {
-	name           string
-	shipgateClient shipgateClient
-	kvCache        *cache.Cache
+	name    string
+	kvCache *cache.Cache
+
+	shipgateAddress     string
+	shipgateClient      api.ShipInfoServiceClient
+	connectedShipsMutex sync.RWMutex
+	connectedShips      []ship
 }
 
 func NewServer(name, shipgateAddress string) *Server {
 	return &Server{
-		name:           name,
-		shipgateClient: shipgateClient{shipgateAddress: shipgateAddress},
-		kvCache:        cache.New(),
+		name:            name,
+		shipgateAddress: shipgateAddress,
+		kvCache:         cache.New(),
 	}
 }
 
@@ -78,12 +83,10 @@ func (s *Server) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Start the loop that retrieves the ship list from the shipgate. The first
-	// set is fetches synchronously so that the ship list will start populated.
-	if err := s.shipgateClient.refreshShipList(); err != nil {
+	// Start the loop that retrieves the ship list from the shipgate.
+	if err := s.startShipRefreshLoop(ctx); err != nil {
 		return err
 	}
-	go s.shipgateClient.startShipListRefreshLoop(ctx)
 
 	return nil
 }
@@ -251,34 +254,33 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *server.Client) error {
-	var shipList []packets.ShipListEntry
-	activeShips := s.shipgateClient.getActiveShips()
-	numShips := len(activeShips)
+	s.connectedShipsMutex.Lock()
+	defer s.connectedShipsMutex.Unlock()
 
-	if numShips > 0 {
-		shipList = make([]packets.ShipListEntry, numShips)
-
-		for i, ship := range activeShips {
-			shipList[i] = packets.ShipListEntry{
-				MenuID:   uint16(i + 1),
-				ShipID:   uint32(ship.id),
-				ShipName: [36]byte{},
-			}
-			copy(shipList[i].ShipName[:], ship.name)
+	shipList := make([]packets.ShipListEntry, 0)
+	for i, ship := range s.connectedShips {
+		entry := packets.ShipListEntry{
+			MenuID:   uint16(i + 1),
+			ShipID:   uint32(ship.id),
+			ShipName: [36]byte{},
 		}
-	} else {
+		copy(entry.ShipName[:], ship.name)
+		shipList = append(shipList, entry)
+	}
+
+	if len(shipList) == 0 {
 		// A "No Ships!" entry is shown if we either can't connect to the shipgate or
 		// the shipgate doesn't report any connected ships.
-		shipList = []packets.ShipListEntry{
-			{MenuID: 0xFF, ShipID: 0xFF, ShipName: [36]byte{}},
-		}
+		shipList = append(shipList, packets.ShipListEntry{
+			MenuID: 0xFF, ShipID: 0xFF, ShipName: [36]byte{},
+		})
 		copy(shipList[0].ShipName[:], internal.ConvertToUtf16("No Ships!")[:])
 	}
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
 			Type:  packets.LoginShipListType,
-			Flags: uint32(numShips),
+			Flags: uint32(len(shipList)),
 		},
 		Unknown:     0x20,
 		Unknown2:    0xFFFFFFF4,
@@ -693,15 +695,16 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
-	activeShips := s.shipgateClient.getActiveShips()
+	s.connectedShipsMutex.Lock()
+	defer s.connectedShipsMutex.Unlock()
 	selectedShip := menuSelectionPkt.ItemID - 1
 
-	if selectedShip < 0 || selectedShip >= uint32(len(activeShips)) {
+	if selectedShip >= uint32(len(s.connectedShips)) {
 		return fmt.Errorf("Invalid ship selection: %d", selectedShip)
 	}
 
-	shipIP, _ := net.ParseIP(activeShips[selectedShip].ip).MarshalText()
-	shipPort, _ := strconv.ParseInt(activeShips[selectedShip].port, 10, 16)
+	shipIP, _ := net.ParseIP(s.connectedShips[selectedShip].ip).MarshalText()
+	shipPort, _ := strconv.ParseInt(s.connectedShips[selectedShip].port, 10, 16)
 
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
