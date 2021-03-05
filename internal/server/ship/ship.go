@@ -2,6 +2,7 @@
 package ship
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/dcrodman/archon"
@@ -12,6 +13,10 @@ import (
 	"github.com/dcrodman/archon/internal/server/block"
 	"github.com/dcrodman/archon/internal/server/character"
 	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // BackMenuItem is the block ID reserved for returning to the ship select menu.
@@ -23,6 +28,8 @@ type Server struct {
 	name string
 	port string
 
+	shipgateAddress string
+	shipgateClient  api.ShipgateServiceClient
 	// Precomputed block packet.
 	blockListPkt *packets.BlockList
 }
@@ -69,6 +76,18 @@ func (s *Server) Name() string { return s.name }
 func (s *Server) Port() string { return s.port }
 
 func (s *Server) Init() error {
+	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
+	if err != nil {
+		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
+	}
+
+	conn, err := grpc.Dial(s.shipgateAddress, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return fmt.Errorf("failed to connect to shipgate: %s", err)
+	}
+
+	s.shipgateClient = api.NewShipgateServiceClient(conn)
+
 	return nil
 }
 

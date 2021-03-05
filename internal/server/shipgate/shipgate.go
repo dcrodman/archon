@@ -26,10 +26,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	opts := []grpc.ServerOption{grpc.Creds(creds)}
 	grpcServer := grpc.NewServer(opts...)
 
-	shipInfoService := shipInfoServiceServer{}
-	api.RegisterShipInfoServiceServer(grpcServer, &shipInfoService)
-	shipgateService := shipgateServiceServer{}
-	api.RegisterShipgateServiceServer(grpcServer, &shipgateService)
+	api.RegisterShipgateServiceServer(grpcServer, &shipgateServiceServer{})
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {

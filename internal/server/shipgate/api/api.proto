@@ -16,15 +16,20 @@ message ShipList {
   repeated Ship ships = 1;
 }
 
-// ShipInfoService is intended for clients that need to know information
-// about the registered ships but not change state (like the character server).
-service ShipInfoService {
-  // GetActiveShips returns the list of Ships that currently connected to the
-  // shipgate and ready to receive players.
-  rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
+message RegistrationRequest {
+    string name = 1;
+    string address = 2;
+    int32 port = 3;
+    int32 maxPlayers = 4;
 }
 
 // ShipgateService provides game functionality and is intended for use by
 // ship servers serving players.
 service ShipgateService{
+    // GetActiveShips returns the list of Ships that currently connected to the
+  // shipgate and ready to receive players.
+  rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
+
+  // RegisterShip informs the shipgate that it is able to serve players.
+  rpc RegisterShip(RegistrationRequest) returns (google.protobuf.Empty);
 }

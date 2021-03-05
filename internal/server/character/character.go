@@ -61,7 +61,7 @@ type Server struct {
 	kvCache *cache.Cache
 
 	shipgateAddress     string
-	shipgateClient      api.ShipInfoServiceClient
+	shipgateClient      api.ShipgateServiceClient
 	connectedShipsMutex sync.RWMutex
 	connectedShips      []ship
 }

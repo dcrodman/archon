@@ -35,7 +35,7 @@ func (s *Server) startShipRefreshLoop(ctx context.Context) error {
 	}
 	// Lazy, but just leave the connection open until the server shuts down.
 
-	s.shipgateClient = api.NewShipInfoServiceClient(conn)
+	s.shipgateClient = api.NewShipgateServiceClient(conn)
 
 	// The first set is fetched synchronously so that the ship list will start populated.
 	// Also gives us a chance to validate that the shipgate address is valid.
