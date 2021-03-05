@@ -18,6 +18,10 @@ log_level: debug
 # X.509 certificate for the shipgate server.
 shipgate_certificate_file: "certificate.pem"
 
+web:
+  # HTTP endpoint port for publically accessible API endpoints.
+  http_port: 10000
+
 database:
   # Hostname of the Postgres database instance.
   host: 127.0.0.1
@@ -73,10 +77,6 @@ block_server:
   port: 15000
   # Number of lobbies to create per block.
   num_lobbies: 15
-
-web:
-  # HTTP endpoint port for publically accessible API endpoints.
-  http_port: 14000
 
 debugging:
   # Enable extra info-providing mechanisms for the server. Only enable for development.
