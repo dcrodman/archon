@@ -136,16 +136,16 @@ func loadParameterFiles(paramFileDir string) error {
 	// Offset should at this point be the total size of the files
 	// to send - break it all up into chunks for indexing.
 	paramChunkData = make(map[int][]byte)
-	numChunks := offset / MaxDataChunkSize
+	numChunks := offset / maxDataChunkSize
 	for i := 0; i < numChunks; i++ {
-		dataOff := i * MaxDataChunkSize
-		paramChunkData[i] = tmpChunkData[dataOff : dataOff+MaxDataChunkSize]
-		offset -= MaxDataChunkSize
+		dataOff := i * maxDataChunkSize
+		paramChunkData[i] = tmpChunkData[dataOff : dataOff+maxDataChunkSize]
+		offset -= maxDataChunkSize
 	}
 
 	// Add any remaining data.
 	if offset > 0 {
-		paramChunkData[numChunks] = tmpChunkData[numChunks*MaxDataChunkSize:]
+		paramChunkData[numChunks] = tmpChunkData[numChunks*maxDataChunkSize:]
 	}
 	return nil
 }

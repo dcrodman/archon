@@ -86,27 +86,35 @@ func (f *Frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListene
 		}
 	}()
 
+	clientWg := &sync.WaitGroup{}
 handleLoop:
 	for {
 		select {
 		case <-ctx.Done():
 			break handleLoop
 		case connection := <-connections:
+			clientWg.Add(1)
 			// Note: If there is eventually a need to implement worker pooling rather than spawning
 			// new goroutines for each client, this is where it should be implemented.
-			go f.acceptClient(ctx, connection)
+			go f.acceptClient(ctx, connection, clientWg)
 		}
 	}
 
+	archon.Log.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Name())
+	clientWg.Wait()
 	archon.Log.Infof("%v server exited", f.Backend.Name())
 }
 
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
 // the Client and sending the welcome packets. If it succeeds, the goroutine moves
 // into the packet processing loop.
-func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
+func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	c := server.NewClient(connection)
 	c.Extension = f.Backend.CreateExtension()
+
+	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
 
 	if err := f.Backend.StartSession(c); err != nil {
 		archon.Log.Errorf("StartSession() failed for client %s: %s", c.IPAddr(), err)
@@ -118,8 +126,6 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn) {
 		_ = connection.Close()
 		return
 	}
-
-	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
 
 	globalClientList.add(c)
 	f.processPackets(ctx, c)
@@ -134,6 +140,13 @@ func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
 	var err error
 
 	for {
+		select {
+		case <-ctx.Done():
+			// For now just allow the deferred function to close the connection.
+			return
+		default:
+		}
+
 		buffer, err = f.readNextPacket(c, buffer)
 
 		if err == io.EOF {
@@ -148,15 +161,9 @@ func (f *Frontend) processPackets(ctx context.Context, c *server.Client) {
 			archdebug.SendClientPacketToAnalyzer(c.Extension.DebugInfo(), buffer, uint16(size))
 		}
 
-		select {
-		case <-ctx.Done():
-			// For now just allow the deferred function to close the connection.
+		if err = f.Backend.Handle(ctx, c, buffer); err != nil {
+			archon.Log.Warn("error in client communication: " + err.Error())
 			return
-		default:
-			if err = f.Backend.Handle(ctx, c, buffer); err != nil {
-				archon.Log.Warn("error in client communication: " + err.Error())
-				return
-			}
 		}
 	}
 }

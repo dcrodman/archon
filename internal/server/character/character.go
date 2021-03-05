@@ -37,31 +37,23 @@ import (
 
 const (
 	// Maximum size of a block of parameter or guildcard data.
-	MaxDataChunkSize = 0x6800
+	maxDataChunkSize = 0x6800
 	// Expected format of the timestamp sent to the client.
-	TimeFormat = "2006:01:02: 15:05:05"
+	timeFormat = "2006:01:02: 15:05:05"
 	// Id sent in the menu selection packet to tell the client
 	// that the selection was made on the ship menu.
 	ShipSelectionMenuId uint16 = 0x13
 )
 
 var (
+	// Copyright in the welcome packet. The client expects exactly this string and will
+	// crash if it does not exactly match.
 	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
+	// Scrolling message that appears across the top of the ship selection screen.
 	shipSelectionScrollMessage     []byte
 	shipSelectionScrollMessageInit sync.Once
 )
-
-// Returns the scroll message displayed along the top of the ship selection screen,
-// lazily computing it from the config file and storing it in a package var.
-func getScrollMessage() []byte {
-	shipSelectionScrollMessageInit.Do(func() {
-		shipSelectionScrollMessage = internal.ConvertToUtf16(
-			viper.GetString("character_server.scroll_message"),
-		)
-	})
-	return shipSelectionScrollMessage
-}
 
 type Server struct {
 	name           string
@@ -77,17 +69,21 @@ func NewServer(name, shipgateAddress string) *Server {
 	}
 }
 
-func (s *Server) Name() string { return s.name }
+func (s *Server) Name() string {
+	return s.name
+}
 
 func (s *Server) Init(ctx context.Context) error {
 	if err := initParameterData(); err != nil {
 		return err
 	}
 
+	// Start the loop that retrieves the ship list from the shipgate. The first
+	// set is fetches synchronously so that the ship list will start populated.
 	if err := s.shipgateClient.refreshShipList(); err != nil {
 		return err
 	}
-	go s.shipgateClient.startShipListRefreshLoop()
+	go s.shipgateClient.startShipListRefreshLoop(ctx)
 
 	return nil
 }
@@ -198,7 +194,6 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
-	archon.Log.Infof("phase: %v", loginPkt.Phase)
 	if loginPkt.Phase == packets.ShipSelection {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
@@ -239,7 +234,7 @@ func (s *Server) sendMessage(c *server.Client, message string) error {
 	})
 }
 
-// send a timestamp packet in order to indicate the server's current time.
+// Send a timestamp packet in order to indicate the server's current time.
 func (s *Server) sendTimestamp(c *server.Client) error {
 	pkt := &packets.Timestamp{
 		Header:    packets.BBHeader{Type: packets.LoginTimestampType},
@@ -248,7 +243,7 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 	var tv syscall.Timeval
 	_ = syscall.Gettimeofday(&tv)
-	stamp := fmt.Sprintf("%s.%03d", time.Now().Format(TimeFormat), uint64(tv.Usec/1000))
+	stamp := fmt.Sprintf("%s.%03d", time.Now().Format(timeFormat), uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
 	return c.Send(pkt)
@@ -265,8 +260,7 @@ func (s *Server) sendShipList(c *server.Client) error {
 
 		for i, ship := range activeShips {
 			shipList[i] = packets.ShipListEntry{
-				MenuID: uint16(i + 1),
-				//MenuId:   0x12,
+				MenuID:   uint16(i + 1),
 				ShipID:   uint32(ship.id),
 				ShipName: [36]byte{},
 			}
@@ -311,6 +305,17 @@ func (s *Server) sendScrollMessage(c *server.Client) error {
 	// TODO: This doesn't guarantee all bytes are sent like transmit does.
 	_, err := c.Write(pktData[:size])
 	return err
+}
+
+// Returns the scroll message displayed along the top of the ship selection screen,
+// lazily computing it from the config file and storing it in a package var.
+func getScrollMessage() []byte {
+	shipSelectionScrollMessageInit.Do(func() {
+		shipSelectionScrollMessage = internal.ConvertToUtf16(
+			viper.GetString("character_server.scroll_message"),
+		)
+	})
+	return shipSelectionScrollMessage
 }
 
 // Load key config and other option data from the database or provide defaults for new accounts.
@@ -501,11 +506,11 @@ func (s *Server) sendGuildcardChunk(c *server.Client, chunkNum uint32) error {
 	}
 
 	// The client will only accept 0x6800 bytes of a chunk per packet.
-	offset := uint16(chunkNum) * MaxDataChunkSize
+	offset := uint16(chunkNum) * maxDataChunkSize
 	remaining := uint16(len(c.GuildcardData)) - offset
 
-	if remaining > MaxDataChunkSize {
-		pkt.Data = c.GuildcardData[offset : offset+MaxDataChunkSize]
+	if remaining > maxDataChunkSize {
+		pkt.Data = c.GuildcardData[offset : offset+maxDataChunkSize]
 	} else {
 		pkt.Data = c.GuildcardData[offset:]
 	}

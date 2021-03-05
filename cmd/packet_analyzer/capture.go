@@ -50,7 +50,7 @@ var (
 func startCapturing(serverAddr, folder string, httpPort, tcpPort, managePort int, auto bool) {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGCONT, syscall.SIGTERM)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGABRT, syscall.SIGTERM)
 	go captureExitHandler(signalChan, folder, auto)
 
 	go listenForTCPPackets(serverAddr, tcpPort)
@@ -290,7 +290,7 @@ func convertPrintableContents(packetBytes []int) []string {
 
 	for i, b := range packetBytes {
 		if unicode.IsPrint(rune(packetBytes[i])) {
-			r[i] = string(b)
+			r[i] = fmt.Sprintf("%v", b)
 		} else {
 			r[i] = "."
 		}

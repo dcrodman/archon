@@ -3,6 +3,9 @@ package character
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
@@ -10,8 +13,6 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"sync"
-	"time"
 )
 
 // Server's internal representation of Ship connection information for
@@ -33,25 +34,25 @@ type shipgateClient struct {
 // Return a list of the currently active ships.
 func (sc *shipgateClient) getActiveShips() []ship {
 	sc.shipsMutex.RLock()
+	defer sc.shipsMutex.RUnlock()
 
 	shipsCopy := make([]ship, len(sc.ships))
 	copy(shipsCopy, sc.ships)
-
-	sc.shipsMutex.RUnlock()
-
 	return shipsCopy
 }
 
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (sc *shipgateClient) startShipListRefreshLoop() {
+func (sc *shipgateClient) startShipListRefreshLoop(ctx context.Context) {
 	for {
-		timer := time.Tick(time.Second * 30)
-		<-timer
-
-		if err := sc.refreshShipList(); err != nil {
-			archon.Log.Errorf(err.Error())
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second * 10):
+			if err := sc.refreshShipList(); err != nil {
+				archon.Log.Errorf(err.Error())
+			}
 		}
 	}
 }
