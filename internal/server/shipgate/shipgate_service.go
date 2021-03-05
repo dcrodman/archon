@@ -60,7 +60,7 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 			ip:   req.Address,
 			port: req.Port,
 		}
-		archon.Log.Infof("registered ship %d at %s:%d", req.Name, req.Address, req.Port)
+		archon.Log.Infof("SHIPGATE registered ship %s at %s:%s", req.Name, req.Address, req.Port)
 	}
 	return &emptypb.Empty{}, nil
 }

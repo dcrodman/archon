@@ -687,21 +687,18 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
+
 	selectedShip := menuSelectionPkt.ItemID - 1
-
 	if selectedShip >= uint32(len(s.connectedShips)) {
-		return fmt.Errorf("Invalid ship selection: %d", selectedShip)
+		return fmt.Errorf("invalid ship selection: %d", selectedShip)
 	}
 
-	shipIP, _ := net.ParseIP(s.connectedShips[selectedShip].ip).MarshalText()
-	shipPort, _ := strconv.ParseInt(s.connectedShips[selectedShip].port, 10, 16)
+	shipIP := net.ParseIP(s.connectedShips[selectedShip].ip).To4()
+	shipPort, _ := strconv.Atoi(s.connectedShips[selectedShip].port)
 
-	pkt := &packets.Redirect{
+	return c.Send(&packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
-		IPAddr: [4]uint8{},
+		IPAddr: [4]uint8{shipIP[0], shipIP[1], shipIP[2], shipIP[3]},
 		Port:   uint16(shipPort),
-	}
-	copy(pkt.IPAddr[:], shipIP[:])
-
-	return c.Send(pkt)
+	})
 }
