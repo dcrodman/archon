@@ -294,30 +294,20 @@ func (s *Server) sendShipList(c *server.Client) error {
 
 // send whatever scrolling message was read out of the config file for the login screen.
 func (s *Server) sendScrollMessage(c *server.Client) error {
-	pkt := &packets.ScrollMessagePacket{
-		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
-		Message: getScrollMessage(),
-	}
-
-	// The end of the message appears to be garbled unless there is a block of extra bytes
-	// on the end; add an extra and let fixLength add the rest.
-	pktData, size := internal.BytesFromStruct(pkt)
-	pktData = append(pktData, 0x00)
-
-	// TODO: This doesn't guarantee all bytes are sent like transmit does.
-	_, err := c.Write(pktData[:size])
-	return err
-}
-
-// Returns the scroll message displayed along the top of the ship selection screen,
-// lazily computing it from the config file and storing it in a package var.
-func getScrollMessage() []byte {
+	// Returns the scroll message displayed along the top of the ship selection screen,
+	// lazily computing it from the config file and storing it in a package var.
 	shipSelectionScrollMessageInit.Do(func() {
 		shipSelectionScrollMessage = internal.ConvertToUtf16(
 			viper.GetString("character_server.scroll_message"),
 		)
+		// The end of the message appears to be garbled unless there is an extra byte...?
+		shipSelectionScrollMessage = append(shipSelectionScrollMessage, 0x00)
 	})
-	return shipSelectionScrollMessage
+
+	return c.Send(&packets.ScrollMessagePacket{
+		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
+		Message: shipSelectionScrollMessage,
+	})
 }
 
 // Load key config and other option data from the database or provide defaults for new accounts.
