@@ -13,6 +13,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/spf13/viper"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
@@ -20,8 +22,8 @@ import (
 	"github.com/dcrodman/archon/internal/server/frontend"
 	"github.com/dcrodman/archon/internal/server/login"
 	"github.com/dcrodman/archon/internal/server/patch"
+	"github.com/dcrodman/archon/internal/server/ship"
 	"github.com/dcrodman/archon/internal/server/shipgate"
-	"github.com/spf13/viper"
 )
 
 const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
@@ -72,6 +74,7 @@ func main() {
 	dataPort := viper.GetString("patch_server.data_port")
 	loginPort := viper.GetString("login_server.port")
 	characterPort := viper.GetString("character_server.port")
+	shipPort := viper.GetString("ship_server.port")
 
 	shipgateAddr := buildAddress(viper.GetString("shipgate_server.port"))
 
@@ -91,6 +94,11 @@ func main() {
 		{
 			Address: buildAddress(characterPort),
 			Backend: character.NewServer("CHARACTER", shipgateAddr),
+		},
+		// TODO: Eventually, these three should be able to be run independently.
+		{
+			Address: buildAddress(shipPort),
+			Backend: ship.NewServer("SHIP"),
 		},
 	}
 

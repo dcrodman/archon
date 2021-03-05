@@ -66,15 +66,17 @@ shipgate_server:
 
 ship_server:
   # Port on which the SHIP server will listen.
-  port: 15001
+  port: 15000
+  # Shipgate server address.
+  shipgate_address: "127.0.0.1:13000"
   # Name of the ship that will appear in the selection screen.
   name: "Default"
   # Number of block servers to run for this ship.
-  num_blocks: 5
+  num_blocks: 2
 
 block_server:
   # Base block port.
-  port: 15000
+  port: 15001
   # Number of lobbies to create per block.
   num_lobbies: 15
 

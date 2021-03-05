@@ -2,24 +2,65 @@ package shipgate
 
 import (
 	"context"
+	"sync"
 
+	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+type ship struct {
+	id   int
+	name string
+	ip   string
+	port string
+	// TODO: Need a way to deregister these reliably. Ships will probably need
+	// their own gRPC service so I'm deferring the heartbeating problem until then.
+	active bool
+}
+
 type shipgateServiceServer struct {
 	api.UnimplementedShipgateServiceServer
+
+	connectedShips      map[string]*ship
+	connectedShipsMutex sync.RWMutex
 }
 
 func (s *shipgateServiceServer) GetActiveShips(ctx context.Context, _ *emptypb.Empty) (*api.ShipList, error) {
-	return &api.ShipList{
-		Ships: []*api.ShipList_Ship{
-			{Id: 1, Name: "Test 1", Ip: "192.168.1.4", Port: "15001"},
-			{Id: 2, Name: "Test 2", Ip: "192.168.1.4", Port: "15002"},
-		},
-	}, nil
+	s.connectedShipsMutex.RLock()
+	defer s.connectedShipsMutex.RUnlock()
+
+	ships := make([]*api.ShipList_Ship, 0)
+	for _, connectedShip := range s.connectedShips {
+		ships = append(ships, &api.ShipList_Ship{
+			Id:   int32(connectedShip.id),
+			Name: connectedShip.name,
+			Ip:   connectedShip.ip,
+			Port: connectedShip.port,
+		})
+	}
+
+	return &api.ShipList{Ships: ships}, nil
 }
 
 func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.RegistrationRequest) (*emptypb.Empty, error) {
-	panic("not implemented") // TODO: Implement
+	s.connectedShipsMutex.Lock()
+	defer s.connectedShipsMutex.Unlock()
+
+	// Ships are never cleared from the map so that we can keep the IDs relatively
+	// stable and allow for brief interruptions while preserving idempotency.
+	if _, ok := s.connectedShips[req.Name]; ok {
+		s.connectedShips[req.Name].active = true
+		s.connectedShips[req.Name].ip = req.Address
+		s.connectedShips[req.Name].port = req.Port
+	} else {
+		s.connectedShips[req.Name] = &ship{
+			id:   len(s.connectedShips) + 1,
+			name: req.Name,
+			ip:   req.Address,
+			port: req.Port,
+		}
+		archon.Log.Infof("registered ship %d at %s:%d", req.Name, req.Address, req.Port)
+	}
+	return &emptypb.Empty{}, nil
 }

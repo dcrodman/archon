@@ -2,6 +2,7 @@
 package ship
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,7 +11,6 @@ import (
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server"
-	"github.com/dcrodman/archon/internal/server/block"
 	"github.com/dcrodman/archon/internal/server/character"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
@@ -26,25 +26,31 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 
 type Server struct {
 	name string
-	port string
 
-	shipgateAddress string
-	shipgateClient  api.ShipgateServiceClient
+	shipgateClient api.ShipgateServiceClient
+
 	// Precomputed block packet.
 	blockListPkt *packets.BlockList
 }
 
-func NewServer(name, port string, blockServers []block.BlockServer) *Server {
-	// The block list packet is recomputed since it's mildly expensive and
-	// (at least for now) shouldn't be changing without a restart.
-	blocks := make([]packets.Block, 0)
-	for i, blockServer := range blockServers {
-		b := packets.Block{
-			Unknown: 0x12,
-			BlockID: uint32(i + 1),
-		}
-		copy(b.BlockName[:], internal.ConvertToUtf16(blockServer.Name()))
-		blocks = append(blocks, b)
+func NewServer(name string) *Server {
+	return &Server{name: name}
+}
+
+func (s *Server) Name() string {
+	return s.name
+}
+
+func (s *Server) Init(ctx context.Context) error {
+	// Precompute the block list packet since it's not going to change
+	// without a restart and is unncessary to continually compute.
+	numBlocks := viper.GetInt("ship_server.num_blocks")
+	blocks := make([]packets.Block, numBlocks)
+
+	for i := 0; i < numBlocks; i++ {
+		blocks[i].Unknown = 0x12
+		blocks[i].BlockID = uint32(i + 1)
+		copy(blocks[i].BlockName[:], internal.ConvertToUtf16(fmt.Sprintf("BLOCK%2d", i)))
 	}
 
 	// The "back" menu item for returning to the ship select screen
@@ -55,38 +61,38 @@ func NewServer(name, port string, blockServers []block.BlockServer) *Server {
 	})
 	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
 
-	blockListPkt := &packets.BlockList{
+	s.blockListPkt = &packets.BlockList{
 		Header: packets.BBHeader{
 			Type:  packets.BlockListType,
-			Flags: uint32(len(blockServers)),
+			Flags: uint32(numBlocks),
 		},
 		Unknown: 0x08,
 		Blocks:  blocks,
 	}
-	copy(blockListPkt.ShipName[:], name)
+	copy(s.blockListPkt.ShipName[:], []byte(s.name))
 
-	return &Server{
-		name:         name,
-		port:         port,
-		blockListPkt: blockListPkt,
-	}
-}
-
-func (s *Server) Name() string { return s.name }
-func (s *Server) Port() string { return s.port }
-
-func (s *Server) Init() error {
+	// Connect to the shipgate.
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
 		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}
 
-	conn, err := grpc.Dial(s.shipgateAddress, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial(viper.GetString("ship_server.shipgate_address"), grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
 
 	s.shipgateClient = api.NewShipgateServiceClient(conn)
+
+	// Register this ship with the shipgate so that it can start accepting players.
+	_, err = s.shipgateClient.RegisterShip(ctx, &api.RegistrationRequest{
+		Name:    viper.GetString("ship_server.name"),
+		Port:    viper.GetString("ship_server.port"),
+		Address: viper.GetString("hostname"),
+	})
+	if err != nil {
+		return fmt.Errorf("error registering with shipgate: %v", err)
+	}
 
 	return nil
 }
@@ -114,7 +120,7 @@ func (s *Server) StartSession(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
 	var header packets.BBHeader
 	internal.StructFromBytes(data[:packets.BBHeaderSize], &header)
 

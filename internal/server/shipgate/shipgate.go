@@ -26,9 +26,11 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	opts := []grpc.ServerOption{grpc.Creds(creds)}
 	grpcServer := grpc.NewServer(opts...)
 
-	api.RegisterShipgateServiceServer(grpcServer, &shipgateServiceServer{})
+	api.RegisterShipgateServiceServer(grpcServer, &shipgateServiceServer{
+		connectedShips: make(map[string]*ship, 0),
+	})
 
-	l, err := net.Listen("tcp", addr)
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
 		return
@@ -38,7 +40,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	go func() {
 		archon.Log.Printf("SHIPGATE waiting for requests on %s", addr)
 
-		if err := grpcServer.Serve(l); err != nil {
+		if err := grpcServer.Serve(listener); err != nil {
 			errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
 			return
 		}
