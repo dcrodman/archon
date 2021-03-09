@@ -22,7 +22,7 @@ import (
 // BackMenuItem is the block ID reserved for returning to the ship select menu.
 const BackMenuItem = 0xFF
 
-var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
+var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 type Server struct {
 	name string
