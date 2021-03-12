@@ -1,14 +1,3 @@
-// The character package contains the implementation of the CHARACTER server.
-//
-// Clients are sent to the CHARACTER server after authenticating with LOGIN. Each client
-// connects to the server in four different phases (each one is a new connection):
-//  1. Data download (login options, guildcard, and character previews).
-//  2. Character selection
-//  3. (Optional) Character creation/modification (recreate and dressing room)
-//  4. Confirmation and ship selection
-//
-// The ship list is obtained by communicating with the shipgate server since ships
-// do not directly connect to this server.
 package character
 
 import (
@@ -56,6 +45,16 @@ var (
 	shipSelectionScrollMessageInit sync.Once
 )
 
+// Server is the CHARACTER server implementation. Clients are sent to this server
+//  after authenticating with LOGIN. Each client connects to the server in four
+// different phases (each one is a new connection):
+// 	1. Data download (login options, guildcard, and character previews).
+//  2. Character selection
+//  3. (Optional) Character creation/modification (recreate and dressing room)
+//  4. Confirmation and ship selection
+//
+// The ship list is obtained by communicating with the shipgate server since ships
+// do not directly connect to this server.
 type Server struct {
 	name    string
 	kvCache *cache.Cache

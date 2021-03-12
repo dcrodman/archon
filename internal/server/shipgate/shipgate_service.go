@@ -19,6 +19,9 @@ type ship struct {
 	active bool
 }
 
+// shipgateServiceServer implements the SHIPGATE server logic, which never directly
+// interacts with the client. Instead it is responsible for coordinating information
+// transfer between the CHARACTER, SHIP, and BLOCK servers.
 type shipgateServiceServer struct {
 	api.UnimplementedShipgateServiceServer
 
