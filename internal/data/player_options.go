@@ -17,7 +17,7 @@ type PlayerOptions struct {
 // FindPlayerOptions returns all of hte PlayerOptions associated with an Account.
 func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
 	var playerOptions PlayerOptions
-	err := db.Where("AccountID = ?", &account.ID).Find(&playerOptions).Error
+	err := db.Where("account_id = ?", &account.ID).Find(&playerOptions).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

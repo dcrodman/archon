@@ -27,7 +27,7 @@ type Account struct {
 // the given slot or nil if none exists.
 func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 	var character Character
-	err := db.Where("slot = ?", slot).Where("AccountID = ?", &a.ID).Find(&character).Error
+	err := db.Where("slot = ?", slot).Where("account_id = ?", &a.ID).Find(&character).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

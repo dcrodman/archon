@@ -52,7 +52,7 @@ type Character struct {
 // or none if no Character exists.
 func FindCharacter(account *Account, slotNum int) (*Character, error) {
 	var character Character
-	err := db.Where("slot = ?", slotNum).Where("AccountID = ?", &account.ID).Find(&character).Error
+	err := db.Where("slot = ?", slotNum).Where("account_id = ?", &account.ID).Find(&character).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
