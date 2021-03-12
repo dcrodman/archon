@@ -27,7 +27,7 @@ type Account struct {
 // the given slot or nil if none exists.
 func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 	var character Character
-	err := db.Where("slot = ?", slot).Where("account_id = ?", &a.ID).Find(&character).Error
+	err := db.First(&character).Where("slot = ?", slot).Where("account_id = ?", &a.ID).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -43,7 +43,7 @@ func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 // *Account instance if found or nil if there is no match.
 func FindAccount(username string) (*Account, error) {
 	var account Account
-	err := db.Where("username = ?", username).Find(&account).Error
+	err := db.First(&account).Where("username = ?", username).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,7 +60,7 @@ func FindAccount(username string) (*Account, error) {
 // there is no match.
 func FindUnscopedAccount(username string) (*Account, error) {
 	var account Account
-	err := db.Unscoped().Where("username = ?", username).Find(&account).Error
+	err := db.Unscoped().First(&account).Where("username = ?", username).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
