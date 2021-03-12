@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/dcrodman/archon"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var db *gorm.DB
 
 func Initialize(dataSource string) error {
 	var err error
-	db, err = gorm.Open("postgres", dataSource)
+	db, err = gorm.Open(postgres.Open(dataSource))
 
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %s", err)
@@ -24,7 +24,11 @@ func Initialize(dataSource string) error {
 }
 
 func Shutdown() {
-	if err := db.Close(); err != nil {
+	database, err := db.DB()
+	if err != nil {
+		archon.Log.Error("error while getting current connection: ", err)
+	}
+	if err := database.Close(); err != nil {
 		archon.Log.Error("error while closing database connection: ", err)
 	}
 }

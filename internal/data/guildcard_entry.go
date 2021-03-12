@@ -1,12 +1,14 @@
 package data
 
-import "github.com/jinzhu/gorm"
+import (
+	"errors"
+	"gorm.io/gorm"
+)
 
 type GuildcardEntry struct {
 	gorm.Model
 
 	AccountID int
-	Account   *Account
 
 	Guildcard       int
 	FriendGuildcard int
@@ -22,10 +24,13 @@ type GuildcardEntry struct {
 // FindGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
 func FindGuildcardEntries(account *Account) ([]GuildcardEntry, error) {
 	var guildcardEntries []GuildcardEntry
-	q := db.Model(&account).Related(&guildcardEntries)
+	err := db.Model(&account).Association("GuildcardEntry").Find(&guildcardEntries)
 
-	if q.Error != nil {
-		return nil, q.Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	return guildcardEntries, nil

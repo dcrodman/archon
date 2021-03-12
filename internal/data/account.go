@@ -1,9 +1,10 @@
 package data
 
 import (
+	"errors"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // Account contains the login information specific to each registered user.
@@ -20,19 +21,23 @@ type Account struct {
 	Active           bool `gorm:"default:true"`
 	TeamID           int
 	PrivilegeLevel   byte
+
+	Character      []Character
+	GuildcardEntry []GuildcardEntry
+	PlayerOptions  PlayerOptions
 }
 
 // FindCharacterInSlot returns the Character associated with the account in
 // the given slot or nil if none exists.
 func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 	var character Character
-	q := db.Model(&a).Related(&character).Where("slot = ?", slot)
+	err := db.Model(&a).Where("slot = ?", slot).Association("Character").Find(&character)
 
-	if q.Error != nil {
-		if gorm.IsRecordNotFoundError(q.Error) {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, q.Error
+		return nil, err
 	}
 
 	return &character, nil
@@ -45,7 +50,7 @@ func FindAccount(username string) (*Account, error) {
 	err := db.Where("username = ?", username).Find(&account).Error
 
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -62,7 +67,7 @@ func FindUnscopedAccount(username string) (*Account, error) {
 	err := db.Unscoped().Where("username = ?", username).Find(&account).Error
 
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
