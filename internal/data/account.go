@@ -21,17 +21,13 @@ type Account struct {
 	Active           bool `gorm:"default:true"`
 	TeamID           int
 	PrivilegeLevel   byte
-
-	Character      []Character
-	GuildcardEntry []GuildcardEntry
-	PlayerOptions  PlayerOptions
 }
 
 // FindCharacterInSlot returns the Character associated with the account in
 // the given slot or nil if none exists.
 func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 	var character Character
-	err := db.Model(&a).Where("slot = ?", slot).Association("Character").Find(&character)
+	err := db.Where("slot = ?", slot).Where("AccountID = ?", &a.ID).Find(&character).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -47,7 +43,7 @@ func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 // *Account instance if found or nil if there is no match.
 func FindAccount(username string) (*Account, error) {
 	var account Account
-	err := db.Where("username = ?", username).Find(&account).Omit("Character").Error
+	err := db.Where("username = ?", username).Find(&account).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

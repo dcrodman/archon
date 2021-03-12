@@ -8,6 +8,7 @@ import (
 type PlayerOptions struct {
 	gorm.Model
 
+	Account   *Account
 	AccountID int
 
 	KeyConfig []byte
@@ -16,7 +17,7 @@ type PlayerOptions struct {
 // FindPlayerOptions returns all of hte PlayerOptions associated with an Account.
 func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
 	var playerOptions PlayerOptions
-	err := db.Model(&account).Association("PlayerOptions").Find(&playerOptions)
+	err := db.Where("AccountID = ?", &account.ID).Find(&playerOptions).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -28,7 +29,6 @@ func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
 	return &playerOptions, nil
 }
 
-// UpdatePlayerOptions updates the PlayerOptions row with the contents in po.
-func CreatePlayerOptions(account *Account, po *PlayerOptions) error {
-	return db.Model(account).Association("PlayerOptions").Replace(&po)
+func CreatePlayerOptions(po *PlayerOptions) error {
+	return db.Create(po).Error
 }

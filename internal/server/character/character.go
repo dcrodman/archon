@@ -320,11 +320,12 @@ func (s *Server) handleOptionsRequest(c *server.Client) error {
 	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
 		playerOptions = &data.PlayerOptions{
+			Account:   account,
 			KeyConfig: make([]byte, 420),
 		}
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
 
-		if err = data.CreatePlayerOptions(account, playerOptions); err != nil {
+		if err = data.CreatePlayerOptions(playerOptions); err != nil {
 			return err
 		}
 	}
@@ -573,6 +574,7 @@ func (s *Server) handleCharacterUpdate(c *server.Client, charPkt *packets.Charac
 		stats := BaseStats[p.Class]
 
 		newCharacter := &data.Character{
+			Account:           account,
 			Guildcard:         account.Guildcard,
 			GuildcardStr:      p.GuildcardStr[:],
 			Slot:              charPkt.Slot,
@@ -625,7 +627,7 @@ func (s *Server) handleCharacterUpdate(c *server.Client, charPkt *packets.Charac
 		//--techniques blob,
 		//--options blob,
 
-		if err := data.CreateCharacter(account, newCharacter); err != nil {
+		if err := data.CreateCharacter(newCharacter); err != nil {
 			return err
 		}
 	}

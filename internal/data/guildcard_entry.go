@@ -8,6 +8,7 @@ import (
 type GuildcardEntry struct {
 	gorm.Model
 
+	Account   *Account
 	AccountID int
 
 	Guildcard       int
@@ -24,7 +25,7 @@ type GuildcardEntry struct {
 // FindGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
 func FindGuildcardEntries(account *Account) ([]GuildcardEntry, error) {
 	var guildcardEntries []GuildcardEntry
-	err := db.Model(&account).Association("GuildcardEntry").Find(&guildcardEntries)
+	err := db.Where("AccountID = ?", &account.ID).Find(&guildcardEntries).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

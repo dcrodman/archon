@@ -9,6 +9,7 @@ import (
 type Character struct {
 	gorm.Model
 
+	Account   *Account
 	AccountID int
 
 	Guildcard         int
@@ -51,7 +52,7 @@ type Character struct {
 // or none if no Character exists.
 func FindCharacter(account *Account, slotNum int) (*Character, error) {
 	var character Character
-	err := db.Model(&account).Where("slot = ?", slotNum).Association("Character").Find(&character)
+	err := db.Where("slot = ?", slotNum).Where("AccountID = ?", &account.ID).Find(&character).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -64,8 +65,8 @@ func FindCharacter(account *Account, slotNum int) (*Character, error) {
 }
 
 // CreateCharacter persists a Character to the database.
-func CreateCharacter(account *Account, character *Character) error {
-	return db.Model(account).Association("Character").Append(&character)
+func CreateCharacter(character *Character) error {
+	return db.Create(&character).Error
 }
 
 // UpdateCharacter updates an existing Character row with the contents of character.
