@@ -47,7 +47,7 @@ func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
 // *Account instance if found or nil if there is no match.
 func FindAccount(username string) (*Account, error) {
 	var account Account
-	err := db.Where("username = ?", username).Find(&account).Error
+	err := db.Where("username = ?", username).Find(&account).Omit("Character").Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
