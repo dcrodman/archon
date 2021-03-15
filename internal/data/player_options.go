@@ -32,3 +32,7 @@ func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
 func CreatePlayerOptions(po *PlayerOptions) error {
 	return db.Create(po).Error
 }
+
+func UpdatePlayerOptions(po *PlayerOptions) error {
+	return db.Updates(&po).Error
+}
