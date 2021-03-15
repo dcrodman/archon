@@ -6,8 +6,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/dcrodman/archon/internal/debug"
 	"os"
+
+	"github.com/dcrodman/archon/internal/debug"
 
 	"github.com/dcrodman/archon"
 	"github.com/spf13/viper"

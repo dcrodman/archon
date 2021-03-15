@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+
 	"gorm.io/gorm/logger"
 
 	"github.com/dcrodman/archon"
