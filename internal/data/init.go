@@ -24,7 +24,10 @@ func Initialize(dataSource string, debug bool) error {
 		return fmt.Errorf("failed to connect to database: %s", err)
 	}
 
-	db.AutoMigrate(&Account{}, &PlayerOptions{}, &Character{}, &GuildcardEntry{})
+	err = db.AutoMigrate(&Account{}, &PlayerOptions{}, &Character{}, &GuildcardEntry{})
+	if err != nil {
+		return fmt.Errorf("unable to auto migrate db: %s", err)
+	}
 
 	return nil
 }
