@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/dcrodman/archon/internal/debug"
 	"os"
 
 	"github.com/dcrodman/archon"
@@ -97,7 +98,7 @@ func initDataSource() (func(), error) {
 		viper.GetString("database.sslmode"),
 	)
 
-	if err := data.Initialize(dataSource); err != nil {
+	if err := data.Initialize(dataSource, debug.Enabled()); err != nil {
 		return nil, err
 	}
 

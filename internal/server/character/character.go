@@ -362,7 +362,7 @@ func (s *Server) sendOptions(c *server.Client, keyConfig []byte) error {
 // been selected from the list and the Selecting flag will be set.
 func (s *Server) handleCharacterSelect(c *server.Client, pkt *packets.CharacterSelection) error {
 	account := c.Extension.(*characterClientExtension).account
-	character, err := data.FindCharacter(account, int(pkt.Slot))
+	character, err := account.FindCharacterInSlot(int(pkt.Slot))
 	if err != nil {
 		return err
 	}

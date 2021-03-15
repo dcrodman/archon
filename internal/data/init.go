@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"gorm.io/gorm/logger"
 
 	"github.com/dcrodman/archon"
 	"gorm.io/driver/postgres"
@@ -10,9 +11,14 @@ import (
 
 var db *gorm.DB
 
-func Initialize(dataSource string) error {
+func Initialize(dataSource string, debug bool) error {
 	var err error
-	db, err = gorm.Open(postgres.Open(dataSource))
+	// By default only log errors but enable full SQL query prints-to-console with debug mode
+	log := logger.Default.LogMode(logger.Error)
+	if debug {
+		log = logger.Default.LogMode(logger.Info)
+	}
+	db, err = gorm.Open(postgres.Open(dataSource), &gorm.Config{Logger: log})
 
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %s", err)
