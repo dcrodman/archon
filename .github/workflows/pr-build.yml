@@ -1,9 +1,8 @@
 name: pr-build
 on:
   pull_request:
-    branches:
-      - '*'
-      - '!master'
+    branches-ignore:
+      - 'master'
 jobs:
   build:
     runs-on: ubuntu-latest
