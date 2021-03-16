@@ -1,6 +1,8 @@
 package data
 
 import (
+	"errors"
+
 	"gorm.io/gorm"
 )
 
@@ -45,6 +47,22 @@ type Character struct {
 	ATA               uint16
 	LCK               uint16
 	Meseta            uint32
+}
+
+// FindCharacter returns the Character associated with the account in
+// the given slot or nil if none exists.
+func FindCharacter(account *Account, slot int) (*Character, error) {
+	var character Character
+	err := db.Where("slot = ? AND account_id = ?", slot, &account.ID).First(&character).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &character, nil
 }
 
 // CreateCharacter persists a Character to the database.

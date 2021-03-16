@@ -23,22 +23,6 @@ type Account struct {
 	PrivilegeLevel   byte
 }
 
-// FindCharacterInSlot returns the Character associated with the account in
-// the given slot or nil if none exists.
-func (a *Account) FindCharacterInSlot(slot int) (*Character, error) {
-	var character Character
-	err := db.Where("slot = ? AND account_id = ?", slot, &a.ID).First(&character).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return &character, nil
-}
-
 // FindAccount searches for an account with the specified username, returning the
 // *Account instance if found or nil if there is no match.
 func FindAccount(username string) (*Account, error) {
