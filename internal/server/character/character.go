@@ -320,12 +320,12 @@ func (s *Server) handleOptionsRequest(c *server.Client) error {
 	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
 		playerOptions = &data.PlayerOptions{
-			Account:   *account,
+			Account:   account,
 			KeyConfig: make([]byte, 420),
 		}
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
 
-		if err = data.UpdatePlayerOptions(playerOptions); err != nil {
+		if err = data.CreatePlayerOptions(playerOptions); err != nil {
 			return err
 		}
 	}
@@ -362,25 +362,25 @@ func (s *Server) sendOptions(c *server.Client, keyConfig []byte) error {
 // been selected from the list and the Selecting flag will be set.
 func (s *Server) handleCharacterSelect(c *server.Client, pkt *packets.CharacterSelection) error {
 	account := c.Extension.(*characterClientExtension).account
-	character, err := data.FindCharacter(account, int(pkt.Slot))
+	char, err := data.FindCharacter(account, int(pkt.Slot))
 	if err != nil {
 		return err
 	}
 
 	if pkt.Selecting == 0x01 {
-		if character == nil {
+		if char == nil {
 			return fmt.Errorf("attempted to select nonexistent character in slot: %d", pkt.Slot)
 		}
 		// They've selected a character from the menu.
 		c.Config.SlotNum = uint8(pkt.Slot)
 		return s.sendCharacterAck(c, pkt.Slot, 1)
 	} else {
-		if character == nil {
+		if char == nil {
 			// We don't have a character for this slot.
 			return s.sendCharacterAck(c, pkt.Slot, 2)
 		}
 		// They have a character in that slot; send the character preview.
-		return s.sendCharacterPreview(c, character)
+		return s.sendCharacterPreview(c, char)
 	}
 }
 
@@ -557,7 +557,7 @@ func (s *Server) handleCharacterUpdate(c *server.Client, charPkt *packets.Charac
 		// The "recreate" option. This is a request to create a character in a slot and is used
 		// for both creating new characters and replacing existing ones.
 		account := c.Extension.(*characterClientExtension).account
-		existingCharacter, err := account.FindCharacterInSlot(int(charPkt.Slot))
+		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
 		if err != nil {
 			msg := fmt.Errorf("failed to locate character in slot %d for account %d", charPkt.Slot, account.ID)
 			archon.Log.Error(msg)
@@ -654,7 +654,7 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
 
 	account := c.Extension.(*characterClientExtension).account
-	char, err := account.FindCharacterInSlot(int(pkt.Slot))
+	char, err := data.FindCharacter(account, int(pkt.Slot))
 	if err != nil {
 		return err
 	} else if char == nil {

@@ -1,13 +1,17 @@
 package data
 
-import "github.com/jinzhu/gorm"
+import (
+	"errors"
+
+	"gorm.io/gorm"
+)
 
 // Character is an instance of a character in one of the slots for an account.
 type Character struct {
 	gorm.Model
 
-	AccountID int
 	Account   *Account
+	AccountID int
 
 	Guildcard         int
 	GuildcardStr      []byte
@@ -45,17 +49,17 @@ type Character struct {
 	Meseta            uint32
 }
 
-// FindCharacter returns the Character stored in the specified slot for the account
-// or none if no Character exists.
-func FindCharacter(account *Account, slotNum int) (*Character, error) {
+// FindCharacter returns the Character associated with the account in
+// the given slot or nil if none exists.
+func FindCharacter(account *Account, slot int) (*Character, error) {
 	var character Character
-	q := db.Model(&account).Where("slot = ?", slotNum).Related(&character)
+	err := db.Where("slot = ? AND account_id = ?", slot, &account.ID).First(&character).Error
 
-	if q.Error != nil {
-		if gorm.IsRecordNotFoundError(q.Error) {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, q.Error
+		return nil, err
 	}
 
 	return &character, nil
@@ -63,12 +67,12 @@ func FindCharacter(account *Account, slotNum int) (*Character, error) {
 
 // CreateCharacter persists a Character to the database.
 func CreateCharacter(character *Character) error {
-	return db.Save(&character).Error
+	return db.Create(&character).Error
 }
 
-// CreateCharacter updates an existing Character row with the contents of character.
+// UpdateCharacter updates an existing Character row with the contents of character.
 func UpdateCharacter(character *Character) error {
-	return db.Update(&character).Error
+	return db.Updates(&character).Error
 }
 
 // DeleteCharacter soft-deletes a character record from the database.

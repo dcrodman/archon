@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dcrodman/archon/internal/debug"
+
 	"github.com/dcrodman/archon"
 	"github.com/spf13/viper"
 
@@ -97,7 +99,7 @@ func initDataSource() (func(), error) {
 		viper.GetString("database.sslmode"),
 	)
 
-	if err := data.Initialize(dataSource); err != nil {
+	if err := data.Initialize(dataSource, debug.Enabled()); err != nil {
 		return nil, err
 	}
 

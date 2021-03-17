@@ -53,7 +53,7 @@ func main() {
 	}
 
 	// Connect to the database.
-	if err := data.Initialize(dataSource()); err != nil {
+	if err := data.Initialize(dataSource(), debug.Enabled()); err != nil {
 		archon.Log.Errorf(err.Error())
 		os.Exit(1)
 	}

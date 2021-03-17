@@ -10,3 +10,6 @@ character_server:
 debugging:
   enabled: true
   packet_analyzer_address: packet_analyzer:8081
+
+ship_server:
+  shipgate_address: 0.0.0.0:13000
