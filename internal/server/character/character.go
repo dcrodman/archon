@@ -32,7 +32,7 @@ const (
 	timeFormat = "2006:01:02: 15:05:05"
 	// Id sent in the menu selection packet to tell the client
 	// that the selection was made on the ship menu.
-	ShipSelectionMenuId uint16 = 0x13
+	ShipSelectionMenuId uint16 = 0x12
 )
 
 var (

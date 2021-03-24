@@ -235,7 +235,8 @@ type ScrollMessagePacket struct {
 	Message []byte
 }
 
-// Client's selection from the ship or block selection menu.
+// MenuSelection is a client packet indicating a player's selection from
+// one of the various menus, such as the ship or block list.
 type MenuSelection struct {
 	Header  BBHeader
 	Unknown uint16

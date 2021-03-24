@@ -4,6 +4,8 @@ package ship
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/dcrodman/archon"
@@ -11,7 +13,6 @@ import (
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server"
-	"github.com/dcrodman/archon/internal/server/character"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
@@ -19,58 +20,45 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// BackMenuItem is the block ID reserved for returning to the ship select menu.
-const BackMenuItem = 0xFF
+const (
+	// Menu "prefixes" that are OR'd with the menu IDs in order to
+	// distinguish between the menus from which the client is selecting.
+	ShipListMenuType  = 0x10000000
+	BlockListMenuType = 0x20000000
+
+	// BackMenuItem is the block ID reserved for returning to the ship select menu.
+	BackMenuItem = 0xFF
+)
 
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-type Server struct {
-	name string
-
-	shipgateClient api.ShipgateServiceClient
-
-	// Precomputed block packet.
-	blockListPkt *packets.BlockList
+type Block struct {
+	Name    string
+	Address string
+	ID      int
 }
 
-func NewServer(name string) *Server {
-	return &Server{name: name}
+// Server is the SHIP server implementation. This is similar to PATCH and LOGIN
+// in that it really just exists to be a gateway. Is main responsibility is to
+// provide the client with the block list and then send the address of the
+// block that the user selects.
+type Server struct {
+	name           string
+	blocks         []Block
+	shipgateClient api.ShipgateServiceClient
+}
+
+func NewServer(name string, blocks []Block) *Server {
+	return &Server{name: name, blocks: blocks}
 }
 
 func (s *Server) Name() string {
 	return s.name
 }
 
+// Init connects the ship to the shipgate and registers so that it
+// can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
-	// Precompute the block list packet since it's not going to change
-	// without a restart and is unncessary to continually compute.
-	numBlocks := viper.GetInt("ship_server.num_blocks")
-	blocks := make([]packets.Block, numBlocks)
-
-	for i := 0; i < numBlocks; i++ {
-		blocks[i].Unknown = 0x12
-		blocks[i].BlockID = uint32(i + 1)
-		copy(blocks[i].BlockName[:], internal.ConvertToUtf16(fmt.Sprintf("BLOCK%2d", i)))
-	}
-
-	// The "back" menu item for returning to the ship select screen
-	// is sent to the client as another (final) block selection option.
-	blocks = append(blocks, packets.Block{
-		Unknown: 0x08,
-		BlockID: BackMenuItem,
-	})
-	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
-
-	s.blockListPkt = &packets.BlockList{
-		Header: packets.BBHeader{
-			Type:  packets.BlockListType,
-			Flags: uint32(numBlocks),
-		},
-		Unknown: 0x08,
-		Blocks:  blocks,
-	}
-	copy(s.blockListPkt.ShipName[:], []byte(s.name))
-
 	// Connect to the shipgate.
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
@@ -131,15 +119,9 @@ func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) erro
 		internal.StructFromBytes(data, &loginPkt)
 		err = s.handleShipLogin(c, &loginPkt)
 	case packets.MenuSelectType:
-		var pkt packets.MenuSelection
-		internal.StructFromBytes(data, &pkt)
-		// They can be at either the ship or block selection menu, so make sure we have the right one.
-		if pkt.MenuID == character.ShipSelectionMenuId {
-			// TODO: Hack for now, but this coupling on the login server logic needs to go away.
-			err = s.handleShipSelection(c)
-		} else {
-			err = s.handleBlockSelection(c, pkt)
-		}
+		var menuSelectPkt packets.MenuSelection
+		internal.StructFromBytes(data, &menuSelectPkt)
+		err = s.handleMenuSelection(c, &menuSelectPkt)
 	default:
 		archon.Log.Infof("received unknown packet %02x from %s", header.Type, c.IPAddr())
 	}
@@ -193,53 +175,101 @@ func (s *Server) sendMessage(c *server.Client, message string) error {
 
 // send the client the block list on the selection screen.
 func (s *Server) sendBlockList(c *server.Client) error {
-	return c.Send(s.blockListPkt)
+	var blocks []packets.Block
+	for _, blockCfg := range s.blocks {
+		block := packets.Block{
+			Unknown: 0x12,
+			BlockID: BlockListMenuType | uint32(blockCfg.ID),
+		}
+		copy(block.BlockName[:], internal.ConvertToUtf16(blockCfg.Name))
+		blocks = append(blocks, block)
+	}
+
+	// The "back" menu item for returning to the ship select screen
+	// is sent to the client as another (final) block selection option.
+	blocks = append(blocks, packets.Block{
+		Unknown: 0x08,
+		BlockID: BlockListMenuType | BackMenuItem,
+	})
+	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
+
+	blockListPkt := &packets.BlockList{
+		Header: packets.BBHeader{
+			Type:  packets.BlockListType,
+			Flags: uint32(len(blocks)),
+		},
+		Unknown: 0x08,
+		Blocks:  blocks,
+	}
+	copy(blockListPkt.ShipName[:], []byte(viper.GetString("ship_server.name")))
+
+	return c.Send(blockListPkt)
+}
+
+func (s *Server) handleMenuSelection(c *server.Client, pkt *packets.MenuSelection) error {
+	// They can be at either the ship or block selection menu, so make sure we have the right one.
+	// Note: Should probably figure out what menuSelectPkt.MenuID is for (oandif that's the right name).
+	var err error
+	switch pkt.ItemID & 0xFF000000 {
+	case BlockListMenuType:
+		err = s.handleBlockSelection(c, pkt.ItemID^BlockListMenuType)
+	case ShipListMenuType:
+		err = s.handleShipSelection(c, pkt.ItemID^ShipListMenuType)
+	default:
+		err = fmt.Errorf("unrecognized menu ID: %v", pkt.MenuID)
+	}
+	return err
+}
+
+func (s *Server) handleBlockSelection(c *server.Client, selection uint32) error {
+	// The player selected a block to join from the menu. Redirect them to the block's address
+	// if a block was chosen or send them the ship list to take them back to the ship selection
+	// meny if "Ship List" was chosen.
+	if selection == BackMenuItem {
+		return s.sendShipList(c)
+	} else if int(selection) > len(s.blocks) || int(selection) < 0 {
+		return fmt.Errorf("error selecting block: block ID %d out of range [0, %d]", selection, len(s.blocks))
+	}
+
+	var err error
+	for _, block := range s.blocks {
+		if block.ID == int(selection) {
+			err = s.sendBlockRedirect(c, block)
+			break
+		}
+	}
+	return err
+}
+
+func (s *Server) sendShipList(c *server.Client) error {
+	// TODO: Send the ship list, which needs to be identical to the ship list sent by
+	// the character server. This will require retrieving the ship list from the shipgate,
+	// which we can either do in a refresh loop like the character server or just issue a
+	// request here and deal with something fancier later/never.
+	return nil
 }
 
 // Player selected one of the items on the ship select screen.
-func (s *Server) handleShipSelection(c *server.Client) error {
-	//var pkt packets.MenuSelection
-	//internal.StructFromBytes(client.ConnectionState().Data(), &pkt)
-	//
-	//selectedShip := pkt.ItemId - 1
-	//
-	//if selectedShip < 0 || selectedShip >= uint32(len(character.shipList)) {
-	//	return errors.New("Invalid ship selection: " + string(selectedShip))
-	//}
-	//s := &character.shipList[selectedShip]
-	//
-	//return archon.SendRedirect(client, s.ipAddr[:], s.port)
+func (s *Server) handleShipSelection(c *server.Client, selection uint32) error {
+	// TODO: Redirect to the selected ship if it's different than this one, otherwise
+	// just send the block list packet again.
 	return nil
 }
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *Server) sendBlockRedirect(c *server.Client) error {
-	//pkt := &packets.Redirect{
-	//	Header: packets.BBHeader{Type: packets.RedirectType},
-	//	IPAddr: [4]uint8{},
-	//	Port:   s.charRedirectPort,
-	//}
-	//ip := archon.BroadcastIP()
-	//copy(pkt.IPAddr[:], ip[:])
-	//
-	//return c.send(pkt)
-	return nil
-}
+func (s *Server) sendBlockRedirect(c *server.Client, block Block) error {
+	addressParts := strings.Split(block.Address, ":")
+	blockIP := net.ParseIP(addressParts[0]).To4()
+	port, err := strconv.Atoi(addressParts[1])
+	if err != nil {
+		return fmt.Errorf("error parsing port from block address: %v", block.Address)
+	}
 
-// The player selected a block to join from the menu.
-func (s *Server) handleBlockSelection(c *server.Client, pkt packets.MenuSelection) error {
-	// Grab the chosen block and redirect them to the selected block server.
-	//port, _ := strconv.ParseInt(s.port, 10, 16)
-	//selectedBlock := pkt.ItemId
-	//
-	//if selectedBlock == BackMenuItem {
-	//	s.SendShipList(sc, character.shipList)
-	//} else if int(selectedBlock) > archon.Config.Server.NumBlocks {
-	//	return fmt.Errorf("Block selection %v out of range %v", selectedBlock, archon.Config.Server.NumBlocks)
-	//}
-	//
-	//ipAddr := archon.BroadcastIP()
-	//return archon.SendRedirect(sc, ipAddr[:], uint16(uint32(port)+selectedBlock))
-	return nil
+	pkt := &packets.Redirect{
+		Header: packets.BBHeader{Type: packets.RedirectType},
+		Port:   uint16(port),
+	}
+	copy(pkt.IPAddr[:], blockIP)
+	return c.Send(pkt)
 }

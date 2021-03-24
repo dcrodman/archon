@@ -18,6 +18,7 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
+	"github.com/dcrodman/archon/internal/server/block"
 	"github.com/dcrodman/archon/internal/server/character"
 	"github.com/dcrodman/archon/internal/server/frontend"
 	"github.com/dcrodman/archon/internal/server/login"
@@ -78,6 +79,20 @@ func main() {
 
 	shipgateAddr := buildAddress(viper.GetString("shipgate_server.port"))
 
+	var blocks []ship.Block
+	var blockServers []*frontend.Frontend
+	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
+		name := fmt.Sprintf("BLOCK%02d", i)
+		address := buildAddress(viper.GetInt("block_server.port") + i)
+
+		blocks = append(blocks, ship.Block{
+			Name: name, Address: address, ID: i,
+		})
+		blockServers = append(blockServers, &frontend.Frontend{
+			Address: address, Backend: block.NewServer(name),
+		})
+	}
+
 	servers := []*frontend.Frontend{
 		{
 			Address: buildAddress(patchPort),
@@ -95,12 +110,14 @@ func main() {
 			Address: buildAddress(characterPort),
 			Backend: character.NewServer("CHARACTER", shipgateAddr),
 		},
-		// TODO: Eventually, these three should be able to be run independently.
+		// TODO: Eventually the ship and block servers should be able to be run
+		// independently of the other four servers (and possibly each other).
 		{
 			Address: buildAddress(shipPort),
-			Backend: ship.NewServer("SHIP"),
+			Backend: ship.NewServer("SHIP", blocks),
 		},
 	}
+	servers = append(servers, blockServers...)
 
 	// Bind the server loops to one top-level server context so that we can shut down cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -145,8 +162,8 @@ func dataSource() string {
 	)
 }
 
-func buildAddress(port string) string {
-	return fmt.Sprintf("%s:%s", viper.GetString("hostname"), port)
+func buildAddress(port interface{}) string {
+	return fmt.Sprintf("%s:%v", viper.GetString("hostname"), port)
 }
 
 func registerExitHandler(cancelFn func(), wg ...*sync.WaitGroup) {
