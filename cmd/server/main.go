@@ -93,6 +93,8 @@ func main() {
 		})
 	}
 
+	shipgateClient := shipgate.NewShipGateClient(shipgateAddr)
+
 	servers := []*frontend.Frontend{
 		{
 			Address: buildAddress(patchPort),
@@ -108,13 +110,13 @@ func main() {
 		},
 		{
 			Address: buildAddress(characterPort),
-			Backend: character.NewServer("CHARACTER", shipgateAddr),
+			Backend: character.NewServer("CHARACTER", shipgateClient),
 		},
 		// TODO: Eventually the ship and block servers should be able to be run
 		// independently of the other four servers (and possibly each other).
 		{
 			Address: buildAddress(shipPort),
-			Backend: ship.NewServer("SHIP", blocks),
+			Backend: ship.NewServer("SHIP", blocks, shipgateClient),
 		},
 	}
 	servers = append(servers, blockServers...)

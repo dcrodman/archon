@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
-	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 	"unicode/utf16"
+
+	"github.com/dcrodman/archon/internal/server/shipgate"
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
@@ -21,7 +21,6 @@ import (
 	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/internal/cache"
-	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
 )
 
@@ -56,20 +55,16 @@ var (
 // The ship list is obtained by communicating with the shipgate server since ships
 // do not directly connect to this server.
 type Server struct {
-	name    string
-	kvCache *cache.Cache
-
-	shipgateAddress     string
-	shipgateClient      api.ShipgateServiceClient
-	connectedShipsMutex sync.RWMutex
-	connectedShips      []ship
+	name           string
+	kvCache        *cache.Cache
+	shipgateClient *shipgate.ShipGateClient
 }
 
-func NewServer(name, shipgateAddress string) *Server {
+func NewServer(name string, shipgateClient *shipgate.ShipGateClient) *Server {
 	return &Server{
-		name:            name,
-		shipgateAddress: shipgateAddress,
-		kvCache:         cache.New(),
+		name:           name,
+		shipgateClient: shipgateClient,
+		kvCache:        cache.New(),
 	}
 }
 
@@ -83,7 +78,7 @@ func (s *Server) Init(ctx context.Context) error {
 	}
 
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.startShipRefreshLoop(ctx); err != nil {
+	if err := s.shipgateClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -196,7 +191,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
-	if loginPkt.Phase == packets.ShipSelection {
+	if loginPkt.Phase == packets.ShipSelectionPhase {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}
@@ -253,28 +248,7 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *server.Client) error {
-	s.connectedShipsMutex.RLock()
-	defer s.connectedShipsMutex.RUnlock()
-
-	shipList := make([]packets.ShipListEntry, 0)
-	for i, ship := range s.connectedShips {
-		entry := packets.ShipListEntry{
-			MenuID:   uint16(i + 1),
-			ShipID:   uint32(ship.id),
-			ShipName: [36]byte{},
-		}
-		copy(entry.ShipName[:], ship.name)
-		shipList = append(shipList, entry)
-	}
-
-	if len(shipList) == 0 {
-		// A "No Ships!" entry is shown if we either can't connect to the shipgate or
-		// the shipgate doesn't report any connected ships.
-		shipList = append(shipList, packets.ShipListEntry{
-			MenuID: 0xFF, ShipID: 0xFF, ShipName: [36]byte{},
-		})
-		copy(shipList[0].ShipName[:], internal.ConvertToUtf16("No Ships!")[:])
-	}
+	shipList := s.shipgateClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -684,20 +658,14 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
-	s.connectedShipsMutex.Lock()
-	defer s.connectedShipsMutex.Unlock()
-
 	selectedShip := menuSelectionPkt.ItemID - 1
-	if selectedShip >= uint32(len(s.connectedShips)) {
-		return fmt.Errorf("invalid ship selection: %d", selectedShip)
+	ip, port, err := s.shipgateClient.GetSelectedShip(selectedShip)
+	if err != nil {
+		return fmt.Errorf("could not get selected ship: %d", selectedShip)
 	}
-
-	shipIP := net.ParseIP(s.connectedShips[selectedShip].ip).To4()
-	shipPort, _ := strconv.Atoi(s.connectedShips[selectedShip].port)
-
 	return c.Send(&packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
-		IPAddr: [4]uint8{shipIP[0], shipIP[1], shipIP[2], shipIP[3]},
-		Port:   uint16(shipPort),
+		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
+		Port:   uint16(port),
 	})
 }

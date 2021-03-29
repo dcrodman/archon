@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/server/shipgate"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
@@ -43,13 +45,14 @@ type Block struct {
 // provide the client with the block list and then send the address of the
 // block that the user selects.
 type Server struct {
-	name           string
-	blocks         []Block
-	shipgateClient api.ShipgateServiceClient
+	name               string
+	blocks             []Block
+	grpcShipgateClient api.ShipgateServiceClient
+	shipgateClient     *shipgate.ShipGateClient
 }
 
-func NewServer(name string, blocks []Block) *Server {
-	return &Server{name: name, blocks: blocks}
+func NewServer(name string, blocks []Block, shipgateClient *shipgate.ShipGateClient) *Server {
+	return &Server{name: name, blocks: blocks, shipgateClient: shipgateClient}
 }
 
 func (s *Server) Name() string {
@@ -70,10 +73,10 @@ func (s *Server) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
 
-	s.shipgateClient = api.NewShipgateServiceClient(conn)
+	s.grpcShipgateClient = api.NewShipgateServiceClient(conn)
 
 	// Register this ship with the shipgate so that it can start accepting players.
-	_, err = s.shipgateClient.RegisterShip(ctx, &api.RegistrationRequest{
+	_, err = s.grpcShipgateClient.RegisterShip(ctx, &api.RegistrationRequest{
 		Name:    viper.GetString("ship_server.name"),
 		Port:    viper.GetString("ship_server.port"),
 		Address: viper.GetString("hostname"),
@@ -210,6 +213,11 @@ func (s *Server) handleMenuSelection(c *server.Client, pkt *packets.MenuSelectio
 	// They can be at either the ship or block selection menu, so make sure we have the right one.
 	// Note: Should probably figure out what menuSelectPkt.MenuID is for (oandif that's the right name).
 	var err error
+	// Case if user gets back from block selection to ship selection
+	if pkt.MenuID == 1 && pkt.ItemID == 1 {
+		// TODO check with multiple servers
+		err = s.handleShipSelection(c, pkt.ItemID-1)
+	}
 	switch pkt.ItemID & 0xFF000000 {
 	case BlockListMenuType:
 		err = s.handleBlockSelection(c, pkt.ItemID^BlockListMenuType)
@@ -242,18 +250,34 @@ func (s *Server) handleBlockSelection(c *server.Client, selection uint32) error 
 }
 
 func (s *Server) sendShipList(c *server.Client) error {
-	// TODO: Send the ship list, which needs to be identical to the ship list sent by
-	// the character server. This will require retrieving the ship list from the shipgate,
-	// which we can either do in a refresh loop like the character server or just issue a
-	// request here and deal with something fancier later/never.
-	return nil
+	shipList := s.shipgateClient.GetConnectedShipList()
+
+	pkt := &packets.ShipList{
+		Header: packets.BBHeader{
+			Type:  packets.LoginShipListType,
+			Flags: uint32(len(shipList)),
+		},
+		Unknown:     0x20,
+		Unknown2:    0xFFFFFFF4,
+		Unknown3:    0x04,
+		ShipEntries: shipList,
+	}
+	copy(pkt.ServerName[:], internal.ConvertToUtf16("Archon"))
+
+	return c.Send(pkt)
 }
 
 // Player selected one of the items on the ship select screen.
 func (s *Server) handleShipSelection(c *server.Client, selection uint32) error {
-	// TODO: Redirect to the selected ship if it's different than this one, otherwise
-	// just send the block list packet again.
-	return nil
+	ip, port, err := s.shipgateClient.GetSelectedShip(selection)
+	if err != nil {
+		return fmt.Errorf("could not get selected ship: %d", selection)
+	}
+	return c.Send(&packets.Redirect{
+		Header: packets.BBHeader{Type: packets.RedirectType},
+		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
+		Port:   uint16(port),
+	})
 }
 
 // Send the IP address and port of the character server to  which the client will

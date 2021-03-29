@@ -68,6 +68,8 @@ const (
 	ShipSelection
 )
 
+const ShipSelectionPhase = 0xE04
+
 // Login Packet (0x93) sent to both the login and character servers.
 type Login struct {
 	Header        BBHeader
