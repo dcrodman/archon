@@ -48,11 +48,11 @@ type Server struct {
 	name               string
 	blocks             []Block
 	grpcShipgateClient api.ShipgateServiceClient
-	shipgateClient     *shipgate.ShipGateClient
+	shipListClient     *shipgate.ShipListClient
 }
 
-func NewServer(name string, blocks []Block, shipgateClient *shipgate.ShipGateClient) *Server {
-	return &Server{name: name, blocks: blocks, shipgateClient: shipgateClient}
+func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
+	return &Server{name: name, blocks: blocks, shipListClient: shipgate.NewShipListClient(shipgateAddr)}
 }
 
 func (s *Server) Name() string {
@@ -83,6 +83,10 @@ func (s *Server) Init(ctx context.Context) error {
 	})
 	if err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
+	}
+	// Start the loop that retrieves the ship list from the shipgate.
+	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -250,7 +254,7 @@ func (s *Server) handleBlockSelection(c *server.Client, selection uint32) error 
 }
 
 func (s *Server) sendShipList(c *server.Client) error {
-	shipList := s.shipgateClient.GetConnectedShipList()
+	shipList := s.shipListClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -269,7 +273,7 @@ func (s *Server) sendShipList(c *server.Client) error {
 
 // Player selected one of the items on the ship select screen.
 func (s *Server) handleShipSelection(c *server.Client, selection uint32) error {
-	ip, port, err := s.shipgateClient.GetSelectedShip(selection)
+	ip, port, err := s.shipListClient.GetSelectedShipAddress(selection)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selection)
 	}

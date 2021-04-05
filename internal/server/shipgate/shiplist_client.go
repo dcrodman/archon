@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type ShipGateClient struct {
+type ShipListClient struct {
 	shipgateAddress string
 	shipgateClient  api.ShipgateServiceClient
 
@@ -36,11 +36,11 @@ type shipInfo struct {
 	port string
 }
 
-func NewShipGateClient(shipgateAddress string) *ShipGateClient {
-	return &ShipGateClient{shipgateAddress: shipgateAddress}
+func NewShipListClient(shipgateAddress string) *ShipListClient {
+	return &ShipListClient{shipgateAddress: shipgateAddress}
 }
 
-func (s *ShipGateClient) StartShipRefreshLoop(ctx context.Context) error {
+func (s *ShipListClient) StartShipRefreshLoop(ctx context.Context) error {
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
 		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
@@ -64,7 +64,7 @@ func (s *ShipGateClient) StartShipRefreshLoop(ctx context.Context) error {
 	return nil
 }
 
-func (s *ShipGateClient) GetConnectedShipList() []packets.ShipListEntry {
+func (s *ShipListClient) GetConnectedShipList() []packets.ShipListEntry {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
@@ -89,7 +89,7 @@ func (s *ShipGateClient) GetConnectedShipList() []packets.ShipListEntry {
 	return shipList
 }
 
-func (s *ShipGateClient) GetSelectedShip(selectedShip uint32) (net.IP, int, error) {
+func (s *ShipListClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -105,7 +105,7 @@ func (s *ShipGateClient) GetSelectedShip(selectedShip uint32) (net.IP, int, erro
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (s *ShipGateClient) startShipListRefreshLoop(ctx context.Context) {
+func (s *ShipListClient) startShipListRefreshLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -118,7 +118,7 @@ func (s *ShipGateClient) startShipListRefreshLoop(ctx context.Context) {
 	}
 }
 
-func (s *ShipGateClient) refreshShipList() error {
+func (s *ShipListClient) refreshShipList() error {
 	response, err := s.shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch ships from shipgate: %s", err)

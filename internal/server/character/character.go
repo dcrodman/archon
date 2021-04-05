@@ -57,13 +57,13 @@ var (
 type Server struct {
 	name           string
 	kvCache        *cache.Cache
-	shipgateClient *shipgate.ShipGateClient
+	shipListClient *shipgate.ShipListClient
 }
 
-func NewServer(name string, shipgateClient *shipgate.ShipGateClient) *Server {
+func NewServer(name string, shipgateAddr string) *Server {
 	return &Server{
 		name:           name,
-		shipgateClient: shipgateClient,
+		shipListClient: shipgate.NewShipListClient(shipgateAddr),
 		kvCache:        cache.New(),
 	}
 }
@@ -78,7 +78,7 @@ func (s *Server) Init(ctx context.Context) error {
 	}
 
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipgateClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
-	if loginPkt.Phase == packets.ShipSelectionPhase {
+	if loginPkt.Phase == packets.ShipSelection {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}
@@ -248,7 +248,7 @@ func (s *Server) sendTimestamp(c *server.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *server.Client) error {
-	shipList := s.shipgateClient.GetConnectedShipList()
+	shipList := s.shipListClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -659,7 +659,7 @@ func (s *Server) updateCharacter(c *server.Client, pkt *packets.CharacterSummary
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *server.Client, menuSelectionPkt *packets.MenuSelection) error {
 	selectedShip := menuSelectionPkt.ItemID - 1
-	ip, port, err := s.shipgateClient.GetSelectedShip(selectedShip)
+	ip, port, err := s.shipListClient.GetSelectedShipAddress(selectedShip)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selectedShip)
 	}

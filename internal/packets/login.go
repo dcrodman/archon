@@ -46,7 +46,7 @@ type Welcome struct {
 // LoginPhase is an identifier set by the client to distinguish the "phases" it passes
 // though with the Character server. The client disconnects and then reconnects between
 // each phase.
-type LoginPhase uint16
+type LoginPhase uint8
 
 const (
 	// Initialize represents the first connection with the Character server. The
@@ -68,8 +68,6 @@ const (
 	ShipSelection
 )
 
-const ShipSelectionPhase = 0xE04
-
 // Login Packet (0x93) sent to both the login and character servers.
 type Login struct {
 	Header        BBHeader
@@ -77,6 +75,7 @@ type Login struct {
 	ClientVersion uint16
 	Unknown2      uint32
 	Phase         LoginPhase
+	Unknown4      uint8 // It's not clear yet if this field is part of/related to the Phase field but it can take either 0 or e value on different clients
 	TeamID        uint32
 	Username      [16]byte
 	Padding       [32]byte
