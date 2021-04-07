@@ -114,7 +114,7 @@ func main() {
 		// independently of the other four servers (and possibly each other).
 		{
 			Address: buildAddress(shipPort),
-			Backend: ship.NewServer("SHIP", blocks),
+			Backend: ship.NewServer("SHIP", blocks, shipgateAddr),
 		},
 	}
 	servers = append(servers, blockServers...)
