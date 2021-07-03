@@ -1,6 +1,7 @@
 package character
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"io/ioutil"
@@ -10,8 +11,8 @@ import (
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/debug"
+	"github.com/dcrodman/archon/internal/prs"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/dcrodman/archon/pkg/prs"
 	"github.com/spf13/viper"
 )
 
@@ -58,6 +59,11 @@ type stats struct {
 	LCK uint16
 }
 
+func (s *stats) String() string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
 // Struct for caching the parameter chunk data and header so
 // that the param files aren't re-read every time.
 type parameterEntry struct {
@@ -86,8 +92,16 @@ func initParameterData() error {
 			return
 		}
 
-		decompressedStatsFile := make([]byte, prs.DecompressSize(compressedStatsFile))
-		prs.Decompress(compressedStatsFile, decompressedStatsFile)
+		decompressedSize, err := prs.DecompressSize(compressedStatsFile)
+		if err != nil {
+			initErr = fmt.Errorf("failed to decompress size of PlyLevelTbl.prs: %v", err)
+			return
+		}
+
+		decompressedStatsFile, err := prs.Decompress(compressedStatsFile, decompressedSize)
+		if err != nil {
+			initErr = fmt.Errorf("failed to decompress PlyLevelTbl.prs: %v", err)
+		}
 
 		// Base character class stats are stored sequentially, each 14 bytes long.
 		for i := 0; i < NumCharacterClasses; i++ {
