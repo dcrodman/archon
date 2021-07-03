@@ -55,7 +55,7 @@ func TestPRS(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 
-	if s :=deep.Equal(gotCharacterStats, wantCharacterStats); len(s) > 0 {
+	if s := deep.Equal(gotCharacterStats, wantCharacterStats); len(s) > 0 {
 		t.Fatal(s)
 	}
 }

@@ -1,4 +1,5 @@
 package prs
+
 //
 //type compressor struct {
 //	// bitPos is the position we are reading from the controlByte.

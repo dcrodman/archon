@@ -13,7 +13,6 @@ func DecompressSize(src []byte) (int, error) {
 	return d.dstSize, nil
 }
 
-
 // TODO
 //func Compress(src []byte) ([]byte, error) {
 //	c := newCompressor(src)
