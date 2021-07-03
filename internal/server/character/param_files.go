@@ -1,7 +1,6 @@
 package character
 
 import (
-	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"io/ioutil"
@@ -57,11 +56,6 @@ type stats struct {
 	DFP uint16
 	ATA uint16
 	LCK uint16
-}
-
-func (s *stats) String() string {
-	b, _ := json.Marshal(s)
-	return string(b)
 }
 
 // Struct for caching the parameter chunk data and header so
