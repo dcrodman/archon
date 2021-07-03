@@ -1,0 +1,22 @@
+name: build
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: docker://golang:latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the code
+        run: go build -v ./cmd/*
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: docker://golang:latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Tests
+        run: go test ./cmd/* ./internal/*

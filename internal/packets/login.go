@@ -46,7 +46,7 @@ type Welcome struct {
 // LoginPhase is an identifier set by the client to distinguish the "phases" it passes
 // though with the Character server. The client disconnects and then reconnects between
 // each phase.
-type LoginPhase uint16
+type LoginPhase uint8
 
 const (
 	// Initialize represents the first connection with the Character server. The
@@ -75,6 +75,7 @@ type Login struct {
 	ClientVersion uint16
 	Unknown2      uint32
 	Phase         LoginPhase
+	Unknown4      uint8 // It's not clear yet if this field is part of/related to the Phase field but it can take either 0 or e value on different clients
 	TeamID        uint32
 	Username      [16]byte
 	Padding       [32]byte
@@ -235,7 +236,8 @@ type ScrollMessagePacket struct {
 	Message []byte
 }
 
-// Client's selection from the ship or block selection menu.
+// MenuSelection is a client packet indicating a player's selection from
+// one of the various menus, such as the ship or block list.
 type MenuSelection struct {
 	Header  BBHeader
 	Unknown uint16

@@ -1,4 +1,7 @@
 # Archon
+![build](https://github.com/dcrodman/archon/actions/workflows/build.yml/badge.svg?branch=master) 
+![discord](https://img.shields.io/discord/819749462468984923) 
+![license](https://img.shields.io/github/license/dcrodman/archon) 
 
 Private server implementation for Phantasy Star Online Blue Burst by SEGA.
 

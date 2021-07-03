@@ -3,40 +3,50 @@
  */
 package block
 
-import "github.com/dcrodman/archon/internal/packets"
+import (
+	"context"
 
-//
-//import (
-//	"fmt"
-//	"github.com/dcrodman/archon"
-//	"github.com/dcrodman/archon/server"
-//	"github.com/dcrodman/archon/server/ship"
-//	"github.com/dcrodman/archon/util"
-//	"net"
-//	"strconv"
-//)
-//
-type BlockServer struct {
+	"github.com/dcrodman/archon/internal/server"
+)
+
+type Server struct {
 	name string
-	port string
-
-	lobbyPkt packets.LobbyList
 }
 
-func (s *BlockServer) Name() string { return s.name }
-func (s *BlockServer) Port() string { return s.port }
+func NewServer(name string) *Server {
+	return &Server{
+		name: name,
+	}
+}
 
-//
-//func NewServer(name string, port int64) server.Server {
-//	return &BlockServer{
-//		name: name,
-//		port: strconv.FormatInt(port, 10),
-//	}
-//}
-//
-//func (server *BlockServer) Name() string { return server.name }
-//
-//func (server *BlockServer) Port() string { return server.port }
+func (s *Server) Name() string {
+	return s.name
+}
+
+// Init is called before a Backend is started as a hook for the Backend to
+// perform any necessary initialization before it can accept clients.
+func (s *Server) Init(ctx context.Context) error {
+	return nil
+}
+
+// CreateExtension returns an implementation of the ClientExtension interface
+// containing a fresh representation of Backend-specific state for a client.
+func (s *Server) CreateExtension() server.ClientExtension {
+	panic("not implemented") // TODO: Implement
+}
+
+// StartSession performs any connection initialization necessary to begin
+// communicating with the client. This likely involves sending a "welcome" packet.
+func (s *Server) StartSession(c *server.Client) error {
+	panic("not implemented") // TODO: Implement
+}
+
+// Handle is the main entry point for processing client packets. It's responsible
+// for generally handling all packets from a client as well as sending any responses.
+func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
+	panic("not implemented") // TODO: Implement
+}
+
 //
 //func (server *BlockServer) Init() error {
 //	// Precompute our lobby list since this won't change once the server has started.

@@ -27,7 +27,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	grpcServer := grpc.NewServer(opts...)
 
 	api.RegisterShipgateServiceServer(grpcServer, &shipgateServiceServer{
-		connectedShips: make(map[string]*ship, 0),
+		connectedShips: make(map[string]*ship),
 	})
 
 	listener, err := net.Listen("tcp", addr)

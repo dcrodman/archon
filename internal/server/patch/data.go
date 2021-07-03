@@ -15,6 +15,11 @@ import (
 	"github.com/dcrodman/archon/internal/server/internal"
 )
 
+// DataServer is responsible for exchanging file metadata with game clients
+// in order to determine whether or not the client's files match the known patch
+// files. If any of the patch file checksums do not equal the checksums of their
+// corresponding client files (or do not exist), this server allows the client to
+// download the correct file contents and forces a restart.
 type DataServer struct {
 	name string
 }

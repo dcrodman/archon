@@ -1,8 +1,3 @@
-// The login package contains the implementation of the LOGIN server.
-//
-// Clients connect to LOGIN after going through the patch server. This server's
-// main responsibility is to authenticate the client's username/password and
-// set some initial state on the client before sending them to the CHARACTER server.
 package login
 
 import (
@@ -21,6 +16,10 @@ import (
 // Copyright message expected by the client when connecting.
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
 
+// Server is the LOGIN server implementation. Clients connect to this server
+// after going through the DATA server, its main responsibility is to authenticate
+// the client's username/password and set some initial state on the client before
+// redirecting them to the CHARACTER server.
 type Server struct {
 	name                  string
 	characterRedirectPort uint16
