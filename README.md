@@ -91,7 +91,6 @@ equivalents on a Windows system should still set the server up correctly.
 * [Go](https://golang.org)
 * [Git](https://git-scm.com/)
 * [PostgreSQL](https://www.postgresql.org/)
-* A C compiler for your system
 
 ### 1. Compile the code
 
