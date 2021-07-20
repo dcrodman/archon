@@ -79,6 +79,8 @@ func main() {
 
 	shipgateAddr := buildAddress(viper.GetString("shipgate_server.port"))
 
+	// Automatically configure the block servers based on the number of
+	// ship blocks requested.
 	var blocks []ship.Block
 	var blockServers []*frontend.Frontend
 	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
@@ -167,8 +169,9 @@ func buildAddress(port interface{}) string {
 }
 
 func registerExitHandler(cancelFn func(), wg ...*sync.WaitGroup) {
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
 	go func() {
 		<-c
 		archon.Log.Infof("shutting down...")
