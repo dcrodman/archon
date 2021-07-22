@@ -32,7 +32,7 @@ func getWelcomeMessage() ([]byte, uint16) {
 			archon.Log.Warn("patch server welcome message exceeds 65,000 characters")
 			messageBytes = messageBytes[:1<<16-2]
 		}
-
+		// Set the unicode byte order mark appropriately since we use LE encoding.
 		messageBytes = append([]byte{0xFF, 0xFE}, messageBytes...)
 	})
 
