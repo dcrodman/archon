@@ -52,7 +52,11 @@ type Server struct {
 }
 
 func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
-	return &Server{name: name, blocks: blocks, shipListClient: shipgate.NewShipListClient(shipgateAddr)}
+	return &Server{
+		name:           name,
+		blocks:         blocks,
+		shipListClient: shipgate.NewShipListClient(shipgateAddr),
+	}
 }
 
 func (s *Server) Name() string {
@@ -99,7 +103,7 @@ func (s *Server) CreateExtension() server.ClientExtension {
 	}
 }
 
-func (s *Server) StartSession(c *server.Client) error {
+func (s *Server) Handshake(c *server.Client) error {
 	ext := c.Extension.(*shipClientExtension)
 
 	pkt := &packets.Welcome{

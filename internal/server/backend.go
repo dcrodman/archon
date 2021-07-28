@@ -16,9 +16,9 @@ type Backend interface {
 	// containing a fresh representation of Backend-specific state for a client.
 	CreateExtension() ClientExtension
 
-	// StartSession performs any connection initialization necessary to begin
+	// Handshake performs any connection initialization necessary to begin
 	// communicating with the client. This likely involves sending a "welcome" packet.
-	StartSession(c *Client) error
+	Handshake(c *Client) error
 
 	// Handle is the main entry point for processing client packets. It's responsible
 	// for generally handling all packets from a client as well as sending any responses.

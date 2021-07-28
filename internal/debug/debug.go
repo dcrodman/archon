@@ -8,8 +8,9 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/dcrodman/archon"
 	"github.com/spf13/viper"
+
+	"github.com/dcrodman/archon"
 )
 
 type packetAnalyzerRequest struct {

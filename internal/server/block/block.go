@@ -35,9 +35,9 @@ func (s *Server) CreateExtension() server.ClientExtension {
 	panic("not implemented") // TODO: Implement
 }
 
-// StartSession performs any connection initialization necessary to begin
+// Handshake performs any connection initialization necessary to begin
 // communicating with the client. This likely involves sending a "welcome" packet.
-func (s *Server) StartSession(c *server.Client) error {
+func (s *Server) Handshake(c *server.Client) error {
 	panic("not implemented") // TODO: Implement
 }
 

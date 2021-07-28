@@ -92,7 +92,7 @@ func (s *Server) CreateExtension() server.ClientExtension {
 	}
 }
 
-func (s *Server) StartSession(c *server.Client) error {
+func (s *Server) Handshake(c *server.Client) error {
 	ext := c.Extension.(*characterClientExtension)
 
 	pkt := &packets.Welcome{

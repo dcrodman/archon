@@ -66,7 +66,7 @@ func (s *Server) CreateExtension() server.ClientExtension {
 	}
 }
 
-func (s *Server) StartSession(c *server.Client) error {
+func (s *Server) Handshake(c *server.Client) error {
 	ext := c.Extension.(*patchClientExtension)
 
 	// Send the welcome packet to a client with the copyright message and encryption vectors.

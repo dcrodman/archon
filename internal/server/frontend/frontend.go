@@ -116,8 +116,8 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
 
-	if err := f.Backend.StartSession(c); err != nil {
-		archon.Log.Errorf("StartSession() failed for client %s: %s", c.IPAddr(), err)
+	if err := f.Backend.Handshake(c); err != nil {
+		archon.Log.Errorf("Handshake() failed for client %s: %s", c.IPAddr(), err)
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
