@@ -3,7 +3,7 @@ package character
 import (
 	"bytes"
 	"encoding/json"
-	"os"
+	"io/ioutil"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -14,21 +14,21 @@ import (
 
 func TestPRS(t *testing.T) {
 	decompressedFile := "./testdata/decompressed_stats_file.prs"
-	wantDecompressed, err := os.ReadFile(decompressedFile)
+	wantDecompressed, err := ioutil.ReadFile(decompressedFile)
 	if err != nil {
-		t.Fatalf("err %v", err)
+		t.Fatalf("error opening decompressed_stats_file.prs: %v", err)
 	}
 
 	characterStatsFile := "./testdata/wantedCharacterStats.json"
-	wantCharacterStats, err := os.ReadFile(characterStatsFile)
+	wantCharacterStats, err := ioutil.ReadFile(characterStatsFile)
 	if err != nil {
-		t.Fatalf("err %v", err)
+		t.Fatalf("error opening wantedCharacterStats.json: %v", err)
 	}
 
 	testFile := "../../../setup/parameters/PlyLevelTbl.prs"
-	wantCompressed, err := os.ReadFile(testFile)
+	wantCompressed, err := ioutil.ReadFile(testFile)
 	if err != nil {
-		t.Fatalf("err %v", err)
+		t.Fatalf("error opening parameters/PlyLevelTbl.prs: %v", err)
 	}
 
 	size, err := prs.DecompressSize(wantCompressed)
