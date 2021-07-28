@@ -48,7 +48,7 @@ type Server struct {
 	dataRedirectPort uint16
 }
 
-func NewServer(name, dataPort string) server.Backend {
+func NewServer(name, dataPort string) *Server {
 	// Convert the data port to a BE uint for the redirect packet.
 	parsedDataPort, _ := strconv.ParseUint(dataPort, 10, 16)
 	dataRedirectPort := uint16((parsedDataPort >> 8) | (parsedDataPort << 8))

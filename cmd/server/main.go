@@ -18,9 +18,9 @@ import (
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
+	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/block"
 	"github.com/dcrodman/archon/internal/server/character"
-	"github.com/dcrodman/archon/internal/server/frontend"
 	"github.com/dcrodman/archon/internal/server/login"
 	"github.com/dcrodman/archon/internal/server/patch"
 	"github.com/dcrodman/archon/internal/server/ship"
@@ -82,7 +82,7 @@ func main() {
 	// Automatically configure the block servers based on the number of
 	// ship blocks requested.
 	var blocks []ship.Block
-	var blockServers []*frontend.Frontend
+	var blockServers []*server.Frontend
 	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
 		name := fmt.Sprintf("BLOCK%02d", i)
 		address := buildAddress(viper.GetInt("block_server.port") + i)
@@ -90,12 +90,12 @@ func main() {
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
 		})
-		blockServers = append(blockServers, &frontend.Frontend{
+		blockServers = append(blockServers, &server.Frontend{
 			Address: address, Backend: block.NewServer(name),
 		})
 	}
 
-	servers := []*frontend.Frontend{
+	servers := []*server.Frontend{
 		{
 			Address: buildAddress(patchPort),
 			Backend: patch.NewServer("PATCH", dataPort),
