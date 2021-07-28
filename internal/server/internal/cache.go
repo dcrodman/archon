@@ -1,10 +1,9 @@
-// Package cache provides a wrapper around an underlying cache library
-// that can be used to provide transient key-value storage per-server.
-package cache
+package internal
 
 import (
-	gocache "github.com/patrickmn/go-cache"
 	"time"
+
+	gocache "github.com/patrickmn/go-cache"
 )
 
 // Cache is an instance of a key-value store with contents specific to
@@ -14,7 +13,7 @@ type Cache struct {
 	cacheInstance *gocache.Cache
 }
 
-func New() *Cache {
+func NewCache() *Cache {
 	return &Cache{cacheInstance: gocache.New(-1, 10*time.Second)}
 }
 

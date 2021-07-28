@@ -19,7 +19,6 @@ import (
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/dcrodman/archon/internal/server/internal/cache"
 	"github.com/spf13/viper"
 )
 
@@ -55,7 +54,7 @@ var (
 // do not directly connect to this server.
 type Server struct {
 	name           string
-	kvCache        *cache.Cache
+	kvCache        *internal.Cache
 	shipListClient *shipgate.ShipListClient
 }
 
@@ -63,7 +62,7 @@ func NewServer(name string, shipgateAddr string) *Server {
 	return &Server{
 		name:           name,
 		shipListClient: shipgate.NewShipListClient(shipgateAddr),
-		kvCache:        cache.New(),
+		kvCache:        internal.NewCache(),
 	}
 }
 
