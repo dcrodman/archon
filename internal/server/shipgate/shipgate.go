@@ -7,11 +7,12 @@ import (
 	"io/ioutil"
 	"net"
 
-	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
 // Start starts the gRPC API servers listening on addr.

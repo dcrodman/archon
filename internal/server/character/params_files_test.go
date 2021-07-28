@@ -3,9 +3,10 @@ package character
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/go-test/deep"
 	"os"
 	"testing"
+
+	"github.com/go-test/deep"
 
 	"github.com/dcrodman/archon/internal/prs"
 	"github.com/dcrodman/archon/internal/server/internal"

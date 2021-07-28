@@ -69,7 +69,7 @@ func (s *DataServer) Handle(ctx context.Context, c *client.Client, data []byte) 
 	case packets.PatchClientListDoneType:
 		err = s.updateClientFiles(c)
 	default:
-		archon.Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		archon.Log.Infof("received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }

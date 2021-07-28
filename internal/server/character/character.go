@@ -10,16 +10,17 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/dcrodman/archon/internal/server/client"
-	"github.com/dcrodman/archon/internal/server/shipgate"
-
 	"github.com/dcrodman/archon"
+	"github.com/spf13/viper"
+
+	internal2 "github.com/dcrodman/archon/internal"
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/spf13/viper"
+	"github.com/dcrodman/archon/internal/server/shipgate"
 )
 
 const (
@@ -149,7 +150,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		// Just wait for the client to disconnect.
 		break
 	default:
-		archon.Log.Infof("Received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
 	return err
 }
@@ -277,7 +278,7 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 	})
 }
 
-// Load key config and other option data from the database or provide defaults for new accounts.
+// LoadConfig key config and other option data from the database or provide defaults for new accounts.
 func (s *Server) handleOptionsRequest(c *client.Client) error {
 	account := c.Account
 	playerOptions, err := data.FindPlayerOptions(account)
@@ -368,7 +369,7 @@ func (s *Server) sendCharacterPreview(c *client.Client, char *data.Character) er
 	previewPacket := &packets.CharacterSummary{
 		Header: packets.BBHeader{Type: packets.LoginCharPreviewType},
 		Slot:   0,
-		Character: character.Summary{
+		Character: character.CharacterSummary{
 			Experience:     char.Experience,
 			Level:          char.Level,
 			NameColor:      char.NameColor,
@@ -407,7 +408,7 @@ func (s *Server) sendChecksumAck(c *client.Client) error {
 	})
 }
 
-// Load the player's saved guildcards, build the chunk data, and send the chunk header.
+// LoadConfig the player's saved guildcards, build the chunk data, and send the chunk header.
 func (s *Server) handleGuildcardDataStart(c *client.Client) error {
 	account := c.Account
 	guildcards, err := data.FindGuildcardEntries(account)
@@ -415,7 +416,7 @@ func (s *Server) handleGuildcardDataStart(c *client.Client) error {
 		return err
 	}
 
-	gcData := new(archon.GuildcardData)
+	gcData := new(internal2.GuildcardData)
 	// Maximum of 140 entries can be sent.
 	for i, entry := range guildcards {
 		// TODO: This may not actually work yet, but I haven't gotten to

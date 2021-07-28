@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dcrodman/archon/internal/debug"
-
 	"github.com/dcrodman/archon"
 	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/data"
+	"github.com/dcrodman/archon/internal/debug"
 )
 
 var config = flag.String("config", "./", "Path to the directory containing the server config file")
@@ -26,7 +25,7 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	archon.Load(*config)
+	archon.LoadConfig(*config)
 	cleanup, err := initDataSource()
 	if err != nil {
 		fmt.Println(err.Error())

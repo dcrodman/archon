@@ -6,10 +6,11 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon"
+	"github.com/spf13/viper"
+
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/spf13/viper"
 )
 
 // Convert the welcome message to UTF-16LE and cache it. PSOBB expects this prefix to the message,
@@ -88,7 +89,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 			err = s.sendPatchRedirect(c)
 		}
 	default:
-		archon.Log.Infof("Received unknown packet %2x from %s", header.Type, c.IPAddr())
+		archon.Log.Infof("received unknown packet %2x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }

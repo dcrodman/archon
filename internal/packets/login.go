@@ -194,7 +194,7 @@ type SetFlag struct {
 type CharacterSummary struct {
 	Header    BBHeader
 	Slot      uint32
-	Character character.Summary
+	Character character.CharacterSummary
 }
 
 // Message in a large text box, usually sent right before a disconnect.

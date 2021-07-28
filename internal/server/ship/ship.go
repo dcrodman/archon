@@ -1,4 +1,3 @@
-// The ship server logic.
 package ship
 
 import (
@@ -8,24 +7,24 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dcrodman/archon/internal/server/client"
-	"github.com/dcrodman/archon/internal/server/shipgate"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/shipgate"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
-	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 const (
 	// Menu "prefixes" that are OR'd with the menu IDs in order to
 	// distinguish between the menus from which the client is selecting.
-	ShipListMenuType  = 0x10000000
-	BlockListMenuType = 0x20000000
+	shipListMenuType  = 0x10000000
+	blockListMenuType = 0x20000000
 
 	// BackMenuItem is the block ID reserved for returning to the ship select menu.
 	BackMenuItem = 0xFF
@@ -185,7 +184,7 @@ func (s *Server) sendBlockList(c *client.Client) error {
 	for _, blockCfg := range s.blocks {
 		block := packets.Block{
 			Unknown: 0x12,
-			BlockID: BlockListMenuType | uint32(blockCfg.ID),
+			BlockID: blockListMenuType | uint32(blockCfg.ID),
 		}
 		copy(block.BlockName[:], internal.ConvertToUtf16(blockCfg.Name))
 		blocks = append(blocks, block)
@@ -195,7 +194,7 @@ func (s *Server) sendBlockList(c *client.Client) error {
 	// is sent to the client as another (final) block selection option.
 	blocks = append(blocks, packets.Block{
 		Unknown: 0x08,
-		BlockID: BlockListMenuType | BackMenuItem,
+		BlockID: blockListMenuType | BackMenuItem,
 	})
 	copy(blocks[len(blocks)-1].BlockName[:], internal.ConvertToUtf16("Ship Selection"))
 
@@ -222,10 +221,10 @@ func (s *Server) handleMenuSelection(c *client.Client, pkt *packets.MenuSelectio
 		err = s.handleShipSelection(c, pkt.ItemID-1)
 	}
 	switch pkt.ItemID & 0xFF000000 {
-	case BlockListMenuType:
-		err = s.handleBlockSelection(c, pkt.ItemID^BlockListMenuType)
-	case ShipListMenuType:
-		err = s.handleShipSelection(c, pkt.ItemID^ShipListMenuType)
+	case blockListMenuType:
+		err = s.handleBlockSelection(c, pkt.ItemID^blockListMenuType)
+	case shipListMenuType:
+		err = s.handleShipSelection(c, pkt.ItemID^shipListMenuType)
 	default:
 		err = fmt.Errorf("unrecognized menu ID: %v", pkt.MenuID)
 	}

@@ -5,8 +5,9 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
 type ship struct {

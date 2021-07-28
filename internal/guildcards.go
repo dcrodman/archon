@@ -1,6 +1,4 @@
-package archon
-
-// TODO: Move these somewhere more appropriate.
+package internal
 
 // GuildcardData is the per-player guildcard data chunk.
 type GuildcardData struct {

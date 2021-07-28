@@ -3,11 +3,11 @@ package data
 import (
 	"fmt"
 
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
 	"github.com/dcrodman/archon"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 var db *gorm.DB

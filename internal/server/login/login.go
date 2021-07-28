@@ -65,7 +65,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
-		archon.Log.Infof("Received unknown packet %x from %s", header.Type, c.IPAddr())
+		archon.Log.Infof("received unknown packet %x from %s", header.Type, c.IPAddr())
 	}
 
 	return err

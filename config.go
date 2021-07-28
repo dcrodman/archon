@@ -17,8 +17,8 @@ var (
 	cachedIPBytes [4]byte
 )
 
-// Load initializes Viper with the contents of the config file under configPath.
-func Load(configPath string) {
+// LoadConfig initializes Viper with the contents of the config file under configPath.
+func LoadConfig(configPath string) {
 	viper.AddConfigPath(configPath)
 	viper.SetConfigName(defaultConfigName)
 	viper.SetConfigType("yaml")

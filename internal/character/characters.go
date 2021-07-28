@@ -4,7 +4,6 @@ package character
 type CharClass uint8
 
 const (
-	// Possible character classes as defined by the game.
 	Humar CharClass = iota
 	Hunewearl
 	Hucast
@@ -19,9 +18,9 @@ const (
 	Ramarl
 )
 
-// Common intermediate representation of a Character as it gets passed around
-// various servers and/or stored.
-type Summary struct {
+// CharacterSummary is the common intermediate representation of a Character as it gets
+//passed around various servers and/or stored.
+type CharacterSummary struct {
 	Experience     uint32
 	Level          uint32
 	GuildcardStr   [16]byte

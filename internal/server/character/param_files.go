@@ -8,11 +8,12 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/spf13/viper"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/prs"
 	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -78,7 +79,7 @@ func initParameterData() error {
 			return
 		}
 
-		// Load the base stats for creating new characters.
+		// LoadConfig the base stats for creating new characters.
 		statsFile, _ := os.Open(filepath.Join(paramFileDir, "PlyLevelTbl.prs"))
 		compressedStatsFile, err := ioutil.ReadAll(statsFile)
 		if err != nil {
@@ -106,7 +107,7 @@ func initParameterData() error {
 	return initErr
 }
 
-// Load the PSOBB parameter files, build the parameter header,
+// LoadConfig the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
 func loadParameterFiles(paramFileDir string) error {
 	archon.Log.Infof("loading parameters from %s", paramFileDir)

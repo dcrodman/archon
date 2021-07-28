@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcrodman/archon/internal/packets"
-
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/server/internal"
-	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
 type ShipListClient struct {

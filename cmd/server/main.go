@@ -33,7 +33,7 @@ var config = flag.String("config", "./", "Path to the directory containing the s
 
 func main() {
 	flag.Parse()
-	archon.Load(*config)
+	archon.LoadConfig(*config)
 	archon.InitLogger()
 
 	archon.Log.Info("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
