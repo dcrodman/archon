@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sync"
 
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/spf13/viper"
 )
 
@@ -24,18 +25,18 @@ type clientList struct {
 	sync.RWMutex
 }
 
-func (cl *clientList) add(c *Client) {
+func (cl *clientList) add(c *client.Client) {
 	cl.Lock()
 	cl.clients.PushBack(c)
 	cl.Unlock()
 }
 
-func (cl *clientList) remove(c *Client) {
+func (cl *clientList) remove(c *client.Client) {
 	clAddr := c.IPAddr()
 	cl.Lock()
 
 	for clientElem := cl.clients.Front(); clientElem != nil; clientElem = clientElem.Next() {
-		client := clientElem.Value.(*Client)
+		client := clientElem.Value.(*client.Client)
 
 		if client.IPAddr() == clAddr {
 			cl.clients.Remove(clientElem)
@@ -47,7 +48,7 @@ func (cl *clientList) remove(c *Client) {
 }
 
 // Note: this comparison is by IP address, not element value.
-func (cl *clientList) has(c *Client) bool {
+func (cl *clientList) has(c *client.Client) bool {
 	clAddr := c.IPAddr()
 
 	cl.RLock()

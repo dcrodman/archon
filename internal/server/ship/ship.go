@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/shipgate"
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/internal/server"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 	"github.com/spf13/viper"
@@ -96,14 +96,14 @@ func (s *Server) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) CreateExtension() server.ClientExtension {
+func (s *Server) CreateExtension() client.ClientExtension {
 	return &shipClientExtension{
 		clientCrypt: crypto.NewBBCrypt(),
 		serverCrypt: crypto.NewBBCrypt(),
 	}
 }
 
-func (s *Server) Handshake(c *server.Client) error {
+func (s *Server) Handshake(c *client.Client) error {
 	ext := c.Extension.(*shipClientExtension)
 
 	pkt := &packets.Welcome{
@@ -119,7 +119,7 @@ func (s *Server) Handshake(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var header packets.BBHeader
 	internal.StructFromBytes(data[:packets.BBHeaderSize], &header)
 
@@ -139,7 +139,7 @@ func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleShipLogin(c *server.Client, loginPkt *packets.Login) error {
+func (s *Server) handleShipLogin(c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
@@ -164,7 +164,7 @@ func (s *Server) handleShipLogin(c *server.Client, loginPkt *packets.Login) erro
 	return s.sendBlockList(c)
 }
 
-func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
+func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
@@ -176,7 +176,7 @@ func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
 	})
 }
 
-func (s *Server) sendMessage(c *server.Client, message string) error {
+func (s *Server) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -185,7 +185,7 @@ func (s *Server) sendMessage(c *server.Client, message string) error {
 }
 
 // send the client the block list on the selection screen.
-func (s *Server) sendBlockList(c *server.Client) error {
+func (s *Server) sendBlockList(c *client.Client) error {
 	var blocks []packets.Block
 	for _, blockCfg := range s.blocks {
 		block := packets.Block{
@@ -217,7 +217,7 @@ func (s *Server) sendBlockList(c *server.Client) error {
 	return c.Send(blockListPkt)
 }
 
-func (s *Server) handleMenuSelection(c *server.Client, pkt *packets.MenuSelection) error {
+func (s *Server) handleMenuSelection(c *client.Client, pkt *packets.MenuSelection) error {
 	// They can be at either the ship or block selection menu, so make sure we have the right one.
 	// Note: Should probably figure out what menuSelectPkt.MenuID is for (oandif that's the right name).
 	var err error
@@ -237,7 +237,7 @@ func (s *Server) handleMenuSelection(c *server.Client, pkt *packets.MenuSelectio
 	return err
 }
 
-func (s *Server) handleBlockSelection(c *server.Client, selection uint32) error {
+func (s *Server) handleBlockSelection(c *client.Client, selection uint32) error {
 	// The player selected a block to join from the menu. Redirect them to the block's address
 	// if a block was chosen or send them the ship list to take them back to the ship selection
 	// meny if "Ship List" was chosen.
@@ -257,7 +257,7 @@ func (s *Server) handleBlockSelection(c *server.Client, selection uint32) error 
 	return err
 }
 
-func (s *Server) sendShipList(c *server.Client) error {
+func (s *Server) sendShipList(c *client.Client) error {
 	shipList := s.shipListClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
@@ -276,7 +276,7 @@ func (s *Server) sendShipList(c *server.Client) error {
 }
 
 // Player selected one of the items on the ship select screen.
-func (s *Server) handleShipSelection(c *server.Client, selection uint32) error {
+func (s *Server) handleShipSelection(c *client.Client, selection uint32) error {
 	ip, port, err := s.shipListClient.GetSelectedShipAddress(selection)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selection)
@@ -290,7 +290,7 @@ func (s *Server) handleShipSelection(c *server.Client, selection uint32) error {
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *Server) sendBlockRedirect(c *server.Client, block Block) error {
+func (s *Server) sendBlockRedirect(c *client.Client, block Block) error {
 	addressParts := strings.Split(block.Address, ":")
 	blockIP := net.ParseIP(addressParts[0]).To4()
 	port, err := strconv.Atoi(addressParts[1])

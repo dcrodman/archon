@@ -11,7 +11,7 @@ import (
 	"github.com/dcrodman/archon"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
 )
 
@@ -34,7 +34,7 @@ func (s *DataServer) Init(ctx context.Context) error {
 	return initializePatchData()
 }
 
-func (s *DataServer) CreateExtension() server.ClientExtension {
+func (s *DataServer) CreateExtension() client.ClientExtension {
 	return &patchClientExtension{
 		clientCrypt:   crypto.NewPCCrypt(),
 		serverCrypt:   crypto.NewPCCrypt(),
@@ -42,7 +42,7 @@ func (s *DataServer) CreateExtension() server.ClientExtension {
 	}
 }
 
-func (s *DataServer) Handshake(c *server.Client) error {
+func (s *DataServer) Handshake(c *client.Client) error {
 	ext := c.Extension.(*patchClientExtension)
 
 	// Send the welcome packet to a client with the copyright message and encryption vectors.
@@ -56,7 +56,7 @@ func (s *DataServer) Handshake(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *DataServer) Handle(ctx context.Context, c *server.Client, data []byte) error {
+func (s *DataServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var hdr packets.PCHeader
 
 	internal.StructFromBytes(data[:packets.PCHeaderSize], &hdr)
@@ -80,7 +80,7 @@ func (s *DataServer) Handle(ctx context.Context, c *server.Client, data []byte) 
 }
 
 // Simple acknowledgement to the welcome response.
-func (s *DataServer) sendWelcomeAck(c *server.Client) error {
+func (s *DataServer) sendWelcomeAck(c *client.Client) error {
 	return c.Send(packets.PCHeader{
 		Size: 0x04,
 		Type: packets.PatchHandshakeType,
@@ -88,7 +88,7 @@ func (s *DataServer) sendWelcomeAck(c *server.Client) error {
 }
 
 // Once the client has authenticated, send them the list of files to update.
-func (s *DataServer) handlePatchLogin(c *server.Client) error {
+func (s *DataServer) handlePatchLogin(c *client.Client) error {
 	if err := s.sendDataAck(c); err != nil {
 		return err
 	}
@@ -99,12 +99,12 @@ func (s *DataServer) handlePatchLogin(c *server.Client) error {
 }
 
 // Acknowledgement sent after the DATA connection handshake.
-func (s *DataServer) sendDataAck(c *server.Client) error {
+func (s *DataServer) sendDataAck(c *client.Client) error {
 	return c.Send(packets.PCHeader{Type: packets.PatchDataAckType, Size: 0x04})
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
-func (s *DataServer) sendFileList(c *server.Client, node *directoryNode) error {
+func (s *DataServer) sendFileList(c *client.Client, node *directoryNode) error {
 	if err := s.sendChangeDir(c, node.clientPath); err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (s *DataServer) sendFileList(c *server.Client, node *directoryNode) error {
 }
 
 // Tell the client to change to some directory within its file tree.
-func (s *DataServer) sendChangeDir(c *server.Client, dir string) error {
+func (s *DataServer) sendChangeDir(c *client.Client, dir string) error {
 	pkt := packets.ChangeDir{
 		Header:  packets.PCHeader{Type: packets.PatchChangeDirType},
 		Dirname: [64]byte{},
@@ -140,7 +140,7 @@ func (s *DataServer) sendChangeDir(c *server.Client, dir string) error {
 }
 
 // Tell the client to check a file in its current working directory.
-func (s *DataServer) sendCheckFile(c *server.Client, index uint32, filename string) error {
+func (s *DataServer) sendCheckFile(c *client.Client, index uint32, filename string) error {
 	pkt := packets.CheckFile{
 		Header:  packets.PCHeader{Type: packets.PatchCheckFileType},
 		PatchID: index,
@@ -151,18 +151,18 @@ func (s *DataServer) sendCheckFile(c *server.Client, index uint32, filename stri
 }
 
 // Tell the client to change to one directory above.
-func (s *DataServer) sendDirAbove(c *server.Client) error {
+func (s *DataServer) sendDirAbove(c *client.Client) error {
 	return c.Send(packets.PCHeader{Type: packets.PatchDirAboveType, Size: 0x04})
 }
 
 // Tell the client that we've finished sending the patch list.
-func (s *DataServer) sendFileListDone(c *server.Client) error {
+func (s *DataServer) sendFileListDone(c *client.Client) error {
 	return c.Send(packets.PCHeader{Type: packets.PatchFileListDoneType, Size: 0x04})
 }
 
 // The client sent us a checksum for one of the patch files. Compare it to what we
 // have and add it to the list of files to update if there is any discrepancy.
-func (s *DataServer) handleFileStatus(c *server.Client, fileStatus *packets.FileStatus) {
+func (s *DataServer) handleFileStatus(c *client.Client, fileStatus *packets.FileStatus) {
 	patchFile := patchIndex[fileStatus.PatchID]
 
 	if fileStatus.Checksum != patchFile.checksum || fileStatus.FileSize != patchFile.fileSize {
@@ -173,7 +173,7 @@ func (s *DataServer) handleFileStatus(c *server.Client, fileStatus *packets.File
 
 // The client finished sending all of the file check packets. If they have
 // any files that need updating, now's the time to do it.
-func (s *DataServer) updateClientFiles(c *server.Client) error {
+func (s *DataServer) updateClientFiles(c *client.Client) error {
 	var numFiles, totalSize uint32 = 0, 0
 
 	for _, patch := range c.Extension.(*patchClientExtension).filesToUpdate {
@@ -194,7 +194,7 @@ func (s *DataServer) updateClientFiles(c *server.Client) error {
 }
 
 // Send the total number and cumulative size of files that need updating.
-func (s *DataServer) sendStartFileUpdate(c *server.Client, num, totalSize uint32) error {
+func (s *DataServer) sendStartFileUpdate(c *client.Client, num, totalSize uint32) error {
 	return c.Send(packets.StartFileUpdate{
 		Header:    packets.PCHeader{Type: packets.PatchUpdateFilesType},
 		NumFiles:  num,
@@ -204,7 +204,7 @@ func (s *DataServer) sendStartFileUpdate(c *server.Client, num, totalSize uint32
 
 // Recursively traverse our tree of patch files, sending the file data to the client
 // when an out of date file is encountered.
-func (s *DataServer) traverseAndUpdate(c *server.Client, node *directoryNode) error {
+func (s *DataServer) traverseAndUpdate(c *client.Client, node *directoryNode) error {
 	if err := s.sendChangeDir(c, node.name); err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (s *DataServer) traverseAndUpdate(c *server.Client, node *directoryNode) er
 	return s.sendDirAbove(c)
 }
 
-func (s *DataServer) updateClientFile(c *server.Client, patch *fileEntry) error {
+func (s *DataServer) updateClientFile(c *client.Client, patch *fileEntry) error {
 	if err := s.sendFileHeader(c, patch); err != nil {
 		return nil
 	}
@@ -265,7 +265,7 @@ func (s *DataServer) updateClientFile(c *server.Client, patch *fileEntry) error 
 }
 
 // send the header for a file we're about to update.
-func (s *DataServer) sendFileHeader(c *server.Client, patch *fileEntry) error {
+func (s *DataServer) sendFileHeader(c *client.Client, patch *fileEntry) error {
 	pkt := packets.FileHeader{
 		Header:   packets.PCHeader{Type: packets.PatchFileHeaderType},
 		FileSize: patch.fileSize,
@@ -277,7 +277,7 @@ func (s *DataServer) sendFileHeader(c *server.Client, patch *fileEntry) error {
 }
 
 // send a chunk of file data.
-func (s *DataServer) sendFileChunk(c *server.Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
+func (s *DataServer) sendFileChunk(c *client.Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > maxFileChunkSize {
 		archon.Log.Errorf("Attempted to send %v byte chunk; max is %v",
 			strconv.Itoa(int(chunkSize)), string(rune(maxFileChunkSize)))
@@ -294,11 +294,11 @@ func (s *DataServer) sendFileChunk(c *server.Client, chunk, chksm, chunkSize uin
 }
 
 // Finished sending a particular file.
-func (s *DataServer) sendFileComplete(c *server.Client) error {
+func (s *DataServer) sendFileComplete(c *client.Client) error {
 	return c.Send(packets.PCHeader{Type: packets.PatchFileCompleteType, Size: 0x04})
 }
 
 // We've finished updating files.
-func (s *DataServer) sendUpdateComplete(c *server.Client) error {
+func (s *DataServer) sendUpdateComplete(c *client.Client) error {
 	return c.Send(packets.PCHeader{Type: packets.PatchUpdateCompleteType, Size: 0x04})
 }

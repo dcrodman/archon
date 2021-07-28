@@ -9,7 +9,7 @@ import (
 	"github.com/dcrodman/archon/internal/auth"
 	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
 )
 
@@ -33,14 +33,14 @@ func NewServer(name, characterPort string) *Server {
 func (s *Server) Name() string                   { return s.name }
 func (s *Server) Init(ctx context.Context) error { return nil }
 
-func (s *Server) CreateExtension() server.ClientExtension {
+func (s *Server) CreateExtension() client.ClientExtension {
 	return &loginClientExtension{
 		serverCrypt: crypto.NewBBCrypt(),
 		clientCrypt: crypto.NewBBCrypt(),
 	}
 }
 
-func (s *Server) Handshake(c *server.Client) error {
+func (s *Server) Handshake(c *client.Client) error {
 	ext := c.Extension.(*loginClientExtension)
 
 	pkt := &packets.Welcome{
@@ -56,7 +56,7 @@ func (s *Server) Handshake(c *server.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var header packets.BBHeader
 	internal.StructFromBytes(data[:packets.BBHeaderSize], &header)
 
@@ -76,7 +76,7 @@ func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
@@ -117,7 +117,7 @@ func (s *Server) handleLogin(c *server.Client, loginPkt *packets.Login) error {
 
 // sendSecurity transmits initialization packet with information about the user's
 // authentication status.
-func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
+func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	// Constants set according to how Newserv does it.
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
@@ -132,7 +132,7 @@ func (s *Server) sendSecurity(c *server.Client, errorCode uint32) error {
 
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
-func (s *Server) sendMessage(c *server.Client, message string) error {
+func (s *Server) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -142,7 +142,7 @@ func (s *Server) sendMessage(c *server.Client, message string) error {
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *Server) sendCharacterRedirect(c *server.Client) error {
+func (s *Server) sendCharacterRedirect(c *client.Client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},

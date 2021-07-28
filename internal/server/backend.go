@@ -1,6 +1,10 @@
 package server
 
-import "context"
+import (
+	"context"
+
+	"github.com/dcrodman/archon/internal/server/client"
+)
 
 // Backend is an interface for a sub-server that handles a specific set of client
 // interactions as part of the game flow.
@@ -14,13 +18,13 @@ type Backend interface {
 
 	// CreateExtension returns an implementation of the ClientExtension interface
 	// containing a fresh representation of Backend-specific state for a client.
-	CreateExtension() ClientExtension
+	CreateExtension() client.ClientExtension
 
 	// Handshake performs any connection initialization necessary to begin
 	// communicating with the client. This likely involves sending a "welcome" packet.
-	Handshake(c *Client) error
+	Handshake(c *client.Client) error
 
 	// Handle is the main entry point for processing client packets. It's responsible
 	// for generally handling all packets from a client as well as sending any responses.
-	Handle(ctx context.Context, c *Client, data []byte) error
+	Handle(ctx context.Context, c *client.Client, data []byte) error
 }

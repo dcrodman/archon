@@ -14,6 +14,7 @@ import (
 
 	"github.com/dcrodman/archon"
 	archdebug "github.com/dcrodman/archon/internal/debug"
+	"github.com/dcrodman/archon/internal/server/client"
 )
 
 // Frontend implements the concurrent client connection logic.
@@ -110,7 +111,7 @@ handleLoop:
 func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	c := NewClient(connection)
+	c := client.NewClient(connection)
 	c.Extension = f.Backend.CreateExtension()
 
 	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
@@ -132,7 +133,7 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func (f *Frontend) processPackets(ctx context.Context, c *Client) {
+func (f *Frontend) processPackets(ctx context.Context, c *client.Client) {
 	defer f.closeConnectionAndRecover(f.Backend.Name(), c)
 
 	buffer := make([]byte, 2048)
@@ -169,7 +170,7 @@ func (f *Frontend) processPackets(ctx context.Context, c *Client) {
 
 // closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
 // client, and removes them from the list regardless of the state of the connection.
-func (*Frontend) closeConnectionAndRecover(serverName string, c *Client) {
+func (*Frontend) closeConnectionAndRecover(serverName string, c *client.Client) {
 	if err := recover(); err != nil {
 		archon.Log.Errorf("error in client communication with %s: error=%s, trace: %s",
 			c.IPAddr(), err, debug.Stack())
@@ -187,7 +188,7 @@ func (*Frontend) closeConnectionAndRecover(serverName string, c *Client) {
 // readNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func (f *Frontend) readNextPacket(c *Client, buffer []byte) ([]byte, error) {
+func (f *Frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
 	headerSize := int(c.Extension.HeaderSize())
 
 	// Read and decrypt the packet header.
@@ -216,7 +217,7 @@ func (f *Frontend) readNextPacket(c *Client, buffer []byte) ([]byte, error) {
 	return buffer, nil
 }
 
-func (f *Frontend) readDataFromClient(c *Client, n int, buffer []byte) error {
+func (f *Frontend) readDataFromClient(c *client.Client, n int, buffer []byte) error {
 	received := 0
 
 	for received < n {

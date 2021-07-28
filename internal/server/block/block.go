@@ -6,7 +6,7 @@ package block
 import (
 	"context"
 
-	"github.com/dcrodman/archon/internal/server"
+	"github.com/dcrodman/archon/internal/server/client"
 )
 
 type Server struct {
@@ -31,19 +31,19 @@ func (s *Server) Init(ctx context.Context) error {
 
 // CreateExtension returns an implementation of the ClientExtension interface
 // containing a fresh representation of Backend-specific state for a client.
-func (s *Server) CreateExtension() server.ClientExtension {
+func (s *Server) CreateExtension() client.ClientExtension {
 	panic("not implemented") // TODO: Implement
 }
 
 // Handshake performs any connection initialization necessary to begin
 // communicating with the client. This likely involves sending a "welcome" packet.
-func (s *Server) Handshake(c *server.Client) error {
+func (s *Server) Handshake(c *client.Client) error {
 	panic("not implemented") // TODO: Implement
 }
 
 // Handle is the main entry point for processing client packets. It's responsible
 // for generally handling all packets from a client as well as sending any responses.
-func (s *Server) Handle(ctx context.Context, c *server.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	panic("not implemented") // TODO: Implement
 }
 
