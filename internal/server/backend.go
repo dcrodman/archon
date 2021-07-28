@@ -16,9 +16,10 @@ type Backend interface {
 	// perform any necessary initialization before it can accept clients.
 	Init(ctx context.Context) error
 
-	// CreateExtension returns an implementation of the ClientExtension interface
-	// containing a fresh representation of Backend-specific state for a client.
-	CreateExtension() client.ClientExtension
+	// SetUpClient performs any initialization on the Client needed to be
+	// able to begin the session. Namely, it's the server's responsibility
+	// to choose the appropriate encryption implementation.
+	SetUpClient(c *client.Client)
 
 	// Handshake performs any connection initialization necessary to begin
 	// communicating with the client. This likely involves sending a "welcome" packet.

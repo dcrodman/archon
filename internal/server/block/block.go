@@ -1,6 +1,3 @@
-/*
- * The BLOCK and SHIP server logic.
- */
 package block
 
 import (
@@ -23,26 +20,18 @@ func (s *Server) Name() string {
 	return s.name
 }
 
-// Init is called before a Backend is started as a hook for the Backend to
-// perform any necessary initialization before it can accept clients.
 func (s *Server) Init(ctx context.Context) error {
 	return nil
 }
 
-// CreateExtension returns an implementation of the ClientExtension interface
-// containing a fresh representation of Backend-specific state for a client.
-func (s *Server) CreateExtension() client.ClientExtension {
+func (s *Server) SetUpClient(c *client.Client) {
 	panic("not implemented") // TODO: Implement
 }
 
-// Handshake performs any connection initialization necessary to begin
-// communicating with the client. This likely involves sending a "welcome" packet.
 func (s *Server) Handshake(c *client.Client) error {
 	panic("not implemented") // TODO: Implement
 }
 
-// Handle is the main entry point for processing client packets. It's responsible
-// for generally handling all packets from a client as well as sending any responses.
 func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	panic("not implemented") // TODO: Implement
 }

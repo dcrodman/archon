@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -59,23 +58,19 @@ func NewServer(name, dataPort string) *Server {
 func (s *Server) Name() string                   { return s.name }
 func (s *Server) Init(ctx context.Context) error { return nil }
 
-func (s *Server) CreateExtension() client.ClientExtension {
-	return &patchClientExtension{
-		clientCrypt: crypto.NewPCCrypt(),
-		serverCrypt: crypto.NewPCCrypt(),
-	}
+func (s *Server) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewPCCryptoSession()
+	c.DebugTags["server_type"] = "patch"
 }
 
 func (s *Server) Handshake(c *client.Client) error {
-	ext := c.Extension.(*patchClientExtension)
-
 	// Send the welcome packet to a client with the copyright message and encryption vectors.
 	pkt := packets.PatchWelcome{
 		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
-	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
-	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
+	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
+	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 
 	return c.SendRaw(pkt)
 }

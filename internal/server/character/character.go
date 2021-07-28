@@ -17,7 +17,6 @@ import (
 	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/data"
-	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/internal/cache"
@@ -85,16 +84,12 @@ func (s *Server) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) CreateExtension() client.ClientExtension {
-	return &characterClientExtension{
-		serverCrypt: crypto.NewBBCrypt(),
-		clientCrypt: crypto.NewBBCrypt(),
-	}
+func (s *Server) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewBlueBurstCryptoSession()
+	c.DebugTags["server_type"] = "character"
 }
 
 func (s *Server) Handshake(c *client.Client) error {
-	ext := c.Extension.(*characterClientExtension)
-
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -102,8 +97,8 @@ func (s *Server) Handshake(c *client.Client) error {
 		ClientVector: [48]byte{},
 	}
 	copy(pkt.Copyright[:], loginCopyright)
-	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
-	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
+	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
+	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
 	return c.SendRaw(pkt)
 }
@@ -183,7 +178,7 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 
 	c.TeamID = uint32(account.TeamID)
 	c.Guildcard = uint32(account.Guildcard)
-	c.Extension.(*characterClientExtension).account = account
+	c.Account = account
 
 	if err = s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
@@ -285,7 +280,7 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 
 // Load key config and other option data from the database or provide defaults for new accounts.
 func (s *Server) handleOptionsRequest(c *client.Client) error {
-	account := c.Extension.(*characterClientExtension).account
+	account := c.Account
 	playerOptions, err := data.FindPlayerOptions(account)
 	if err != nil {
 		return err
@@ -335,7 +330,7 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 // slots (i.e. 4 times). The client also sends this packet when a character has
 // been selected from the list and the Selecting flag will be set.
 func (s *Server) handleCharacterSelect(c *client.Client, pkt *packets.CharacterSelection) error {
-	account := c.Extension.(*characterClientExtension).account
+	account := c.Account
 	char, err := data.FindCharacter(account, int(pkt.Slot))
 	if err != nil {
 		return err
@@ -415,7 +410,7 @@ func (s *Server) sendChecksumAck(c *client.Client) error {
 
 // Load the player's saved guildcards, build the chunk data, and send the chunk header.
 func (s *Server) handleGuildcardDataStart(c *client.Client) error {
-	account := c.Extension.(*characterClientExtension).account
+	account := c.Account
 	guildcards, err := data.FindGuildcardEntries(account)
 	if err != nil {
 		return err
@@ -515,7 +510,7 @@ func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
 }
 
 func clientFlagKey(c *client.Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Extension.(*characterClientExtension).account.ID)
+	return fmt.Sprintf("client-flags-%d", c.Account.ID)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
@@ -530,7 +525,7 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 	} else {
 		// The "recreate" option. This is a request to create a character in a slot and is used
 		// for both creating new characters and replacing existing ones.
-		account := c.Extension.(*characterClientExtension).account
+		account := c.Account
 		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
 		if err != nil {
 			msg := fmt.Errorf("failed to locate character in slot %d for account %d", charPkt.Slot, account.ID)
@@ -627,7 +622,7 @@ func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary
 	flags, _ := s.kvCache.Get(clientFlagKey(c))
 	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
 
-	account := c.Extension.(*characterClientExtension).account
+	account := c.Account
 	char, err := data.FindCharacter(account, int(pkt.Slot))
 	if err != nil {
 		return err

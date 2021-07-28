@@ -7,7 +7,6 @@ import (
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
-	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -33,16 +32,12 @@ func NewServer(name, characterPort string) *Server {
 func (s *Server) Name() string                   { return s.name }
 func (s *Server) Init(ctx context.Context) error { return nil }
 
-func (s *Server) CreateExtension() client.ClientExtension {
-	return &loginClientExtension{
-		serverCrypt: crypto.NewBBCrypt(),
-		clientCrypt: crypto.NewBBCrypt(),
-	}
+func (s *Server) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewBlueBurstCryptoSession()
+	c.DebugTags["server_type"] = "login"
 }
 
 func (s *Server) Handshake(c *client.Client) error {
-	ext := c.Extension.(*loginClientExtension)
-
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -50,8 +45,8 @@ func (s *Server) Handshake(c *client.Client) error {
 		ClientVector: [48]byte{},
 	}
 	copy(pkt.Copyright[:], loginCopyright)
-	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
-	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
+	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
+	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
 	return c.SendRaw(pkt)
 }

@@ -5,26 +5,11 @@ import (
 	"net"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/internal"
 )
-
-// ClientExtension is an interface for implementing Backend-specific behavior
-// or state required by one of the sub-servers.
-type ClientExtension interface {
-	// HeaderSize returns the length of the header of all client packets.
-	HeaderSize() uint16
-
-	// Encrypt encrypts bytes in place with the encryption key for the client.
-	Encrypt(bytes []byte, length uint32)
-
-	// Encrypt decrypts bytes in place with the encryption key for the client.
-	Decrypt(bytes []byte, length uint32)
-
-	// DebugInfo returns a set of KV pairs used for server debugging/logging.
-	DebugInfo() map[string]interface{}
-}
 
 // Client represents a user connected through a PSOBB game client.
 type Client struct {
@@ -32,7 +17,11 @@ type Client struct {
 	ipAddr     string
 	port       string
 
-	Extension ClientExtension
+	// Cipher implementation responsible for packet encryption.
+	CryptoSession CryptoSession
+
+	// Account associated with the player.
+	Account *data.Account
 
 	// Client information shared amongst most Backend implementations.
 	Config packets.ClientConfig
@@ -40,9 +29,18 @@ type Client struct {
 	Flag   uint32
 	TeamID uint32
 	IsGm   bool
-
+	// Guildcard linked to the account.
 	Guildcard     uint32
 	GuildcardData []byte
+
+	// File list used exclusively by the Data server for tracking which
+	// files need updating. TODO: This ought to be expressed more gracefully
+	// but we have very little information by which we can identify a unique
+	// PSO client in the patch phase and this is easy so...here we are.
+	FilesToUpdate map[int]interface{}
+
+	// Debugging information used for logging purposes.
+	DebugTags map[string]interface{}
 }
 
 func NewClient(connection *net.TCPConn) *Client {
@@ -79,7 +77,7 @@ func (c *Client) SendRaw(packet interface{}) error {
 	bytes, size := internal.BytesFromStruct(packet)
 
 	if debug.Enabled() {
-		debug.SendServerPacketToAnalyzer(c.Extension.DebugInfo(), bytes, uint16(size))
+		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, uint16(size))
 	}
 
 	return c.transmit(bytes, uint16(size))
@@ -101,17 +99,17 @@ func (c *Client) transmit(data []byte, length uint16) error {
 	return nil
 }
 
-// send converts a packet struct to bytes and encrypts it before  using the
+// Send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
 func (c *Client) Send(packet interface{}) error {
 	data, length := internal.BytesFromStruct(packet)
-	bytes, size := adjustPacketLength(data, uint16(length), c.Extension.HeaderSize())
+	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
 	if debug.Enabled() {
-		debug.SendServerPacketToAnalyzer(c.Extension.DebugInfo(), bytes, size)
+		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, size)
 	}
 
-	c.Extension.Encrypt(bytes, uint32(size))
+	c.CryptoSession.Encrypt(bytes, uint32(size))
 	return c.transmit(bytes, size)
 }
 

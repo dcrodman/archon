@@ -7,8 +7,8 @@ package encryption
 
 import "fmt"
 
-// The Blowfish block size in bytes.
-const bbBlockSize = 8
+// BlowfishBlockSize is the Blowfish block size in bytes.
+const BlowfishBlockSize = 8
 
 // A blowfishCipher is an instance of Blowfish encryption using a particular key.
 type blowfishCipher struct {
@@ -30,7 +30,7 @@ func newCipher(key []byte) (psoCipher, error) {
 }
 
 func (c *blowfishCipher) blockSize() int {
-	return bbBlockSize
+	return BlowfishBlockSize
 }
 
 // Encrypt encrypts the 8-byte buffer src using the key k

@@ -112,7 +112,7 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 	defer wg.Done()
 
 	c := client.NewClient(connection)
-	c.Extension = f.Backend.CreateExtension()
+	f.Backend.SetUpClient(c)
 
 	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
 
@@ -157,8 +157,8 @@ func (f *Frontend) processPackets(ctx context.Context, c *client.Client) {
 		}
 
 		if archdebug.Enabled() {
-			size := determinePacketSize(buffer, c.Extension.HeaderSize())
-			archdebug.SendClientPacketToAnalyzer(c.Extension.DebugInfo(), buffer, uint16(size))
+			size := determinePacketSize(buffer, c.CryptoSession.HeaderSize())
+			archdebug.SendClientPacketToAnalyzer(c.DebugTags, buffer, uint16(size))
 		}
 
 		if err = f.Backend.Handle(ctx, c, buffer); err != nil {
@@ -189,14 +189,14 @@ func (*Frontend) closeConnectionAndRecover(serverName string, c *client.Client) 
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
 func (f *Frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
-	headerSize := int(c.Extension.HeaderSize())
+	headerSize := int(c.CryptoSession.HeaderSize())
 
 	// Read and decrypt the packet header.
 	if err := f.readDataFromClient(c, headerSize, buffer); err != nil {
 		return buffer, err
 	}
 
-	c.Extension.Decrypt(buffer[:headerSize], uint32(headerSize))
+	c.CryptoSession.Decrypt(buffer[:headerSize], uint32(headerSize))
 
 	packetSize := determinePacketSize(buffer[:2], uint16(headerSize))
 
@@ -212,7 +212,7 @@ func (f *Frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, erro
 		return buffer, err
 	}
 
-	c.Extension.Decrypt(buffer[headerSize:packetSize], uint32(packetSize-headerSize))
+	c.CryptoSession.Decrypt(buffer[headerSize:packetSize], uint32(packetSize-headerSize))
 
 	return buffer, nil
 }

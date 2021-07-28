@@ -9,8 +9,8 @@ import (
 	"fmt"
 )
 
-// Number of bytes the block cipher operates on at once.
-const pcBlockSize = 4
+// PSOPCBlockSize is the number of bytes the block cipher operates on at once.
+const PSOPCBlockSize = 4
 
 type pcCipher struct {
 	seed     uint32
@@ -33,7 +33,7 @@ func newPCCipher(key []byte) (psoCipher, error) {
 }
 
 func (crypt *pcCipher) blockSize() int {
-	return pcBlockSize
+	return PSOPCBlockSize
 }
 
 // Initialize the cipher.

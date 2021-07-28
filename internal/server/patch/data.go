@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/dcrodman/archon"
-	crypto "github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -34,24 +33,20 @@ func (s *DataServer) Init(ctx context.Context) error {
 	return initializePatchData()
 }
 
-func (s *DataServer) CreateExtension() client.ClientExtension {
-	return &patchClientExtension{
-		clientCrypt:   crypto.NewPCCrypt(),
-		serverCrypt:   crypto.NewPCCrypt(),
-		filesToUpdate: make(map[int]*fileEntry),
-	}
+func (s *DataServer) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewPCCryptoSession()
+	c.FilesToUpdate = make(map[int]interface{})
+	c.DebugTags["server_type"] = "data"
 }
 
 func (s *DataServer) Handshake(c *client.Client) error {
-	ext := c.Extension.(*patchClientExtension)
-
 	// Send the welcome packet to a client with the copyright message and encryption vectors.
 	pkt := packets.PatchWelcome{
 		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
-	copy(pkt.ServerVector[:], ext.serverCrypt.Vector)
-	copy(pkt.ClientVector[:], ext.clientCrypt.Vector)
+	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
+	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
 	return c.SendRaw(pkt)
 }
@@ -166,8 +161,7 @@ func (s *DataServer) handleFileStatus(c *client.Client, fileStatus *packets.File
 	patchFile := patchIndex[fileStatus.PatchID]
 
 	if fileStatus.Checksum != patchFile.checksum || fileStatus.FileSize != patchFile.fileSize {
-		ext := c.Extension.(*patchClientExtension)
-		ext.filesToUpdate[int(fileStatus.PatchID)] = patchFile
+		c.FilesToUpdate[int(fileStatus.PatchID)] = patchFile
 	}
 }
 
@@ -176,9 +170,9 @@ func (s *DataServer) handleFileStatus(c *client.Client, fileStatus *packets.File
 func (s *DataServer) updateClientFiles(c *client.Client) error {
 	var numFiles, totalSize uint32 = 0, 0
 
-	for _, patch := range c.Extension.(*patchClientExtension).filesToUpdate {
+	for _, patch := range c.FilesToUpdate {
 		numFiles++
-		totalSize += patch.fileSize
+		totalSize += patch.(*fileEntry).fileSize
 	}
 
 	if numFiles > 0 {
@@ -209,11 +203,9 @@ func (s *DataServer) traverseAndUpdate(c *client.Client, node *directoryNode) er
 		return err
 	}
 
-	ext := c.Extension.(*patchClientExtension)
-
 	for _, file := range node.patchFiles {
-		if entry, ok := ext.filesToUpdate[int(file.index)]; ok {
-			if err := s.updateClientFile(c, entry); err != nil {
+		if entry, ok := c.FilesToUpdate[int(file.index)]; ok {
+			if err := s.updateClientFile(c, entry.(*fileEntry)); err != nil {
 				return err
 			}
 		}
