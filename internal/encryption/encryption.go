@@ -23,27 +23,6 @@ type PSOCrypt struct {
 	Vector []uint8
 }
 
-// Generate a cryptographically secure random string of bytes.
-func createKey(size int) []byte {
-	key := make([]byte, size)
-
-	for i := 0; i < size; i++ {
-		if err := binary.Read(rand.Reader, binary.LittleEndian, &key[i]); err != nil {
-			panic(fmt.Errorf("error creating key: %v", err))
-		}
-	}
-
-	return key
-}
-
-// Condense four bytes into a LE 32-bit value.
-func le(b []byte) uint32 {
-	for i := 3; len(b) < 4; i-- {
-		b = append(b, 0)
-	}
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
-}
-
 // Returns a newly allocated PSOCrypt with randomly generated, appropriately
 // sized keys for encrypting packets over PSOPC connections.
 func NewPCCrypt() *PSOCrypt {
@@ -88,4 +67,25 @@ func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
 		block := data[i : i+blockSize]
 		crypt.cipher.decrypt(block)
 	}
+}
+
+// Generate a cryptographically secure random string of bytes.
+func createKey(size int) []byte {
+	key := make([]byte, size)
+
+	for i := 0; i < size; i++ {
+		if err := binary.Read(rand.Reader, binary.LittleEndian, &key[i]); err != nil {
+			panic(fmt.Errorf("error creating key: %v", err))
+		}
+	}
+
+	return key
+}
+
+// Condense four bytes into a LE 32-bit value.
+func toLittleEndian(b []byte) uint32 {
+	for i := 3; len(b) < 4; i-- {
+		b = append(b, 0)
+	}
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }

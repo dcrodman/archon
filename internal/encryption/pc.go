@@ -1,41 +1,43 @@
-// PSOPC encryption algorithm. Implementation based on (and in some cases basically
-// copied from) the encryption library included with Fuzziqer Software's newserv code.
+// PSOPC encryption algorithm.
 //
-// Note: The cipher used PC/Gamecrube is not symmetrical in that decrypting a block
-// previously encrypted with this cipher will not yield the same result due (I think)
-// to the key rotations.
+// The cipher used PC/Gamecrube is not symmetrical in that decrypting a block
+// previously encrypted with this cipher will not yield the same result due
+// (I think) to the key rotations.
 package encryption
 
-import "strconv"
+import (
+	"fmt"
+)
 
-const PCBlockSize = 4
+// Number of bytes the block cipher operates on at once.
+const pcBlockSize = 4
 
-type PCCrypt struct {
+type pcCipher struct {
 	seed     uint32
 	position uint32
 	keys     []uint32
 }
 
-type PCKeySizeError int
-
-func (k PCKeySizeError) Error() string {
-	return "encryption/pccrypt: invalid key size " + strconv.Itoa(int(k))
-}
-
 func newPCCipher(key []byte) (psoCipher, error) {
 	if len(key) > 4 {
-		return nil, PCKeySizeError(1)
+		return nil, fmt.Errorf("encryption/pccrypt: invalid key size %d", key)
 	}
 	// Key is expected to be in little endian.
-	crypt := &PCCrypt{seed: le(key), position: 0, keys: make([]uint32, 57)}
+	crypt := &pcCipher{
+		seed:     toLittleEndian(key),
+		position: 0,
+		keys:     make([]uint32, 57),
+	}
 	crypt.createKeys()
 	return crypt, nil
 }
 
-func (crypt *PCCrypt) blockSize() int { return PCBlockSize }
+func (crypt *pcCipher) blockSize() int {
+	return pcBlockSize
+}
 
 // Initialize the cipher.
-func (crypt *PCCrypt) createKeys() {
+func (crypt *pcCipher) createKeys() {
 	x := uint32(1)
 	key := crypt.seed
 	crypt.keys[56], crypt.keys[55] = key, key
@@ -55,7 +57,7 @@ func (crypt *PCCrypt) createKeys() {
 	crypt.position = 56
 }
 
-func (crypt *PCCrypt) mixKeys() {
+func (crypt *pcCipher) mixKeys() {
 	initial := 1
 	for i := 0x18; i > 0; i-- {
 		x := crypt.keys[initial+0x1F]
@@ -74,7 +76,7 @@ func (crypt *PCCrypt) mixKeys() {
 	}
 }
 
-func (crypt *PCCrypt) getNextKey() uint32 {
+func (crypt *pcCipher) getNextKey() uint32 {
 	var re uint32
 	if crypt.position == 56 {
 		crypt.mixKeys()
@@ -85,19 +87,19 @@ func (crypt *PCCrypt) getNextKey() uint32 {
 	return re
 }
 
-func (crypt *PCCrypt) encrypt(src []byte) {
+func (crypt *pcCipher) encrypt(src []byte) {
 	crypt.process(src, len(src))
 }
 
-func (crypt *PCCrypt) decrypt(src []byte) {
+func (crypt *pcCipher) decrypt(src []byte) {
 	crypt.process(src, len(src))
 }
 
 // Perform the actual encryption/decryption. The operation is
 // symmetrical, so the same algorithm can be applied for both.
-func (crypt *PCCrypt) process(data []byte, size int) {
+func (crypt *pcCipher) process(data []byte, size int) {
 	for x := 0; x < size; x += 4 {
-		tmp := le(data[x : x+4])
+		tmp := toLittleEndian(data[x : x+4])
 		tmp ^= crypt.getNextKey()
 		// Stick the data back in LE order.
 		data[x] = byte(tmp)
