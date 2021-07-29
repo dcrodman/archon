@@ -32,7 +32,10 @@ func LoadConfig(configPath string) {
 		os.Exit(1)
 	}
 	viper.SetConfigName(overrideConfigName)
-	viper.MergeInConfig()
+
+	if err := viper.MergeInConfig(); err != nil {
+		panic(fmt.Errorf("viper.MergeInConfig returned error: %v", err))
+	}
 }
 
 // BroadcastIP converts the configured broadcast IP string into 4 bytes to be used

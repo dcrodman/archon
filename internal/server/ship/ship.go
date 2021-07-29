@@ -219,6 +219,9 @@ func (s *Server) handleMenuSelection(c *client.Client, pkt *packets.MenuSelectio
 	if pkt.MenuID == 1 && pkt.ItemID == 1 {
 		// TODO check with multiple servers
 		err = s.handleShipSelection(c, pkt.ItemID-1)
+		if err != nil {
+			return err
+		}
 	}
 	switch pkt.ItemID & 0xFF000000 {
 	case blockListMenuType:

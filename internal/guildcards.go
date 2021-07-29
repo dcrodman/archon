@@ -19,6 +19,6 @@ type GuildcardDataEntry struct {
 	Language    uint8
 	SectionID   uint8
 	CharClass   uint8
-	padding     uint32
+	Padding     uint32
 	Comment     [176]byte
 }

@@ -85,7 +85,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.PatchWelcomeType:
 		err = s.sendWelcomeAck(c)
 	case packets.PatchHandshakeType:
-		if err := s.sendWelcomeMessage(c); err == nil {
+		if err = s.sendWelcomeMessage(c); err == nil {
 			err = s.sendPatchRedirect(c)
 		}
 	default:
