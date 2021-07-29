@@ -98,11 +98,10 @@ Assuming Go installed:
 
     git clone https://github.com/dcrodman/archon.git
     cd archon
-    mkdir .bin
-    export GOBIN=$(pwd)/.bin
-    go install ./cmd/*
+    mkdir bin
+    go build -o bin ./cmd/*
     
-This will install the Archon server and tools to the `.bin` subdirectory in the root 
+This will install the Archon server and tools to the `bin` subdirectory in the root 
 of your project's directory.
 
 ### 2. Create a directory for the server files
@@ -113,7 +112,7 @@ go this route then from the directory in which you want the server files to resi
 
     mkdir archon_server
     cd archon_server
-    cp path-to-cloned-code/.bin/* .
+    cp path-to-cloned-code/bin/* .
 
 In the following steps you'll need to update `config.yaml` with the full path to
 any subdirectories you create (for instance, `patch_server.patch_dir`).

@@ -67,15 +67,13 @@ fi
 
 pushd "$INSTALL_DIR" > /dev/null 2>&1
 
-mkdir .bin
-export GOBIN="$(pwd)/.bin"
-
+mkdir bin
 pushd "$SETUP_DIR"/.. > /dev/null 2>&1
-go install ./cmd/*
+go build -o bin ./cmd/*
 popd > /dev/null 2>&1
 
 # Copy compiled binaries to the server folder.
-cp .bin/* "$INSTALL_DIR"
+cp bin/* "$INSTALL_DIR"
 
 # Copy all setup files to the server folder.
 cp -r "$SETUP_DIR"/* .
