@@ -50,6 +50,7 @@ func NewClient(connection *net.TCPConn) *Client {
 		connection: connection,
 		ipAddr:     addr[0],
 		port:       addr[1],
+		DebugTags:  make(map[string]interface{}),
 	}
 }
 
