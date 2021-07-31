@@ -146,7 +146,9 @@ func main() {
 	}
 
 	// Register a SIGTERM handler so that Ctrl-C will shut the servers down gracefully.
-	registerExitHandler(cancel, &serverWg)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go exitHandler(cancel, c, &serverWg)
 
 	serverWg.Wait()
 }
@@ -168,20 +170,25 @@ func buildAddress(port interface{}) string {
 	return fmt.Sprintf("%s:%v", viper.GetString("hostname"), port)
 }
 
-func registerExitHandler(cancelFn func(), wg ...*sync.WaitGroup) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+func exitHandler(cancelFn func(), c chan os.Signal, wg ...*sync.WaitGroup) {
+	<-c
+	archon.Log.Infof("shutting down...")
 
+	cancelFn()
+	exitChan := make(chan bool)
 	go func() {
-		<-c
-		archon.Log.Infof("shutting down...")
-
-		cancelFn()
 		// TODO: add a timeout here.
 		for _, wg := range wg {
 			wg.Wait()
 		}
-
-		os.Exit(0)
+		exitChan <- true
 	}()
+
+	select {
+	case <-c:
+		archon.Log.Info("hard exiting (killed)")
+	case <-exitChan:
+	}
+
+	os.Exit(0)
 }
