@@ -59,7 +59,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err := s.handleLogin(c, &loginPkt)
+		err = s.handleLogin(c, &loginPkt)
 	default:
 		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
