@@ -3,15 +3,14 @@ package shipgate
 import (
 	"context"
 	"fmt"
-	"github.com/dcrodman/archon/internal/auth"
-	"google.golang.org/grpc/metadata"
 	"sync"
 	"time"
 
 	"github.com/dcrodman/archon"
-	"google.golang.org/protobuf/types/known/emptypb"
-
+	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type ship struct {

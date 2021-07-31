@@ -2,12 +2,13 @@ package login
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
 	"github.com/dcrodman/archon/internal/server/shipgate"
-	"strconv"
 )
 
 // Copyright message expected by the client when connecting.
@@ -102,35 +103,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
-		return err
-	}
 	return s.sendCharacterRedirect(c)
-}
-
-// sendSecurity transmits initialization packet with information about the user's
-// authentication status.
-func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
-	// Constants set according to how Newserv does it.
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
-		ErrorCode:    errorCode,
-		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
-		Config:       c.Config,
-		Capabilities: 0x00000102,
-	})
-}
-
-// Sends a message to the client. In this case whatever message is sent
-// here will be displayed in a dialog box after the patch screen.
-func (s *Server) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  internal.ConvertToUtf16(message),
-	})
 }
 
 // Send the IP address and port of the character server to  which the client will

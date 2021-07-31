@@ -3,16 +3,17 @@ package shipgate
 import (
 	"context"
 	"fmt"
-	"github.com/dcrodman/archon/internal/auth"
-	"github.com/dcrodman/archon/internal/data"
-	"github.com/dcrodman/archon/internal/server/client"
-	"google.golang.org/grpc/metadata"
-	"gorm.io/gorm"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dcrodman/archon/internal/auth"
+	"github.com/dcrodman/archon/internal/data"
+	"github.com/dcrodman/archon/internal/server/client"
+	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
 
 	"github.com/dcrodman/archon"
 	"github.com/golang/protobuf/ptypes/empty"

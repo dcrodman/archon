@@ -171,10 +171,6 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	c.Guildcard = uint32(account.Guildcard)
 	c.Account = account
 
-	if err = s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
-		return err
-	}
-
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
 	if loginPkt.Phase == packets.ShipSelection {
@@ -190,31 +186,6 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	}
 
 	return nil
-}
-
-// send the security initialization packet with information about the user's
-// authentication status.
-func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
-	// Constants set according to how Newserv does it.
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
-		ErrorCode:    errorCode,
-		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
-		Config:       c.Config,
-		Capabilities: 0x00000102,
-	})
-}
-
-// Sends a message to the client. In this case whatever message is sent
-// here will be displayed in a dialog box after the patch screen.
-func (s *Server) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  internal.ConvertToUtf16(message),
-	})
 }
 
 // Send a timestamp packet in order to indicate the server's current time.
