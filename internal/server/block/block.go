@@ -2,9 +2,16 @@ package block
 
 import (
 	"context"
+	"strings"
 
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/auth"
+	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
+	"github.com/dcrodman/archon/internal/server/internal"
 )
+
+var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 type Server struct {
 	name string
@@ -25,96 +32,83 @@ func (s *Server) Init(ctx context.Context) error {
 }
 
 func (s *Server) SetUpClient(c *client.Client) {
-	panic("not implemented") // TODO: Implement
+	c.CryptoSession = client.NewBlueBurstCryptoSession()
+	c.DebugTags["server_type"] = "block"
 }
 
 func (s *Server) Handshake(c *client.Client) error {
-	panic("not implemented") // TODO: Implement
+	pkt := &packets.Welcome{
+		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
+		Copyright:    [96]byte{},
+		ServerVector: [48]byte{},
+		ClientVector: [48]byte{},
+	}
+	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
+	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
+
+	return c.SendRaw(pkt)
 }
 
 func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	panic("not implemented") // TODO: Implement
+	var packetHeader packets.BBHeader
+	internal.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
+
+	var err error
+	switch packetHeader.Type {
+	case packets.LoginType:
+		var loginPkt packets.Login
+		internal.StructFromBytes(data, &loginPkt)
+		err = s.handleLogin(c, &loginPkt)
+	default:
+		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+	}
+	return err
 }
 
-//
-//func (server *BlockServer) Init() error {
-//	// Precompute our lobby list since this won't change once the server has started.
-//	server.lobbyPkt.Header.Size = archon.BBHeaderSize
-//	server.lobbyPkt.Header.Type = archon.LobbyListType
-//	server.lobbyPkt.Header.Flags = uint32(archon.Config.BlockServer.NumLobbies)
-//	for i := 0; i <= archon.Config.BlockServer.NumLobbies; i++ {
-//		server.lobbyPkt.Lobbies = append(server.lobbyPkt.Lobbies, struct {
-//			MenuId  uint32
-//			LobbyId uint32
-//			Padding uint32
-//		}{
-//			MenuId:  0x1A0001,
-//			LobbyId: uint32(i),
-//			Padding: 0,
-//		})
-//		server.lobbyPkt.Header.Size += 12
-//	}
-//	return nil
-//}
-//
-//func (server *BlockServer) NewClient(conn *net.TCPConn) (*server.Client, error) {
-//	return ship.NewShipClient(conn)
-//}
-//
-//func (server *BlockServer) Handle(c *server.Client) error {
-//	var hdr archon.BBHeader
-//	util.StructFromBytes(c.Data()[:archon.BBHeaderSize], &hdr)
-//
-//	var err error
-//	switch hdr.Type {
-//	case archon.LoginType:
-//		err = server.handleShipLogin(c)
-//	default:
-//		archon.Log.Infof("Received unknown packet %02x from %s", hdr.Type, c.IPAddr())
-//	}
-//	return err
-//}
-//
-//func (server *BlockServer) handleShipLogin(c *server.Client) error {
-//	if _, err := archon.VerifyAccount(c); err != nil {
-//		return err
-//	}
-//	if err := server.sendSecurity(c, archon.BBLoginErrorNone, c.guildcard, c.teamId); err != nil {
-//		return err
-//	}
-//	if err := server.sendBlockList(c); err != nil {
-//		return err
-//	}
-//	return server.sendLobbyList(c)
-//}
-//
-//func (server *BlockServer) sendSecurity(client *server.Client, errorCode archon.BBLoginError,
-//	guildcard uint32, teamId uint32) error {
-//	// Constants set according to how Newserv does it.
-//	pkt := &archon.SecurityPacket{
-//		Header:       archon.BBHeader{Type: archon.LoginSecurityType},
-//		ErrorCode:    uint32(errorCode),
-//		PlayerTag:    0x00010000,
-//		Guildcard:    guildcard,
-//		TeamId:       teamId,
-//		Config:       &client.config,
-//		Capabilities: 0x00000102,
-//	}
-//
-//	archon.Log.Debug("Sending Security Packet")
-//	return archon.EncryptAndSend(client, pkt)
-//}
-//
-//// send the client the block list on the selection screen.
-//func (server *BlockServer) sendBlockList(client *server.Client) error {
-//	//data, size := util.BytesFromStruct(pkt)
-//	archon.Log.Debug("Sending Block Packet - NOT IMPLEMENTED")
-//	//return client.SendEncrypted(data, size)
-//	return nil
-//}
-//
-//// send the client the lobby list on the selection screen.
-//func (server *BlockServer) sendLobbyList(client *server.Client) error {
-//	archon.Log.Debug("Sending Lobby List Packet")
-//	return archon.EncryptAndSend(client, server.lobbyPkt)
-//}
+func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
+	username := string(internal.StripPadding(loginPkt.Username[:]))
+	password := string(internal.StripPadding(loginPkt.Password[:]))
+
+	if _, err := auth.VerifyAccount(username, password); err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return sendErr
+			}
+			return err
+		}
+	}
+
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return err
+	}
+
+	// TODO: Packets 0x83 and 0xE7
+	return nil
+}
+
+func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+	return c.Send(&packets.Security{
+		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamID:       c.TeamID,
+		Config:       c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+func (s *Server) sendMessage(c *client.Client, message string) error {
+	return c.Send(&packets.LoginClientMessage{
+		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
+}
