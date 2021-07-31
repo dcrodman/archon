@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -46,14 +45,14 @@ type Server struct {
 	name               string
 	blocks             []Block
 	grpcShipgateClient api.ShipgateServiceClient
-	shipListClient     *shipgate.ShipListClient
+	shipGateClient     *shipgate.ShipGateClient
 }
 
 func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
 	return &Server{
 		name:           name,
 		blocks:         blocks,
-		shipListClient: shipgate.NewShipListClient(shipgateAddr),
+		shipGateClient: shipgate.NewShipGateClient(shipgateAddr),
 	}
 }
 
@@ -87,7 +86,7 @@ func (s *Server) Init(ctx context.Context) error {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipGateClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -122,7 +121,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err = s.handleShipLogin(c, &loginPkt)
+		err = s.handleShipLogin(ctx, c, &loginPkt)
 	case packets.MenuSelectType:
 		var menuSelectPkt packets.MenuSelection
 		internal.StructFromBytes(data, &menuSelectPkt)
@@ -133,49 +132,20 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleShipLogin(c *client.Client, loginPkt *packets.Login) error {
+func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if _, err := auth.VerifyAccount(username, password); err != nil {
-		switch err {
-		case auth.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
-		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
-			if sendErr == nil {
-				return sendErr
-			}
-			return err
-		}
-	}
-
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+	if _, err := s.shipGateClient.AuthenticateAccount(
+		ctx,
+		c,
+		username,
+		password,
+	); err != nil {
 		return err
 	}
+
 	return s.sendBlockList(c)
-}
-
-func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
-		ErrorCode:    errorCode,
-		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
-		Config:       c.Config,
-		Capabilities: 0x00000102,
-	})
-}
-
-func (s *Server) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  internal.ConvertToUtf16(message),
-	})
 }
 
 // send the client the block list on the selection screen.
@@ -255,7 +225,7 @@ func (s *Server) handleBlockSelection(c *client.Client, selection uint32) error 
 }
 
 func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipListClient.GetConnectedShipList()
+	shipList := s.shipGateClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -274,7 +244,7 @@ func (s *Server) sendShipList(c *client.Client) error {
 
 // Player selected one of the items on the ship select screen.
 func (s *Server) handleShipSelection(c *client.Client, selection uint32) error {
-	ip, port, err := s.shipListClient.GetSelectedShipAddress(selection)
+	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selection)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selection)
 	}

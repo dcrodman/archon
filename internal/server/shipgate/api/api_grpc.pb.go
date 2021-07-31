@@ -24,6 +24,9 @@ type ShipgateServiceClient interface {
 	GetActiveShips(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ShipList, error)
 	// RegisterShip informs the shipgate that it is able to serve players.
 	RegisterShip(ctx context.Context, in *RegistrationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// AuthenticateAccount verifies an account. A password should be provided
+	// via the rpc call metadata.
+	AuthenticateAccount(ctx context.Context, in *AccountAuthRequest, opts ...grpc.CallOption) (*AccountAuthResponse, error)
 }
 
 type shipgateServiceClient struct {
@@ -52,6 +55,15 @@ func (c *shipgateServiceClient) RegisterShip(ctx context.Context, in *Registrati
 	return out, nil
 }
 
+func (c *shipgateServiceClient) AuthenticateAccount(ctx context.Context, in *AccountAuthRequest, opts ...grpc.CallOption) (*AccountAuthResponse, error) {
+	out := new(AccountAuthResponse)
+	err := c.cc.Invoke(ctx, "/api.ShipgateService/AuthenticateAccount", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ShipgateServiceServer is the server API for ShipgateService service.
 // All implementations must embed UnimplementedShipgateServiceServer
 // for forward compatibility
@@ -61,6 +73,9 @@ type ShipgateServiceServer interface {
 	GetActiveShips(context.Context, *emptypb.Empty) (*ShipList, error)
 	// RegisterShip informs the shipgate that it is able to serve players.
 	RegisterShip(context.Context, *RegistrationRequest) (*emptypb.Empty, error)
+	// AuthenticateAccount verifies an account. A password should be provided
+	// via the rpc call metadata.
+	AuthenticateAccount(context.Context, *AccountAuthRequest) (*AccountAuthResponse, error)
 	mustEmbedUnimplementedShipgateServiceServer()
 }
 
@@ -73,6 +88,9 @@ func (UnimplementedShipgateServiceServer) GetActiveShips(context.Context, *empty
 }
 func (UnimplementedShipgateServiceServer) RegisterShip(context.Context, *RegistrationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterShip not implemented")
+}
+func (UnimplementedShipgateServiceServer) AuthenticateAccount(context.Context, *AccountAuthRequest) (*AccountAuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AuthenticateAccount not implemented")
 }
 func (UnimplementedShipgateServiceServer) mustEmbedUnimplementedShipgateServiceServer() {}
 
@@ -123,6 +141,24 @@ func _ShipgateService_RegisterShip_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ShipgateService_AuthenticateAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AccountAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ShipgateServiceServer).AuthenticateAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.ShipgateService/AuthenticateAccount",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ShipgateServiceServer).AuthenticateAccount(ctx, req.(*AccountAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ShipgateService_ServiceDesc is the grpc.ServiceDesc for ShipgateService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -138,7 +174,11 @@ var ShipgateService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RegisterShip",
 			Handler:    _ShipgateService_RegisterShip_Handler,
 		},
+		{
+			MethodName: "AuthenticateAccount",
+			Handler:    _ShipgateService_AuthenticateAccount_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/server/shipgate/api/api.proto",
+	Metadata: "api.proto",
 }

@@ -2,14 +2,12 @@ package login
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/shipgate"
+	"strconv"
 )
 
 // Copyright message expected by the client when connecting.
@@ -22,11 +20,17 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 type Server struct {
 	name                  string
 	characterRedirectPort uint16
+	shipGateClient        *shipgate.ShipGateClient
 }
 
-func NewServer(name, characterPort string) *Server {
+func NewServer(name, characterPort, shipgateAddr string) *Server {
 	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
-	return &Server{name: name, characterRedirectPort: uint16(charPort)}
+
+	return &Server{
+		name:                  name,
+		shipGateClient:        shipgate.NewShipGateClient(shipgateAddr),
+		characterRedirectPort: uint16(charPort),
+	}
 }
 
 func (s *Server) Name() string                   { return s.name }
@@ -60,7 +64,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err = s.handleLogin(c, &loginPkt)
+		err = s.handleLogin(ctx, c, &loginPkt)
 	case packets.DisconnectType:
 		// Just wait until we recv 0 from the client to disconnect.
 		break
@@ -71,23 +75,17 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if _, err := auth.VerifyAccount(username, password); err != nil {
-		switch err {
-		case auth.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
-		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
-			if sendErr == nil {
-				return sendErr
-			}
-			return err
-		}
+	if _, err := s.shipGateClient.AuthenticateAccount(
+		ctx,
+		c,
+		username,
+		password,
+	); err != nil {
+		return err
 	}
 
 	// The first time we receive this packet the loginClientExtension will have included the

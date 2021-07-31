@@ -3,8 +3,14 @@ package shipgate
 import (
 	"context"
 	"fmt"
+	"github.com/dcrodman/archon/internal/auth"
+	"github.com/dcrodman/archon/internal/data"
+	"github.com/dcrodman/archon/internal/server/client"
+	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +25,7 @@ import (
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
-type ShipListClient struct {
+type ShipGateClient struct {
 	shipgateAddress string
 	shipgateClient  api.ShipgateServiceClient
 
@@ -36,11 +42,11 @@ type shipInfo struct {
 	port string
 }
 
-func NewShipListClient(shipgateAddress string) *ShipListClient {
-	return &ShipListClient{shipgateAddress: shipgateAddress}
+func NewShipGateClient(shipgateAddress string) *ShipGateClient {
+	return &ShipGateClient{shipgateAddress: shipgateAddress}
 }
 
-func (s *ShipListClient) StartShipRefreshLoop(ctx context.Context) error {
+func (s *ShipGateClient) StartShipRefreshLoop(ctx context.Context) error {
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
 		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
@@ -64,7 +70,7 @@ func (s *ShipListClient) StartShipRefreshLoop(ctx context.Context) error {
 	return nil
 }
 
-func (s *ShipListClient) GetConnectedShipList() []packets.ShipListEntry {
+func (s *ShipGateClient) GetConnectedShipList() []packets.ShipListEntry {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
@@ -89,7 +95,7 @@ func (s *ShipListClient) GetConnectedShipList() []packets.ShipListEntry {
 	return shipList
 }
 
-func (s *ShipListClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
+func (s *ShipGateClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -102,10 +108,65 @@ func (s *ShipListClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, in
 	return shipIP, shipPort, nil
 }
 
+func (s *ShipGateClient) AuthenticateAccount(ctx context.Context, c *client.Client, username, password string) (*data.Account, error) {
+	md := metadata.New(map[string]string{
+		"authorization": password,
+	})
+
+	accountpb, err := s.shipgateClient.AuthenticateAccount(
+		metadata.NewOutgoingContext(ctx, md),
+		&api.AccountAuthRequest{Username: username},
+	)
+	if err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return nil, s.sendSecurity(c, packets.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return nil, s.sendSecurity(c, packets.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return nil, sendErr
+			}
+			return nil, err
+		}
+	}
+
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return nil, err
+	}
+
+	rd, err := time.Parse(time.RFC3339, accountpb.GetRegistrationDate())
+	if err != nil {
+		return nil, err
+	}
+
+	var pl byte
+	if b := accountpb.GetPriviledgeLevel(); len(b) != 0 {
+		pl = b[0]
+	}
+
+	return &data.Account{
+		Model: gorm.Model{
+			ID: uint(accountpb.Id),
+		},
+		Username:         accountpb.GetUsername(),
+		Password:         password,
+		Email:            accountpb.GetEmail(),
+		RegistrationDate: rd,
+		Guildcard:        int(accountpb.GetGuildcard()),
+		GM:               accountpb.GetGM(),
+		Banned:           accountpb.GetBanned(),
+		Active:           accountpb.GetActive(),
+		TeamID:           int(accountpb.TeamId),
+		PrivilegeLevel:   pl,
+	}, nil
+}
+
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (s *ShipListClient) startShipListRefreshLoop(ctx context.Context) {
+func (s *ShipGateClient) startShipListRefreshLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -118,7 +179,7 @@ func (s *ShipListClient) startShipListRefreshLoop(ctx context.Context) {
 	}
 }
 
-func (s *ShipListClient) refreshShipList() error {
+func (s *ShipGateClient) refreshShipList() error {
 	response, err := s.shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch ships from shipgate: %s", err)
@@ -138,4 +199,24 @@ func (s *ShipListClient) refreshShipList() error {
 	s.connectedShips = ships
 	s.connectedShipsMutex.Unlock()
 	return nil
+}
+
+func (s *ShipGateClient) sendSecurity(c *client.Client, errorCode uint32) error {
+	return c.Send(&packets.Security{
+		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamID:       c.TeamID,
+		Config:       c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+func (s *ShipGateClient) sendMessage(c *client.Client, message string) error {
+	return c.Send(&packets.LoginClientMessage{
+		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
 }

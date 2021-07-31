@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/spf13/viper"
 
 	internal2 "github.com/dcrodman/archon/internal"
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/packets"
@@ -56,13 +54,13 @@ var (
 type Server struct {
 	name           string
 	kvCache        *internal.Cache
-	shipListClient *shipgate.ShipListClient
+	shipGateClient *shipgate.ShipGateClient
 }
 
 func NewServer(name string, shipgateAddr string) *Server {
 	return &Server{
 		name:           name,
-		shipListClient: shipgate.NewShipListClient(shipgateAddr),
+		shipGateClient: shipgate.NewShipGateClient(shipgateAddr),
 		kvCache:        internal.NewCache(),
 	}
 }
@@ -77,7 +75,7 @@ func (s *Server) Init(ctx context.Context) error {
 	}
 
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipGateClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -112,7 +110,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err = s.handleLogin(c, &loginPkt)
+		err = s.handleLogin(ctx, c, &loginPkt)
 	case packets.LoginOptionsRequestType:
 		err = s.handleOptionsRequest(c)
 	case packets.LoginCharPreviewReqType:
@@ -155,25 +153,18 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
-	account, err := auth.VerifyAccount(
-		string(internal.StripPadding(loginPkt.Username[:])),
-		string(internal.StripPadding(loginPkt.Password[:])),
-	)
+func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+	username := string(internal.StripPadding(loginPkt.Username[:]))
+	password := string(internal.StripPadding(loginPkt.Password[:]))
 
+	account, err := s.shipGateClient.AuthenticateAccount(
+		ctx,
+		c,
+		username,
+		password,
+	)
 	if err != nil {
-		switch err {
-		case auth.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
-		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
-			if sendErr == nil {
-				return sendErr
-			}
-			return err
-		}
+		return err
 	}
 
 	c.TeamID = uint32(account.TeamID)
@@ -243,7 +234,7 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipListClient.GetConnectedShipList()
+	shipList := s.shipGateClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -654,7 +645,7 @@ func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
 	selectedShip := menuSelectionPkt.ItemID - 1
-	ip, port, err := s.shipListClient.GetSelectedShipAddress(selectedShip)
+	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selectedShip)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selectedShip)
 	}

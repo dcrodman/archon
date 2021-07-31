@@ -2,7 +2,11 @@ package shipgate
 
 import (
 	"context"
+	"fmt"
+	"github.com/dcrodman/archon/internal/auth"
+	"google.golang.org/grpc/metadata"
 	"sync"
+	"time"
 
 	"github.com/dcrodman/archon"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -70,4 +74,34 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 		archon.Log.Infof("SHIPGATE registered ship %s at %s:%s", req.Name, req.Address, req.Port)
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (s *shipgateServiceServer) AuthenticateAccount(ctx context.Context, req *api.AccountAuthRequest) (*api.AccountAuthResponse, error) {
+	md, exists := metadata.FromIncomingContext(ctx)
+	if !exists || md.Len() == 0 {
+		return nil, fmt.Errorf("no metadata provided on request")
+	}
+
+	creds := md.Get("authorization")
+	if len(creds) == 0 {
+		return nil, fmt.Errorf("no authorization provided in request metadata")
+	}
+
+	account, err := auth.VerifyAccount(req.GetUsername(), creds[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.AccountAuthResponse{
+		Id:               uint64(account.ID),
+		Username:         account.Username,
+		Email:            account.Email,
+		RegistrationDate: account.RegistrationDate.Format(time.RFC3339),
+		Guildcard:        int64(account.Guildcard),
+		GM:               account.GM,
+		Banned:           account.Banned,
+		Active:           account.Active,
+		TeamId:           int64(account.TeamID),
+		PriviledgeLevel:  []byte{account.PrivilegeLevel},
+	}, nil
 }

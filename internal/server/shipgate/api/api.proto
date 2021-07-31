@@ -17,19 +17,41 @@ message ShipList {
 }
 
 message RegistrationRequest {
-    string name = 1;
-    string address = 2;
-    string port = 3;
-    int32 maxPlayers = 4;
+  string name = 1;
+  string address = 2;
+  string port = 3;
+  int32 maxPlayers = 4;
+}
+
+message AccountAuthRequest {
+  string username = 1;
+}
+
+message AccountAuthResponse {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
+  string registration_date = 4;
+  int64 guildcard = 5;
+  bool GM = 6;
+  bool banned = 7;
+  bool active = 8;
+  int64 team_id = 9;
+  bytes priviledge_level = 10;
 }
 
 // ShipgateService provides game functionality and is intended for use by
 // ship servers serving players.
 service ShipgateService{
-    // GetActiveShips returns the list of Ships that currently connected to the
+  // GetActiveShips returns the list of Ships that currently connected to the
   // shipgate and ready to receive players.
   rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
 
   // RegisterShip informs the shipgate that it is able to serve players.
   rpc RegisterShip(RegistrationRequest) returns (google.protobuf.Empty);
+
+  // AuthenticateAccount verifies an account. A password should be provided
+  // via the rpc call metadata.
+  rpc AuthenticateAccount(AccountAuthRequest) returns (AccountAuthResponse);
 }
+
