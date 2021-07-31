@@ -261,13 +261,3 @@ type Block struct {
 	Padding   uint16
 	BlockName [36]byte
 }
-
-// Available lobbies on a block.
-type LobbyList struct {
-	Header  BBHeader
-	Lobbies []struct {
-		MenuID  uint32
-		LobbyID uint32
-		Padding uint32
-	}
-}

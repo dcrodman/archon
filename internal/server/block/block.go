@@ -14,12 +14,14 @@ import (
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 type Server struct {
-	name string
+	name       string
+	numLobbies int
 }
 
-func NewServer(name string) *Server {
+func NewServer(name string, lobbies int) *Server {
 	return &Server{
-		name: name,
+		name:       name,
+		numLobbies: lobbies,
 	}
 }
 
@@ -70,6 +72,7 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
+	// TODO: Use shipgate to auth instead.
 	if _, err := auth.VerifyAccount(username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
@@ -88,8 +91,11 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
 	}
+	if err := s.sendLobbyList(c); err != nil {
+		return err
+	}
+	// TODO: Send 0xE7
 
-	// TODO: Packets 0x83 and 0xE7
 	return nil
 }
 
@@ -110,5 +116,21 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  internal.ConvertToUtf16(message),
+	})
+}
+
+func (s *Server) sendLobbyList(c *client.Client) error {
+	lobbyEntries := make([]packets.LobbyListEntry, s.numLobbies)
+	for i := 0; i < s.numLobbies; i++ {
+		lobbyEntries[i].MenuID = 0x001A0001
+		lobbyEntries[i].LobbyID = uint32(i)
+	}
+
+	return c.Send(&packets.LobbyList{
+		Header: packets.BBHeader{
+			Type:  packets.LobbyListType,
+			Flags: 0x0F,
+		},
+		Lobbies: lobbyEntries,
 	})
 }

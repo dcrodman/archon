@@ -91,7 +91,7 @@ func main() {
 			Name: name, Address: address, ID: i,
 		})
 		blockServers = append(blockServers, &server.Frontend{
-			Address: address, Backend: block.NewServer(name),
+			Address: address, Backend: block.NewServer(name, viper.GetInt("block_server.num_lobbies")),
 		})
 	}
 
@@ -113,7 +113,7 @@ func main() {
 			Backend: character.NewServer("CHARACTER", shipgateAddr),
 		},
 		// TODO: Eventually the ship and block servers should be able to be run
-		// independently of the other four servers (and possibly each other).
+		// independently of the other four servers
 		{
 			Address: buildAddress(shipPort),
 			Backend: ship.NewServer("SHIP", blocks, shipgateAddr),
