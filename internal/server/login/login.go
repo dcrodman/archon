@@ -10,6 +10,7 @@ import (
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
+	"github.com/dcrodman/archon/internal/server/shipgate"
 )
 
 // Copyright message expected by the client when connecting.
@@ -22,15 +23,29 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 type Server struct {
 	name                  string
 	characterRedirectPort uint16
+	shipGateClient        *shipgate.Client
+	shipGateAddr          string
 }
 
-func NewServer(name, characterPort string) *Server {
+func NewServer(name, characterPort, shipgateAddr string) *Server {
 	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
-	return &Server{name: name, characterRedirectPort: uint16(charPort)}
+
+	return &Server{
+		name:                  name,
+		shipGateAddr:          shipgateAddr,
+		characterRedirectPort: uint16(charPort),
+	}
 }
 
-func (s *Server) Name() string                   { return s.name }
-func (s *Server) Init(ctx context.Context) error { return nil }
+func (s *Server) Name() string { return s.name }
+func (s *Server) Init(_ context.Context) error {
+	shipGateClient, err := shipgate.NewClient(s.shipGateAddr)
+	if err != nil {
+		return err
+	}
+	s.shipGateClient = shipGateClient
+	return nil
+}
 
 func (s *Server) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
@@ -60,7 +75,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err = s.handleLogin(c, &loginPkt)
+		err = s.handleLogin(ctx, c, &loginPkt)
 	case packets.DisconnectType:
 		// Just wait until we recv 0 from the client to disconnect.
 		break
@@ -71,11 +86,11 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if _, err := auth.VerifyAccount(username, password); err != nil {
+	if _, err := s.shipGateClient.AuthenticateAccount(ctx, username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
@@ -90,6 +105,9 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 		}
 	}
 
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return err
+	}
 	// The first time we receive this packet the loginClientExtension will have included the
 	// version string in the security data; check it.
 	//if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
@@ -104,13 +122,10 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
-		return err
-	}
 	return s.sendCharacterRedirect(c)
 }
 
-// sendSecurity transmits initialization packet with information about the user's
+// send the security initialization packet with information about the user's
 // authentication status.
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	// Constants set according to how Newserv does it.

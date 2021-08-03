@@ -65,18 +65,11 @@ if [ ! -d "$INSTALL_DIR" ]; then
   mkdir "$INSTALL_DIR" || echo "Please enter a valid directory."
 fi
 
-pushd "$INSTALL_DIR" > /dev/null 2>&1
-
-mkdir bin
-pushd "$SETUP_DIR"/.. > /dev/null 2>&1
-go build -o bin ./cmd/*
-popd > /dev/null 2>&1
-
-# Copy compiled binaries to the server folder.
-cp bin/* "$INSTALL_DIR"
+mkdir "$INSTALL_DIR"/bin
+go build -o bin "$SETUP_DIR"/../cmd/*
 
 # Copy all setup files to the server folder.
-cp -r "$SETUP_DIR"/* .
+rsync -r --exclude="*.sh" "$SETUP_DIR"/* .
 
 # Edit default patches directory.
 SEARCH='patch_dir: "/usr/local/etc/archon/patches"'
@@ -113,18 +106,17 @@ psql $DB_NAME -c "CREATE USER $ARCHON_USER WITH ENCRYPTED PASSWORD '$ARCHON_PASS
 psql $DB_NAME -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $ARCHON_USER;"
 
 # This should exist, but let's verify just in case.
-if [ ! -d patches ]; then
-  mkdir patches
-  cp -r patches/* patches/.
+if [ ! -d "$INSTALL_DIR"/patches ]; then
+  mkdir "$INSTALL_DIR"/patches
+  cp -r "$SETUP_DIR"/patches/* "$INSTALL_DIR"/patches/.
 fi
 
-
 echo "Generating certificates..."
-./generate_cert --ip "$SERVER_IP" > /dev/null 2>&1
+./bin/generate_cert --ip "$SERVER_IP" > /dev/null 2>&1
 echo "Done."
 
 echo "Adding account..."
-./account --config . add
+./bin/account --config . add
 echo "Done."
 
 echo
@@ -135,5 +127,5 @@ echo "  $(pwd)/patches"
 echo
 echo "Please verify the config file has the correct settings before running."
 echo "To run the server, execute the following:"
-echo "  $(pwd)/server --config $(pwd)"
+echo "  $(pwd)/bin/server --config $(pwd)"
 echo

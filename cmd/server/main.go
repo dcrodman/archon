@@ -106,7 +106,7 @@ func main() {
 		},
 		{
 			Address: buildAddress(loginPort),
-			Backend: login.NewServer("LOGIN", characterPort),
+			Backend: login.NewServer("LOGIN", characterPort, shipgateAddr),
 		},
 		{
 			Address: buildAddress(characterPort),

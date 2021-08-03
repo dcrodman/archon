@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/auth"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -46,14 +46,15 @@ type Server struct {
 	name               string
 	blocks             []Block
 	grpcShipgateClient api.ShipgateServiceClient
-	shipListClient     *shipgate.ShipListClient
+	shipGateClient     *shipgate.Client
+	shipGateAddr       string
 }
 
 func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
 	return &Server{
-		name:           name,
-		blocks:         blocks,
-		shipListClient: shipgate.NewShipListClient(shipgateAddr),
+		name:         name,
+		blocks:       blocks,
+		shipGateAddr: shipgateAddr,
 	}
 }
 
@@ -64,6 +65,12 @@ func (s *Server) Name() string {
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
+	var err error
+	s.shipGateClient, err = shipgate.NewClient(s.shipGateAddr)
+	if err != nil {
+		return err
+	}
+
 	// Connect to the shipgate.
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
@@ -87,7 +94,7 @@ func (s *Server) Init(ctx context.Context) error {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipGateClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -122,7 +129,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginType:
 		var loginPkt packets.Login
 		internal.StructFromBytes(data, &loginPkt)
-		err = s.handleShipLogin(c, &loginPkt)
+		err = s.handleShipLogin(ctx, c, &loginPkt)
 	case packets.MenuSelectType:
 		var menuSelectPkt packets.MenuSelection
 		internal.StructFromBytes(data, &menuSelectPkt)
@@ -133,11 +140,11 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleShipLogin(c *client.Client, loginPkt *packets.Login) error {
+func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if _, err := auth.VerifyAccount(username, password); err != nil {
+	if _, err := s.shipGateClient.AuthenticateAccount(ctx, username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
@@ -155,10 +162,14 @@ func (s *Server) handleShipLogin(c *client.Client, loginPkt *packets.Login) erro
 	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
 	}
+
 	return s.sendBlockList(c)
 }
 
+// send the security initialization packet with information about the user's
+// authentication status.
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+	// Constants set according to how Newserv does it.
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
@@ -170,6 +181,8 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	})
 }
 
+// Sends a message to the client. In this case whatever message is sent
+// here will be displayed in a dialog box after the patch screen.
 func (s *Server) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
@@ -255,7 +268,7 @@ func (s *Server) handleBlockSelection(c *client.Client, selection uint32) error 
 }
 
 func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipListClient.GetConnectedShipList()
+	shipList := s.shipGateClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -274,7 +287,7 @@ func (s *Server) sendShipList(c *client.Client) error {
 
 // Player selected one of the items on the ship select screen.
 func (s *Server) handleShipSelection(c *client.Client, selection uint32) error {
-	ip, port, err := s.shipListClient.GetSelectedShipAddress(selection)
+	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selection)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selection)
 	}

@@ -8,6 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dcrodman/archon/internal/data"
+	"google.golang.org/grpc/metadata"
+	"gorm.io/gorm"
+
 	"github.com/dcrodman/archon"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/viper"
@@ -19,7 +23,7 @@ import (
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
-type ShipListClient struct {
+type Client struct {
 	shipgateAddress string
 	shipgateClient  api.ShipgateServiceClient
 
@@ -36,24 +40,25 @@ type shipInfo struct {
 	port string
 }
 
-func NewShipListClient(shipgateAddress string) *ShipListClient {
-	return &ShipListClient{shipgateAddress: shipgateAddress}
-}
-
-func (s *ShipListClient) StartShipRefreshLoop(ctx context.Context) error {
+func NewClient(shipgateAddress string) (*Client, error) {
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
-		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
+		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}
 
-	conn, err := grpc.Dial(s.shipgateAddress, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial(shipgateAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return fmt.Errorf("failed to connect to shipgate: %s", err)
+		return nil, fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
-	// Lazy, but just leave the connection open until the server shuts down.
 
-	s.shipgateClient = api.NewShipgateServiceClient(conn)
+	return &Client{
+		shipgateAddress: shipgateAddress,
+		// Lazy, but just leave the connection open until the server shuts down.
+		shipgateClient: api.NewShipgateServiceClient(conn),
+	}, nil
+}
 
+func (s *Client) StartShipRefreshLoop(ctx context.Context) error {
 	// The first set is fetched synchronously so that the ship list will start populated.
 	// Also gives us a chance to validate that the shipgate address is valid.
 	if err := s.refreshShipList(); err != nil {
@@ -64,7 +69,7 @@ func (s *ShipListClient) StartShipRefreshLoop(ctx context.Context) error {
 	return nil
 }
 
-func (s *ShipListClient) GetConnectedShipList() []packets.ShipListEntry {
+func (s *Client) GetConnectedShipList() []packets.ShipListEntry {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
@@ -89,7 +94,7 @@ func (s *ShipListClient) GetConnectedShipList() []packets.ShipListEntry {
 	return shipList
 }
 
-func (s *ShipListClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
+func (s *Client) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -102,10 +107,50 @@ func (s *ShipListClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, in
 	return shipIP, shipPort, nil
 }
 
+func (s *Client) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
+	md := metadata.New(map[string]string{
+		"authorization": password,
+	})
+
+	accountpb, err := s.shipgateClient.AuthenticateAccount(
+		metadata.NewOutgoingContext(ctx, md),
+		&api.AccountAuthRequest{Username: username},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rd, err := time.Parse(time.RFC3339, accountpb.GetRegistrationDate())
+	if err != nil {
+		return nil, err
+	}
+
+	var pl byte
+	if b := accountpb.GetPriviledgeLevel(); len(b) != 0 {
+		pl = b[0]
+	}
+
+	return &data.Account{
+		Model: gorm.Model{
+			ID: uint(accountpb.Id),
+		},
+		Username:         accountpb.GetUsername(),
+		Password:         password,
+		Email:            accountpb.GetEmail(),
+		RegistrationDate: rd,
+		Guildcard:        int(accountpb.GetGuildcard()),
+		GM:               accountpb.GetGM(),
+		Banned:           accountpb.GetBanned(),
+		Active:           accountpb.GetActive(),
+		TeamID:           int(accountpb.TeamId),
+		PrivilegeLevel:   pl,
+	}, nil
+}
+
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (s *ShipListClient) startShipListRefreshLoop(ctx context.Context) {
+func (s *Client) startShipListRefreshLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -118,7 +163,7 @@ func (s *ShipListClient) startShipListRefreshLoop(ctx context.Context) {
 	}
 }
 
-func (s *ShipListClient) refreshShipList() error {
+func (s *Client) refreshShipList() error {
 	response, err := s.shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch ships from shipgate: %s", err)
