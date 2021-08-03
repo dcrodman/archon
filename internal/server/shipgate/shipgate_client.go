@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dcrodman/archon/internal/data"
-	"github.com/dcrodman/archon/internal/server/client"
 	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"
 
