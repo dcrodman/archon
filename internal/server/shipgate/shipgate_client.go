@@ -185,23 +185,3 @@ func (s *Client) refreshShipList() error {
 	s.connectedShipsMutex.Unlock()
 	return nil
 }
-
-func (s *Client) sendSecurity(c *client.Client, errorCode uint32) error {
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
-		ErrorCode:    errorCode,
-		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
-		Config:       c.Config,
-		Capabilities: 0x00000102,
-	})
-}
-
-func (s *Client) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  internal.ConvertToUtf16(message),
-	})
-}

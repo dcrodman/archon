@@ -158,6 +158,11 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 			return err
 		}
 	}
+
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return err
+	}
+
 	return s.sendBlockList(c)
 }
 

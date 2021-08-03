@@ -104,6 +104,10 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 			return err
 		}
 	}
+
+	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+		return err
+	}
 	// The first time we receive this packet the loginClientExtension will have included the
 	// version string in the security data; check it.
 	//if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
