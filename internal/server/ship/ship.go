@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/auth"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -143,16 +144,46 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 	username := string(internal.StripPadding(loginPkt.Username[:]))
 	password := string(internal.StripPadding(loginPkt.Password[:]))
 
-	if _, err := s.shipGateClient.AuthenticateAccount(
-		ctx,
-		c,
-		username,
-		password,
-	); err != nil {
-		return err
+	if _, err := s.shipGateClient.AuthenticateAccount(ctx, username, password); err != nil {
+		switch err {
+		case auth.ErrInvalidCredentials:
+			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+		case auth.ErrAccountBanned:
+			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+		default:
+			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			if sendErr == nil {
+				return sendErr
+			}
+			return err
+		}
 	}
-
 	return s.sendBlockList(c)
+}
+
+// send the security initialization packet with information about the user's
+// authentication status.
+func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+	// Constants set according to how Newserv does it.
+	return c.Send(&packets.Security{
+		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+		ErrorCode:    errorCode,
+		PlayerTag:    0x00010000,
+		Guildcard:    c.Guildcard,
+		TeamID:       c.TeamID,
+		Config:       c.Config,
+		Capabilities: 0x00000102,
+	})
+}
+
+// Sends a message to the client. In this case whatever message is sent
+// here will be displayed in a dialog box after the patch screen.
+func (s *Server) sendMessage(c *client.Client, message string) error {
+	return c.Send(&packets.LoginClientMessage{
+		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+		Language: 0x00450009,
+		Message:  internal.ConvertToUtf16(message),
+	})
 }
 
 // send the client the block list on the selection screen.

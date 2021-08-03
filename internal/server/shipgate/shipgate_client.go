@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/dcrodman/archon/internal/auth"
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/server/client"
 	"google.golang.org/grpc/metadata"
@@ -110,7 +108,7 @@ func (s *Client) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error
 	return shipIP, shipPort, nil
 }
 
-func (s *Client) AuthenticateAccount(ctx context.Context, c *client.Client, username, password string) (*data.Account, error) {
+func (s *Client) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
 	md := metadata.New(map[string]string{
 		"authorization": password,
 	})
@@ -120,21 +118,6 @@ func (s *Client) AuthenticateAccount(ctx context.Context, c *client.Client, user
 		&api.AccountAuthRequest{Username: username},
 	)
 	if err != nil {
-		switch err {
-		case auth.ErrInvalidCredentials:
-			return nil, s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
-			return nil, s.sendSecurity(c, packets.BBLoginErrorBanned)
-		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
-			if sendErr == nil {
-				return nil, sendErr
-			}
-			return nil, err
-		}
-	}
-
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return nil, err
 	}
 
