@@ -54,14 +54,15 @@ var (
 type Server struct {
 	name           string
 	kvCache        *internal.Cache
-	shipGateClient *shipgate.ShipGateClient
+	shipGateClient *shipgate.Client
+	shipGateAddr   string
 }
 
 func NewServer(name string, shipgateAddr string) *Server {
 	return &Server{
-		name:           name,
-		shipGateClient: shipgate.NewShipGateClient(shipgateAddr),
-		kvCache:        internal.NewCache(),
+		name:         name,
+		kvCache:      internal.NewCache(),
+		shipGateAddr: shipgateAddr,
 	}
 }
 
@@ -70,6 +71,12 @@ func (s *Server) Name() string {
 }
 
 func (s *Server) Init(ctx context.Context) error {
+	var err error
+	s.shipGateClient, err = shipgate.NewClient(s.shipGateAddr)
+	if err != nil {
+		return err
+	}
+
 	if err := initParameterData(); err != nil {
 		return err
 	}

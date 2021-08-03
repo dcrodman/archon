@@ -45,14 +45,15 @@ type Server struct {
 	name               string
 	blocks             []Block
 	grpcShipgateClient api.ShipgateServiceClient
-	shipGateClient     *shipgate.ShipGateClient
+	shipGateClient     *shipgate.Client
+	shipGateAddr       string
 }
 
 func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
 	return &Server{
-		name:           name,
-		blocks:         blocks,
-		shipGateClient: shipgate.NewShipGateClient(shipgateAddr),
+		name:         name,
+		blocks:       blocks,
+		shipGateAddr: shipgateAddr,
 	}
 }
 
@@ -63,6 +64,12 @@ func (s *Server) Name() string {
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
+	var err error
+	s.shipGateClient, err = shipgate.NewClient(s.shipGateAddr)
+	if err != nil {
+		return err
+	}
+
 	// Connect to the shipgate.
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {

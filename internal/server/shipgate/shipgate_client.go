@@ -26,7 +26,7 @@ import (
 	"github.com/dcrodman/archon/internal/server/shipgate/api"
 )
 
-type ShipGateClient struct {
+type Client struct {
 	shipgateAddress string
 	shipgateClient  api.ShipgateServiceClient
 
@@ -43,24 +43,25 @@ type shipInfo struct {
 	port string
 }
 
-func NewShipGateClient(shipgateAddress string) *ShipGateClient {
-	return &ShipGateClient{shipgateAddress: shipgateAddress}
-}
-
-func (s *ShipGateClient) StartShipRefreshLoop(ctx context.Context) error {
+func NewClient(shipgateAddress string) (*Client, error) {
 	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
 	if err != nil {
-		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
+		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}
 
-	conn, err := grpc.Dial(s.shipgateAddress, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial(shipgateAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return fmt.Errorf("failed to connect to shipgate: %s", err)
+		return nil, fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
-	// Lazy, but just leave the connection open until the server shuts down.
 
-	s.shipgateClient = api.NewShipgateServiceClient(conn)
+	return &Client{
+		shipgateAddress: shipgateAddress,
+		// Lazy, but just leave the connection open until the server shuts down.
+		shipgateClient: api.NewShipgateServiceClient(conn),
+	}, nil
+}
 
+func (s *Client) StartShipRefreshLoop(ctx context.Context) error {
 	// The first set is fetched synchronously so that the ship list will start populated.
 	// Also gives us a chance to validate that the shipgate address is valid.
 	if err := s.refreshShipList(); err != nil {
@@ -71,7 +72,7 @@ func (s *ShipGateClient) StartShipRefreshLoop(ctx context.Context) error {
 	return nil
 }
 
-func (s *ShipGateClient) GetConnectedShipList() []packets.ShipListEntry {
+func (s *Client) GetConnectedShipList() []packets.ShipListEntry {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
@@ -96,7 +97,7 @@ func (s *ShipGateClient) GetConnectedShipList() []packets.ShipListEntry {
 	return shipList
 }
 
-func (s *ShipGateClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
+func (s *Client) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -109,7 +110,7 @@ func (s *ShipGateClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, in
 	return shipIP, shipPort, nil
 }
 
-func (s *ShipGateClient) AuthenticateAccount(ctx context.Context, c *client.Client, username, password string) (*data.Account, error) {
+func (s *Client) AuthenticateAccount(ctx context.Context, c *client.Client, username, password string) (*data.Account, error) {
 	md := metadata.New(map[string]string{
 		"authorization": password,
 	})
@@ -167,7 +168,7 @@ func (s *ShipGateClient) AuthenticateAccount(ctx context.Context, c *client.Clie
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (s *ShipGateClient) startShipListRefreshLoop(ctx context.Context) {
+func (s *Client) startShipListRefreshLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -180,7 +181,7 @@ func (s *ShipGateClient) startShipListRefreshLoop(ctx context.Context) {
 	}
 }
 
-func (s *ShipGateClient) refreshShipList() error {
+func (s *Client) refreshShipList() error {
 	response, err := s.shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch ships from shipgate: %s", err)
@@ -202,7 +203,7 @@ func (s *ShipGateClient) refreshShipList() error {
 	return nil
 }
 
-func (s *ShipGateClient) sendSecurity(c *client.Client, errorCode uint32) error {
+func (s *Client) sendSecurity(c *client.Client, errorCode uint32) error {
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
@@ -214,7 +215,7 @@ func (s *ShipGateClient) sendSecurity(c *client.Client, errorCode uint32) error 
 	})
 }
 
-func (s *ShipGateClient) sendMessage(c *client.Client, message string) error {
+func (s *Client) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,

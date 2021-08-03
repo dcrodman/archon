@@ -21,7 +21,8 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 type Server struct {
 	name                  string
 	characterRedirectPort uint16
-	shipGateClient        *shipgate.ShipGateClient
+	shipGateClient        *shipgate.Client
+	shipGateAddr          string
 }
 
 func NewServer(name, characterPort, shipgateAddr string) *Server {
@@ -29,13 +30,20 @@ func NewServer(name, characterPort, shipgateAddr string) *Server {
 
 	return &Server{
 		name:                  name,
-		shipGateClient:        shipgate.NewShipGateClient(shipgateAddr),
+		shipGateAddr:          shipgateAddr,
 		characterRedirectPort: uint16(charPort),
 	}
 }
 
-func (s *Server) Name() string                   { return s.name }
-func (s *Server) Init(ctx context.Context) error { return nil }
+func (s *Server) Name() string { return s.name }
+func (s *Server) Init(_ context.Context) error {
+	shipGateClient, err := shipgate.NewClient(s.shipGateAddr)
+	if err != nil {
+		return err
+	}
+	s.shipGateClient = shipGateClient
+	return nil
+}
 
 func (s *Server) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
