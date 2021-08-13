@@ -4,10 +4,6 @@
  */
 package packets
 
-import (
-	"github.com/dcrodman/archon/internal/character"
-)
-
 // Packet types for packets sent to and from the login and character servers.
 const (
 	LoginWelcomeType            = 0x03
@@ -190,11 +186,42 @@ type SetFlag struct {
 	Flag   uint32
 }
 
+// CharacterSummary is the common intermediate representation of a Character as it gets
+//passed around various servers and/or stored.
+type CharacterPreview struct {
+	Experience     uint32
+	Level          uint32
+	GuildcardStr   [16]byte
+	Unknown        [2]uint32
+	NameColor      uint32
+	Model          byte
+	Padding        [15]byte
+	NameColorChksm uint32
+	SectionID      byte
+	Class          byte
+	V2Flags        byte
+	Version        byte
+	V1Flags        uint32
+	Costume        uint16
+	Skin           uint16
+	Face           uint16
+	Head           uint16
+	Hair           uint16
+	HairRed        uint16
+	HairGreen      uint16
+	HairBlue       uint16
+	PropX          float32
+	PropY          float32
+	// In reality this is [16]uint16 but []uint8 is more convenient to work with.
+	Name     [32]uint8
+	Playtime uint32
+}
+
 // Sent to the client for the selection menu and received for updating a character.
 type CharacterSummary struct {
 	Header    BBHeader
 	Slot      uint32
-	Character character.CharacterSummary
+	Character CharacterPreview
 }
 
 // Message in a large text box, usually sent right before a disconnect.

@@ -9,11 +9,10 @@ import (
 	"os"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core/auth"
+	"github.com/dcrodman/archon/internal/core/data"
+	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/spf13/viper"
-
-	"github.com/dcrodman/archon/internal/auth"
-	"github.com/dcrodman/archon/internal/data"
-	"github.com/dcrodman/archon/internal/debug"
 )
 
 var config = flag.String("config", "./", "Path to the directory containing the server config file")

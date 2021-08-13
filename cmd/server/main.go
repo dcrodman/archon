@@ -13,18 +13,18 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dcrodman/archon/internal"
+	"github.com/dcrodman/archon/internal/block"
+	"github.com/dcrodman/archon/internal/character"
+	"github.com/dcrodman/archon/internal/core/data"
+	"github.com/dcrodman/archon/internal/core/debug"
+	"github.com/dcrodman/archon/internal/login"
+	patch2 "github.com/dcrodman/archon/internal/patch"
+	"github.com/dcrodman/archon/internal/ship"
+	"github.com/dcrodman/archon/internal/shipgate"
 	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/data"
-	"github.com/dcrodman/archon/internal/debug"
-	"github.com/dcrodman/archon/internal/server"
-	"github.com/dcrodman/archon/internal/server/block"
-	"github.com/dcrodman/archon/internal/server/character"
-	"github.com/dcrodman/archon/internal/server/login"
-	"github.com/dcrodman/archon/internal/server/patch"
-	"github.com/dcrodman/archon/internal/server/ship"
-	"github.com/dcrodman/archon/internal/server/shipgate"
 )
 
 const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
@@ -82,7 +82,7 @@ func main() {
 	// Automatically configure the block servers based on the number of
 	// ship blocks requested.
 	var blocks []ship.Block
-	var blockServers []*server.Frontend
+	var blockServers []*internal.Frontend
 	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
 		name := fmt.Sprintf("BLOCK%02d", i)
 		address := buildAddress(viper.GetInt("block_server.port") + i)
@@ -90,19 +90,19 @@ func main() {
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
 		})
-		blockServers = append(blockServers, &server.Frontend{
+		blockServers = append(blockServers, &internal.Frontend{
 			Address: address, Backend: block.NewServer(name, viper.GetInt("block_server.num_lobbies")),
 		})
 	}
 
-	servers := []*server.Frontend{
+	servers := []*internal.Frontend{
 		{
 			Address: buildAddress(patchPort),
-			Backend: patch.NewServer("PATCH", dataPort),
+			Backend: patch2.NewServer("PATCH", dataPort),
 		},
 		{
 			Address: buildAddress(dataPort),
-			Backend: patch.NewDataServer("DATA"),
+			Backend: patch2.NewDataServer("DATA"),
 		},
 		{
 			Address: buildAddress(loginPort),
