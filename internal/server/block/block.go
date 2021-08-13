@@ -6,6 +6,7 @@ import (
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/auth"
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/server/client"
 	"github.com/dcrodman/archon/internal/server/internal"
@@ -94,9 +95,11 @@ func (s *Server) handleLogin(c *client.Client, loginPkt *packets.Login) error {
 	if err := s.sendLobbyList(c); err != nil {
 		return err
 	}
-	// TODO: Send 0xE7
+	if err := s.fetchAndSendCharacter(c); err != nil {
+		return err
+	}
 
-	return nil
+	return s.sendFullCharacterEnd(c)
 }
 
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
@@ -132,5 +135,64 @@ func (s *Server) sendLobbyList(c *client.Client) error {
 			Flags: 0x0F,
 		},
 		Lobbies: lobbyEntries,
+	})
+}
+
+func (s *Server) fetchAndSendCharacter(c *client.Client) error {
+	// TODO: Load this from shipgate
+	character := &data.Character{}
+
+	charPkt := &packets.FullCharacter{
+		Header: packets.BBHeader{Type: packets.FullCharacterType},
+		// TODO: All of these.
+		// NumInventoryItems uint8
+		// HPMaterials       uint8
+		// TPMaterials       uint8
+		// Language          uint8
+		// Inventory         [30]InventorySlot
+		ATP:        character.ATP,
+		MST:        character.MST,
+		EVP:        character.EVP,
+		HP:         character.HP,
+		DFP:        character.DFP,
+		ATA:        character.ATA,
+		LCK:        character.LCK,
+		Level:      uint16(character.Level),
+		Experience: character.Experience,
+		Meseta:     character.Meseta,
+		// NameColorBlue
+		// NameColorGreen
+		// NameColorRed
+		// NameColorTransparency
+		// SkinID
+		SectionID: character.SectionID,
+		Class:     character.Class,
+		// SkinFlag
+		Costume:        character.Costume,
+		Skin:           character.Skin,
+		Face:           character.Face,
+		Head:           character.Head,
+		Hair:           character.Hair,
+		HairColorRed:   character.HairRed,
+		HairColorGreen: character.HairGreen,
+		HairColorBlue:  character.HairBlue,
+		// ProportionX:    uint32(character.ProportionX),
+		// ProportionY:    uint32(character.ProportionY),
+		PlayTime: character.Playtime,
+	}
+	copy(charPkt.GuildcardStr[:], character.GuildcardStr)
+	copy(charPkt.Name[:], character.Name)
+	// copy(charPkt.KeyConfig[:], character.)
+	// copy(charPkt.Techniques[:], character.)
+	// copy(charPkt.Options[:], )
+	// copy(charPkt.QuestData[:], )
+
+	return c.Send(charPkt)
+}
+
+func (s *Server) sendFullCharacterEnd(c *client.Client) error {
+	// Acts as an EOF for the full character data.
+	return c.Send(&packets.BBHeader{
+		Type: packets.FullCharacterEndType,
 	})
 }
