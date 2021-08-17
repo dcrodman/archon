@@ -10,7 +10,7 @@ import (
 
 func summarizeFiles() {
 	if flag.NArg() == 0 {
-		fmt.Println("usage: -summarize [file.session...]")
+		fmt.Println("usage: summarize [file.session...]")
 		return
 	}
 

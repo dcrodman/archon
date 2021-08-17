@@ -16,6 +16,12 @@ import (
 	"unicode"
 )
 
+// SessionFile represents the file format of the persisted session data.
+type SessionFile struct {
+	SessionID string
+	Packets   []Packet
+}
+
 // HTTP request from the server implementations containing the packet data.
 type PacketRequest struct {
 	// The server from which this request has originated.
@@ -138,24 +144,22 @@ func readStringFromData(data []byte) string {
 func listenForHTTPPackets(serverAddr string, httpPort int) {
 	addr := fmt.Sprintf("%s:%d", serverAddr, httpPort)
 
-	fmt.Println("listening for packets via HTTP on", addr)
+	// Request handler responsible only for parsing the packet request and then
+	// throwing it onto a queue for async processing.
+	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+		p := &PacketRequest{}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			fmt.Printf("error reading JSON from data: %s\n", err.Error())
+			return
+		}
+		p.Timestamp = time.Now()
+		recordPacket(p)
+	})
 
-	http.HandleFunc("/", packetHandler)
+	fmt.Println("listening for packets via HTTP on", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		fmt.Println(err)
 	}
-}
-
-// Request handler responsible only for parsing the packet request and then
-// throwing it onto a queue for async processing.
-func packetHandler(w http.ResponseWriter, r *http.Request) {
-	p := &PacketRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		fmt.Printf("error reading JSON from data: %s\n", err.Error())
-		return
-	}
-	p.Timestamp = time.Now()
-	recordPacket(p)
 }
 
 func recordPacket(p *PacketRequest) {
@@ -177,7 +181,7 @@ func key(serverName, sessionID string) string {
 	if sessionID == "" {
 		return serverName
 	}
-	return fmt.Sprintf("%s-%s", serverName, sessionID)
+	return fmt.Sprintf("%s_%s", serverName, sessionID)
 }
 
 // Continuously spins on a channel, reading packets and appending them

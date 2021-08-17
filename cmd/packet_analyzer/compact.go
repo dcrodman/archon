@@ -14,12 +14,12 @@ import (
 const PacketLineLength = 16
 
 func compactFiles() {
-	if flag.NArg() == 0 {
-		fmt.Println("usage: -compact [file.session...]")
+	if flag.NArg() < 2 {
+		fmt.Println("usage: compact [file.session...]")
 		return
 	}
 
-	for i := 0; i < flag.NArg(); i++ {
+	for i := 1; i < flag.NArg(); i++ {
 		sessionFile := flag.Arg(i)
 		compact, err := compactSession(sessionFile)
 		if err != nil {
@@ -71,12 +71,32 @@ func generateCompactedFile(filename string, session *SessionFile) error {
 }
 
 func writePacketToFile(f *bufio.Writer, p *Packet) error {
-	data := packetToBytes(p.Contents)
-	pktLen := len(p.Contents)
-
 	if err := writePacketHeaderToFile(f, p); err != nil {
 		return err
 	}
+
+	if err := writePacketBodyToFile(f, p); err != nil {
+		return err
+	}
+
+	_, _ = f.WriteString("\n\n")
+	return f.Flush()
+}
+
+func writePacketHeaderToFile(f *bufio.Writer, p *Packet) error {
+	size, _ := strconv.ParseInt(p.Size, 16, 16)
+	header := fmt.Sprintf(
+		"%s -> %s\nType: %s\nSize: %s (%d) bytes\n",
+		p.Source, p.Destination, p.Type, p.Size, size,
+	)
+
+	_, err := f.WriteString(header)
+	return err
+}
+
+func writePacketBodyToFile(f *bufio.Writer, p *Packet) error {
+	data := packetToBytes(p.Contents)
+	pktLen := len(p.Contents)
 
 	for rem, offset := pktLen, 0; rem > 0; rem -= PacketLineLength {
 		var line string
@@ -92,21 +112,7 @@ func writePacketToFile(f *bufio.Writer, p *Packet) error {
 			return err
 		}
 	}
-
-	_, _ = f.WriteString("\n\n")
-	f.Flush()
 	return nil
-}
-
-func writePacketHeaderToFile(f *bufio.Writer, p *Packet) error {
-	size, _ := strconv.ParseInt(p.Size, 16, 16)
-	header := fmt.Sprintf(
-		"%s -> %s\nType: %s\nSize: %s (%d) bytes\n",
-		p.Source, p.Destination, p.Type, p.Size, size,
-	)
-
-	_, err := f.WriteString(header)
-	return err
 }
 
 // Build one line of formatted packet data.
@@ -119,7 +125,7 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 		if j == 8 {
 			// Visual aid - spacing between groups of 8 bytes.
 			j = 0
-			line.WriteString("  ")
+			// line.WriteString("  ")
 		}
 
 		line.WriteString(fmt.Sprintf("%02x ", data[i]))
