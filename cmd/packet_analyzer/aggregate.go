@@ -134,14 +134,14 @@ func writeMarkdownForFile(f *os.File, subserver, filename string) {
 
 	for _, packet := range sessionData.Packets {
 		pType, _ := strconv.ParseUint(packet.Type, 16, 32)
-		f.WriteString(fmt.Sprintf("### 0x%.4X\n", pType))
+		f.WriteString(fmt.Sprintf("### 0x%.4X  \n", pType))
 
-		f.WriteString(fmt.Sprintf("Canonical name: %s\n", getPacketName(subserver, pType)))
+		f.WriteString(fmt.Sprintf("Canonical name: %s  \n", getPacketName(subserver, pType)))
 
-		f.WriteString(fmt.Sprintf("Direction: %s -> %s\n", packet.Source, packet.Destination))
+		f.WriteString(fmt.Sprintf("Direction: %s -> %s  \n", packet.Source, packet.Destination))
 
 		size, _ := strconv.ParseInt(packet.Size, 16, 32)
-		f.WriteString(fmt.Sprintf("Size: 0x%.4X\n", size))
+		f.WriteString(fmt.Sprintf("Size: 0x%.4X  \n", size))
 
 		f.WriteString("```\n")
 		buf := bufio.NewWriter(f)
