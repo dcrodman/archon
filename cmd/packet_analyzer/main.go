@@ -38,6 +38,7 @@ type Packet struct {
 }
 
 var (
+	// Capture options.
 	address  = flag.String("addr", "localhost", "Address and port on which to bind")
 	httpPort = flag.Int("http", 8081, "Port on which the HTTP service should listen")
 	tcpPort  = flag.Int("tcp", 8082, "Port on which the raw TCP service should listen")
@@ -45,6 +46,9 @@ var (
 
 	auto   = flag.Bool("auto", false, "Automatically runs both compact and summarize on generated session file")
 	folder = flag.String("folder", "", "Folder to which the resulting session files will be written")
+
+	// Aggregate options.
+	collapse = flag.Bool("collapse", false, "Wrap the packet contents in collapsable sections")
 )
 
 func main() {

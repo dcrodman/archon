@@ -124,7 +124,7 @@ func aggregateFiles() {
 }
 
 func writeMarkdownForFile(f *os.File, subserver, filename string) {
-	f.WriteString(fmt.Sprintf("## %s Server\n", strings.Title(subserver)))
+	f.WriteString(fmt.Sprintf("## %s Server  \n", strings.Title(subserver)))
 
 	sessionData, err := parseSessionDataFromFile(filename)
 	if err != nil {
@@ -143,13 +143,21 @@ func writeMarkdownForFile(f *os.File, subserver, filename string) {
 		size, _ := strconv.ParseInt(packet.Size, 16, 32)
 		f.WriteString(fmt.Sprintf("Size: 0x%.4X  \n", size))
 
+		if *collapse {
+			f.WriteString("<details>  \n  \n")
+		}
+
 		f.WriteString("```\n")
 		buf := bufio.NewWriter(f)
 		writePacketBodyToFile(buf, &packet)
 		buf.Flush()
 		f.WriteString("```\n")
 
-		f.WriteString("\n")
+		if *collapse {
+			f.WriteString("</details>  \n")
+		}
+
+		f.WriteString("</br>  \n\n")
 	}
 }
 
