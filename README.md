@@ -27,16 +27,14 @@ questions feel free to open an issue.
 
 ## Installation
 
-There are three ways to run the existing server:
-- manually build the server
-- running the server in docker
+There are three ways to set up the server:
 - using the setup script
+- manually
+- running the server in docker
 
-Consider using manual installation, or the setup script if you want to have full control on the tools and server 
-you're running or if you want to change something on the fly.
-
-If you mostly need to run an existing version, want to test it out or just want to use less 
-tools - consider using dockerized setup.
+Most people will want to use the setup script, which just automates the manual installation
+process. However if you'd prefer to test the server in an isolated environment or prefer to
+use fewer tools, the Dockerized setup may work better for you.
 
 ## Setup Script
 
