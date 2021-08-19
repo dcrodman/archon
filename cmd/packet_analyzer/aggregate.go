@@ -142,10 +142,11 @@ func writeMarkdownForFile(buf *strings.Builder, subserver, filename string) {
 
 		buf.WriteString(fmt.Sprintf("Canonical name: %s  \n", getPacketName(subserver, pType)))
 
-		buf.WriteString(fmt.Sprintf("Direction: %s -> %s  \n", packet.Source, packet.Destination))
+		buf.WriteString(fmt.Sprintf("Source: %s  \n", packet.Source))
+		buf.WriteString(fmt.Sprintf("Destination: %s  \n", packet.Destination))
 
 		size, _ := strconv.ParseInt(packet.Size, 16, 32)
-		buf.WriteString(fmt.Sprintf("Size: 0x%.4X  \n", size))
+		buf.WriteString(fmt.Sprintf("Size: `0x%.4X`  \n", size))
 
 		if *collapse {
 			buf.WriteString("<details>  \n  \n")
@@ -161,7 +162,7 @@ func writeMarkdownForFile(buf *strings.Builder, subserver, filename string) {
 			buf.WriteString("</details>  \n")
 		}
 
-		buf.WriteString("</br>  \n\n")
+		buf.WriteString("  \n\n")
 	}
 }
 
