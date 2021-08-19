@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const bytesPerRow = 16
-
 var (
 	// Order in which the session files will be presented in the emitted file.
 	serverOrder = []string{
@@ -107,24 +105,30 @@ func aggregateFiles() {
 	}
 	defer f.Close()
 
-	// Write the file header.
-	f.WriteString(fmt.Sprintf("# %s\n\n", strings.Title(serverName)))
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("# %s\n\n", strings.Title(serverName)))
 
 	// Write each file as a subheading, with all packets in that file formatted under that.
 	for _, subserver := range serverOrder {
 		for _, sessionFile := range sessionFiles {
 			if strings.Contains(sessionFile, subserver) {
-				writeMarkdownForFile(f, subserver, sessionFile)
+				writeMarkdownForFile(&buf, subserver, sessionFile)
 				break
 			}
 		}
 	}
 
+	// Write the file header.
+	if _, err := f.WriteString(buf.String()); err != nil {
+		fmt.Printf("error: failed to write to markdown file: %v", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("wrote", outputFilename)
 }
 
-func writeMarkdownForFile(f *os.File, subserver, filename string) {
-	f.WriteString(fmt.Sprintf("## %s Server  \n", strings.Title(subserver)))
+func writeMarkdownForFile(buf *strings.Builder, subserver, filename string) {
+	buf.WriteString(fmt.Sprintf("## %s Server  \n", strings.Title(subserver)))
 
 	sessionData, err := parseSessionDataFromFile(filename)
 	if err != nil {
@@ -134,30 +138,30 @@ func writeMarkdownForFile(f *os.File, subserver, filename string) {
 
 	for _, packet := range sessionData.Packets {
 		pType, _ := strconv.ParseUint(packet.Type, 16, 32)
-		f.WriteString(fmt.Sprintf("### 0x%.4X  \n", pType))
+		buf.WriteString(fmt.Sprintf("### 0x%.4X  \n", pType))
 
-		f.WriteString(fmt.Sprintf("Canonical name: %s  \n", getPacketName(subserver, pType)))
+		buf.WriteString(fmt.Sprintf("Canonical name: %s  \n", getPacketName(subserver, pType)))
 
-		f.WriteString(fmt.Sprintf("Direction: %s -> %s  \n", packet.Source, packet.Destination))
+		buf.WriteString(fmt.Sprintf("Direction: %s -> %s  \n", packet.Source, packet.Destination))
 
 		size, _ := strconv.ParseInt(packet.Size, 16, 32)
-		f.WriteString(fmt.Sprintf("Size: 0x%.4X  \n", size))
+		buf.WriteString(fmt.Sprintf("Size: 0x%.4X  \n", size))
 
 		if *collapse {
-			f.WriteString("<details>  \n  \n")
+			buf.WriteString("<details>  \n  \n")
 		}
 
-		f.WriteString("```\n")
-		buf := bufio.NewWriter(f)
-		writePacketBodyToFile(buf, &packet)
-		buf.Flush()
-		f.WriteString("```\n")
+		buf.WriteString("```\n")
+		w := bufio.NewWriter(buf)
+		_ = writePacketBodyToFile(w, &packet)
+		w.Flush()
+		buf.WriteString("```\n")
 
 		if *collapse {
-			f.WriteString("</details>  \n")
+			buf.WriteString("</details>  \n")
 		}
 
-		f.WriteString("</br>  \n\n")
+		buf.WriteString("</br>  \n\n")
 	}
 }
 
