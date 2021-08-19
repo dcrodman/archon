@@ -19,22 +19,8 @@ etc. are more than welcome! I try to keep the development pretty open but if you
 questions feel free to open an issue.
 * [Installation](#Installation)
 * [Setup Script](#setup-script)
-  + [Script Prerequisites](#script-prerequisites)
-* [Manual installation](#manual-installation)
-  + [Manual Prerequisites](#manual-prerequisites)
-  + [1. Compile the code](#1-compile-the-code)
-  + [2. Create a directory for the server files](#2-create-a-directory-for-the-server-files)
-  + [3. Copy the supporting files](#3-copy-the-supporting-files)
-  + [4. Create the database](#4-create-the-database)
-  + [5. Set the hostname](#5-set-the-hostname)
-  + [6. Point a PSOBB client at the server](#6-point-a-psobb-client-at-the-server)
-  + [7. Add files to the patch directory](#7-add-files-to-the-patch-directory)
-  + [8. Generate the shipgate SSL certificates](#8-generate-the-shipgate-ssl-certificates)
-  + [9. Add the first player account](#9-add-the-first-player-account)
-  + [10. Run the server](#10-run-the-server)
-* [Run in docker](#run-in-docker)
-  + [Docker Prerequisites](#docker-prerequisites)
-  + [How-to](#how-to)  
+* [Manual Installation](#manual-installation)
+* [Running in Docker](#run-in-docker)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 * [Contributing](#contributing)
@@ -213,7 +199,7 @@ The moment of truth; run the server by running this from your server directory:
 If everything's been configured correctly, you should get a bunch of messages about the different
 sub-servers waiting for connections on the configured ports.
 
-## Run in docker
+## Running in Docker
 
 ### Docker Prerequisites:
 * [Docker](https://www.docker.com)
@@ -243,9 +229,9 @@ doing the following:
 
     cd path-to-cloned-code
     git pull
-    export GOBIN=$(pwd)/.bin
-    go install ./cmd/*
-    cp .bin/server your-server-directory
+    mkdir bin
+    go build -o bin ./cmd/*
+    cp build/* your-server-directory
 
 At the time of writing Archon doesn't yet have a recommended way of doing a no-downtime upgrade.
 There are ways to mitigate this (like running a script to do this when nobody is connected) but
@@ -255,4 +241,4 @@ for now this is up to server admins to work out what works for them.
 
 This is a pretty large project and pull requests, issues, and discussions are greatly appreciated!
 If you'd like to get started contributing code to Archon, check out the 
-[ Developer's Guide](https://github.com/dcrodman/archon/wiki/Developer's-Guide).
+[Developer's Guide](https://github.com/dcrodman/archon/wiki/Developer's-Guide).
