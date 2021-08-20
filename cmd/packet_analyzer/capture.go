@@ -48,29 +48,28 @@ var (
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
-func startCapturing(serverAddr, folder string, httpPort, tcpPort int, auto bool) {
+func startCapturing() {
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGABRT, syscall.SIGTERM)
-	go captureExitHandler(signalChan, folder, auto)
+	go captureExitHandler(signalChan, *folder, *auto)
 
-	go listenForTCPPackets(serverAddr, tcpPort)
-	listenForHTTPPackets(serverAddr, httpPort)
+	go listenForTCPPackets(*address, *tcpPort)
+	listenForHTTPPackets(*address, *httpPort)
 }
 
-// Write all of our current session information to files in the local directory.
 func captureExitHandler(c chan os.Signal, folder string, auto bool) {
 	<-c
 	fmt.Println("flushing session data to files...")
 
+	// Write all of our current session information to files in the local directory.
 	for sessionName, packetList := range packetQueues {
 		sessionFile := SessionFile{
 			SessionID: sessionName,
 			Packets:   packetList,
 		}
-
-		filename := path.Join(".", folder, sessionName) + ".session"
 		b, _ := json.MarshalIndent(sessionFile, "", "\t")
+		filename := path.Join(".", folder, sessionName) + ".session"
 
 		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
 			fmt.Printf("failed to save session data: %s\n", err.Error())
@@ -165,6 +164,10 @@ func listenForHTTPPackets(serverAddr string, httpPort int) {
 func recordPacket(p *PacketRequest) {
 	channelKey := key(p.ServerName, p.SessionID)
 	pc, ok := packetChannels[channelKey]
+
+	if *include == "" || !strings.Contains(*include, p.SessionID) {
+		return
+	}
 
 	if !ok {
 		// Create the channel and start a goroutine to process it.

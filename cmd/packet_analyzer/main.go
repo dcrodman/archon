@@ -39,13 +39,14 @@ type Packet struct {
 
 var (
 	// Capture options.
-	address  = flag.String("host", "0.0.0.0", "Address and port on which to bind")
+	address  = flag.String("h", "0.0.0.0", "Address and port on which to bind")
 	httpPort = flag.Int("http", 8081, "Port on which the HTTP service should listen")
 	tcpPort  = flag.Int("tcp", 8082, "Port on which the raw TCP service should listen")
 	uiPort   = flag.Int("ui", 0, "Port on which HTTP UI server (disabled by default)")
 
-	auto   = flag.Bool("auto", false, "Automatically runs both compact and summarize on generated session file")
-	folder = flag.String("folder", "", "Folder to which the resulting session files will be written")
+	auto    = flag.Bool("auto", false, "Automatically runs both compact and summarize on generated session file")
+	folder  = flag.String("folder", "", "Folder to which the resulting session files will be written")
+	include = flag.String("i", "", "Delimited list of session names to capture")
 
 	// Aggregate options.
 	collapse = flag.Bool("collapse", false, "Wrap the packet contents in collapsable sections")
@@ -65,7 +66,7 @@ func main() {
 
 	switch command {
 	case "capture":
-		startCapturing(*address, *folder, *httpPort, *tcpPort, *auto)
+		startCapturing()
 	case "summarize":
 		summarizeFiles()
 	case "compact":
