@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dcrodman/archon"
-	client2 "github.com/dcrodman/archon/internal/client"
-	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/spf13/viper"
 
+	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/client"
+	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/packets"
 )
 
@@ -59,12 +59,12 @@ func NewServer(name, dataPort string) *Server {
 func (s *Server) Name() string                   { return s.name }
 func (s *Server) Init(ctx context.Context) error { return nil }
 
-func (s *Server) SetUpClient(c *client2.Client) {
-	c.CryptoSession = client2.NewPCCryptoSession()
+func (s *Server) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewPCCryptoSession()
 	c.DebugTags["server_type"] = "patch"
 }
 
-func (s *Server) Handshake(c *client2.Client) error {
+func (s *Server) Handshake(c *client.Client) error {
 	// Send the welcome packet to a client with the copyright message and encryption vectors.
 	pkt := packets.PatchWelcome{
 		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
@@ -76,7 +76,7 @@ func (s *Server) Handshake(c *client2.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *client2.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var header packets.PCHeader
 	bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
 
@@ -94,7 +94,7 @@ func (s *Server) Handle(ctx context.Context, c *client2.Client, data []byte) err
 	return err
 }
 
-func (s *Server) sendWelcomeAck(c *client2.Client) error {
+func (s *Server) sendWelcomeAck(c *client.Client) error {
 	// PatchHandshakeType is treated as an ack in this case.
 	return c.Send(&packets.PCHeader{
 		Size: 0x04,
@@ -103,7 +103,7 @@ func (s *Server) sendWelcomeAck(c *client2.Client) error {
 }
 
 // Message displayed on the patch download screen.
-func (s *Server) sendWelcomeMessage(c *client2.Client) error {
+func (s *Server) sendWelcomeMessage(c *client.Client) error {
 	message, size := getWelcomeMessage()
 	pkt := &packets.PatchWelcomeMessage{
 		Header: packets.PCHeader{
@@ -117,7 +117,7 @@ func (s *Server) sendWelcomeMessage(c *client2.Client) error {
 }
 
 // send the redirect packet, providing the IP and port of the next server.
-func (s *Server) sendPatchRedirect(c *client2.Client) error {
+func (s *Server) sendPatchRedirect(c *client.Client) error {
 	pkt := packets.PatchRedirect{
 		Header:  packets.PCHeader{Type: packets.PatchRedirectType},
 		IPAddr:  [4]uint8{},
