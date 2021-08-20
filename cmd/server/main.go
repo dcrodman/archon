@@ -177,7 +177,6 @@ func exitHandler(cancelFn func(), c chan os.Signal, wg ...*sync.WaitGroup) {
 	cancelFn()
 	exitChan := make(chan bool)
 	go func() {
-		// TODO: add a timeout here.
 		for _, wg := range wg {
 			wg.Wait()
 		}

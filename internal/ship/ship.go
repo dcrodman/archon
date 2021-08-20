@@ -225,7 +225,6 @@ func (s *Server) handleMenuSelection(c *client.Client, pkt *packets.MenuSelectio
 	var err error
 	// Case if user gets back from block selection to ship selection
 	if pkt.MenuID == 1 && pkt.ItemID == 1 {
-		// TODO check with multiple servers
 		err = s.handleShipSelection(c, pkt.ItemID-1)
 		if err != nil {
 			return err
