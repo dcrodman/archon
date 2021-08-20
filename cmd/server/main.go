@@ -90,9 +90,15 @@ func main() {
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
 		})
-		blockServers = append(blockServers, &internal.Frontend{
-			Address: address, Backend: block.NewServer(name, viper.GetInt("block_server.num_lobbies")),
-		})
+		blockServer := &internal.Frontend{
+			Address: address,
+			Backend: block.NewServer(
+				name,
+				shipgateAddr,
+				viper.GetInt("block_server.num_lobbies"),
+			),
+		}
+		blockServers = append(blockServers, blockServer)
 	}
 
 	servers := []*internal.Frontend{

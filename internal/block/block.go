@@ -10,6 +10,7 @@ import (
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/shipgate"
 )
 
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
@@ -17,12 +18,16 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyri
 type Server struct {
 	name       string
 	numLobbies int
+
+	shipgateAddress string
+	shipgateClient  *shipgate.Client
 }
 
-func NewServer(name string, lobbies int) *Server {
+func NewServer(name, shipgateAddress string, lobbies int) *Server {
 	return &Server{
-		name:       name,
-		numLobbies: lobbies,
+		name:            name,
+		numLobbies:      lobbies,
+		shipgateAddress: shipgateAddress,
 	}
 }
 
@@ -31,7 +36,10 @@ func (s *Server) Name() string {
 }
 
 func (s *Server) Init(ctx context.Context) error {
-	return nil
+	var err error
+	s.shipgateClient, err = shipgate.NewClient(s.shipgateAddress)
+
+	return err
 }
 
 func (s *Server) SetUpClient(c *client2.Client) {
@@ -62,19 +70,19 @@ func (s *Server) Handle(ctx context.Context, c *client2.Client, data []byte) err
 	case packets.LoginType:
 		var loginPkt packets.Login
 		bytes.StructFromBytes(data, &loginPkt)
-		err = s.handleLogin(c, &loginPkt)
+		err = s.handleLogin(ctx, c, &loginPkt)
 	default:
 		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (s *Server) handleLogin(c *client2.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(ctx context.Context, c *client2.Client, loginPkt *packets.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	// TODO: Use shipgate to auth instead.
-	if _, err := auth.VerifyAccount(username, password); err != nil {
+	account, err := s.shipgateClient.AuthenticateAccount(ctx, username, password)
+	if err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
@@ -88,6 +96,7 @@ func (s *Server) handleLogin(c *client2.Client, loginPkt *packets.Login) error {
 			return err
 		}
 	}
+	c.Account = account
 
 	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
