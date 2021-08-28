@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/dcrodman/archon"
-	client2 "github.com/dcrodman/archon/internal/client"
+	"github.com/dcrodman/archon/internal/client"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/data"
@@ -35,6 +35,7 @@ func (s *Server) Name() string {
 	return s.name
 }
 
+// Init connects to the shipgate.
 func (s *Server) Init(ctx context.Context) error {
 	var err error
 	s.shipgateClient, err = shipgate.NewClient(s.shipgateAddress)
@@ -42,12 +43,12 @@ func (s *Server) Init(ctx context.Context) error {
 	return err
 }
 
-func (s *Server) SetUpClient(c *client2.Client) {
-	c.CryptoSession = client2.NewBlueBurstCryptoSession()
+func (s *Server) SetUpClient(c *client.Client) {
+	c.CryptoSession = client.NewBlueBurstCryptoSession()
 	c.DebugTags["server_type"] = "block"
 }
 
-func (s *Server) Handshake(c *client2.Client) error {
+func (s *Server) Handshake(c *client.Client) error {
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -61,7 +62,7 @@ func (s *Server) Handshake(c *client2.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *client2.Client, data []byte) error {
+func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var packetHeader packets.BBHeader
 	bytes.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
 
@@ -77,7 +78,7 @@ func (s *Server) Handle(ctx context.Context, c *client2.Client, data []byte) err
 	return err
 }
 
-func (s *Server) handleLogin(ctx context.Context, c *client2.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -111,7 +112,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client2.Client, loginPkt *p
 	return s.sendFullCharacterEnd(c)
 }
 
-func (s *Server) sendSecurity(c *client2.Client, errorCode uint32) error {
+func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
@@ -123,7 +124,7 @@ func (s *Server) sendSecurity(c *client2.Client, errorCode uint32) error {
 	})
 }
 
-func (s *Server) sendMessage(c *client2.Client, message string) error {
+func (s *Server) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -131,7 +132,7 @@ func (s *Server) sendMessage(c *client2.Client, message string) error {
 	})
 }
 
-func (s *Server) sendLobbyList(c *client2.Client) error {
+func (s *Server) sendLobbyList(c *client.Client) error {
 	lobbyEntries := make([]packets.LobbyListEntry, s.numLobbies)
 	for i := 0; i < s.numLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
@@ -147,7 +148,7 @@ func (s *Server) sendLobbyList(c *client2.Client) error {
 	})
 }
 
-func (s *Server) fetchAndSendCharacter(c *client2.Client) error {
+func (s *Server) fetchAndSendCharacter(c *client.Client) error {
 	// TODO: Load this from shipgate
 	character := &data.Character{}
 
@@ -199,7 +200,7 @@ func (s *Server) fetchAndSendCharacter(c *client2.Client) error {
 	return c.Send(charPkt)
 }
 
-func (s *Server) sendFullCharacterEnd(c *client2.Client) error {
+func (s *Server) sendFullCharacterEnd(c *client.Client) error {
 	// Acts as an EOF for the full character data.
 	return c.Send(&packets.BBHeader{
 		Type: packets.FullCharacterEndType,
