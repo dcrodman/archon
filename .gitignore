@@ -2,3 +2,5 @@
 *.idea
 *.sublime-*
 *archon.debug
+bin/
+/analyzer/
