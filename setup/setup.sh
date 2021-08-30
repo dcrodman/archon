@@ -1,6 +1,25 @@
 #!/bin/bash
 set -e
 
+function sed_replace
+{
+  SEARCH="$1"
+  REPLACE="$2"
+  FILE="$3"
+
+  # Determine which linux platform we are running on.
+  # This is needed due to differences in the sed implementation in bsd and gnu
+  unamestr=$(uname)
+  if [ "$unamestr" = 'Linux' ]; then
+    sed -i "s#$SEARCH#$REPLACE#" "$FILE"
+  elif [ "$unamestr" = 'FreeBSD' ]; then
+    sed -i '' "s#$SEARCH#$REPLACE#" "$FILE"
+  else
+    echo "Unknown Platform...exiting."
+    exit 1
+  fi
+}
+
 if ! command -v go >/dev/null 2>&1
 then
     echo "Please install Go."
@@ -74,32 +93,32 @@ rsync -r --exclude="*.sh" "$SETUP_DIR"/* .
 # Edit default patches directory.
 SEARCH='patch_dir: "/usr/local/etc/archon/patches"'
 REPLACE="patch_dir: \"$(pwd)/patches\""
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 # Edit default parameters directory
 SEARCH='parameters_dir: "/usr/local/etc/archon/parameters"'
 REPLACE="parameters_dir: \"$(pwd)/parameters\""
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 # Edit hostname
 SEARCH='hostname: 0.0.0.0'
 REPLACE="hostname: $SERVER_IP"
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 # Edit external address
 SEARCH='external_ip: 127.0.0.1'
 REPLACE="external_ip: $EXTERNAL_ADDRESS"
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 # Edit certificate location
 SEARCH='shipgate_certificate_file: "certificate.pem"'
 REPLACE="shipgate_certificate_file: \"$(pwd)/certificate.pem\""
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 # Edit key location
 SEARCH='ssl_key_file: "key.pem"'
 REPLACE="ssl_key_file: \"$(pwd)/key.pem\""
-sed -i '' "s#$SEARCH#$REPLACE#" config.yaml
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
 createdb "$DB_NAME"
 psql $DB_NAME -c "CREATE USER $ARCHON_USER WITH ENCRYPTED PASSWORD '$ARCHON_PASSWORD';"
