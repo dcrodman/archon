@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -97,8 +98,8 @@ func aggregateFiles() {
 		sessionFiles = append(sessionFiles, filename)
 	}
 
-	outputFilename := fmt.Sprintf("%s_aggregated.md", serverName)
-	f, err := os.Create(outputFilename)
+	outFile := path.Join(path.Dir(sessionFiles[0]), fmt.Sprintf("%s_aggregated.md", serverName))
+	f, err := os.Create(outFile)
 	if err != nil {
 		fmt.Printf("error: unable to create markdown file: %v\n", err)
 		os.Exit(1)
@@ -124,7 +125,7 @@ func aggregateFiles() {
 		os.Exit(1)
 	}
 
-	fmt.Println("wrote", outputFilename)
+	fmt.Println("wrote", outFile)
 }
 
 func writeMarkdownForFile(buf *strings.Builder, subserver, filename string) {
