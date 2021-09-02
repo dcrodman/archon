@@ -65,8 +65,7 @@ if [ ! -d "$INSTALL_DIR" ]; then
   mkdir "$INSTALL_DIR" || echo "Please enter a valid directory."
 fi
 
-mkdir "$INSTALL_DIR"/bin
-go build -o bin "$SETUP_DIR"/../cmd/*
+make build
 
 # Copy all setup files to the server folder.
 rsync -r --exclude="*.sh" "$SETUP_DIR"/* .

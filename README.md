@@ -86,8 +86,7 @@ Assuming Go installed:
 
     git clone https://github.com/dcrodman/archon.git
     cd archon
-    mkdir bin
-    go build -o bin ./cmd/*
+    make
     
 This will install the Archon server and tools to the `bin` subdirectory in the root 
 of your project's directory.
