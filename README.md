@@ -7,16 +7,20 @@ Private server implementation for Phantasy Star Online Blue Burst by SEGA.
 
 The goal of the Archon project is to build a modern, easy-to-use, customizable, and 
 high-performing PSOBB server that can be run across multiple platforms with little 
-setup overhead. The project is currently in development and changing rapidly while I 
-piece together the PSO protocol and lean how the client works.
+setup overhead. The project is currently in relatively active development and things
+change frequently while I piece together the PSO protocol and lean how the client works.
 
 Credit is due to the authors of [Tethealla](http://pioneer2.net), 
 [Sylverant](http://sylverant.net), and [Newserv](http://www.fuzziqersoftware.com), 
 whose servers I'm studying as I write Archon.
 
-Forks, bug fixes, issue reports, explanations of some of the client's bizarre behavior, 
-etc. are more than welcome! I try to keep the development pretty open but if you have
-questions feel free to open an issue.
+This is a long running project that I work on when I have time, which is pretty sporadic
+given how time-intensive this endeavor is. That said, forks, bug fixes, issue reports,
+explanations of some of the client's bizarre behavior, questions, etc. are welcome to
+help move things along. If you'd like to get involved, the
+[Developer's Guide](https://github.com/dcrodman/archon/wiki/Developer's-Guide) is a good
+place to start.
+
 * [Installation](#Installation)
 * [Setup Script](#setup-script)
 * [Manual Installation](#manual-installation)
@@ -234,9 +238,3 @@ doing the following:
 At the time of writing Archon doesn't yet have a recommended way of doing a no-downtime upgrade.
 There are ways to mitigate this (like running a script to do this when nobody is connected) but
 for now this is up to server admins to work out what works for them.
-
-## Contributing
-
-This is a pretty large project and pull requests, issues, and discussions are greatly appreciated!
-If you'd like to get started contributing code to Archon, check out the 
-[Developer's Guide](https://github.com/dcrodman/archon/wiki/Developer's-Guide).
