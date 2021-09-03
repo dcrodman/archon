@@ -130,7 +130,7 @@ if [ ! -d "$INSTALL_DIR"/patches ]; then
 fi
 
 echo "Generating certificates..."
-./bin/generate_cert --ip "$SERVER_IP" > /dev/null 2>&1
+./bin/certgen --ip "$SERVER_IP" > /dev/null 2>&1
 echo "Done."
 
 echo "Adding account..."
