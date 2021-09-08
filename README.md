@@ -180,7 +180,7 @@ The shipgate API server requires clients to connect over SSL as both a form of s
 mutual authentication. Archon includes a tool for generating these certificates, which need to be
 present in the server's config directory:
 
-    ./generate_cert
+    ./certgen
 
 The tool will prompt you for your server's external_ip (which should be the same as `external_ip`
 in `config.yaml`). You may also provide a CIDR block.
