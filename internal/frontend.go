@@ -12,10 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
 )
+
+var connectedClients = make(map[string]*client.Client)
 
 // Frontend implements the concurrent client connection logic.
 //
@@ -72,8 +76,8 @@ func (f *Frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListene
 	go func() {
 		for {
 			// Poll until we can accept more clients.
-			for isServerFull() {
-				time.Sleep(time.Second)
+			for len(connectedClients) > viper.GetInt("max_connections") {
+				time.Sleep(10 * time.Second)
 			}
 
 			connection, err := socket.AcceptTCP()
@@ -121,13 +125,13 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
-	if globalClientList.has(c) {
+	if _, ok := connectedClients[c.IPAddr()]; ok {
 		archon.Log.Infof("%s rejected second connection from %s", f.Backend.Name(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
 
-	globalClientList.add(c)
+	connectedClients[c.IPAddr()] = c
 	f.processPackets(ctx, c)
 }
 
@@ -180,7 +184,7 @@ func (*Frontend) closeConnectionAndRecover(serverName string, c *client.Client) 
 		archon.Log.Warnf("failed to close client connection: %s", err)
 	}
 
-	globalClientList.remove(c)
+	delete(connectedClients, c.IPAddr())
 
 	archon.Log.Infof("disconnected %s client %s", serverName, c.IPAddr())
 }
