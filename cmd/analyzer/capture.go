@@ -165,7 +165,7 @@ func recordPacket(p *PacketRequest) {
 	channelKey := key(p.ServerName, p.SessionID)
 	pc, ok := packetChannels[channelKey]
 
-	if *include == "" || !strings.Contains(*include, p.SessionID) {
+	if *include != "" && !strings.Contains(*include, p.SessionID) {
 		return
 	}
 
