@@ -27,7 +27,6 @@ place to start.
 * [Running in Docker](#run-in-docker)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
-* [Contributing](#contributing)
 
 ## Installation
 
