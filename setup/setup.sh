@@ -66,22 +66,21 @@ if [ ! "$EXTERNAL_ADDRESS" ]; then
   EXTERNAL_ADDRESS="127.0.0.1"
 fi
 
-SETUP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$(dirname "${BASH_SOURCE[0]}")"
+SETUP_DIR=$(pwd)
+# Move up to the base checkout so that we can build everything.
+pushd "$SETUP_DIR/../" > /dev/null
 
 # The user can provide the install location as the first option
-# If it's not provided, we'll use the root archon dir.
+# If it's not provided, we'll use a subdirectory of the archon repo.
 if [ -z "$1" ]; then
-  pushd "$SETUP_DIR" > /dev/null 2>&1
-  cd ..
   mkdir archon_server
-  cd archon_server
-  INSTALL_DIR=$(pwd)
+  INSTALL_DIR="$(pwd)/archon_server"
 else
+  if [ ! -d "$1" ]; then
+    mkdir "$INSTALL_DIR" || echo "Failed to create installation directory."
+  fi
   INSTALL_DIR="$1"
-fi
-
-if [ ! -d "$INSTALL_DIR" ]; then
-  mkdir "$INSTALL_DIR" || echo "Please enter a valid directory."
 fi
 
 make build
