@@ -24,7 +24,7 @@ place to start.
 * [Installation](#Installation)
 * [Setup Script](#setup-script)
 * [Manual Installation](#manual-installation)
-* [Running in Docker](#run-in-docker)
+* [Running in Docker](#running-in-docker)
 * [Administration](#administration)
   + [Updating the server](#updating-the-server)
 
@@ -207,31 +207,30 @@ sub-servers waiting for connections on the configured ports.
 
 ### How-to
 
-Change your working directory to `build` e.g. run `cd build`.
-
 Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
 
-There are 3 services available in current docker-compose version:
+There are 4 services available in current docker-compose version:
 - `postgres` - PostgreSQL database with initial DB and tables created via script
 - `account` - account tool which creates initial account for login (can be disabled or commented out if not needed)
 - `server` - actual server running on 127.0.0.1 with PSO ports exposed
+- `analyzer` - the packet_analyzer tool
 
-In dockerized setup server is running same commands as in the manual setup so it contains 
-all the tools bundled in the container.
+In the dockerized setup, the server is running the same commands as in the manual setup.
+
+\* Note: Once the account service runs successfully, it will fail on subsequent runs.
 
 ## Administration
 
 ### Updating the server
 
 While individual commits may at points break `master`, the current HEAD of `master` should at all
-times reference a fully functioning server. It should generally be safe to update your versiom by
+times reference a fully functioning server. It should generally be safe to update your version by
 doing the following:
 
     cd path-to-cloned-code
     git pull
-    mkdir bin
-    go build -o bin ./cmd/*
-    cp build/* your-server-directory
+    make build
+    cp bin/* your-server-directory
 
 At the time of writing Archon doesn't yet have a recommended way of doing a no-downtime upgrade.
 There are ways to mitigate this (like running a script to do this when nobody is connected) but

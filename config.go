@@ -1,6 +1,7 @@
 package archon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -8,9 +9,6 @@ import (
 
 	"github.com/spf13/viper"
 )
-
-const defaultConfigName = "config"
-const overrideConfigName = "override"
 
 var (
 	// TODO: Remove these and put them closer to where they're actually used.
@@ -20,11 +18,16 @@ var (
 // LoadConfig initializes Viper with the contents of the config file under configPath.
 func LoadConfig(configPath string) {
 	viper.AddConfigPath(configPath)
-	viper.SetConfigName(defaultConfigName)
+	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
+	envPrefix := "ARCHON"
+	// Config values
+	viper.SetEnvPrefix(envPrefix)
+	viper.AutomaticEnv()
+
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		if errors.Is(err, viper.ConfigFileNotFoundError{}) {
 			fmt.Printf("error reading config file: no config file in path %s", configPath)
 		} else {
 			fmt.Printf("error reading config file: %v", err)
@@ -32,9 +35,16 @@ func LoadConfig(configPath string) {
 		os.Exit(1)
 	}
 
-	// Attempt to load any configs from the override file if present.
-	viper.SetConfigName(overrideConfigName)
-	_ = viper.MergeInConfig()
+	// This allows us to set nested yaml config options through environment
+	// variables. For example:
+	// database.host can be set using: <envPrefix>_DATABASE_HOST
+	for _, k := range viper.AllKeys() {
+		envVar := strings.ReplaceAll(strings.ToUpper(k), ".", "_")
+		if err := viper.BindEnv(k, envPrefix+"_"+envVar); err != nil {
+			fmt.Printf("error binding %s to %s", k, envPrefix+"_"+envVar)
+			os.Exit(1)
+		}
+	}
 }
 
 // BroadcastIP converts the configured broadcast IP string into 4 bytes to be used

@@ -1,24 +1,27 @@
 FROM golang:1.16-alpine as builder
 
-RUN apk add gcc libc-dev
-# Create initial dir
-RUN mkdir archon
-COPY ./ ./archon
+RUN apk add gcc libc-dev make
+
+# Create directory structure
+RUN mkdir -p archon archon/.bin archon/archon_server
+
+# Copy repo to container
+COPY . ./archon
+
 WORKDIR archon
+
 # Compile the code
-RUN mkdir .bin
-ENV GOBIN=/go/archon/.bin
-RUN go install ./cmd/*
+RUN make build
+
 # Create a directory for the server files
-RUN mkdir archon_server
 WORKDIR archon_server
-RUN cp ../.bin/* .
+
 # Copy the supporting files
-RUN cp -r ../setup/* .
-# Add override config
-COPY /build/override.yaml ./override.yaml
+RUN cp ../bin/* . && cp -r ../setup/* .
+
 # Generate certificate
 RUN ./certgen -ip 0.0.0.0/32
+
 # Create test user account
 FROM builder as account
 # !!! This requires an existing postgres connection !!!
