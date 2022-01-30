@@ -1,8 +1,5 @@
 name: build
-on:
-  push:
-    branches:
-      - '*'
+on: [pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,8 +7,8 @@ jobs:
       image: docker://golang:latest
     steps:
       - uses: actions/checkout@v2
-      - name: Build the code
-        run: go build -v ./cmd/*
+      - name: Build and test
+        run: make all
   test:
     runs-on: ubuntu-latest
     container:
@@ -19,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Tests
-        run: go test ./...
+        run: make test
   golangci:
     runs-on: ubuntu-latest
     steps:
