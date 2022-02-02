@@ -1,5 +1,5 @@
 CONFIG_PATH=/usr/local/etc/archon
-BIN_DIR=bin
+BIN_DIR ?= bin
 ANALYZER_DST ?= analyzer
 
 .DEFAULT_TARGET := all
