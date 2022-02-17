@@ -14,6 +14,8 @@ function sed_replace
     sed -i "s#$SEARCH#$REPLACE#" "$FILE"
   elif [ "$unamestr" = 'FreeBSD' ]; then
     sed -i '' "s#$SEARCH#$REPLACE#" "$FILE"
+  elif [ "$unamestr" = 'Darwin' ]; then
+    sed -i '' "s#$SEARCH#$REPLACE#" "$FILE"
   else
     echo "Unknown Platform...exiting."
     exit 1
@@ -41,19 +43,14 @@ then
     exit 1
 fi
 
-read -rp "Please enter the database name for archon (default: archondb): " DB_NAME
-if [ ! "$DB_NAME" ]; then
-  DB_NAME="archondb"
+read -rp "Is this the first time setup? (default: y): " FIRST_TIME_SETUP
+if [ ! "$FIRST_TIME_SETUP" ]; then
+  FIRST_TIME_SETUP="y"
 fi
 
-read -rp "Please enter the username for the archon database (default: archonadmin): " ARCHON_USER
-if [ ! "$ARCHON_USER" ]; then
-  ARCHON_USER="archonadmin"
-fi
-
-read -rp "Please enter the password for the archon database (default: psoadminpassword): " ARCHON_PASSWORD
-if [ ! "$ARCHON_PASSWORD" ]; then
-  ARCHON_PASSWORD="psoadminpassword"
+read -rp "Is this setup for docker? (default: n): " DOCKER
+if [ ! "$DOCKER" ]; then
+  DOCKER="n"
 fi
 
 read -rp "Please enter the server address (default: 0.0.0.0): " SERVER_IP
@@ -66,6 +63,26 @@ if [ ! "$EXTERNAL_ADDRESS" ]; then
   EXTERNAL_ADDRESS="127.0.0.1"
 fi
 
+read -rp "Please enter the database name for archon (default: archondb): " ARCHON_DB_NAME
+if [ ! "$ARCHON_DB_NAME" ]; then
+  ARCHON_DB_NAME="archondb"
+fi
+
+read -rp "Please enter the database address for archon (default: 127.0.0.1): " ARCHON_DB_HOST
+if [ ! "$ARCHON_DB_HOST" ]; then
+  ARCHON_DB_HOST="127.0.0.1"
+fi
+
+read -rp "Please enter the username for the archon database (default: archonadmin): " ARCHON_DB_USER
+if [ ! "$ARCHON_DB_USER" ]; then
+  ARCHON_DB_USER="archonadmin"
+fi
+
+read -rp "Please enter the password for the archon database (default: psoadminpassword): " ARCHON_DB_PASS
+if [ ! "$ARCHON_DB_PASS " ]; then
+  ARCHON_DB_PASS="psoadminpassword"
+fi
+
 cd "$(dirname "${BASH_SOURCE[0]}")"
 SETUP_DIR=$(pwd)
 # Move up to the base checkout so that we can build everything.
@@ -74,16 +91,17 @@ pushd "$SETUP_DIR/../" > /dev/null
 # The user can provide the install location as the first option
 # If it's not provided, we'll use a subdirectory of the archon repo.
 if [ -z "$1" ]; then
-  mkdir archon_server
+  mkdir -p archon_server
   INSTALL_DIR="$(pwd)/archon_server"
 else
   if [ ! -d "$1" ]; then
-    mkdir "$INSTALL_DIR" || echo "Failed to create installation directory."
+    mkdir -p "$INSTALL_DIR" || echo "Failed to create installation directory."
   fi
   INSTALL_DIR="$1"
 fi
 
-make build
+BIN_DIR="$INSTALL_DIR/bin" make build
+cd "$INSTALL_DIR"
 
 # Copy all setup files to the server folder.
 rsync -r --exclude="*.sh" "$SETUP_DIR"/* .
@@ -118,9 +136,18 @@ SEARCH='ssl_key_file: "key.pem"'
 REPLACE="ssl_key_file: \"$(pwd)/key.pem\""
 sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
 
-createdb "$DB_NAME"
-psql $DB_NAME -c "CREATE USER $ARCHON_USER WITH ENCRYPTED PASSWORD '$ARCHON_PASSWORD';"
-psql $DB_NAME -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $ARCHON_USER;"
+# Edit key location
+SEARCH='host: 127.0.0.1'
+REPLACE="host: $ARCHON_DB_HOST"
+sed_replace "$SEARCH" "$REPLACE" 'config.yaml'
+
+# Docker creates these credentials
+if [  "$FIRST_TIME_SETUP" = "y" ] && [ "$DOCKER" = "n" ]; then
+  echo "You will be prompted for the database password."
+  createdb "$ARCHON_DB_NAME" -h "$ARCHON_DB_HOST"
+  psql -d "$ARCHON_DB_NAME" -h "$ARCHON_DB_HOST" -c "CREATE USER $ARCHON_DB_USER WITH ENCRYPTED PASSWORD '$ARCHON_DB_PASS';"
+  psql -d "$ARCHON_DB_NAME" -h "$ARCHON_DB_HOST" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO $ARCHON_DB_USER;"
+fi
 
 # This should exist, but let's verify just in case.
 if [ ! -d "$INSTALL_DIR"/patches ]; then
@@ -129,12 +156,14 @@ if [ ! -d "$INSTALL_DIR"/patches ]; then
 fi
 
 echo "Generating certificates..."
-./bin/certgen --ip "$SERVER_IP" > /dev/null 2>&1
+../bin/certgen --ip "$SERVER_IP" > /dev/null 2>&1
 echo "Done."
 
-echo "Adding account..."
-./bin/account --config . add
-echo "Done."
+if [ "$FIRST_TIME_SETUP" = "y" ]; then
+  echo "Adding account..."
+  ../bin/account --config . add
+  echo "Done."
+fi
 
 echo
 echo "Archon setup is complete."
