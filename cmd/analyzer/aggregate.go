@@ -8,6 +8,9 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -107,7 +110,7 @@ func aggregateFiles() {
 	defer f.Close()
 
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("# %s\n\n", strings.Title(serverName)))
+	buf.WriteString(fmt.Sprintf("# %s\n\n", cases.Title(language.English).String(serverName)))
 
 	// Write each file as a subheading, with all packets in that file formatted under that.
 	for _, subserver := range serverOrder {
@@ -129,7 +132,7 @@ func aggregateFiles() {
 }
 
 func writeMarkdownForFile(buf *strings.Builder, subserver, filename string) {
-	buf.WriteString(fmt.Sprintf("## %s Server  \n", strings.Title(subserver)))
+	buf.WriteString(fmt.Sprintf("## %s Server  \n", cases.Title(language.English).String(subserver)))
 
 	sessionData, err := parseSessionDataFromFile(filename)
 	if err != nil {

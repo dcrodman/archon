@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -151,7 +153,7 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 		case auth.ErrAccountBanned:
 			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}

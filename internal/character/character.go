@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 	"unicode/utf16"
 
 	"github.com/spf13/viper"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/client"
@@ -172,7 +173,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		case auth.ErrAccountBanned:
 			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}

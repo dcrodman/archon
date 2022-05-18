@@ -3,7 +3,6 @@ package login
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/client"
@@ -11,6 +10,8 @@ import (
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Copyright message expected by the client when connecting.
@@ -97,7 +98,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		case auth.ErrAccountBanned:
 			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
-			sendErr := s.sendMessage(c, strings.Title(err.Error()))
+			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
