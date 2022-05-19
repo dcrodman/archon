@@ -53,9 +53,9 @@ if [ ! "$DOCKER" ]; then
   DOCKER="n"
 fi
 
-read -rp "Please enter the server address (default: 0.0.0.0): " SERVER_IP
+read -rp "Please enter the server address (default: 127.0.0.1): " SERVER_IP
 if [ ! "$SERVER_IP" ]; then
-  SERVER_IP="0.0.0.0"
+  SERVER_IP="127.0.0.1"
 fi
 
 read -rp "Please enter the external server address (default: 127.0.0.1): " EXTERNAL_ADDRESS
@@ -68,9 +68,14 @@ if [ ! "$ARCHON_DB_NAME" ]; then
   ARCHON_DB_NAME="archondb"
 fi
 
-read -rp "Please enter the database address for archon (default: 127.0.0.1): " ARCHON_DB_HOST
+DEFAULT_DB_ADDR="127.0.0.1"
+if [ $DOCKER = "y" ]; then
+  DEFAULT_DB_ADDR="0.0.0.0"
+fi
+
+read -rp "Please enter the database address for archon (default: $DEFAULT_DB_ADDR): " ARCHON_DB_HOST
 if [ ! "$ARCHON_DB_HOST" ]; then
-  ARCHON_DB_HOST="127.0.0.1"
+  ARCHON_DB_HOST="$DEFAULT_DB_ADDR"
 fi
 
 read -rp "Please enter the username for the archon database (default: archonadmin): " ARCHON_DB_USER
@@ -156,7 +161,7 @@ if [ ! -d "$INSTALL_DIR"/patches ]; then
 fi
 
 echo "Generating certificates..."
-../bin/certgen --ip "$SERVER_IP" > /dev/null 2>&1
+./bin/certgen --ip "$SERVER_IP" > /dev/null 2>&1
 echo "Done."
 
 if [ "$FIRST_TIME_SETUP" = "y" ]; then
@@ -173,5 +178,5 @@ echo "  $(pwd)/patches"
 echo
 echo "Please verify the config file has the correct settings before running."
 echo "To run the server, execute the following:"
-echo "  $(pwd)/bin/server --config $(pwd)"
+echo "  $(pwd)/bin/archon server --config $(pwd)"
 echo

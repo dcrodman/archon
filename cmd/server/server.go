@@ -1,11 +1,10 @@
-// The server command is the main entrypoint for running archon. It takes
+// Package server is the main entrypoint for running archon. It takes
 // care of initializing everything as well as running as many servers are
 // needed for a fully functional server backend.
-package main
+package server
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -22,18 +21,19 @@ import (
 	patch2 "github.com/dcrodman/archon/internal/patch"
 	"github.com/dcrodman/archon/internal/ship"
 	"github.com/dcrodman/archon/internal/shipgate"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"github.com/urfave/cli/v2"
 
 	"github.com/dcrodman/archon"
 )
 
 const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
 
-var config = flag.String("config", "./", "Path to the directory containing the server config file")
+func server(cc *cli.Context) error {
+	config := cc.String("config")
 
-func main() {
-	flag.Parse()
-	archon.LoadConfig(*config)
+	archon.LoadConfig(config)
 	archon.InitLogger()
 
 	archon.Log.Info("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
@@ -44,19 +44,20 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
 
-	archon.Log.Infof("loaded configuration from %s", *config)
+	archon.Log.Infof("loaded configuration from %s", config)
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if err := os.Chdir(filepath.Dir(*config)); err != nil {
-		archon.Log.Errorf("failed to change to config directory: %v", err)
-		os.Exit(1)
+	if err := os.Chdir(filepath.Dir(config)); err != nil {
+		err = errors.Wrap(err, "failed to change config directory")
+		archon.Log.Error(err.Error())
+		return err
 	}
 
 	// Connect to the database.
 	if err := data.Initialize(dataSource(), debug.Enabled()); err != nil {
-		archon.Log.Errorf(err.Error())
-		os.Exit(1)
+		archon.Log.Error(err.Error())
+		return err
 	}
 	defer data.Shutdown()
 
@@ -128,7 +129,8 @@ func main() {
 	servers = append(servers, blockServers...)
 
 	// Bind the server loops to one top-level server context so that we can shut down cleanly.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(cc.Context)
+	defer cancel()
 
 	// Start the shipgate gRPC server and make sure it launches before the other servers start.
 	readyChan := make(chan bool)
@@ -137,7 +139,7 @@ func main() {
 	go func() {
 		if err := <-errChan; err != nil {
 			archon.Log.Errorf("exiting due to SHIPGATE error: %v", err)
-			os.Exit(1)
+			cancel()
 		}
 	}()
 	<-readyChan
@@ -146,8 +148,9 @@ func main() {
 	var serverWg sync.WaitGroup
 	for _, server := range servers {
 		if err := server.Start(ctx, &serverWg); err != nil {
-			archon.Log.Errorf("failed to start %s server: %v\n", server.Backend.Name(), err)
-			os.Exit(1)
+			err = errors.Wrapf(err, "failed to start %s server\n", server.Backend.Name())
+			archon.Log.Errorf(err.Error())
+			return err
 		}
 	}
 
@@ -157,6 +160,8 @@ func main() {
 	go exitHandler(cancel, c, &serverWg)
 
 	serverWg.Wait()
+
+	return nil
 }
 
 // Returns the database URI of the game database.
@@ -192,8 +197,7 @@ func exitHandler(cancelFn func(), c chan os.Signal, wg ...*sync.WaitGroup) {
 	select {
 	case <-c:
 		archon.Log.Info("hard exiting (killed)")
+		os.Exit(0)
 	case <-exitChan:
 	}
-
-	os.Exit(0)
 }
