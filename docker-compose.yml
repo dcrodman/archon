@@ -3,7 +3,7 @@ services:
   postgres:
     image: postgres
     ports:
-      - "5432:5432"
+      - 5432:5432
     environment:
       - POSTGRES_DB=archondb
       - POSTGRES_USER=archonadmin
@@ -15,7 +15,15 @@ services:
       retries: 5
   account:
     build:
-      target: account
+      context: .
+    command:
+      - /usr/bin/account
+      - --config
+      - /etc/archon
+      - --username=testuser
+      - --password=testpass
+      - --email=test@mail
+      - add
     environment:
       - "ARCHON_DATABASE_HOST=postgres"
     depends_on:
@@ -23,7 +31,11 @@ services:
         condition: service_healthy
   server:
     build:
-      target: server
+      context: .
+    command:
+      - /usr/bin/server
+      - --config
+      - /etc/archon
     environment:
       - "ARCHON_DATABASE_HOST=postgres"
       - "ARCHON_PATCH_SERVER_PATCH_DIR=./patches"
@@ -40,7 +52,12 @@ services:
         condition: service_healthy
   packet_analyzer:
     build:
-      target: packet_analyzer
+      context: .
+    command:
+      - /usr/bin/analyzer
+      - -folder=sessions
+      - -ui=8083
+      - -auto
     environment:
       - "ARCHON_DEBUGGING_ENABLED=true"
       - "ARCHON_PACKET_ANALYZER_ADDRESS=packet_analyzer:8081"

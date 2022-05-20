@@ -1,34 +1,19 @@
+Dockerfile
 FROM golang:1.16-alpine as builder
 
 RUN apk add gcc libc-dev make
 
-# Create directory structure
-RUN mkdir -p archon archon/.bin archon/archon_server
-
 # Copy repo to container
-COPY . ./archon
-
-WORKDIR archon
+COPY . /app
 
 # Compile the code
+WORKDIR /app
 RUN make build
 
-# Create a directory for the server files
-WORKDIR archon_server
+FROM alpine:latest
 
+COPY --from=builder /app/bin/ /usr/bin
 # Copy the supporting files
-RUN cp ../bin/* . && cp -r ../setup/* .
+COPY ../setup/ /etc/archon
 
-# Generate certificate
-RUN ./certgen -ip 0.0.0.0/32
-
-# Create test user account
-FROM builder as account
-# !!! This requires an existing postgres connection !!!
-CMD ["./account", "--username", "testuser", "--password", "testpass", "--email", "test@mail", "--config", ".", "add"]
-
-FROM builder as server
-ENTRYPOINT ["./server"]
-
-FROM builder as packet_analyzer
-ENTRYPOINT ["./analyzer", "-folder", "sessions", "-ui", "8083", "-auto"]
+CMD ["server", "--config", "/etc/archon"]
