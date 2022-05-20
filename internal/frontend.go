@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/client"
+	"github.com/dcrodman/archon/internal/core/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
 )
 

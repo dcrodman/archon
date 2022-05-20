@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 
-	"github.com/dcrodman/archon/internal/client"
+	"github.com/dcrodman/archon/internal/core/client"
 )
 
 // Backend is an interface for a sub-server that handles a specific set of client

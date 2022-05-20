@@ -14,9 +14,9 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon"
-	"github.com/dcrodman/archon/internal/client"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
+	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
