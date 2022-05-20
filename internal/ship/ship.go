@@ -169,13 +169,23 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 }
 
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+	cfg := packets.ClientConfig{
+		Magic:        c.Config.Magic,
+		CharSelected: c.Config.CharSelected,
+		SlotNum:      c.Config.SlotNum,
+		Flags:        c.Config.Flags,
+	}
+	copy(cfg.Ports[:], c.Config.Ports[:])
+	copy(cfg.Unused[:], c.Config.Unused[:])
+	copy(cfg.Unused2[:], c.Config.Unused2[:])
+
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
 		TeamID:       c.TeamID,
-		Config:       c.Config,
+		Config:       cfg,
 		Capabilities: 0x00000102,
 	})
 }

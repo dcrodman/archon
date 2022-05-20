@@ -8,8 +8,19 @@ import (
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/packets"
 )
+
+type ClientConfig struct {
+	// The rest of this holds various portions of client state to represent
+	// the client's progression through the login process.
+	Magic        uint32 // Must be set to 0x48615467
+	CharSelected uint8  // Has a character been selected?
+	SlotNum      uint8  // Slot number of selected Character
+	Flags        uint16
+	Ports        [4]uint16
+	Unused       [4]uint32
+	Unused2      [2]uint32
+}
 
 // Client represents a user connected through a PSOBB game client.
 type Client struct {
@@ -24,7 +35,7 @@ type Client struct {
 	Account *data.Account
 
 	// Client information shared amongst most Backend implementations.
-	Config packets.ClientConfig
+	Config ClientConfig
 
 	Flag   uint32
 	TeamID uint32

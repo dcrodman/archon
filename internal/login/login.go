@@ -129,6 +129,16 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 // send the security initialization packet with information about the user's
 // authentication status.
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+	cfg := packets.ClientConfig{
+		Magic:        c.Config.Magic,
+		CharSelected: c.Config.CharSelected,
+		SlotNum:      c.Config.SlotNum,
+		Flags:        c.Config.Flags,
+	}
+	copy(cfg.Ports[:], c.Config.Ports[:])
+	copy(cfg.Unused[:], c.Config.Unused[:])
+	copy(cfg.Unused2[:], c.Config.Unused2[:])
+
 	// Constants set according to how Newserv does it.
 	return c.Send(&packets.Security{
 		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
@@ -136,7 +146,7 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
 		TeamID:       c.TeamID,
-		Config:       c.Config,
+		Config:       cfg,
 		Capabilities: 0x00000102,
 	})
 }
