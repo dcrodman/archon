@@ -18,12 +18,21 @@ import (
 
 const blockLen = 0x18
 
-var exePath = flag.String("exe", "Psobb.exe", "Path (full or relative) to the PSOBB executable")
-var newAddress = flag.String("address", "127.0.0.1", "The new address or IPv4 address")
-var provider = flag.String("provider", "Ephinea", "Executable provider")
+var (
+	newAddress = flag.String("address", "127.0.0.1", "The new address or IPv4 address")
+	provider   = flag.String("provider", "TethVer12513", "Executable provider")
+)
 
 func main() {
 	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Println("usage: patcher [exe]")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	exePath := flag.Args()[0]
+
 	var offsets []int64
 	switch *provider {
 	case "TethVer12510":
@@ -63,7 +72,7 @@ func main() {
 
 	fmt.Printf("patching exe with new address: %s\n", *newAddress)
 
-	file, err := os.OpenFile(*exePath, os.O_RDWR, 0666)
+	file, err := os.OpenFile(exePath, os.O_RDWR, 0666)
 	if err != nil {
 		fmt.Println("error opening file: " + err.Error())
 		os.Exit(1)
