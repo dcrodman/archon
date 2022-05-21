@@ -21,11 +21,11 @@ import (
 
 var connectedClients = make(map[string]*client.Client)
 
-// Frontend implements the concurrent client connection logic.
+// frontend implements the concurrent client connection logic.
 //
 // Data is read from any connected clients and passed to a backend instance, abstracting
 // the lower level connection details away from the Backends.
-type Frontend struct {
+type frontend struct {
 	Address string
 	Backend Backend
 }
@@ -33,7 +33,7 @@ type Frontend struct {
 // Start initializes the server backend and opens a TCP socket for the specified server.
 // A blocking loop for accepting client connections is spun off in its own goroutine and
 // added to the WaitGroup. Context cancellations will stop the server.
-func (f *Frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
+func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 	if err := f.Backend.Init(ctx); err != nil {
 		return fmt.Errorf("failed to initialize %s server: %v", f.Backend.Name(), err)
 	}
@@ -50,8 +50,8 @@ func (f *Frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 }
 
 // createSocket opens a TCP socket to listen for client connections on the Address
-// provided to the Frontend.
-func (f *Frontend) createSocket() (*net.TCPListener, error) {
+// provided to the frontend.
+func (f *frontend) createSocket() (*net.TCPListener, error) {
 	hostAddr, err := net.ResolveTCPAddr("tcp", f.Address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve address %s", err.Error())
@@ -67,7 +67,7 @@ func (f *Frontend) createSocket() (*net.TCPListener, error) {
 
 // startBlockingLoop implements a connection handling loop that's purely responsible for
 // accepting new connections and spinning off goroutines for the Backend to handle them.
-func (f *Frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
+func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	archon.Log.Printf("%s waiting for connections on %v", f.Backend.Name(), f.Address)
@@ -112,7 +112,7 @@ handleLoop:
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
 // the Client and sending the welcome packets. If it succeeds, the goroutine moves
 // into the packet processing loop.
-func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg *sync.WaitGroup) {
+func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	c := client.NewClient(connection)
@@ -137,7 +137,7 @@ func (f *Frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func (f *Frontend) processPackets(ctx context.Context, c *client.Client) {
+func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 	defer f.closeConnectionAndRecover(f.Backend.Name(), c)
 
 	buffer := make([]byte, 2048)
@@ -174,7 +174,7 @@ func (f *Frontend) processPackets(ctx context.Context, c *client.Client) {
 
 // closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
 // client, and removes them from the list regardless of the state of the connection.
-func (*Frontend) closeConnectionAndRecover(serverName string, c *client.Client) {
+func (*frontend) closeConnectionAndRecover(serverName string, c *client.Client) {
 	if err := recover(); err != nil {
 		archon.Log.Errorf("error in client communication with %s: error=%s, trace: %s",
 			c.IPAddr(), err, debug.Stack())
@@ -192,7 +192,7 @@ func (*Frontend) closeConnectionAndRecover(serverName string, c *client.Client) 
 // readNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func (f *Frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
+func (f *frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
 	headerSize := int(c.CryptoSession.HeaderSize())
 
 	// Read and decrypt the packet header.
@@ -221,7 +221,7 @@ func (f *Frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, erro
 	return buffer, nil
 }
 
-func (f *Frontend) readDataFromClient(c *client.Client, n int, buffer []byte) error {
+func (f *frontend) readDataFromClient(c *client.Client, n int, buffer []byte) error {
 	received := 0
 
 	for received < n {

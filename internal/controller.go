@@ -24,7 +24,7 @@ import (
 // launching everything.
 type Controller struct {
 	wg      *sync.WaitGroup
-	servers []*Frontend
+	servers []*frontend
 }
 
 func (c *Controller) Start(ctx context.Context) error {
@@ -76,7 +76,7 @@ func (c *Controller) declareServers() {
 	// Automatically configure the block servers based on the number of
 	// ship blocks requested.
 	var blocks []ship.Block
-	var blockServers []*Frontend
+	var blockServers []*frontend
 	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
 		name := fmt.Sprintf("BLOCK%02d", i)
 		address := buildAddress(viper.GetInt("block_server.port") + i)
@@ -84,7 +84,7 @@ func (c *Controller) declareServers() {
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
 		})
-		blockServer := &Frontend{
+		blockServer := &frontend{
 			Address: address,
 			Backend: block.NewServer(
 				name,
@@ -95,7 +95,7 @@ func (c *Controller) declareServers() {
 		blockServers = append(blockServers, blockServer)
 	}
 
-	c.servers = []*Frontend{
+	c.servers = []*frontend{
 		{
 			Address: buildAddress(viper.GetString("patch_server.patch_port")),
 			Backend: patch.NewServer("PATCH", viper.GetString("patch_server.data_port")),
