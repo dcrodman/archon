@@ -35,12 +35,12 @@ type frontend struct {
 // added to the WaitGroup. Context cancellations will stop the server.
 func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 	if err := f.Backend.Init(ctx); err != nil {
-		return fmt.Errorf("failed to initialize %s server: %v", f.Backend.Identifier(), err)
+		return fmt.Errorf("[%s] error initializing server: %v", f.Backend.Identifier(), err)
 	}
 
 	socket, err := f.createSocket()
 	if err != nil {
-		return fmt.Errorf("failed to open socket on %s: %v", f.Address, err)
+		return fmt.Errorf("error creating socket on %s: %v", f.Address, err)
 	}
 
 	wg.Add(1)
@@ -54,7 +54,7 @@ func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 func (f *frontend) createSocket() (*net.TCPListener, error) {
 	hostAddr, err := net.ResolveTCPAddr("tcp", f.Address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve address %s", err.Error())
+		return nil, fmt.Errorf("error resolving address %s", err.Error())
 	}
 
 	socket, err := net.ListenTCP("tcp", hostAddr)
@@ -70,7 +70,7 @@ func (f *frontend) createSocket() (*net.TCPListener, error) {
 func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	archon.Log.Printf("%s waiting for connections on %v", f.Backend.Identifier(), f.Address)
+	archon.Log.Printf("[%s] waiting for connections on %v", f.Backend.Identifier(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {

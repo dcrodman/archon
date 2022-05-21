@@ -41,12 +41,12 @@ type shipInfo struct {
 func NewClient(shipgateAddress, certFile string) (*Client, error) {
 	creds, err := credentials.NewClientTLSFromFile(certFile, "")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
+		return nil, fmt.Errorf("error loading certificate file for shipgate: %s", err)
 	}
 
 	conn, err := grpc.Dial(shipgateAddress, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to shipgate: %s", err)
+		return nil, fmt.Errorf("error connecting to shipgate: %s", err)
 	}
 
 	return &Client{

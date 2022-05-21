@@ -33,7 +33,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
+		errChan <- fmt.Errorf("error starting ship info service listener on %s: %s", addr, err)
 		return
 	}
 
@@ -42,7 +42,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 		archon.Log.Printf("SHIPGATE waiting for requests on %s", addr)
 
 		if err := grpcServer.Serve(listener); err != nil {
-			errChan <- fmt.Errorf("failed to start ship info service on %s: %s", addr, err)
+			errChan <- fmt.Errorf("error starting ship info service on %s: %s", addr, err)
 			return
 		}
 
@@ -59,17 +59,17 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 func loadX509Certificate() (*tls.Certificate, error) {
 	certFile, err := ioutil.ReadFile(viper.GetString("shipgate_certificate_file"))
 	if err != nil {
-		return nil, fmt.Errorf("unable to load certificate file: %s", err)
+		return nil, fmt.Errorf("error loading certificate file: %s", err)
 	}
 
 	keyFile, err := ioutil.ReadFile(viper.GetString("shipgate_server.ssl_key_file"))
 	if err != nil {
-		return nil, fmt.Errorf("unable to load key file: %s", err)
+		return nil, fmt.Errorf("error loading key file: %s", err)
 	}
 
 	cert, err := tls.X509KeyPair(certFile, keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load X.509 certificate: %s", err)
+		return nil, fmt.Errorf("error loading X.509 certificate: %s", err)
 	}
 
 	return &cert, nil

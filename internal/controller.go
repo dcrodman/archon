@@ -124,7 +124,7 @@ func (c *Controller) run(ctx context.Context) error {
 	for _, server := range c.servers {
 		server.Config = c.Config
 		if err := server.Start(ctx, &c.wg); err != nil {
-			return fmt.Errorf("failed to start %s server: %w", server.Backend.Identifier(), err)
+			return fmt.Errorf("error starting %s server: %w", server.Backend.Identifier(), err)
 		}
 	}
 

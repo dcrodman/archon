@@ -112,7 +112,7 @@ func buildPatchFileTree(rootNode *directoryNode) error {
 
 		files, err := ioutil.ReadDir(currentNode.path)
 		if err != nil {
-			return fmt.Errorf("failed to load directory %s: %v", currentNode.path, err)
+			return fmt.Errorf("error loading directory %s: %v", currentNode.path, err)
 		}
 
 		patchFiles := make([]*fileEntry, 0)

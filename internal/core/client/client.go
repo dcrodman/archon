@@ -104,7 +104,7 @@ func (c *Client) transmit(data []byte, length uint16) error {
 	for bytesSent < int(length) {
 		b, err := c.Write(data[:length])
 		if err != nil {
-			return fmt.Errorf("failed to send to client %v: %s", c.IPAddr(), err.Error())
+			return fmt.Errorf("error sending to client %v: %s", c.IPAddr(), err.Error())
 		}
 		bytesSent += b
 	}

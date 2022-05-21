@@ -72,12 +72,12 @@ func (s *Server) Init(ctx context.Context) error {
 	// Connect to the shipgate.
 	creds, err := credentials.NewClientTLSFromFile(s.Config.ShipgateCertFile, "")
 	if err != nil {
-		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
+		return fmt.Errorf("error loading certificate file for shipgate: %s", err)
 	}
 
 	conn, err := grpc.Dial(s.Config.ShipgateAddress(), grpc.WithTransportCredentials(creds))
 	if err != nil {
-		return fmt.Errorf("failed to connect to shipgate: %s", err)
+		return fmt.Errorf("error connecting to shipgate: %s", err)
 	}
 
 	s.grpcShipgateClient = api.NewShipgateServiceClient(conn)

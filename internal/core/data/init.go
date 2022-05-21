@@ -22,12 +22,12 @@ func Initialize(dataSource string, debug bool) error {
 	db, err = gorm.Open(postgres.Open(dataSource), &gorm.Config{Logger: log})
 
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %s", err)
+		return fmt.Errorf("error connecting to database: %s", err)
 	}
 
 	err = db.AutoMigrate(&Account{}, &PlayerOptions{}, &Character{}, &GuildcardEntry{})
 	if err != nil {
-		return fmt.Errorf("unable to auto migrate db: %s", err)
+		return fmt.Errorf("error auto migrating db: %s", err)
 	}
 
 	return nil

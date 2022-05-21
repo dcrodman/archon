@@ -541,7 +541,7 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 		account := c.Account
 		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
 		if err != nil {
-			msg := fmt.Errorf("failed to locate character in slot %d for account %d", charPkt.Slot, account.ID)
+			msg := fmt.Errorf("error locating character in slot %d for account %d", charPkt.Slot, account.ID)
 			archon.Log.Error(msg)
 			return msg
 		}
@@ -669,7 +669,7 @@ func (s *Server) handleShipSelection(c *client.Client, menuSelectionPkt *packets
 	selectedShip := menuSelectionPkt.ItemID - 1
 	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selectedShip)
 	if err != nil {
-		return fmt.Errorf("could not get selected ship: %d", selectedShip)
+		return fmt.Errorf("error retrieving selected ship: %d", selectedShip)
 	}
 	return c.Send(&packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},

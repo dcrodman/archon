@@ -71,7 +71,7 @@ func initParameterData(paramFileDir string) error {
 
 	paramInitLock.Do(func() {
 		if err := loadParameterFiles(paramFileDir); err != nil {
-			initErr = fmt.Errorf("failed to load parameter files:" + err.Error())
+			initErr = fmt.Errorf("error loading parameter files:" + err.Error())
 			return
 		}
 
@@ -79,19 +79,19 @@ func initParameterData(paramFileDir string) error {
 		statsFile, _ := os.Open(filepath.Join(paramFileDir, "PlyLevelTbl.prs"))
 		compressedStatsFile, err := ioutil.ReadAll(statsFile)
 		if err != nil {
-			initErr = fmt.Errorf("failed to load PlyLevelTbl.prs:" + err.Error())
+			initErr = fmt.Errorf("error loading PlyLevelTbl.prs:" + err.Error())
 			return
 		}
 
 		decompressedSize, err := prs.DecompressSize(compressedStatsFile)
 		if err != nil {
-			initErr = fmt.Errorf("failed to decompress size of PlyLevelTbl.prs: %v", err)
+			initErr = fmt.Errorf("error decompressing size of PlyLevelTbl.prs: %v", err)
 			return
 		}
 
 		decompressedStatsFile, err := prs.Decompress(compressedStatsFile, decompressedSize)
 		if err != nil {
-			initErr = fmt.Errorf("failed to decompress PlyLevelTbl.prs: %v", err)
+			initErr = fmt.Errorf("error decompressing PlyLevelTbl.prs: %v", err)
 		}
 
 		// Base character class stats are stored sequentially, each 14 bytes long.
