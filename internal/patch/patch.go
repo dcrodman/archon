@@ -2,12 +2,9 @@ package patch
 
 import (
 	"context"
-	"strconv"
-	"sync"
-
-	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/packets"
@@ -16,48 +13,35 @@ import (
 // Convert the welcome message to UTF-16LE and cache it. PSOBB expects this prefix to the message,
 //not completely sure why. Language perhaps?
 
-var (
-	messageBytes []byte
-	messageInit  sync.Once
-
-	// Copyright message expected by the client for the patch welcome.
-	copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
-)
-
-func getWelcomeMessage() ([]byte, uint16) {
-	messageInit.Do(func() {
-		messageBytes = bytes.ConvertToUtf16(viper.GetString("patch_server.welcome_message"))
-
-		if len(messageBytes) > (1 << 16) {
-			archon.Log.Warn("patch server welcome message exceeds 65,000 characters")
-			messageBytes = messageBytes[:1<<16-2]
-		}
-		// Set the unicode byte order mark appropriately since we use LE encoding.
-		messageBytes = append([]byte{0xFF, 0xFE}, messageBytes...)
-	})
-
-	return messageBytes, uint16(len(messageBytes))
-}
+// Copyright message expected by the client for the patch welcome.
+var copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 
 // Server is the PATCH server implementation. It is extremely simple and for the
 // most part only exists as a first point of contact for the client, its chief
 // responsibility being to send clients the address of the DATA server.
 type Server struct {
-	name string
-	// Parsed representation of the login port.
-	dataRedirectPort uint16
+	Name   string
+	Config *core.Config
+
+	welcomeMessage []byte
 }
 
-func NewServer(name, dataPort string) *Server {
-	// Convert the data port to a BE uint for the redirect packet.
-	parsedDataPort, _ := strconv.ParseUint(dataPort, 10, 16)
-	dataRedirectPort := uint16((parsedDataPort >> 8) | (parsedDataPort << 8))
-
-	return &Server{name: name, dataRedirectPort: dataRedirectPort}
+func (s *Server) Identifier() string {
+	return s.Name
 }
 
-func (s *Server) Name() string                   { return s.name }
-func (s *Server) Init(ctx context.Context) error { return nil }
+func (s *Server) Init(ctx context.Context) error {
+	s.welcomeMessage = bytes.ConvertToUtf16(s.Config.PatchServer.WelcomeMessage)
+
+	if len(s.welcomeMessage) > (1 << 16) {
+		archon.Log.Warn("patch server welcome message exceeds 65,000 characters")
+		s.welcomeMessage = s.welcomeMessage[:1<<16-2]
+	}
+	// Set the unicode byte order mark appropriately since we use LE encoding.
+	s.welcomeMessage = append([]byte{0xFF, 0xFE}, s.welcomeMessage...)
+
+	return nil
+}
 
 func (s *Server) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewPCCryptoSession()
@@ -104,13 +88,12 @@ func (s *Server) sendWelcomeAck(c *client.Client) error {
 
 // Message displayed on the patch download screen.
 func (s *Server) sendWelcomeMessage(c *client.Client) error {
-	message, size := getWelcomeMessage()
 	pkt := &packets.PatchWelcomeMessage{
 		Header: packets.PCHeader{
-			Size: packets.PCHeaderSize + size,
+			Size: packets.PCHeaderSize + uint16(len(s.welcomeMessage)),
 			Type: packets.PatchMessageType,
 		},
-		Message: message,
+		Message: s.welcomeMessage,
 	}
 
 	return c.Send(pkt)
@@ -119,9 +102,10 @@ func (s *Server) sendWelcomeMessage(c *client.Client) error {
 // send the redirect packet, providing the IP and port of the next server.
 func (s *Server) sendPatchRedirect(c *client.Client) error {
 	pkt := packets.PatchRedirect{
-		Header:  packets.PCHeader{Type: packets.PatchRedirectType},
-		IPAddr:  [4]uint8{},
-		Port:    s.dataRedirectPort,
+		Header: packets.PCHeader{Type: packets.PatchRedirectType},
+		IPAddr: [4]uint8{},
+		// Convert the data port to a BE uint for the redirect packet.
+		Port:    uint16((s.Config.PatchServer.DataPort >> 8) | (s.Config.PatchServer.DataPort << 8)),
 		Padding: 0,
 	}
 

@@ -8,11 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/data"
-	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/spf13/viper"
 )
 
 var config = flag.String("config", "./", "Path to the directory containing the server config file")
@@ -24,7 +22,6 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	archon.LoadConfig(*config)
 	cleanup, err := initDataSource()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -87,20 +84,10 @@ func usage() {
 // initDataSource creates the connection to the database, and returns a func
 // which should be deferred for cleanup.
 func initDataSource() (func(), error) {
-	dataSource := fmt.Sprintf(
-		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
-		viper.GetString("database.host"),
-		viper.GetInt("database.port"),
-		viper.GetString("database.name"),
-		viper.GetString("database.username"),
-		viper.GetString("database.password"),
-		viper.GetString("database.sslmode"),
-	)
-
-	if err := data.Initialize(dataSource, debug.Enabled()); err != nil {
+	config := core.LoadConfig(*config)
+	if err := data.Initialize(config.DatabaseURL(), config.Debugging.Enabled); err != nil {
 		return nil, err
 	}
-
 	return data.Shutdown, nil
 }
 

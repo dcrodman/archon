@@ -2,16 +2,18 @@ package login
 
 import (
 	"context"
-	"strconv"
+	"fmt"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 // Copyright message expected by the client when connecting.
@@ -22,27 +24,23 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 // the client's username/password and set some initial state on the client before
 // redirecting them to the CHARACTER server.
 type Server struct {
-	name                  string
-	characterRedirectPort uint16
-	shipGateClient        *shipgate.Client
-	shipGateAddr          string
+	Name   string
+	Config *core.Config
+
+	shipGateClient *shipgate.Client
 }
 
-func NewServer(name, characterPort, shipgateAddr string) *Server {
-	charPort, _ := strconv.ParseUint(characterPort, 10, 16)
-
-	return &Server{
-		name:                  name,
-		shipGateAddr:          shipgateAddr,
-		characterRedirectPort: uint16(charPort),
-	}
+func (s *Server) Identifier() string {
+	return s.Name
 }
 
-func (s *Server) Name() string { return s.name }
 func (s *Server) Init(_ context.Context) error {
-	shipGateClient, err := shipgate.NewClient(s.shipGateAddr)
+	shipGateClient, err := shipgate.NewClient(
+		s.Config.ShipgateAddress(),
+		s.Config.ShipgateCertFile,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to shipgate: %w", err)
 	}
 	s.shipGateClient = shipGateClient
 	return nil
@@ -167,7 +165,7 @@ func (s *Server) sendCharacterRedirect(c *client.Client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},
-		Port:   s.characterRedirectPort,
+		Port:   uint16(s.Config.CharacterServer.Port),
 	}
 	ip := archon.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])

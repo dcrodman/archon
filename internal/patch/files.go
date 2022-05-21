@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon"
-	"github.com/spf13/viper"
 )
 
 // maxFileChunkSize is the maximum number of bytes we can send of a file at a time.
@@ -69,20 +68,18 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData() error {
+func initializePatchData(patchDir string) error {
 	var initErr error
 
 	patchInitLock.Do(func() {
-		dir := viper.GetString("patch_server.patch_dir")
-
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", dir)
+		if _, err := os.Stat(patchDir); os.IsNotExist(err) {
+			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", patchDir)
 			return
 		}
 
-		rootNode = &directoryNode{path: dir, clientPath: "./"}
+		rootNode = &directoryNode{path: patchDir, clientPath: "./"}
 
-		archon.Log.Infof("loading patch files from %s", dir)
+		archon.Log.Infof("loading patch files from %s", patchDir)
 		if err := buildPatchFileTree(rootNode); err != nil {
 			initErr = fmt.Errorf("error loading patch files: %s", err)
 			return

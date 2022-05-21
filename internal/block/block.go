@@ -3,43 +3,39 @@ package block
 import (
 	"context"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 type Server struct {
-	name       string
-	numLobbies int
+	Name   string
+	Config *core.Config
 
-	shipgateAddress string
-	shipgateClient  *shipgate.Client
+	shipgateClient *shipgate.Client
 }
 
-func NewServer(name, shipgateAddress string, lobbies int) *Server {
-	return &Server{
-		name:            name,
-		numLobbies:      lobbies,
-		shipgateAddress: shipgateAddress,
-	}
-}
-
-func (s *Server) Name() string {
-	return s.name
+func (s *Server) Identifier() string {
+	return s.Name
 }
 
 // Init connects to the shipgate.
 func (s *Server) Init(ctx context.Context) error {
 	var err error
-	s.shipgateClient, err = shipgate.NewClient(s.shipgateAddress)
+	s.shipgateClient, err = shipgate.NewClient(
+		s.Config.ShipgateAddress(),
+		s.Config.ShipgateCertFile,
+	)
 
 	return err
 }
@@ -144,8 +140,8 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 }
 
 func (s *Server) sendLobbyList(c *client.Client) error {
-	lobbyEntries := make([]packets.LobbyListEntry, s.numLobbies)
-	for i := 0; i < s.numLobbies; i++ {
+	lobbyEntries := make([]packets.LobbyListEntry, s.Config.BlockServer.NumLobbies)
+	for i := 0; i < s.Config.BlockServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
 		lobbyEntries[i].LobbyID = uint32(i)
 	}

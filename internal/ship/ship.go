@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
@@ -45,41 +45,37 @@ type Block struct {
 // provide the client with the block list and then send the address of the
 // block that the user selects.
 type Server struct {
-	name               string
-	blocks             []Block
+	Name   string
+	Config *core.Config
+	Blocks []Block
+
 	grpcShipgateClient api.ShipgateServiceClient
 	shipGateClient     *shipgate.Client
-	shipGateAddr       string
 }
 
-func NewServer(name string, blocks []Block, shipgateAddr string) *Server {
-	return &Server{
-		name:         name,
-		blocks:       blocks,
-		shipGateAddr: shipgateAddr,
-	}
-}
-
-func (s *Server) Name() string {
-	return s.name
+func (s *Server) Identifier() string {
+	return s.Name
 }
 
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
 	var err error
-	s.shipGateClient, err = shipgate.NewClient(s.shipGateAddr)
+	s.shipGateClient, err = shipgate.NewClient(
+		s.Config.ShipgateAddress(),
+		s.Config.ShipgateCertFile,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to shipgate: %w", err)
 	}
 
 	// Connect to the shipgate.
-	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
+	creds, err := credentials.NewClientTLSFromFile(s.Config.ShipgateCertFile, "")
 	if err != nil {
 		return fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}
 
-	conn, err := grpc.Dial(viper.GetString("ship_server.shipgate_address"), grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial(s.Config.ShipgateAddress(), grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return fmt.Errorf("failed to connect to shipgate: %s", err)
 	}
@@ -88,9 +84,9 @@ func (s *Server) Init(ctx context.Context) error {
 
 	// Register this ship with the shipgate so that it can start accepting players.
 	_, err = s.grpcShipgateClient.RegisterShip(ctx, &api.RegistrationRequest{
-		Name:    viper.GetString("ship_server.name"),
-		Port:    viper.GetString("ship_server.port"),
-		Address: viper.GetString("hostname"),
+		Name:    s.Config.ShipServer.Name,
+		Port:    strconv.Itoa(s.Config.ShipServer.Port),
+		Address: s.Config.Hostname,
 	})
 	if err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
@@ -201,7 +197,7 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 // send the client the block list on the selection screen.
 func (s *Server) sendBlockList(c *client.Client) error {
 	var blocks []packets.Block
-	for _, blockCfg := range s.blocks {
+	for _, blockCfg := range s.Blocks {
 		block := packets.Block{
 			Unknown: 0x12,
 			BlockID: blockListMenuType | uint32(blockCfg.ID),
@@ -226,7 +222,7 @@ func (s *Server) sendBlockList(c *client.Client) error {
 		Unknown: 0x08,
 		Blocks:  blocks,
 	}
-	copy(blockListPkt.ShipName[:], []byte(viper.GetString("ship_server.name")))
+	copy(blockListPkt.ShipName[:], []byte(s.Config.ShipServer.Name))
 
 	return c.Send(blockListPkt)
 }
@@ -259,12 +255,12 @@ func (s *Server) handleBlockSelection(c *client.Client, selection uint32) error 
 	// meny if "Ship List" was chosen.
 	if selection == BackMenuItem {
 		return s.sendShipList(c)
-	} else if int(selection) > len(s.blocks) || int(selection) < 0 {
-		return fmt.Errorf("error selecting block: block ID %d out of range [0, %d]", selection, len(s.blocks))
+	} else if int(selection) > len(s.Blocks) || int(selection) < 0 {
+		return fmt.Errorf("error selecting block: block ID %d out of range [0, %d]", selection, len(s.Blocks))
 	}
 
 	var err error
-	for _, block := range s.blocks {
+	for _, block := range s.Blocks {
 		if block.ID == int(selection) {
 			err = s.sendBlockRedirect(c, block)
 			break

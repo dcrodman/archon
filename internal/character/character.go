@@ -9,11 +9,11 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/spf13/viper"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
@@ -53,32 +53,30 @@ var (
 // The ship list is obtained by communicating with the shipgate server since ships
 // do not directly connect to this server.
 type Server struct {
-	name           string
+	Name   string
+	Config *core.Config
+
 	kvCache        *Cache
 	shipGateClient *shipgate.Client
-	shipGateAddr   string
 }
 
-func NewServer(name string, shipgateAddr string) *Server {
-	return &Server{
-		name:         name,
-		kvCache:      NewCache(),
-		shipGateAddr: shipgateAddr,
-	}
-}
-
-func (s *Server) Name() string {
-	return s.name
+func (s *Server) Identifier() string {
+	return s.Name
 }
 
 func (s *Server) Init(ctx context.Context) error {
+	s.kvCache = NewCache()
+
 	var err error
-	s.shipGateClient, err = shipgate.NewClient(s.shipGateAddr)
+	s.shipGateClient, err = shipgate.NewClient(
+		s.Config.ShipgateAddress(),
+		s.Config.ShipgateCertFile,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to shipgate: %w", err)
 	}
 
-	if err := initParameterData(); err != nil {
+	if err := initParameterData(s.Config.CharacterServer.ParametersDir); err != nil {
 		return err
 	}
 
@@ -281,7 +279,7 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 	// lazily computing it from the config file and storing it in a package var.
 	shipSelectionScrollMessageInit.Do(func() {
 		shipSelectionScrollMessage = bytes.ConvertToUtf16(
-			viper.GetString("character_server.scroll_message"),
+			s.Config.CharacterServer.ScrollMessage,
 		)
 		// The end of the message appears to be garbled unless there is an extra byte...?
 		shipSelectionScrollMessage = append(shipSelectionScrollMessage, 0x00)

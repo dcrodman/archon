@@ -8,8 +8,6 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/dcrodman/archon"
 )
 
@@ -23,29 +21,16 @@ type packetAnalyzerRequest struct {
 
 var packetAnalyzerChan = make(chan packetAnalyzerRequest, 10)
 
-// Enabled returns whether or not the server was set to debug mode.
-func Enabled() bool {
-	return viper.GetBool("debugging.enabled")
-}
-
 // StartUtilities spins off the services associated with debug mode.
-func StartUtilities() {
-	startPprofServer()
+func StartUtilities(pprofPort int, analyzerAddr string) {
+	startPprofServer(pprofPort)
 
-	if packetAnalyzerEnabled() {
-		go startAnalyzerExporter()
+	if analyzerAddr != "" {
+		go startAnalyzerExporter(analyzerAddr)
 	}
 }
 
-func packetAnalyzerEnabled() bool {
-	return PacketAnalyzerAddress() != ""
-}
-
-func PacketAnalyzerAddress() string {
-	return viper.GetString("debugging.packet_analyzer_address")
-}
-
-func startAnalyzerExporter() {
+func startAnalyzerExporter(analyzerAddr string) {
 	for {
 		packet := <-packetAnalyzerChan
 
@@ -54,7 +39,7 @@ func startAnalyzerExporter() {
 
 		// We don't care if the packets don't get through.
 		r, err := httpClient.Post(
-			"http://"+PacketAnalyzerAddress(),
+			"http://"+analyzerAddr,
 			"application/json",
 			bytes.NewBuffer(reqBytes),
 		)
@@ -69,8 +54,8 @@ func startAnalyzerExporter() {
 
 // This function starts the default pprof HTTP server that can be accessed via localhost
 // to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
-func startPprofServer() {
-	listenerAddr := fmt.Sprintf("localhost:%s", viper.GetString("debugging.pprof_port"))
+func startPprofServer(pprofPort int) {
+	listenerAddr := fmt.Sprintf("localhost:%d", pprofPort)
 	archon.Log.Infof("starting pprof server on %s", listenerAddr)
 
 	go func() {
@@ -93,10 +78,6 @@ func SendClientPacketToAnalyzer(debugInfo map[string]interface{}, packetBytes []
 }
 
 func sendToPacketAnalyzer(debugInfo map[string]interface{}, packetBytes []byte, size int, source, destination string) {
-	if !packetAnalyzerEnabled() {
-		return
-	}
-
 	cbytes := make([]int, size)
 	for i := 0; i < size; i++ {
 		cbytes[i] = int(packetBytes[i])

@@ -10,7 +10,7 @@ import (
 // interactions as part of the game flow.
 type Backend interface {
 	// Name returns a uniquely identifying string.
-	Name() string
+	Identifier() string
 
 	// Init is called before a Backend is started as a hook for the Backend to
 	// perform any necessary initialization before it can accept clients.

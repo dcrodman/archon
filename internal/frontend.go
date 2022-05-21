@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
 )
@@ -28,6 +27,7 @@ var connectedClients = make(map[string]*client.Client)
 type frontend struct {
 	Address string
 	Backend Backend
+	Config  *core.Config
 }
 
 // Start initializes the server backend and opens a TCP socket for the specified server.
@@ -35,7 +35,7 @@ type frontend struct {
 // added to the WaitGroup. Context cancellations will stop the server.
 func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 	if err := f.Backend.Init(ctx); err != nil {
-		return fmt.Errorf("failed to initialize %s server: %v", f.Backend.Name(), err)
+		return fmt.Errorf("failed to initialize %s server: %v", f.Backend.Identifier(), err)
 	}
 
 	socket, err := f.createSocket()
@@ -70,13 +70,13 @@ func (f *frontend) createSocket() (*net.TCPListener, error) {
 func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	archon.Log.Printf("%s waiting for connections on %v", f.Backend.Name(), f.Address)
+	archon.Log.Printf("%s waiting for connections on %v", f.Backend.Identifier(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {
 		for {
 			// Poll until we can accept more clients.
-			for len(connectedClients) > viper.GetInt("max_connections") {
+			for len(connectedClients) > f.Config.MaxConnections {
 				time.Sleep(10 * time.Second)
 			}
 
@@ -104,9 +104,9 @@ handleLoop:
 		}
 	}
 
-	archon.Log.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Name())
+	archon.Log.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Identifier())
 	clientWg.Wait()
-	archon.Log.Infof("%v server exited", f.Backend.Name())
+	archon.Log.Infof("%v server exited", f.Backend.Identifier())
 }
 
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
@@ -117,8 +117,9 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 	c := client.NewClient(connection)
 	f.Backend.SetUpClient(c)
+	c.Debug = f.Config.Debugging.Enabled
 
-	archon.Log.Infof("accepted %s connection from %s", f.Backend.Name(), c.IPAddr())
+	archon.Log.Infof("[%s] accepted connection from %s", f.Backend.Identifier(), c.IPAddr())
 
 	if err := f.Backend.Handshake(c); err != nil {
 		archon.Log.Errorf("Handshake() failed for client %s: %s", c.IPAddr(), err)
@@ -126,7 +127,7 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 	// Prevent multiple clients from connecting from the same IP address.
 	if _, ok := connectedClients[c.IPAddr()]; ok {
-		archon.Log.Infof("%s rejected second connection from %s", f.Backend.Name(), c.IPAddr())
+		archon.Log.Infof("%s rejected second connection from %s", f.Backend.Identifier(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
@@ -138,7 +139,7 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
 func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
-	defer f.closeConnectionAndRecover(f.Backend.Name(), c)
+	defer f.closeConnectionAndRecover(f.Backend.Identifier(), c)
 
 	buffer := make([]byte, 2048)
 	var err error
@@ -160,7 +161,7 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 			break
 		}
 
-		if archdebug.Enabled() {
+		if f.Config.Debugging.Enabled {
 			size := determinePacketSize(buffer, c.CryptoSession.HeaderSize())
 			archdebug.SendClientPacketToAnalyzer(c.DebugTags, buffer, uint16(size))
 		}

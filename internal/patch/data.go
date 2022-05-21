@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/packets"
@@ -20,17 +21,16 @@ import (
 // corresponding client files (or do not exist), this server allows the client to
 // download the correct file contents and forces a restart.
 type DataServer struct {
-	name string
+	Name   string
+	Config *core.Config
 }
 
-func NewDataServer(name string) *DataServer {
-	return &DataServer{name: name}
+func (s DataServer) Identifier() string {
+	return s.Name
 }
-
-func (s DataServer) Name() string { return s.name }
 
 func (s *DataServer) Init(ctx context.Context) error {
-	return initializePatchData()
+	return initializePatchData(s.Config.PatchServer.PatchDir)
 }
 
 func (s *DataServer) SetUpClient(c *client.Client) {

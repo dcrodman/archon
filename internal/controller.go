@@ -6,11 +6,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/spf13/viper"
-
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/block"
 	"github.com/dcrodman/archon/internal/character"
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/login"
@@ -23,7 +22,9 @@ import (
 // any shared resources (such as database and logging), defining the servers, and
 // launching everything.
 type Controller struct {
-	wg      *sync.WaitGroup
+	Config *core.Config
+
+	wg      sync.WaitGroup
 	servers []*frontend
 }
 
@@ -33,17 +34,14 @@ func (c *Controller) Start(ctx context.Context) error {
 	archon.InitLogger()
 
 	// Connect to the database.
-	if err := data.Initialize(dataSource(), debug.Enabled()); err != nil {
+	if err := data.Initialize(c.Config.DatabaseURL(), c.Config.Debugging.Enabled); err != nil {
 		return err
 	}
-	archon.Log.Infof("connected to database %s:%d",
-		viper.GetString("database.host"),
-		viper.GetInt("database.port"),
-	)
+	archon.Log.Infof("connected to database %s:%d", c.Config.Database.Host, c.Config.Database.Port)
 
 	// Start any debug utilities if we're configured to do so.
-	if debug.Enabled() {
-		debug.StartUtilities()
+	if c.Config.Debugging.Enabled {
+		debug.StartUtilities(c.Config.Debugging.PprofPort, c.Config.Debugging.PacketAnalyzerAddress)
 	}
 
 	// Start the shipgate gRPC server and make sure it launches before the other servers start.
@@ -54,69 +52,67 @@ func (c *Controller) Start(ctx context.Context) error {
 	return c.run(ctx)
 }
 
-const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
-
-// Returns the database URI of the game database.
-func dataSource() string {
-	return fmt.Sprintf(
-		databaseURITemplate,
-		viper.GetString("database.host"),
-		viper.GetInt("database.port"),
-		viper.GetString("database.name"),
-		viper.GetString("database.username"),
-		viper.GetString("database.password"),
-		viper.GetString("database.sslmode"),
-	)
-}
-
 // Set up all of the servers we want to run.
 func (c *Controller) declareServers() {
-	shipgateAddr := buildAddress(viper.GetString("shipgate_server.port"))
-
 	// Automatically configure the block servers based on the number of
 	// ship blocks requested.
 	var blocks []ship.Block
 	var blockServers []*frontend
-	for i := 1; i <= viper.GetInt("ship_server.num_blocks"); i++ {
+	for i := 1; i <= c.Config.ShipServer.NumBlocks; i++ {
 		name := fmt.Sprintf("BLOCK%02d", i)
-		address := buildAddress(viper.GetInt("block_server.port") + i)
+		address := c.buildAddress(c.Config.BlockServer.Port + i)
 
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
 		})
 		blockServer := &frontend{
 			Address: address,
-			Backend: block.NewServer(
-				name,
-				shipgateAddr,
-				viper.GetInt("block_server.num_lobbies"),
-			),
+			Backend: &block.Server{
+				Name:   name,
+				Config: c.Config,
+			},
 		}
 		blockServers = append(blockServers, blockServer)
 	}
 
 	c.servers = []*frontend{
 		{
-			Address: buildAddress(viper.GetString("patch_server.patch_port")),
-			Backend: patch.NewServer("PATCH", viper.GetString("patch_server.data_port")),
+			Address: c.buildAddress(c.Config.PatchServer.PatchPort),
+			Backend: &patch.Server{
+				Name:   "PATCH",
+				Config: c.Config,
+			},
 		},
 		{
-			Address: buildAddress(viper.GetString("patch_server.data_port")),
-			Backend: patch.NewDataServer("DATA"),
+			Address: c.buildAddress(c.Config.PatchServer.DataPort),
+			Backend: &patch.DataServer{
+				Name:   "DATA",
+				Config: c.Config,
+			},
 		},
 		{
-			Address: buildAddress(viper.GetString("login_server.port")),
-			Backend: login.NewServer("LOGIN", viper.GetString("character_server.port"), shipgateAddr),
+			Address: c.buildAddress(c.Config.LoginServer.Port),
+			Backend: &login.Server{
+				Name:   "LOGIN",
+				Config: c.Config,
+			},
 		},
 		{
-			Address: buildAddress(viper.GetString("character_server.port")),
-			Backend: character.NewServer("CHARACTER", shipgateAddr),
+			Address: c.buildAddress(c.Config.CharacterServer.Port),
+			Backend: &character.Server{
+				Name:   "CHARACTER",
+				Config: c.Config,
+			},
 		},
 		// Note: Eventually the ship and block servers should be able to be run
 		// independently of the other four servers
 		{
-			Address: buildAddress(viper.GetString("ship_server.port")),
-			Backend: ship.NewServer("SHIP", blocks, shipgateAddr),
+			Address: c.buildAddress(c.Config.ShipServer.Port),
+			Backend: &ship.Server{
+				Name:   "SHIP",
+				Config: c.Config,
+				Blocks: blocks,
+			},
 		},
 	}
 
@@ -126,8 +122,9 @@ func (c *Controller) declareServers() {
 func (c *Controller) run(ctx context.Context) error {
 	// Start all of our servers. Failure to initialize one of the registered servers is considered terminal.
 	for _, server := range c.servers {
-		if err := server.Start(ctx, c.wg); err != nil {
-			return fmt.Errorf("failed to start %s server: %w", server.Backend.Name(), err)
+		server.Config = c.Config
+		if err := server.Start(ctx, &c.wg); err != nil {
+			return fmt.Errorf("failed to start %s server: %w", server.Backend.Identifier(), err)
 		}
 	}
 
@@ -139,7 +136,7 @@ func (c *Controller) startShipgate(ctx context.Context) {
 	readyChan := make(chan bool)
 	errChan := make(chan error)
 
-	go shipgate.Start(ctx, buildAddress(viper.GetString("shipgate_server.port")), readyChan, errChan)
+	go shipgate.Start(ctx, c.buildAddress(c.Config.ShipgateServer.Port), readyChan, errChan)
 	go func() {
 		if err := <-errChan; err != nil {
 			fmt.Printf("exiting due to SHIPGATE error: %v", err)
@@ -150,8 +147,8 @@ func (c *Controller) startShipgate(ctx context.Context) {
 	<-readyChan
 }
 
-func buildAddress(port interface{}) string {
-	return fmt.Sprintf("%s:%v", viper.GetString("hostname"), port)
+func (c *Controller) buildAddress(port int) string {
+	return fmt.Sprintf("%s:%v", c.Config.Hostname, port)
 }
 
 func (c *Controller) Shutdown() {

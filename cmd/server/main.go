@@ -14,15 +14,14 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal"
+	"github.com/dcrodman/archon/internal/core"
 )
 
-var config = flag.String("config", "./", "Path to the directory containing the server config file")
+var configFlag = flag.String("config", "./", "Path to the directory containing the server config file")
 
 func main() {
 	flag.Parse()
-	archon.LoadConfig(*config)
 
 	fmt.Println("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
 		"=====================================================\n" +
@@ -32,16 +31,17 @@ func main() {
 		"the License, or (at your option) any later version. This program\n" +
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
 
-	fmt.Println("loaded configuration from", *config)
+	config := core.LoadConfig(*configFlag)
+	fmt.Println("using configuration file:", *configFlag)
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if err := os.Chdir(filepath.Dir(*config)); err != nil {
-		fmt.Println("failed to change to config directory:", err)
+	if err := os.Chdir(filepath.Dir(*configFlag)); err != nil {
+		fmt.Println("error changing to config directory:", err)
 		os.Exit(1)
 	}
 
-	// Bind the server loops to one top-level server context so that we can shut down cleanly.
+	// Bind the Controller to one top-level server context so that we can shut down cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Register a SIGTERM handler so that Ctrl-C will shut the servers down gracefully.
@@ -50,17 +50,20 @@ func main() {
 	go exitHandler(cancel, c)
 
 	// Start up the controller to handle all of the resources and server init.
-	controller := &internal.Controller{}
+	controller := &internal.Controller{
+		Config: config,
+	}
 	if err := controller.Start(ctx); err != nil {
-		if errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			fmt.Println(err)
 		}
 	}
+	fmt.Println("shut down")
 }
 
 func exitHandler(cancelFn func(), c chan os.Signal, wg ...*sync.WaitGroup) {
 	<-c
-	fmt.Println("shutting down...")
+	fmt.Println("waiting to shut down gracefully...")
 
 	cancelFn()
 	exitChan := make(chan bool)

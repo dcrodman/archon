@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/core/prs"
-	"github.com/spf13/viper"
 
 	"github.com/dcrodman/archon"
 )
@@ -68,12 +66,10 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData() error {
+func initParameterData(paramFileDir string) error {
 	var initErr error
 
 	paramInitLock.Do(func() {
-		paramFileDir := viper.GetString("character_server.parameters_dir")
-
 		if err := loadParameterFiles(paramFileDir); err != nil {
 			initErr = fmt.Errorf("failed to load parameter files:" + err.Error())
 			return
@@ -137,9 +133,7 @@ func loadParameterFiles(paramFileDir string) error {
 
 		offset += fileSize
 
-		if debug.Enabled() {
-			archon.Log.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
-		}
+		archon.Log.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
 	}
 
 	// Offset should at this point be the total size of the files

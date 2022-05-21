@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"
 
@@ -19,7 +19,6 @@ import (
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate/api"
 	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/credentials"
 )
 
 type Client struct {
@@ -39,8 +38,8 @@ type shipInfo struct {
 	port string
 }
 
-func NewClient(shipgateAddress string) (*Client, error) {
-	creds, err := credentials.NewClientTLSFromFile(viper.GetString("shipgate_certificate_file"), "")
+func NewClient(shipgateAddress, certFile string) (*Client, error) {
+	creds, err := credentials.NewClientTLSFromFile(certFile, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load certificate file for shipgate: %s", err)
 	}

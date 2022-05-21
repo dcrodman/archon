@@ -51,6 +51,7 @@ type Client struct {
 	FilesToUpdate map[int]interface{}
 
 	// Debugging information used for logging purposes.
+	Debug     bool
 	DebugTags map[string]interface{}
 }
 
@@ -88,7 +89,7 @@ func (c *Client) Close() error {
 func (c *Client) SendRaw(packet interface{}) error {
 	bytes, size := bytes.BytesFromStruct(packet)
 
-	if debug.Enabled() {
+	if c.Debug {
 		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, uint16(size))
 	}
 
@@ -117,7 +118,7 @@ func (c *Client) Send(packet interface{}) error {
 	data, length := bytes.BytesFromStruct(packet)
 	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
-	if debug.Enabled() {
+	if c.Debug {
 		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, size)
 	}
 
