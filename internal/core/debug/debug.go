@@ -8,7 +8,7 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/dcrodman/archon"
+	"github.com/sirupsen/logrus"
 )
 
 type packetAnalyzerRequest struct {
@@ -22,15 +22,15 @@ type packetAnalyzerRequest struct {
 var packetAnalyzerChan = make(chan packetAnalyzerRequest, 10)
 
 // StartUtilities spins off the services associated with debug mode.
-func StartUtilities(pprofPort int, analyzerAddr string) {
-	startPprofServer(pprofPort)
+func StartUtilities(logger *logrus.Logger, pprofPort int, analyzerAddr string) {
+	startPprofServer(logger, pprofPort)
 
 	if analyzerAddr != "" {
-		go startAnalyzerExporter(analyzerAddr)
+		go startAnalyzerExporter(logger, analyzerAddr)
 	}
 }
 
-func startAnalyzerExporter(analyzerAddr string) {
+func startAnalyzerExporter(logger *logrus.Logger, analyzerAddr string) {
 	for {
 		packet := <-packetAnalyzerChan
 
@@ -45,22 +45,22 @@ func startAnalyzerExporter(analyzerAddr string) {
 		)
 
 		if err != nil {
-			archon.Log.Warn("failed to send packet to analyzer: ", err)
+			logger.Warn("failed to send packet to analyzer: ", err)
 		} else if r.StatusCode != 200 {
-			archon.Log.Warn("failed to send packet to analyzer: ", r.Body)
+			logger.Warn("failed to send packet to analyzer: ", r.Body)
 		}
 	}
 }
 
 // This function starts the default pprof HTTP server that can be accessed via localhost
 // to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
-func startPprofServer(pprofPort int) {
+func startPprofServer(logger *logrus.Logger, pprofPort int) {
 	listenerAddr := fmt.Sprintf("localhost:%d", pprofPort)
-	archon.Log.Infof("starting pprof server on %s", listenerAddr)
+	logger.Infof("starting pprof server on %s", listenerAddr)
 
 	go func() {
 		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
-			archon.Log.Infof("error starting pprof server: %s", err)
+			logger.Infof("error starting pprof server: %s", err)
 		}
 	}()
 }

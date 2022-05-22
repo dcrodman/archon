@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/shipgate/api"
 )
@@ -30,6 +30,7 @@ type ship struct {
 type shipgateServiceServer struct {
 	api.UnimplementedShipgateServiceServer
 
+	logger              *logrus.Logger
 	connectedShips      map[string]*ship
 	connectedShipsMutex sync.RWMutex
 }
@@ -59,7 +60,7 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 	// stable and allow for brief interruptions while preserving idempotency.
 	if _, ok := s.connectedShips[req.Name]; ok {
 		if !s.connectedShips[req.Name].active {
-			archon.Log.Infof("SHIPGATE reactivated ship %s at %s:%s", req.Name, req.Address, req.Port)
+			s.logger.Infof("SHIPGATE reactivated ship %s at %s:%s", req.Name, req.Address, req.Port)
 		}
 		s.connectedShips[req.Name].active = true
 		s.connectedShips[req.Name].ip = req.Address
@@ -71,7 +72,7 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 			ip:   req.Address,
 			port: req.Port,
 		}
-		archon.Log.Infof("SHIPGATE registered ship %s at %s:%s", req.Name, req.Address, req.Port)
+		s.logger.Infof("SHIPGATE registered ship %s at %s:%s", req.Name, req.Address, req.Port)
 	}
 	return &emptypb.Empty{}, nil
 }

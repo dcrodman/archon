@@ -7,16 +7,16 @@ import (
 	"io/ioutil"
 	"net"
 
-	"github.com/dcrodman/archon/internal/shipgate/api"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/dcrodman/archon"
+	"github.com/dcrodman/archon/internal/shipgate/api"
 )
 
 // Start starts the gRPC API servers listening on addr.
-func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan error) {
+func Start(ctx context.Context, logger *logrus.Logger, addr string, readyChan chan bool, errChan chan error) {
 	cert, err := loadX509Certificate()
 	if err != nil {
 		errChan <- err
@@ -28,6 +28,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	grpcServer := grpc.NewServer(opts...)
 
 	api.RegisterShipgateServiceServer(grpcServer, &shipgateServiceServer{
+		logger:         logger,
 		connectedShips: make(map[string]*ship),
 	})
 
@@ -39,7 +40,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 
 	// Spin off the listener in its own goroutine since we need to listen for context cancellations.
 	go func() {
-		archon.Log.Printf("SHIPGATE waiting for requests on %s", addr)
+		logger.Printf("SHIPGATE waiting for requests on %s", addr)
 
 		if err := grpcServer.Serve(listener); err != nil {
 			errChan <- fmt.Errorf("error starting ship info service on %s: %s", addr, err)
@@ -53,7 +54,7 @@ func Start(ctx context.Context, addr string, readyChan chan bool, errChan chan e
 	<-ctx.Done()
 
 	grpcServer.GracefulStop()
-	archon.Log.Printf("SHIPGATE server exited")
+	logger.Printf("SHIPGATE server exited")
 }
 
 func loadX509Certificate() (*tls.Certificate, error) {

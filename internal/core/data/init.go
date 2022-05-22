@@ -6,8 +6,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/dcrodman/archon"
 )
 
 var db *gorm.DB
@@ -33,12 +31,13 @@ func Initialize(dataSource string, debug bool) error {
 	return nil
 }
 
-func Shutdown() {
+func Shutdown() error {
 	database, err := db.DB()
 	if err != nil {
-		archon.Log.Error("error while getting current connection: ", err)
+		return fmt.Errorf("error while getting current connection: %w", err)
 	}
 	if err := database.Close(); err != nil {
-		archon.Log.Error("error while closing database connection: ", err)
+		return fmt.Errorf("error while closing database connection: %w", err)
 	}
+	return nil
 }

@@ -8,7 +8,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dcrodman/archon"
+	"github.com/sirupsen/logrus"
+
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
@@ -23,6 +24,7 @@ import (
 type DataServer struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 }
 
 func (s DataServer) Identifier() string {
@@ -30,7 +32,7 @@ func (s DataServer) Identifier() string {
 }
 
 func (s *DataServer) Init(ctx context.Context) error {
-	return initializePatchData(s.Config.PatchServer.PatchDir)
+	return initializePatchData(s.Logger, s.Config.PatchServer.PatchDir)
 }
 
 func (s *DataServer) SetUpClient(c *client.Client) {
@@ -69,7 +71,7 @@ func (s *DataServer) Handle(ctx context.Context, c *client.Client, data []byte) 
 	case packets.PatchClientListDoneType:
 		err = s.updateClientFiles(c)
 	default:
-		archon.Log.Infof("received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
@@ -231,7 +233,7 @@ func (s *DataServer) updateClientFile(c *client.Client, patch *fileEntry) error 
 
 	file, err := os.Open(patch.path)
 	if err != nil {
-		archon.Log.Error(err.Error())
+		s.Logger.Error(err.Error())
 		return err
 	}
 
@@ -271,7 +273,7 @@ func (s *DataServer) sendFileHeader(c *client.Client, patch *fileEntry) error {
 // send a chunk of file data.
 func (s *DataServer) sendFileChunk(c *client.Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > maxFileChunkSize {
-		archon.Log.Errorf("Attempted to send %v byte chunk; max is %v",
+		s.Logger.Errorf("Attempted to send %v byte chunk; max is %v",
 			strconv.Itoa(int(chunkSize)), string(rune(maxFileChunkSize)))
 		panic(errors.New("file chunk size exceeds maximum"))
 	}

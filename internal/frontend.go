@@ -12,7 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcrodman/archon"
+	"github.com/sirupsen/logrus"
+
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
@@ -28,6 +29,7 @@ type frontend struct {
 	Address string
 	Backend Backend
 	Config  *core.Config
+	Logger  *logrus.Logger
 }
 
 // Start initializes the server backend and opens a TCP socket for the specified server.
@@ -70,7 +72,7 @@ func (f *frontend) createSocket() (*net.TCPListener, error) {
 func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	archon.Log.Printf("[%s] waiting for connections on %v", f.Backend.Identifier(), f.Address)
+	f.Logger.Printf("[%s] waiting for connections on %v", f.Backend.Identifier(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {
@@ -82,7 +84,7 @@ func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListene
 
 			connection, err := socket.AcceptTCP()
 			if err != nil {
-				archon.Log.Warnf("failed to accept connection: %s", err.Error())
+				f.Logger.Warnf("failed to accept connection: %s", err.Error())
 				continue
 			}
 
@@ -104,9 +106,9 @@ handleLoop:
 		}
 	}
 
-	archon.Log.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Identifier())
+	f.Logger.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Identifier())
 	clientWg.Wait()
-	archon.Log.Infof("%v server exited", f.Backend.Identifier())
+	f.Logger.Infof("%v server exited", f.Backend.Identifier())
 }
 
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
@@ -119,15 +121,15 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 	f.Backend.SetUpClient(c)
 	c.Debug = f.Config.Debugging.Enabled
 
-	archon.Log.Infof("[%s] accepted connection from %s", f.Backend.Identifier(), c.IPAddr())
+	f.Logger.Infof("[%s] accepted connection from %s", f.Backend.Identifier(), c.IPAddr())
 
 	if err := f.Backend.Handshake(c); err != nil {
-		archon.Log.Errorf("Handshake() failed for client %s: %s", c.IPAddr(), err)
+		f.Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr(), err)
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
 	if _, ok := connectedClients[c.IPAddr()]; ok {
-		archon.Log.Infof("%s rejected second connection from %s", f.Backend.Identifier(), c.IPAddr())
+		f.Logger.Infof("%s rejected second connection from %s", f.Backend.Identifier(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
@@ -157,17 +159,17 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			archon.Log.Warn(err.Error())
+			f.Logger.Warn(err.Error())
 			break
 		}
 
 		if f.Config.Debugging.Enabled {
-			size := determinePacketSize(buffer, c.CryptoSession.HeaderSize())
+			size := f.determinePacketSize(buffer, c.CryptoSession.HeaderSize())
 			archdebug.SendClientPacketToAnalyzer(c.DebugTags, buffer, uint16(size))
 		}
 
 		if err = f.Backend.Handle(ctx, c, buffer); err != nil {
-			archon.Log.Warn("error in client communication: " + err.Error())
+			f.Logger.Warn("error in client communication: " + err.Error())
 			return
 		}
 	}
@@ -175,19 +177,19 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 
 // closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
 // client, and removes them from the list regardless of the state of the connection.
-func (*frontend) closeConnectionAndRecover(serverName string, c *client.Client) {
+func (f *frontend) closeConnectionAndRecover(serverName string, c *client.Client) {
 	if err := recover(); err != nil {
-		archon.Log.Errorf("error in client communication with %s: error=%s, trace: %s",
+		f.Logger.Errorf("error in client communication with %s: error=%s, trace: %s",
 			c.IPAddr(), err, debug.Stack())
 	}
 
 	if err := c.Close(); err != nil {
-		archon.Log.Warnf("failed to close client connection: %s", err)
+		f.Logger.Warnf("failed to close client connection: %s", err)
 	}
 
 	delete(connectedClients, c.IPAddr())
 
-	archon.Log.Infof("disconnected %s client %s", serverName, c.IPAddr())
+	f.Logger.Infof("disconnected %s client %s", serverName, c.IPAddr())
 }
 
 // readNextPacket is a blocking call that only returns once the client has
@@ -203,7 +205,7 @@ func (f *frontend) readNextPacket(c *client.Client, buffer []byte) ([]byte, erro
 
 	c.CryptoSession.Decrypt(buffer[:headerSize], uint32(headerSize))
 
-	packetSize := determinePacketSize(buffer[:2], uint16(headerSize))
+	packetSize := f.determinePacketSize(buffer[:2], uint16(headerSize))
 
 	// Grow the client's receive buffer if they send us a packet bigger than its current capacity.
 	if packetSize > cap(buffer) {
@@ -240,7 +242,7 @@ func (f *frontend) readDataFromClient(c *client.Client, n int, buffer []byte) er
 }
 
 // Extract the packet length from the first two bytes of data.
-func determinePacketSize(data []byte, headerSize uint16) int {
+func (f *frontend) determinePacketSize(data []byte, headerSize uint16) int {
 	if len(data) < 2 {
 		// Panic since this shouldn't happen unless something's very wrong.
 		panic(errors.New("getSize(): data must be at least two bytes"))
@@ -251,7 +253,7 @@ func determinePacketSize(data []byte, headerSize uint16) int {
 	err := binary.Read(reader, binary.LittleEndian, &size)
 
 	if err != nil {
-		archon.Log.Warn("error decoding packet size:", err)
+		f.Logger.Warn("error decoding packet size:", err)
 	}
 
 	// The PSO client occasionally sends packets that are longer than their declared

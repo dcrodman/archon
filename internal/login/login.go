@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -26,6 +27,7 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 type Server struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 
 	shipGateClient *shipgate.Client
 }
@@ -36,6 +38,7 @@ func (s *Server) Identifier() string {
 
 func (s *Server) Init(_ context.Context) error {
 	shipGateClient, err := shipgate.NewClient(
+		s.Logger,
 		s.Config.ShipgateAddress(),
 		s.Config.ShipgateCertFile,
 	)
@@ -79,7 +82,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
-		archon.Log.Infof("received unknown packet %x from %s", header.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %x from %s", header.Type, c.IPAddr())
 	}
 
 	return err

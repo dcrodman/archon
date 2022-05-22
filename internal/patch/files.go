@@ -9,7 +9,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/dcrodman/archon"
+	"github.com/sirupsen/logrus"
 )
 
 // maxFileChunkSize is the maximum number of bytes we can send of a file at a time.
@@ -68,7 +68,7 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData(patchDir string) error {
+func initializePatchData(logger *logrus.Logger, patchDir string) error {
 	var initErr error
 
 	patchInitLock.Do(func() {
@@ -79,8 +79,8 @@ func initializePatchData(patchDir string) error {
 
 		rootNode = &directoryNode{path: patchDir, clientPath: "./"}
 
-		archon.Log.Infof("loading patch files from %s", patchDir)
-		if err := buildPatchFileTree(rootNode); err != nil {
+		logger.Infof("loading patch files from %s", patchDir)
+		if err := buildPatchFileTree(logger, rootNode); err != nil {
 			initErr = fmt.Errorf("error loading patch files: %s", err)
 			return
 		}
@@ -102,7 +102,7 @@ func initializePatchData(patchDir string) error {
 // Files in the patch directory mirror the expected file structure on the client side
 // and in order to tell the client which files to check the server must instruct it to
 // check files relative to the game's executable.
-func buildPatchFileTree(rootNode *directoryNode) error {
+func buildPatchFileTree(logger *logrus.Logger, rootNode *directoryNode) error {
 	directories := make([]*directoryNode, 0)
 	directories = append(directories, rootNode)
 
@@ -125,7 +125,7 @@ func buildPatchFileTree(rootNode *directoryNode) error {
 			}
 			// ignore and warn if a directory we shouldn't parse exists
 			if _, ok := problematicPaths[filename]; ok {
-				archon.Log.Warnf(
+				logger.Warnf(
 					"ignoring %q - consider removing this directory from the patch folder",
 					filename,
 				)

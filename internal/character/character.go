@@ -9,10 +9,10 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -55,6 +55,7 @@ var (
 type Server struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 
 	kvCache        *Cache
 	shipGateClient *shipgate.Client
@@ -69,6 +70,7 @@ func (s *Server) Init(ctx context.Context) error {
 
 	var err error
 	s.shipGateClient, err = shipgate.NewClient(
+		s.Logger,
 		s.Config.ShipgateAddress(),
 		s.Config.ShipgateCertFile,
 	)
@@ -76,7 +78,7 @@ func (s *Server) Init(ctx context.Context) error {
 		return fmt.Errorf("error connecting to shipgate: %w", err)
 	}
 
-	if err := initParameterData(s.Config.CharacterServer.ParametersDir); err != nil {
+	if err := initParameterData(s.Logger, s.Config.CharacterServer.ParametersDir); err != nil {
 		return err
 	}
 
@@ -154,7 +156,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		// Just wait for the client to disconnect.
 		break
 	default:
-		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
 	return err
 }
@@ -532,7 +534,7 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 	if s.hasDressingRoomFlag(c) {
 		// "Dressing room"; a request to update an existing character.
 		if err := s.updateCharacter(c, charPkt); err != nil {
-			archon.Log.Error(err.Error())
+			s.Logger.Error(err.Error())
 			return err
 		}
 	} else {
@@ -542,12 +544,12 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
 		if err != nil {
 			msg := fmt.Errorf("error locating character in slot %d for account %d", charPkt.Slot, account.ID)
-			archon.Log.Error(msg)
+			s.Logger.Error(msg)
 			return msg
 		}
 		if existingCharacter != nil {
 			if err := data.DeleteCharacter(existingCharacter); err != nil {
-				archon.Log.Error(err.Error())
+				s.Logger.Error(err.Error())
 				return err
 			}
 		}

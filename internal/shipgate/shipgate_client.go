@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
@@ -22,6 +22,7 @@ import (
 )
 
 type Client struct {
+	logger          *logrus.Logger
 	shipgateAddress string
 	shipgateClient  api.ShipgateServiceClient
 
@@ -38,7 +39,7 @@ type shipInfo struct {
 	port string
 }
 
-func NewClient(shipgateAddress, certFile string) (*Client, error) {
+func NewClient(logger *logrus.Logger, shipgateAddress, certFile string) (*Client, error) {
 	creds, err := credentials.NewClientTLSFromFile(certFile, "")
 	if err != nil {
 		return nil, fmt.Errorf("error loading certificate file for shipgate: %s", err)
@@ -155,7 +156,7 @@ func (s *Client) startShipListRefreshLoop(ctx context.Context) {
 			return
 		case <-time.After(time.Second * 10):
 			if err := s.refreshShipList(); err != nil {
-				archon.Log.Errorf(err.Error())
+				s.logger.Errorf(err.Error())
 			}
 		}
 	}

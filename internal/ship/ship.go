@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -47,6 +47,7 @@ type Block struct {
 type Server struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 	Blocks []Block
 
 	grpcShipgateClient api.ShipgateServiceClient
@@ -62,6 +63,7 @@ func (s *Server) Identifier() string {
 func (s *Server) Init(ctx context.Context) error {
 	var err error
 	s.shipGateClient, err = shipgate.NewClient(
+		s.Logger,
 		s.Config.ShipgateAddress(),
 		s.Config.ShipgateCertFile,
 	)
@@ -133,7 +135,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		bytes.StructFromBytes(data, &menuSelectPkt)
 		err = s.handleMenuSelection(c, &menuSelectPkt)
 	default:
-		archon.Log.Infof("received unknown packet %02x from %s", header.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %02x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }

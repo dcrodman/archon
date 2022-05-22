@@ -27,7 +27,11 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	defer cleanup()
+	defer func() {
+		if err := cleanup(); err != nil {
+			fmt.Println(err)
+		}
+	}()
 
 	// defer so os.Exit doesn't prevent our clean up.
 	retCode := 0
@@ -83,7 +87,7 @@ func usage() {
 
 // initDataSource creates the connection to the database, and returns a func
 // which should be deferred for cleanup.
-func initDataSource() (func(), error) {
+func initDataSource() (func() error, error) {
 	config := core.LoadConfig(*config)
 	if err := data.Initialize(config.DatabaseURL(), config.Debugging.Enabled); err != nil {
 		return nil, err

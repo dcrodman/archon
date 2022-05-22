@@ -10,8 +10,7 @@ import (
 
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/prs"
-
-	"github.com/dcrodman/archon"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -66,11 +65,11 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData(paramFileDir string) error {
+func initParameterData(logger *logrus.Logger, paramFileDir string) error {
 	var initErr error
 
 	paramInitLock.Do(func() {
-		if err := loadParameterFiles(paramFileDir); err != nil {
+		if err := loadParameterFiles(logger, paramFileDir); err != nil {
 			initErr = fmt.Errorf("error loading parameter files:" + err.Error())
 			return
 		}
@@ -105,8 +104,8 @@ func initParameterData(paramFileDir string) error {
 
 // LoadConfig the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
-func loadParameterFiles(paramFileDir string) error {
-	archon.Log.Infof("loading parameters from %s", paramFileDir)
+func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
+	logger.Infof("loading parameters from %s", paramFileDir)
 
 	offset := 0
 	var tmpChunkData []byte
@@ -133,7 +132,7 @@ func loadParameterFiles(paramFileDir string) error {
 
 		offset += fileSize
 
-		archon.Log.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
+		logger.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
 	}
 
 	// Offset should at this point be the total size of the files

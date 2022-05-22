@@ -3,10 +3,10 @@ package block
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -21,6 +21,7 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyri
 type Server struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 
 	shipgateClient *shipgate.Client
 }
@@ -33,6 +34,7 @@ func (s *Server) Identifier() string {
 func (s *Server) Init(ctx context.Context) error {
 	var err error
 	s.shipgateClient, err = shipgate.NewClient(
+		s.Logger,
 		s.Config.ShipgateAddress(),
 		s.Config.ShipgateCertFile,
 	)
@@ -70,7 +72,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
 	default:
-		archon.Log.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
 	return err
 }

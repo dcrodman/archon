@@ -3,6 +3,8 @@ package patch
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -22,6 +24,7 @@ var copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 type Server struct {
 	Name   string
 	Config *core.Config
+	Logger *logrus.Logger
 
 	welcomeMessage []byte
 }
@@ -34,7 +37,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.welcomeMessage = bytes.ConvertToUtf16(s.Config.PatchServer.WelcomeMessage)
 
 	if len(s.welcomeMessage) > (1 << 16) {
-		archon.Log.Warn("patch server welcome message exceeds 65,000 characters")
+		s.Logger.Warn("patch server welcome message exceeds 65,000 characters")
 		s.welcomeMessage = s.welcomeMessage[:1<<16-2]
 	}
 	// Set the unicode byte order mark appropriately since we use LE encoding.
@@ -73,7 +76,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 			err = s.sendPatchRedirect(c)
 		}
 	default:
-		archon.Log.Infof("received unknown packet %2x from %s", header.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %2x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }
