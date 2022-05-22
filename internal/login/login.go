@@ -8,7 +8,6 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -170,7 +169,7 @@ func (s *Server) sendCharacterRedirect(c *client.Client) error {
 		IPAddr: [4]uint8{},
 		Port:   uint16(s.Config.CharacterServer.Port),
 	}
-	ip := archon.BroadcastIP()
+	ip := s.Config.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])
 
 	return c.Send(pkt)

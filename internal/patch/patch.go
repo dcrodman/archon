@@ -5,7 +5,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/dcrodman/archon"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
@@ -112,7 +111,7 @@ func (s *Server) sendPatchRedirect(c *client.Client) error {
 		Padding: 0,
 	}
 
-	hostnameBytes := archon.BroadcastIP()
+	hostnameBytes := s.Config.BroadcastIP()
 	copy(pkt.IPAddr[:], hostnameBytes[:])
 
 	return c.Send(pkt)
