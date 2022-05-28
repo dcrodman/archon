@@ -22,10 +22,9 @@ run: build
 
 # Requires that protobuf be installed: https://twitchtv.github.io/twirp/docs/install.html
 protos:
-	protoc \
-		--go_out=internal/shipgate \
-		--twirp_out=internal/shipgate \
-		internal/shipgate/api.proto
+	protoc --proto_path=. --go_out=paths=source_relative:. internal/core/proto/archon.proto
+	protoc --proto_path=. --go_out=paths=source_relative:. --twirp_out=paths=source_relative:. internal/shipgate/shipgate.proto
+
 
 analyzer: build
 	${BIN_DIR}/analyzer -auto -folder ${ANALYZER_DST} capture && \

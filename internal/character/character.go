@@ -12,12 +12,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gorm.io/gorm"
 
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/data"
+	"github.com/dcrodman/archon/internal/core/proto"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
@@ -58,7 +60,8 @@ type Server struct {
 	Logger *logrus.Logger
 
 	kvCache        *Cache
-	shipGateClient *shipgate.ShipRegistrationClient
+	shipgateClient shipgate.Shipgate
+	shipListClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -68,9 +71,10 @@ func (s *Server) Identifier() string {
 func (s *Server) Init(ctx context.Context) error {
 	s.kvCache = NewCache()
 
-	s.shipGateClient = &shipgate.ShipRegistrationClient{
+	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipListClient = &shipgate.ShipRegistrationClient{
 		Logger:         s.Logger,
-		ShipgateClient: shipgate.NewRPCClient(s.Config),
+		ShipgateClient: s.shipgateClient,
 	}
 
 	if err := initParameterData(s.Logger, s.Config.CharacterServer.ParametersDir); err != nil {
@@ -78,7 +82,7 @@ func (s *Server) Init(ctx context.Context) error {
 	}
 
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipGateClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -160,7 +164,10 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	account, err := s.shipGateClient.AuthenticateAccount(ctx, username, password)
+	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AccountAuthRequest{
+		Username: username,
+		Password: password,
+	})
 	if err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
@@ -180,9 +187,9 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		return err
 	}
 
-	c.TeamID = uint32(account.TeamID)
-	c.Guildcard = uint32(account.Guildcard)
 	c.Account = account
+	c.TeamID = uint32(account.TeamId)
+	c.Guildcard = uint32(account.Guildcard)
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
@@ -253,7 +260,7 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 
 // Send the menu items for the ship select screen.
 func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipGateClient.GetConnectedShipList()
+	shipList := s.shipListClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -291,7 +298,7 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 // LoadConfig key config and other option data from the database or provide defaults for new accounts.
 func (s *Server) handleOptionsRequest(c *client.Client) error {
 	account := c.Account
-	playerOptions, err := data.FindPlayerOptions(account)
+	playerOptions, err := data.FindPlayerOptions(convertAccountProto(account))
 	if err != nil {
 		return err
 	}
@@ -299,7 +306,7 @@ func (s *Server) handleOptionsRequest(c *client.Client) error {
 	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
 		playerOptions = &data.PlayerOptions{
-			Account:   account,
+			Account:   convertAccountProto(account),
 			KeyConfig: make([]byte, 420),
 		}
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
@@ -341,7 +348,7 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 // been selected from the list and the Selecting flag will be set.
 func (s *Server) handleCharacterSelect(c *client.Client, pkt *packets.CharacterSelection) error {
 	account := c.Account
-	char, err := data.FindCharacter(account, int(pkt.Slot))
+	char, err := data.FindCharacter(convertAccountProto(account), int(pkt.Slot))
 	if err != nil {
 		return err
 	}
@@ -421,7 +428,7 @@ func (s *Server) sendChecksumAck(c *client.Client) error {
 // LoadConfig the player's saved guildcards, build the chunk data, and send the chunk header.
 func (s *Server) handleGuildcardDataStart(c *client.Client) error {
 	account := c.Account
-	guildcards, err := data.FindGuildcardEntries(account)
+	guildcards, err := data.FindGuildcardEntries(convertAccountProto(account))
 	if err != nil {
 		return err
 	}
@@ -520,7 +527,7 @@ func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
 }
 
 func clientFlagKey(c *client.Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Account.ID)
+	return fmt.Sprintf("client-flags-%d", convertAccountProto(c.Account).ID)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
@@ -535,7 +542,7 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 	} else {
 		// The "recreate" option. This is a request to create a character in a slot and is used
 		// for both creating new characters and replacing existing ones.
-		account := c.Account
+		account := convertAccountProto(c.Account)
 		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
 		if err != nil {
 			msg := fmt.Errorf("error locating character in slot %d for account %d", charPkt.Slot, account.ID)
@@ -633,7 +640,7 @@ func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary
 	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
 
 	account := c.Account
-	char, err := data.FindCharacter(account, int(pkt.Slot))
+	char, err := data.FindCharacter(convertAccountProto((account)), int(pkt.Slot))
 	if err != nil {
 		return err
 	} else if char == nil {
@@ -664,7 +671,7 @@ func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary
 // disconnecting from this server.
 func (s *Server) handleShipSelection(c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
 	selectedShip := menuSelectionPkt.ItemID - 1
-	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selectedShip)
+	ip, port, err := s.shipListClient.GetSelectedShipAddress(selectedShip)
 	if err != nil {
 		return fmt.Errorf("error retrieving selected ship: %d", selectedShip)
 	}
@@ -673,4 +680,22 @@ func (s *Server) handleShipSelection(c *client.Client, menuSelectionPkt *packets
 		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
 		Port:   uint16(port),
 	})
+}
+
+func convertAccountProto(account *proto.Account) *data.Account {
+	return &data.Account{
+		Model: gorm.Model{
+			ID: uint(account.Id),
+		},
+		Username:         account.Username,
+		Password:         "",
+		Email:            account.Email,
+		RegistrationDate: time.Time{},
+		Guildcard:        int(account.Guildcard),
+		GM:               account.Gm,
+		Banned:           account.Banned,
+		Active:           account.Active,
+		TeamID:           int(account.TeamId),
+		PrivilegeLevel:   account.PriviledgeLevel[0],
+	}
 }

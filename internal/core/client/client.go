@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/core/debug"
+	"github.com/dcrodman/archon/internal/core/proto"
 )
 
 type ClientConfig struct {
@@ -32,7 +32,7 @@ type Client struct {
 	CryptoSession CryptoSession
 
 	// Account associated with the player.
-	Account *data.Account
+	Account *proto.Account
 
 	// Client information shared amongst most Backend implementations.
 	Config ClientConfig

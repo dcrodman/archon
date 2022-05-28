@@ -15,14 +15,13 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
 )
 
+// NewRPCClient returns a Shipgate client initialized with the configured certificates.
 func NewRPCClient(cfg *core.Config) Shipgate {
 	// Load client cert
 	cert, err := tls.LoadX509KeyPair(cfg.ShipgateCertFile, cfg.ShipgateServer.SSLKeyFile)
@@ -117,42 +116,6 @@ func (s *ShipRegistrationClient) GetSelectedShipAddress(selectedShip uint32) (ne
 	shipIP := net.ParseIP(s.connectedShips[selectedShip].ip).To4()
 	shipPort, _ := strconv.Atoi(s.connectedShips[selectedShip].port)
 	return shipIP, shipPort, nil
-}
-
-func (s *ShipRegistrationClient) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
-	accountResp, err := s.ShipgateClient.AuthenticateAccount(ctx, &AccountAuthRequest{
-		Username: username,
-		Password: password,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	rd, err := time.Parse(time.RFC3339, accountResp.GetRegistrationDate())
-	if err != nil {
-		return nil, err
-	}
-
-	var pl byte
-	if b := accountResp.GetPriviledgeLevel(); len(b) != 0 {
-		pl = b[0]
-	}
-
-	return &data.Account{
-		Model: gorm.Model{
-			ID: uint(accountResp.Id),
-		},
-		Username:         accountResp.GetUsername(),
-		Password:         password,
-		Email:            accountResp.GetEmail(),
-		RegistrationDate: rd,
-		Guildcard:        int(accountResp.GetGuildcard()),
-		GM:               accountResp.GetGM(),
-		Banned:           accountResp.GetBanned(),
-		Active:           accountResp.GetActive(),
-		TeamID:           int(accountResp.TeamId),
-		PrivilegeLevel:   pl,
-	}, nil
 }
 
 // Starts a loop that makes an API request to the shipgate server over an interval

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package archon;
+
+option go_package = "github.com/dcrodman/archon/internal/core/proto";
+
+message Ship {
+  int32  id = 1;
+  string name = 2;
+  string ip = 3;
+  string port = 4;
+  int32 player_count = 5;
+}
+
+message Account {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
+  string registration_date = 4;
+  int64 guildcard = 5;
+  bool gm = 6;
+  bool banned = 7;
+  bool active = 8;
+  int64 team_id = 9;
+  bytes priviledge_level = 10;
+}

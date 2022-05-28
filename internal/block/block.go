@@ -23,7 +23,8 @@ type Server struct {
 	Config *core.Config
 	Logger *logrus.Logger
 
-	shipgateClient *shipgate.ShipRegistrationClient
+	shipgateClient shipgate.Shipgate
+	shipListClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -32,9 +33,10 @@ func (s *Server) Identifier() string {
 
 // Init connects to the shipgate.
 func (s *Server) Init(ctx context.Context) error {
-	s.shipgateClient = &shipgate.ShipRegistrationClient{
+	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipListClient = &shipgate.ShipRegistrationClient{
 		Logger:         s.Logger,
-		ShipgateClient: shipgate.NewRPCClient(s.Config),
+		ShipgateClient: s.shipgateClient,
 	}
 	return nil
 }
@@ -78,7 +80,10 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	account, err := s.shipgateClient.AuthenticateAccount(ctx, username, password)
+	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AccountAuthRequest{
+		Username: username,
+		Password: password,
+	})
 	if err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:

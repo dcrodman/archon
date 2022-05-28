@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dcrodman/archon/internal/core/auth"
+	"github.com/dcrodman/archon/internal/core/proto"
 )
 
 type ship struct {
@@ -35,9 +36,9 @@ func (s *service) GetActiveShips(ctx context.Context, _ *emptypb.Empty) (*ShipLi
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
-	ships := make([]*ShipList_Ship, 0)
+	var shipList ShipList
 	for _, connectedShip := range s.connectedShips {
-		ships = append(ships, &ShipList_Ship{
+		shipList.Ships = append(shipList.Ships, &proto.Ship{
 			Id:   int32(connectedShip.id),
 			Name: connectedShip.name,
 			Ip:   connectedShip.ip,
@@ -45,7 +46,7 @@ func (s *service) GetActiveShips(ctx context.Context, _ *emptypb.Empty) (*ShipLi
 		})
 	}
 
-	return &ShipList{Ships: ships}, nil
+	return &shipList, nil
 }
 
 func (s *service) RegisterShip(ctx context.Context, req *RegistrationRequest) (*emptypb.Empty, error) {
@@ -73,19 +74,19 @@ func (s *service) RegisterShip(ctx context.Context, req *RegistrationRequest) (*
 	return &emptypb.Empty{}, nil
 }
 
-func (s *service) AuthenticateAccount(ctx context.Context, req *AccountAuthRequest) (*AccountAuthResponse, error) {
+func (s *service) AuthenticateAccount(ctx context.Context, req *AccountAuthRequest) (*proto.Account, error) {
 	account, err := auth.VerifyAccount(req.GetUsername(), req.GetPassword())
 	if err != nil {
 		return nil, err
 	}
 
-	return &AccountAuthResponse{
+	return &proto.Account{
 		Id:               uint64(account.ID),
 		Username:         account.Username,
 		Email:            account.Email,
 		RegistrationDate: account.RegistrationDate.Format(time.RFC3339),
 		Guildcard:        int64(account.Guildcard),
-		GM:               account.GM,
+		Gm:               account.GM,
 		Banned:           account.Banned,
 		Active:           account.Active,
 		TeamId:           int64(account.TeamID),

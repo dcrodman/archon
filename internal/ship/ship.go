@@ -123,7 +123,11 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	if _, err := s.shipListClient.AuthenticateAccount(ctx, username, password); err != nil {
+	_, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AccountAuthRequest{
+		Username: username,
+		Password: password,
+	})
+	if err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
