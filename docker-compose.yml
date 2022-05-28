@@ -5,11 +5,11 @@ services:
     ports:
       - 5432:5432
     environment:
-      - POSTGRES_DB=archondb
-      - POSTGRES_USER=archonadmin
-      - POSTGRES_PASSWORD=psoadminpassword
+      POSTGRES_DB: archondb
+      POSTGRES_USER: archonadmin
+      POSTGRES_PASSWORD: psoadminpassword
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U archonadmin -d archondb" ]
+      test: [ "CMD-SHELL", "pg_isready -U archonadmin -d archondb && psql -U archonadmin -lqt | cut -d \\| -f 1 | grep -qw archondb" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,7 +25,7 @@ services:
       - --email=test@mail
       - add
     environment:
-      - "ARCHON_DATABASE_HOST=postgres"
+      ARCHON_DATABASE_HOST: postgres
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,10 +37,10 @@ services:
       - --config
       - /etc/archon
     environment:
-      - "ARCHON_DATABASE_HOST=postgres"
-      - "ARCHON_PATCH_SERVER_PATCH_DIR=./patches"
-      - "ARCHON_CHARACTER_SERVER_PARAMETERS_DIR=./parameters"
-      - "ARCHON_SHIP_SERVER_SHIPGATE_ADDRESS=0.0.0.0:13000"
+      ARCHON_DATABASE_HOST: postgres
+      ARCHON_PATCH_SERVER_PATCH_DIR: ./patches
+      ARCHON_CHARACTER_SERVER_PARAMETERS_DIR: ./parameters
+      ARCHON_SHIP_SERVER_SHIPGATE_ADDRESS: 0.0.0.0:13000
     ports:
       - 11000:11000
       - 11001:11001
@@ -59,8 +59,8 @@ services:
       - -ui=8083
       - -auto
     environment:
-      - "ARCHON_DEBUGGING_ENABLED=true"
-      - "ARCHON_PACKET_ANALYZER_ADDRESS=packet_analyzer:8081"
+      ARCHON_DEBUGGING_ENABLED: "true"
+      ARCHON_PACKET_ANALYZER_ADDRESS: packet_analyzer:8081
     ports:
       - 8081:8081
       - 8082:8082

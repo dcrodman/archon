@@ -1,4 +1,3 @@
-Dockerfile
 FROM golang:1.16-alpine as builder
 
 RUN apk add gcc libc-dev make
@@ -10,7 +9,7 @@ COPY . /app
 WORKDIR /app
 RUN make build
 
-FROM alpine:latest
+FROM alpine:latest as app
 
 COPY --from=builder /app/bin/ /usr/bin
 # Copy the supporting files
