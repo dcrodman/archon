@@ -110,17 +110,27 @@ func scanInput(prompt string) string {
 }
 
 func addAccount(username, password, email string) error {
-	account, err := auth.CreateAccount(username, password, email)
+	account, err := data.FindAccount(username)
 	if err != nil {
-		return fmt.Errorf("failed to create account: %v", err)
+		return fmt.Errorf("error looking up account: %v", err)
 	}
-	fmt.Println("created account with ID: ", account.ID)
+
+	if account.Username != username {
+		account, err := auth.CreateAccount(username, password, email)
+		if err != nil {
+			return fmt.Errorf("error creating account: %v", err)
+		}
+		fmt.Println("created account with ID: ", account.ID)
+	} else {
+		fmt.Printf("account '%s' already exists; skipping\n", username)
+	}
+
 	return nil
 }
 
 func softDeleteAccount(username string) error {
 	if err := auth.DeleteAccount(username); err != nil {
-		return fmt.Errorf("failed to delete account: %v", err)
+		return fmt.Errorf("error deleting account: %v", err)
 	}
 	fmt.Println("deleted account")
 	return nil
@@ -128,7 +138,7 @@ func softDeleteAccount(username string) error {
 
 func permanentlyDeleteAccount(username string) error {
 	if err := auth.PermanentlyDeleteAccount(username); err != nil {
-		return fmt.Errorf("failed to delete account: %v", err)
+		return fmt.Errorf("error deleting account: %v", err)
 	}
 	fmt.Println("deleted account")
 	return nil
