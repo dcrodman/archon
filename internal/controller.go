@@ -3,8 +3,9 @@ package internal
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/dcrodman/archon/internal/block"
 	"github.com/dcrodman/archon/internal/character"
@@ -15,7 +16,6 @@ import (
 	"github.com/dcrodman/archon/internal/patch"
 	"github.com/dcrodman/archon/internal/ship"
 	"github.com/dcrodman/archon/internal/shipgate"
-	"github.com/sirupsen/logrus"
 )
 
 // Controller is the main entrypoint for archon. It's responsible for initializing
@@ -24,24 +24,28 @@ import (
 type Controller struct {
 	Config *core.Config
 
-	logger  *logrus.Logger
-	wg      sync.WaitGroup
-	servers []*frontend
+	logger *logrus.Logger
+	wg     sync.WaitGroup
+
+	shipgateServer *shipgate.Server
+	servers        []*frontend
 }
 
-func (c *Controller) Start(ctx context.Context) error {
-	defer c.Shutdown()
+func (c *Controller) Start(ctx context.Context) {
+	defer c.Shutdown(ctx)
 
 	var err error
 	// Set up the logger, which will be used by all sub-servers.
 	c.logger, err = core.NewLogger(c.Config)
 	if err != nil {
-		return err
+		c.logger.Errorf("error initializing logger: %v", err)
+		return
 	}
 
 	// Connect to the database.
 	if err := data.Initialize(c.Config.DatabaseURL(), c.Config.Debugging.Enabled); err != nil {
-		return err
+		c.logger.Errorf("error initializing database connection: %v", err)
+		return
 	}
 	c.logger.Infof("connected to database %s:%d", c.Config.Database.Host, c.Config.Database.Port)
 
@@ -53,12 +57,13 @@ func (c *Controller) Start(ctx context.Context) error {
 		)
 	}
 
-	// Start the shipgate gRPC server and make sure it launches before the other servers start.
-	c.startShipgate(ctx)
+	// Start the shipgate RPC service and make sure it launches before the other servers start.
+	c.shipgateServer = &shipgate.Server{Config: c.Config, Logger: c.logger}
+	c.shipgateServer.Start(ctx)
 
 	// Configure and run all of our servers.
 	c.declareServers()
-	return c.run(ctx)
+	c.run(ctx)
 }
 
 // Set up all of the servers we want to run.
@@ -134,42 +139,32 @@ func (c *Controller) declareServers() {
 	c.servers = append(c.servers, blockServers...)
 }
 
-func (c *Controller) run(ctx context.Context) error {
+func (c *Controller) run(ctx context.Context) {
 	// Start all of our servers. Failure to initialize one of the registered servers is considered terminal.
 	for _, server := range c.servers {
 		server.Config = c.Config
 		server.Logger = c.logger
 
 		if err := server.Start(ctx, &c.wg); err != nil {
-			return fmt.Errorf("error starting %s server: %w", server.Backend.Identifier(), err)
+			c.logger.Errorf("error starting %s server: %v", server.Backend.Identifier(), err)
+			return
 		}
 	}
 
 	c.wg.Wait()
-	return nil
-}
-
-func (c *Controller) startShipgate(ctx context.Context) {
-	readyChan := make(chan bool)
-	errChan := make(chan error)
-
-	go shipgate.Start(ctx, c.logger, c.buildAddress(c.Config.ShipgateServer.Port), readyChan, errChan)
-	go func() {
-		if err := <-errChan; err != nil {
-			fmt.Printf("exiting due to SHIPGATE error: %v", err)
-			os.Exit(1)
-		}
-	}()
-
-	<-readyChan
 }
 
 func (c *Controller) buildAddress(port int) string {
 	return fmt.Sprintf("%s:%v", c.Config.Hostname, port)
 }
 
-func (c *Controller) Shutdown() {
+func (c *Controller) Shutdown(ctx context.Context) {
 	if err := data.Shutdown(); err != nil {
 		c.logger.Error(err)
 	}
+
+	// Stop the shipgate after all of the other servers have stopped in order to avoid
+	// errors from any shipgate calls during the shutdown process.
+	c.wg.Wait()
+	c.shipgateServer.Shutdown(ctx)
 }

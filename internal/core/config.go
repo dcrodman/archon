@@ -164,7 +164,7 @@ func (c *Config) DatabaseURL() string {
 // the other servers, this just uses the hostname. This should be fixed at some point
 // to use an actual configurable address and the ship server given its own listen config.
 func (c *Config) ShipgateAddress() string {
-	return fmt.Sprintf("%s:%v", c.Hostname, c.ShipgateServer.Port)
+	return fmt.Sprintf("https://%s:%v", c.Hostname, c.ShipgateServer.Port)
 }
 
 // BroadcastIP converts the configured broadcast IP string into 4 bytes to be used

@@ -1,9 +1,9 @@
 syntax = "proto3";
-option go_package = ".;api";
+option go_package = ".;shipgate";
 
 import "google/protobuf/empty.proto";
 
-package api;
+package shipgate;
 
 message ShipList {
   message Ship {
@@ -25,6 +25,7 @@ message RegistrationRequest {
 
 message AccountAuthRequest {
   string username = 1;
+  string password = 2;
 }
 
 message AccountAuthResponse {
@@ -42,7 +43,7 @@ message AccountAuthResponse {
 
 // ShipgateService provides game functionality and is intended for use by
 // ship servers serving players.
-service ShipgateService{
+service Shipgate {
   // GetActiveShips returns the list of Ships that currently connected to the
   // shipgate and ready to receive players.
   rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);

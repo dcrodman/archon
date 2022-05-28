@@ -2,7 +2,6 @@ package login
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
@@ -28,7 +27,7 @@ type Server struct {
 	Config *core.Config
 	Logger *logrus.Logger
 
-	shipGateClient *shipgate.Client
+	shipGateClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -36,15 +35,10 @@ func (s *Server) Identifier() string {
 }
 
 func (s *Server) Init(_ context.Context) error {
-	shipGateClient, err := shipgate.NewClient(
-		s.Logger,
-		s.Config.ShipgateAddress(),
-		s.Config.ShipgateCertFile,
-	)
-	if err != nil {
-		return fmt.Errorf("error connecting to shipgate: %w", err)
+	s.shipGateClient = &shipgate.ShipRegistrationClient{
+		Logger:         s.Logger,
+		ShipgateClient: shipgate.NewRPCClient(s.Config),
 	}
-	s.shipGateClient = shipGateClient
 	return nil
 }
 

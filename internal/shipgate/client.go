@@ -2,29 +2,60 @@ package shipgate
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	ioutil "io/ioutil"
+	"log"
 	"net"
+	http "net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"
 
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/dcrodman/archon/internal/shipgate/api"
-	"github.com/golang/protobuf/ptypes/empty"
 )
 
-type Client struct {
-	logger          *logrus.Logger
-	shipgateAddress string
-	shipgateClient  api.ShipgateServiceClient
+func NewRPCClient(cfg *core.Config) Shipgate {
+	// Load client cert
+	cert, err := tls.LoadX509KeyPair(cfg.ShipgateCertFile, cfg.ShipgateServer.SSLKeyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Load CA cert
+	caCert, err := ioutil.ReadFile(cfg.ShipgateCertFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+	tlsConfig.BuildNameToCertificate()
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	return NewShipgateProtobufClient(cfg.ShipgateAddress(), httpClient)
+}
+
+type ShipRegistrationClient struct {
+	Logger         *logrus.Logger
+	ShipgateClient Shipgate
 
 	connectedShipsMutex sync.RWMutex
 	connectedShips      []shipInfo
@@ -39,25 +70,7 @@ type shipInfo struct {
 	port string
 }
 
-func NewClient(logger *logrus.Logger, shipgateAddress, certFile string) (*Client, error) {
-	creds, err := credentials.NewClientTLSFromFile(certFile, "")
-	if err != nil {
-		return nil, fmt.Errorf("error loading certificate file for shipgate: %s", err)
-	}
-
-	conn, err := grpc.Dial(shipgateAddress, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to shipgate: %s", err)
-	}
-
-	return &Client{
-		shipgateAddress: shipgateAddress,
-		// Lazy, but just leave the connection open until the server shuts down.
-		shipgateClient: api.NewShipgateServiceClient(conn),
-	}, nil
-}
-
-func (s *Client) StartShipRefreshLoop(ctx context.Context) error {
+func (s *ShipRegistrationClient) StartShipRefreshLoop(ctx context.Context) error {
 	// The first set is fetched synchronously so that the ship list will start populated.
 	// Also gives us a chance to validate that the shipgate address is valid.
 	if err := s.refreshShipList(); err != nil {
@@ -68,7 +81,7 @@ func (s *Client) StartShipRefreshLoop(ctx context.Context) error {
 	return nil
 }
 
-func (s *Client) GetConnectedShipList() []packets.ShipListEntry {
+func (s *ShipRegistrationClient) GetConnectedShipList() []packets.ShipListEntry {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
@@ -93,7 +106,7 @@ func (s *Client) GetConnectedShipList() []packets.ShipListEntry {
 	return shipList
 }
 
-func (s *Client) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
+func (s *ShipRegistrationClient) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -106,42 +119,38 @@ func (s *Client) GetSelectedShipAddress(selectedShip uint32) (net.IP, int, error
 	return shipIP, shipPort, nil
 }
 
-func (s *Client) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
-	md := metadata.New(map[string]string{
-		"authorization": password,
+func (s *ShipRegistrationClient) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
+	accountResp, err := s.ShipgateClient.AuthenticateAccount(ctx, &AccountAuthRequest{
+		Username: username,
+		Password: password,
 	})
-
-	accountpb, err := s.shipgateClient.AuthenticateAccount(
-		metadata.NewOutgoingContext(ctx, md),
-		&api.AccountAuthRequest{Username: username},
-	)
 	if err != nil {
 		return nil, err
 	}
 
-	rd, err := time.Parse(time.RFC3339, accountpb.GetRegistrationDate())
+	rd, err := time.Parse(time.RFC3339, accountResp.GetRegistrationDate())
 	if err != nil {
 		return nil, err
 	}
 
 	var pl byte
-	if b := accountpb.GetPriviledgeLevel(); len(b) != 0 {
+	if b := accountResp.GetPriviledgeLevel(); len(b) != 0 {
 		pl = b[0]
 	}
 
 	return &data.Account{
 		Model: gorm.Model{
-			ID: uint(accountpb.Id),
+			ID: uint(accountResp.Id),
 		},
-		Username:         accountpb.GetUsername(),
+		Username:         accountResp.GetUsername(),
 		Password:         password,
-		Email:            accountpb.GetEmail(),
+		Email:            accountResp.GetEmail(),
 		RegistrationDate: rd,
-		Guildcard:        int(accountpb.GetGuildcard()),
-		GM:               accountpb.GetGM(),
-		Banned:           accountpb.GetBanned(),
-		Active:           accountpb.GetActive(),
-		TeamID:           int(accountpb.TeamId),
+		Guildcard:        int(accountResp.GetGuildcard()),
+		GM:               accountResp.GetGM(),
+		Banned:           accountResp.GetBanned(),
+		Active:           accountResp.GetActive(),
+		TeamID:           int(accountResp.TeamId),
 		PrivilegeLevel:   pl,
 	}, nil
 }
@@ -149,21 +158,21 @@ func (s *Client) AuthenticateAccount(ctx context.Context, username, password str
 // Starts a loop that makes an API request to the shipgate server over an interval
 // in order to query the list of active ships. The result is parsed and stored in
 // the Server's ships field.
-func (s *Client) startShipListRefreshLoop(ctx context.Context) {
+func (s *ShipRegistrationClient) startShipListRefreshLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(time.Second * 10):
 			if err := s.refreshShipList(); err != nil {
-				s.logger.Errorf(err.Error())
+				s.Logger.Errorf(err.Error())
 			}
 		}
 	}
 }
 
-func (s *Client) refreshShipList() error {
-	response, err := s.shipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
+func (s *ShipRegistrationClient) refreshShipList() error {
+	response, err := s.ShipgateClient.GetActiveShips(context.Background(), &empty.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch ships from shipgate: %s", err)
 	}

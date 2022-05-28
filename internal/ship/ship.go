@@ -10,8 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
@@ -19,7 +17,6 @@ import (
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
-	"github.com/dcrodman/archon/internal/shipgate/api"
 )
 
 const (
@@ -50,8 +47,8 @@ type Server struct {
 	Logger *logrus.Logger
 	Blocks []Block
 
-	grpcShipgateClient api.ShipgateServiceClient
-	shipGateClient     *shipgate.Client
+	shipgateClient shipgate.Shipgate
+	shipListClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -61,40 +58,22 @@ func (s *Server) Identifier() string {
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
-	var err error
-	s.shipGateClient, err = shipgate.NewClient(
-		s.Logger,
-		s.Config.ShipgateAddress(),
-		s.Config.ShipgateCertFile,
-	)
-	if err != nil {
-		return fmt.Errorf("error connecting to shipgate: %w", err)
+	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipListClient = &shipgate.ShipRegistrationClient{
+		Logger:         s.Logger,
+		ShipgateClient: s.shipgateClient,
 	}
-
-	// Connect to the shipgate.
-	creds, err := credentials.NewClientTLSFromFile(s.Config.ShipgateCertFile, "")
-	if err != nil {
-		return fmt.Errorf("error loading certificate file for shipgate: %s", err)
-	}
-
-	conn, err := grpc.Dial(s.Config.ShipgateAddress(), grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return fmt.Errorf("error connecting to shipgate: %s", err)
-	}
-
-	s.grpcShipgateClient = api.NewShipgateServiceClient(conn)
 
 	// Register this ship with the shipgate so that it can start accepting players.
-	_, err = s.grpcShipgateClient.RegisterShip(ctx, &api.RegistrationRequest{
+	if _, err := s.shipgateClient.RegisterShip(ctx, &shipgate.RegistrationRequest{
 		Name:    s.Config.ShipServer.Name,
 		Port:    strconv.Itoa(s.Config.ShipServer.Port),
 		Address: s.Config.Hostname,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}
 	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipGateClient.StartShipRefreshLoop(ctx); err != nil {
+	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
 		return err
 	}
 
@@ -144,7 +123,7 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	if _, err := s.shipGateClient.AuthenticateAccount(ctx, username, password); err != nil {
+	if _, err := s.shipListClient.AuthenticateAccount(ctx, username, password); err != nil {
 		switch err {
 		case auth.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
@@ -272,7 +251,7 @@ func (s *Server) handleBlockSelection(c *client.Client, selection uint32) error 
 }
 
 func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipGateClient.GetConnectedShipList()
+	shipList := s.shipListClient.GetConnectedShipList()
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
@@ -291,7 +270,7 @@ func (s *Server) sendShipList(c *client.Client) error {
 
 // Player selected one of the items on the ship select screen.
 func (s *Server) handleShipSelection(c *client.Client, selection uint32) error {
-	ip, port, err := s.shipGateClient.GetSelectedShipAddress(selection)
+	ip, port, err := s.shipListClient.GetSelectedShipAddress(selection)
 	if err != nil {
 		return fmt.Errorf("could not get selected ship: %d", selection)
 	}

@@ -67,8 +67,6 @@ shipgate_server:
 ship_server:
   # Port on which the SHIP server will listen.
   port: 15000
-  # Shipgate server address.
-  shipgate_address: "127.0.0.1:13000"
   # Name of the ship that will appear in the selection screen.
   name: "Default"
   # Number of block servers to run for this ship.

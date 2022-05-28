@@ -58,7 +58,7 @@ type Server struct {
 	Logger *logrus.Logger
 
 	kvCache        *Cache
-	shipGateClient *shipgate.Client
+	shipGateClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -68,14 +68,9 @@ func (s *Server) Identifier() string {
 func (s *Server) Init(ctx context.Context) error {
 	s.kvCache = NewCache()
 
-	var err error
-	s.shipGateClient, err = shipgate.NewClient(
-		s.Logger,
-		s.Config.ShipgateAddress(),
-		s.Config.ShipgateCertFile,
-	)
-	if err != nil {
-		return fmt.Errorf("error connecting to shipgate: %w", err)
+	s.shipGateClient = &shipgate.ShipRegistrationClient{
+		Logger:         s.Logger,
+		ShipgateClient: shipgate.NewRPCClient(s.Config),
 	}
 
 	if err := initParameterData(s.Logger, s.Config.CharacterServer.ParametersDir); err != nil {

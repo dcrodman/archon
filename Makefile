@@ -17,11 +17,15 @@ lint:
 test:
 	go test ./...
 
-protos:
-	./gen_protos.sh
-
 run: build
 	${BIN_DIR}/server -config ${CONFIG_PATH}
+
+# Requires that protobuf be installed: https://twitchtv.github.io/twirp/docs/install.html
+protos:
+	protoc \
+		--go_out=internal/shipgate \
+		--twirp_out=internal/shipgate \
+		internal/shipgate/api.proto
 
 analyzer: build
 	${BIN_DIR}/analyzer -auto -folder ${ANALYZER_DST} capture && \

@@ -2,16 +2,13 @@ package shipgate
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dcrodman/archon/internal/core/auth"
-	"github.com/dcrodman/archon/internal/shipgate/api"
 )
 
 type ship struct {
@@ -24,24 +21,23 @@ type ship struct {
 	active bool
 }
 
-// shipgateServiceServer implements the SHIPGATE server logic, which never directly
-// interacts with the client. Instead it is responsible for coordinating information
-// transfer between the CHARACTER, SHIP, and BLOCK servers.
-type shipgateServiceServer struct {
-	api.UnimplementedShipgateServiceServer
+// Service implements the SHIPGATE server logic, which acts as the data and coordination
+// layer between the other server components. It never directly interacts with the client,
+// only handling RPC requests from other trusted servers.
+type service struct {
+	logger *logrus.Logger
 
-	logger              *logrus.Logger
 	connectedShips      map[string]*ship
 	connectedShipsMutex sync.RWMutex
 }
 
-func (s *shipgateServiceServer) GetActiveShips(ctx context.Context, _ *emptypb.Empty) (*api.ShipList, error) {
+func (s *service) GetActiveShips(ctx context.Context, _ *emptypb.Empty) (*ShipList, error) {
 	s.connectedShipsMutex.RLock()
 	defer s.connectedShipsMutex.RUnlock()
 
-	ships := make([]*api.ShipList_Ship, 0)
+	ships := make([]*ShipList_Ship, 0)
 	for _, connectedShip := range s.connectedShips {
-		ships = append(ships, &api.ShipList_Ship{
+		ships = append(ships, &ShipList_Ship{
 			Id:   int32(connectedShip.id),
 			Name: connectedShip.name,
 			Ip:   connectedShip.ip,
@@ -49,10 +45,10 @@ func (s *shipgateServiceServer) GetActiveShips(ctx context.Context, _ *emptypb.E
 		})
 	}
 
-	return &api.ShipList{Ships: ships}, nil
+	return &ShipList{Ships: ships}, nil
 }
 
-func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.RegistrationRequest) (*emptypb.Empty, error) {
+func (s *service) RegisterShip(ctx context.Context, req *RegistrationRequest) (*emptypb.Empty, error) {
 	s.connectedShipsMutex.Lock()
 	defer s.connectedShipsMutex.Unlock()
 
@@ -60,7 +56,7 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 	// stable and allow for brief interruptions while preserving idempotency.
 	if _, ok := s.connectedShips[req.Name]; ok {
 		if !s.connectedShips[req.Name].active {
-			s.logger.Infof("SHIPGATE reactivated ship %s at %s:%s", req.Name, req.Address, req.Port)
+			s.logger.Infof("[SHIPGATE] reactivated ship %s at %s:%s", req.Name, req.Address, req.Port)
 		}
 		s.connectedShips[req.Name].active = true
 		s.connectedShips[req.Name].ip = req.Address
@@ -72,28 +68,18 @@ func (s *shipgateServiceServer) RegisterShip(ctx context.Context, req *api.Regis
 			ip:   req.Address,
 			port: req.Port,
 		}
-		s.logger.Infof("SHIPGATE registered ship %s at %s:%s", req.Name, req.Address, req.Port)
+		s.logger.Infof("[SHIPGATE] registered ship %s at %s:%s", req.Name, req.Address, req.Port)
 	}
 	return &emptypb.Empty{}, nil
 }
 
-func (s *shipgateServiceServer) AuthenticateAccount(ctx context.Context, req *api.AccountAuthRequest) (*api.AccountAuthResponse, error) {
-	md, exists := metadata.FromIncomingContext(ctx)
-	if !exists || md.Len() == 0 {
-		return nil, fmt.Errorf("no metadata provided on request")
-	}
-
-	creds := md.Get("authorization")
-	if len(creds) == 0 {
-		return nil, fmt.Errorf("no authorization provided in request metadata")
-	}
-
-	account, err := auth.VerifyAccount(req.GetUsername(), creds[0])
+func (s *service) AuthenticateAccount(ctx context.Context, req *AccountAuthRequest) (*AccountAuthResponse, error) {
+	account, err := auth.VerifyAccount(req.GetUsername(), req.GetPassword())
 	if err != nil {
 		return nil, err
 	}
 
-	return &api.AccountAuthResponse{
+	return &AccountAuthResponse{
 		Id:               uint64(account.ID),
 		Username:         account.Username,
 		Email:            account.Email,

@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -53,11 +52,7 @@ func main() {
 	controller := &internal.Controller{
 		Config: config,
 	}
-	if err := controller.Start(ctx); err != nil {
-		if !errors.Is(err, context.Canceled) {
-			fmt.Println(err)
-		}
-	}
+	controller.Start(ctx)
 	fmt.Println("shut down")
 }
 

@@ -18,13 +18,13 @@ func NewLogger(cfg *Config) (*logrus.Logger, error) {
 	} else {
 		w, err = os.OpenFile(cfg.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			return nil, fmt.Errorf("ERROR: Failed to open Log file: %w", err)
+			return nil, fmt.Errorf("error opening log file: %w", err)
 		}
 	}
 
 	logLvl, err := logrus.ParseLevel(viper.GetString("log_level"))
 	if err != nil {
-		fmt.Println("ERROR: Failed to parse Log level: " + err.Error())
+		fmt.Println("error parsing Log level: " + err.Error())
 	}
 
 	logger := &logrus.Logger{

@@ -23,7 +23,7 @@ type Server struct {
 	Config *core.Config
 	Logger *logrus.Logger
 
-	shipgateClient *shipgate.Client
+	shipgateClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -32,14 +32,11 @@ func (s *Server) Identifier() string {
 
 // Init connects to the shipgate.
 func (s *Server) Init(ctx context.Context) error {
-	var err error
-	s.shipgateClient, err = shipgate.NewClient(
-		s.Logger,
-		s.Config.ShipgateAddress(),
-		s.Config.ShipgateCertFile,
-	)
-
-	return err
+	s.shipgateClient = &shipgate.ShipRegistrationClient{
+		Logger:         s.Logger,
+		ShipgateClient: shipgate.NewRPCClient(s.Config),
+	}
+	return nil
 }
 
 func (s *Server) SetUpClient(c *client.Client) {
