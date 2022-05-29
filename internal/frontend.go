@@ -106,9 +106,9 @@ handleLoop:
 		}
 	}
 
-	f.Logger.Infof("%v server shutting down (waiting for connections to close)", f.Backend.Identifier())
+	f.Logger.Infof("[%v] shutting down (waiting for connections to close)", f.Backend.Identifier())
 	clientWg.Wait()
-	f.Logger.Infof("%v server exited", f.Backend.Identifier())
+	f.Logger.Infof("[%v] exited", f.Backend.Identifier())
 }
 
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
@@ -129,7 +129,7 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 	// Prevent multiple clients from connecting from the same IP address.
 	if _, ok := connectedClients[c.IPAddr()]; ok {
-		f.Logger.Infof("%s rejected second connection from %s", f.Backend.Identifier(), c.IPAddr())
+		f.Logger.Infof("[%s] rejected second connection from %s", f.Backend.Identifier(), c.IPAddr())
 		_ = connection.Close()
 		return
 	}
@@ -189,7 +189,7 @@ func (f *frontend) closeConnectionAndRecover(serverName string, c *client.Client
 
 	delete(connectedClients, c.IPAddr())
 
-	f.Logger.Infof("disconnected %s client %s", serverName, c.IPAddr())
+	f.Logger.Infof("[%s] disconnected client %s", serverName, c.IPAddr())
 }
 
 // readNextPacket is a blocking call that only returns once the client has
