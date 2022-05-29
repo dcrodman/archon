@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/auth"
@@ -44,6 +45,7 @@ func main() {
 
 	switch flag.Arg(0) {
 	case "add":
+		// The PSOBB client always sends credentials in lowercase,
 		u := checkFlag(username, "Username")
 		p := checkFlag(password, "Password")
 		e := checkFlag(email, "Email")
@@ -110,19 +112,24 @@ func scanInput(prompt string) string {
 }
 
 func addAccount(username, password, email string) error {
-	account, err := data.FindAccount(username)
+	usernameLowered := strings.ToLower(username)
+	if usernameLowered != username {
+		fmt.Println("Warning: PSOBB client does not support capital letters in usernames. Using lowercase version")
+	}
+
+	account, err := data.FindAccount(usernameLowered)
 	if err != nil {
 		return fmt.Errorf("error looking up account: %v", err)
 	}
 
-	if account.Username != username {
-		account, err := auth.CreateAccount(username, password, email)
+	if account == nil {
+		account, err := auth.CreateAccount(usernameLowered, password, email)
 		if err != nil {
 			return fmt.Errorf("error creating account: %v", err)
 		}
-		fmt.Println("created account with ID: ", account.ID)
+		fmt.Printf("created account for '%s' (ID: %d)\n", account.Username, account.ID)
 	} else {
-		fmt.Printf("account '%s' already exists; skipping\n", username)
+		fmt.Printf("account '%s' already exists; skipping\n", usernameLowered)
 	}
 
 	return nil
