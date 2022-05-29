@@ -2,7 +2,11 @@ package shipgate
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	ioutil "io/ioutil"
+	"log"
 	"net/http"
 	"time"
 
@@ -10,6 +14,37 @@ import (
 
 	"github.com/dcrodman/archon/internal/core"
 )
+
+// NewRPCClient returns a Shipgate client initialized with the configured certificates.
+func NewRPCClient(cfg *core.Config) Shipgate {
+	// Load client cert
+	cert, err := tls.LoadX509KeyPair(cfg.ShipgateCertFile, cfg.ShipgateServer.SSLKeyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Load CA cert
+	caCert, err := ioutil.ReadFile(cfg.ShipgateCertFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+	tlsConfig.BuildNameToCertificate()
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	return NewShipgateProtobufClient(cfg.ShipgateAddress(), httpClient)
+}
 
 type Server struct {
 	Config *core.Config

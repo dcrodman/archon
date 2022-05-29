@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
+	"net"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"gorm.io/gorm"
 
 	"github.com/dcrodman/archon/internal/core"
@@ -61,7 +64,6 @@ type Server struct {
 
 	kvCache        *Cache
 	shipgateClient shipgate.Shipgate
-	shipListClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -70,22 +72,11 @@ func (s *Server) Identifier() string {
 
 func (s *Server) Init(ctx context.Context) error {
 	s.kvCache = NewCache()
-
 	s.shipgateClient = shipgate.NewRPCClient(s.Config)
-	s.shipListClient = &shipgate.ShipRegistrationClient{
-		Logger:         s.Logger,
-		ShipgateClient: s.shipgateClient,
-	}
 
 	if err := initParameterData(s.Logger, s.Config.CharacterServer.ParametersDir); err != nil {
 		return err
 	}
-
-	// Start the loop that retrieves the ship list from the shipgate.
-	if err := s.shipListClient.StartShipRefreshLoop(ctx); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -150,7 +141,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.MenuSelectType:
 		var menuSelectionPkt packets.MenuSelection
 		bytes.StructFromBytes(data, &menuSelectionPkt)
-		err = s.handleShipSelection(c, &menuSelectionPkt)
+		err = s.handleShipSelection(ctx, c, &menuSelectionPkt)
 	case packets.DisconnectType:
 		// Just wait for the client to disconnect.
 		break
@@ -197,7 +188,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}
-		if err = s.sendShipList(c); err != nil {
+		if err = s.sendShipList(ctx, c); err != nil {
 			return err
 		}
 		if err = s.sendScrollMessage(c); err != nil {
@@ -259,20 +250,41 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 }
 
 // Send the menu items for the ship select screen.
-func (s *Server) sendShipList(c *client.Client) error {
-	shipList := s.shipListClient.GetConnectedShipList()
+func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
+	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
+	if err != nil {
+		return fmt.Errorf("error retrieving ship list: %w", err)
+	}
 
 	pkt := &packets.ShipList{
 		Header: packets.BBHeader{
 			Type:  packets.LoginShipListType,
-			Flags: uint32(len(shipList)),
+			Flags: uint32(len(shipList.Ships)),
 		},
-		Unknown:     0x20,
-		Unknown2:    0xFFFFFFF4,
-		Unknown3:    0x04,
-		ShipEntries: shipList,
+		Unknown:  0x20,
+		Unknown2: 0xFFFFFFF4,
+		Unknown3: 0x04,
 	}
 	copy(pkt.ServerName[:], bytes.ConvertToUtf16("Archon"))
+
+	if len(shipList.Ships) == 0 {
+		pkt.ShipEntries = append(pkt.ShipEntries, packets.ShipListEntry{
+			MenuID: 0xFF,
+			ShipID: 0xFF,
+		})
+		// pkt.Header.Flags = 1
+		copy(pkt.ShipEntries[0].ShipName[:], ("No Ships!")[:])
+	} else {
+
+		for i, ship := range shipList.Ships {
+			entry := packets.ShipListEntry{
+				MenuID: uint16(i + 1),
+				ShipID: uint32(ship.Id),
+			}
+			copy(entry.ShipName[:], bytes.ConvertToUtf16(ship.Name[:]))
+			pkt.ShipEntries = append(pkt.ShipEntries, entry)
+		}
+	}
 
 	return c.Send(pkt)
 }
@@ -669,12 +681,20 @@ func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary
 // Player selected one of the items on the ship select screen; respond with the
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
-func (s *Server) handleShipSelection(c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
-	selectedShip := menuSelectionPkt.ItemID - 1
-	ip, port, err := s.shipListClient.GetSelectedShipAddress(selectedShip)
+func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
+	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
 	if err != nil {
-		return fmt.Errorf("error retrieving selected ship: %d", selectedShip)
+		return fmt.Errorf("error retrieving ship list: %w", err)
 	}
+
+	selectedShip := menuSelectionPkt.ItemID - 1
+	if selectedShip >= uint32(len(shipList.Ships)) {
+		return fmt.Errorf("invalid ship selection: %d", selectedShip)
+	}
+
+	ip := net.ParseIP(shipList.Ships[selectedShip].Ip).To4()
+	port, _ := strconv.Atoi(shipList.Ships[selectedShip].Port)
+
 	return c.Send(&packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},

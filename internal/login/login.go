@@ -28,7 +28,6 @@ type Server struct {
 	Logger *logrus.Logger
 
 	shipgateClient shipgate.Shipgate
-	shipListClient *shipgate.ShipRegistrationClient
 }
 
 func (s *Server) Identifier() string {
@@ -37,10 +36,6 @@ func (s *Server) Identifier() string {
 
 func (s *Server) Init(_ context.Context) error {
 	s.shipgateClient = shipgate.NewRPCClient(s.Config)
-	s.shipListClient = &shipgate.ShipRegistrationClient{
-		Logger:         s.Logger,
-		ShipgateClient: s.shipgateClient,
-	}
 	return nil
 }
 
