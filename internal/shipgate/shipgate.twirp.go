@@ -43,11 +43,29 @@ type Shipgate interface {
 	GetActiveShips(context.Context, *google_protobuf.Empty) (*ShipList, error)
 
 	// RegisterShip informs the shipgate that it is able to serve players.
-	RegisterShip(context.Context, *RegistrationRequest) (*google_protobuf.Empty, error)
+	RegisterShip(context.Context, *RegisterShipRequest) (*google_protobuf.Empty, error)
 
 	// AuthenticateAccount verifies an account. A password should be provided
 	// via the rpc call metadata.
-	AuthenticateAccount(context.Context, *AccountAuthRequest) (*archon.Account, error)
+	AuthenticateAccount(context.Context, *AuthenticateAccountRequest) (*archon.Account, error)
+
+	// FindCharacter looks up character in a slot on an account.
+	FindCharacter(context.Context, *CharacterRequest) (*FindCharacterResponse, error)
+
+	// UpsertCharacter creates a new character in a slot on an account.
+	UpsertCharacter(context.Context, *UpsertCharacterRequest) (*google_protobuf.Empty, error)
+
+	// DeleteCharacter deletes the character data in a slot on an account.
+	DeleteCharacter(context.Context, *CharacterRequest) (*google_protobuf.Empty, error)
+
+	// GetGuildcardEntires returns the list of guildcards on an account.
+	GetGuildcardEntries(context.Context, *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error)
+
+	// GetPlayerOptions returns the player options tied to an account.
+	GetPlayerOptions(context.Context, *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error)
+
+	// GetPlayerOptions updates or creates the player options tied to an account.
+	UpsertPlayerOptions(context.Context, *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error)
 }
 
 // ========================
@@ -56,7 +74,7 @@ type Shipgate interface {
 
 type shipgateProtobufClient struct {
 	client      HTTPClient
-	urls        [3]string
+	urls        [9]string
 	interceptor twirp.Interceptor
 	opts        twirp.ClientOptions
 }
@@ -84,10 +102,16 @@ func NewShipgateProtobufClient(baseURL string, client HTTPClient, opts ...twirp.
 	// Build method URLs: <baseURL>[<prefix>]/<package>.<Service>/<Method>
 	serviceURL := sanitizeBaseURL(baseURL)
 	serviceURL += baseServicePath(pathPrefix, "archon", "Shipgate")
-	urls := [3]string{
+	urls := [9]string{
 		serviceURL + "GetActiveShips",
 		serviceURL + "RegisterShip",
 		serviceURL + "AuthenticateAccount",
+		serviceURL + "FindCharacter",
+		serviceURL + "UpsertCharacter",
+		serviceURL + "DeleteCharacter",
+		serviceURL + "GetGuildcardEntries",
+		serviceURL + "GetPlayerOptions",
+		serviceURL + "UpsertPlayerOptions",
 	}
 
 	return &shipgateProtobufClient{
@@ -144,18 +168,18 @@ func (c *shipgateProtobufClient) callGetActiveShips(ctx context.Context, in *goo
 	return out, nil
 }
 
-func (c *shipgateProtobufClient) RegisterShip(ctx context.Context, in *RegistrationRequest) (*google_protobuf.Empty, error) {
+func (c *shipgateProtobufClient) RegisterShip(ctx context.Context, in *RegisterShipRequest) (*google_protobuf.Empty, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "archon")
 	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
 	ctx = ctxsetters.WithMethodName(ctx, "RegisterShip")
 	caller := c.callRegisterShip
 	if c.interceptor != nil {
-		caller = func(ctx context.Context, req *RegistrationRequest) (*google_protobuf.Empty, error) {
+		caller = func(ctx context.Context, req *RegisterShipRequest) (*google_protobuf.Empty, error) {
 			resp, err := c.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*RegistrationRequest)
+					typedReq, ok := req.(*RegisterShipRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*RegistrationRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*RegisterShipRequest) when calling interceptor")
 					}
 					return c.callRegisterShip(ctx, typedReq)
 				},
@@ -173,7 +197,7 @@ func (c *shipgateProtobufClient) RegisterShip(ctx context.Context, in *Registrat
 	return caller(ctx, in)
 }
 
-func (c *shipgateProtobufClient) callRegisterShip(ctx context.Context, in *RegistrationRequest) (*google_protobuf.Empty, error) {
+func (c *shipgateProtobufClient) callRegisterShip(ctx context.Context, in *RegisterShipRequest) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
 	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
 	if err != nil {
@@ -190,18 +214,18 @@ func (c *shipgateProtobufClient) callRegisterShip(ctx context.Context, in *Regis
 	return out, nil
 }
 
-func (c *shipgateProtobufClient) AuthenticateAccount(ctx context.Context, in *AccountAuthRequest) (*archon.Account, error) {
+func (c *shipgateProtobufClient) AuthenticateAccount(ctx context.Context, in *AuthenticateAccountRequest) (*archon.Account, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "archon")
 	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
 	ctx = ctxsetters.WithMethodName(ctx, "AuthenticateAccount")
 	caller := c.callAuthenticateAccount
 	if c.interceptor != nil {
-		caller = func(ctx context.Context, req *AccountAuthRequest) (*archon.Account, error) {
+		caller = func(ctx context.Context, req *AuthenticateAccountRequest) (*archon.Account, error) {
 			resp, err := c.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*AccountAuthRequest)
+					typedReq, ok := req.(*AuthenticateAccountRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*AccountAuthRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*AuthenticateAccountRequest) when calling interceptor")
 					}
 					return c.callAuthenticateAccount(ctx, typedReq)
 				},
@@ -219,9 +243,285 @@ func (c *shipgateProtobufClient) AuthenticateAccount(ctx context.Context, in *Ac
 	return caller(ctx, in)
 }
 
-func (c *shipgateProtobufClient) callAuthenticateAccount(ctx context.Context, in *AccountAuthRequest) (*archon.Account, error) {
+func (c *shipgateProtobufClient) callAuthenticateAccount(ctx context.Context, in *AuthenticateAccountRequest) (*archon.Account, error) {
 	out := new(archon.Account)
 	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) FindCharacter(ctx context.Context, in *CharacterRequest) (*FindCharacterResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "FindCharacter")
+	caller := c.callFindCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CharacterRequest) (*FindCharacterResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return c.callFindCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*FindCharacterResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*FindCharacterResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callFindCharacter(ctx context.Context, in *CharacterRequest) (*FindCharacterResponse, error) {
+	out := new(FindCharacterResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) UpsertCharacter(ctx context.Context, in *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertCharacter")
+	caller := c.callUpsertCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertCharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertCharacterRequest) when calling interceptor")
+					}
+					return c.callUpsertCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callUpsertCharacter(ctx context.Context, in *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) DeleteCharacter(ctx context.Context, in *CharacterRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "DeleteCharacter")
+	caller := c.callDeleteCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return c.callDeleteCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callDeleteCharacter(ctx context.Context, in *CharacterRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) GetGuildcardEntries(ctx context.Context, in *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "GetGuildcardEntries")
+	caller := c.callGetGuildcardEntries
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetGuildcardEntriesRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetGuildcardEntriesRequest) when calling interceptor")
+					}
+					return c.callGetGuildcardEntries(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetGuildcardEntriesResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetGuildcardEntriesResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callGetGuildcardEntries(ctx context.Context, in *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+	out := new(GetGuildcardEntriesResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) GetPlayerOptions(ctx context.Context, in *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "GetPlayerOptions")
+	caller := c.callGetPlayerOptions
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPlayerOptionsRequest) when calling interceptor")
+					}
+					return c.callGetPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPlayerOptionsResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPlayerOptionsResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callGetPlayerOptions(ctx context.Context, in *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+	out := new(GetPlayerOptionsResponse)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateProtobufClient) UpsertPlayerOptions(ctx context.Context, in *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertPlayerOptions")
+	caller := c.callUpsertPlayerOptions
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertPlayerOptionsRequest) when calling interceptor")
+					}
+					return c.callUpsertPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateProtobufClient) callUpsertPlayerOptions(ctx context.Context, in *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doProtobufRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -242,7 +542,7 @@ func (c *shipgateProtobufClient) callAuthenticateAccount(ctx context.Context, in
 
 type shipgateJSONClient struct {
 	client      HTTPClient
-	urls        [3]string
+	urls        [9]string
 	interceptor twirp.Interceptor
 	opts        twirp.ClientOptions
 }
@@ -270,10 +570,16 @@ func NewShipgateJSONClient(baseURL string, client HTTPClient, opts ...twirp.Clie
 	// Build method URLs: <baseURL>[<prefix>]/<package>.<Service>/<Method>
 	serviceURL := sanitizeBaseURL(baseURL)
 	serviceURL += baseServicePath(pathPrefix, "archon", "Shipgate")
-	urls := [3]string{
+	urls := [9]string{
 		serviceURL + "GetActiveShips",
 		serviceURL + "RegisterShip",
 		serviceURL + "AuthenticateAccount",
+		serviceURL + "FindCharacter",
+		serviceURL + "UpsertCharacter",
+		serviceURL + "DeleteCharacter",
+		serviceURL + "GetGuildcardEntries",
+		serviceURL + "GetPlayerOptions",
+		serviceURL + "UpsertPlayerOptions",
 	}
 
 	return &shipgateJSONClient{
@@ -330,18 +636,18 @@ func (c *shipgateJSONClient) callGetActiveShips(ctx context.Context, in *google_
 	return out, nil
 }
 
-func (c *shipgateJSONClient) RegisterShip(ctx context.Context, in *RegistrationRequest) (*google_protobuf.Empty, error) {
+func (c *shipgateJSONClient) RegisterShip(ctx context.Context, in *RegisterShipRequest) (*google_protobuf.Empty, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "archon")
 	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
 	ctx = ctxsetters.WithMethodName(ctx, "RegisterShip")
 	caller := c.callRegisterShip
 	if c.interceptor != nil {
-		caller = func(ctx context.Context, req *RegistrationRequest) (*google_protobuf.Empty, error) {
+		caller = func(ctx context.Context, req *RegisterShipRequest) (*google_protobuf.Empty, error) {
 			resp, err := c.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*RegistrationRequest)
+					typedReq, ok := req.(*RegisterShipRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*RegistrationRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*RegisterShipRequest) when calling interceptor")
 					}
 					return c.callRegisterShip(ctx, typedReq)
 				},
@@ -359,7 +665,7 @@ func (c *shipgateJSONClient) RegisterShip(ctx context.Context, in *RegistrationR
 	return caller(ctx, in)
 }
 
-func (c *shipgateJSONClient) callRegisterShip(ctx context.Context, in *RegistrationRequest) (*google_protobuf.Empty, error) {
+func (c *shipgateJSONClient) callRegisterShip(ctx context.Context, in *RegisterShipRequest) (*google_protobuf.Empty, error) {
 	out := new(google_protobuf.Empty)
 	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[1], in, out)
 	if err != nil {
@@ -376,18 +682,18 @@ func (c *shipgateJSONClient) callRegisterShip(ctx context.Context, in *Registrat
 	return out, nil
 }
 
-func (c *shipgateJSONClient) AuthenticateAccount(ctx context.Context, in *AccountAuthRequest) (*archon.Account, error) {
+func (c *shipgateJSONClient) AuthenticateAccount(ctx context.Context, in *AuthenticateAccountRequest) (*archon.Account, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "archon")
 	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
 	ctx = ctxsetters.WithMethodName(ctx, "AuthenticateAccount")
 	caller := c.callAuthenticateAccount
 	if c.interceptor != nil {
-		caller = func(ctx context.Context, req *AccountAuthRequest) (*archon.Account, error) {
+		caller = func(ctx context.Context, req *AuthenticateAccountRequest) (*archon.Account, error) {
 			resp, err := c.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*AccountAuthRequest)
+					typedReq, ok := req.(*AuthenticateAccountRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*AccountAuthRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*AuthenticateAccountRequest) when calling interceptor")
 					}
 					return c.callAuthenticateAccount(ctx, typedReq)
 				},
@@ -405,9 +711,285 @@ func (c *shipgateJSONClient) AuthenticateAccount(ctx context.Context, in *Accoun
 	return caller(ctx, in)
 }
 
-func (c *shipgateJSONClient) callAuthenticateAccount(ctx context.Context, in *AccountAuthRequest) (*archon.Account, error) {
+func (c *shipgateJSONClient) callAuthenticateAccount(ctx context.Context, in *AuthenticateAccountRequest) (*archon.Account, error) {
 	out := new(archon.Account)
 	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[2], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) FindCharacter(ctx context.Context, in *CharacterRequest) (*FindCharacterResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "FindCharacter")
+	caller := c.callFindCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CharacterRequest) (*FindCharacterResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return c.callFindCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*FindCharacterResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*FindCharacterResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callFindCharacter(ctx context.Context, in *CharacterRequest) (*FindCharacterResponse, error) {
+	out := new(FindCharacterResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[3], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) UpsertCharacter(ctx context.Context, in *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertCharacter")
+	caller := c.callUpsertCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertCharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertCharacterRequest) when calling interceptor")
+					}
+					return c.callUpsertCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callUpsertCharacter(ctx context.Context, in *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[4], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) DeleteCharacter(ctx context.Context, in *CharacterRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "DeleteCharacter")
+	caller := c.callDeleteCharacter
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *CharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return c.callDeleteCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callDeleteCharacter(ctx context.Context, in *CharacterRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[5], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) GetGuildcardEntries(ctx context.Context, in *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "GetGuildcardEntries")
+	caller := c.callGetGuildcardEntries
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetGuildcardEntriesRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetGuildcardEntriesRequest) when calling interceptor")
+					}
+					return c.callGetGuildcardEntries(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetGuildcardEntriesResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetGuildcardEntriesResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callGetGuildcardEntries(ctx context.Context, in *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+	out := new(GetGuildcardEntriesResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[6], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) GetPlayerOptions(ctx context.Context, in *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "GetPlayerOptions")
+	caller := c.callGetPlayerOptions
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPlayerOptionsRequest) when calling interceptor")
+					}
+					return c.callGetPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPlayerOptionsResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPlayerOptionsResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callGetPlayerOptions(ctx context.Context, in *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+	out := new(GetPlayerOptionsResponse)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[7], in, out)
+	if err != nil {
+		twerr, ok := err.(twirp.Error)
+		if !ok {
+			twerr = twirp.InternalErrorWith(err)
+		}
+		callClientError(ctx, c.opts.Hooks, twerr)
+		return nil, err
+	}
+
+	callClientResponseReceived(ctx, c.opts.Hooks)
+
+	return out, nil
+}
+
+func (c *shipgateJSONClient) UpsertPlayerOptions(ctx context.Context, in *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "archon")
+	ctx = ctxsetters.WithServiceName(ctx, "Shipgate")
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertPlayerOptions")
+	caller := c.callUpsertPlayerOptions
+	if c.interceptor != nil {
+		caller = func(ctx context.Context, req *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+			resp, err := c.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertPlayerOptionsRequest) when calling interceptor")
+					}
+					return c.callUpsertPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+	return caller(ctx, in)
+}
+
+func (c *shipgateJSONClient) callUpsertPlayerOptions(ctx context.Context, in *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+	out := new(google_protobuf.Empty)
+	ctx, err := doJSONRequest(ctx, c.client, c.opts.Hooks, c.urls[8], in, out)
 	if err != nil {
 		twerr, ok := err.(twirp.Error)
 		if !ok {
@@ -527,6 +1109,24 @@ func (s *shipgateServer) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 		return
 	case "AuthenticateAccount":
 		s.serveAuthenticateAccount(ctx, resp, req)
+		return
+	case "FindCharacter":
+		s.serveFindCharacter(ctx, resp, req)
+		return
+	case "UpsertCharacter":
+		s.serveUpsertCharacter(ctx, resp, req)
+		return
+	case "DeleteCharacter":
+		s.serveDeleteCharacter(ctx, resp, req)
+		return
+	case "GetGuildcardEntries":
+		s.serveGetGuildcardEntries(ctx, resp, req)
+		return
+	case "GetPlayerOptions":
+		s.serveGetPlayerOptions(ctx, resp, req)
+		return
+	case "UpsertPlayerOptions":
+		s.serveUpsertPlayerOptions(ctx, resp, req)
 		return
 	default:
 		msg := fmt.Sprintf("no handler for path %q", req.URL.Path)
@@ -748,7 +1348,7 @@ func (s *shipgateServer) serveRegisterShipJSON(ctx context.Context, resp http.Re
 		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
 		return
 	}
-	reqContent := new(RegistrationRequest)
+	reqContent := new(RegisterShipRequest)
 	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
 	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
 		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
@@ -757,12 +1357,12 @@ func (s *shipgateServer) serveRegisterShipJSON(ctx context.Context, resp http.Re
 
 	handler := s.Shipgate.RegisterShip
 	if s.interceptor != nil {
-		handler = func(ctx context.Context, req *RegistrationRequest) (*google_protobuf.Empty, error) {
+		handler = func(ctx context.Context, req *RegisterShipRequest) (*google_protobuf.Empty, error) {
 			resp, err := s.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*RegistrationRequest)
+					typedReq, ok := req.(*RegisterShipRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*RegistrationRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*RegisterShipRequest) when calling interceptor")
 					}
 					return s.Shipgate.RegisterShip(ctx, typedReq)
 				},
@@ -830,7 +1430,7 @@ func (s *shipgateServer) serveRegisterShipProtobuf(ctx context.Context, resp htt
 		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
 		return
 	}
-	reqContent := new(RegistrationRequest)
+	reqContent := new(RegisterShipRequest)
 	if err = proto.Unmarshal(buf, reqContent); err != nil {
 		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
 		return
@@ -838,12 +1438,12 @@ func (s *shipgateServer) serveRegisterShipProtobuf(ctx context.Context, resp htt
 
 	handler := s.Shipgate.RegisterShip
 	if s.interceptor != nil {
-		handler = func(ctx context.Context, req *RegistrationRequest) (*google_protobuf.Empty, error) {
+		handler = func(ctx context.Context, req *RegisterShipRequest) (*google_protobuf.Empty, error) {
 			resp, err := s.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*RegistrationRequest)
+					typedReq, ok := req.(*RegisterShipRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*RegistrationRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*RegisterShipRequest) when calling interceptor")
 					}
 					return s.Shipgate.RegisterShip(ctx, typedReq)
 				},
@@ -928,7 +1528,7 @@ func (s *shipgateServer) serveAuthenticateAccountJSON(ctx context.Context, resp 
 		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
 		return
 	}
-	reqContent := new(AccountAuthRequest)
+	reqContent := new(AuthenticateAccountRequest)
 	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
 	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
 		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
@@ -937,12 +1537,12 @@ func (s *shipgateServer) serveAuthenticateAccountJSON(ctx context.Context, resp 
 
 	handler := s.Shipgate.AuthenticateAccount
 	if s.interceptor != nil {
-		handler = func(ctx context.Context, req *AccountAuthRequest) (*archon.Account, error) {
+		handler = func(ctx context.Context, req *AuthenticateAccountRequest) (*archon.Account, error) {
 			resp, err := s.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*AccountAuthRequest)
+					typedReq, ok := req.(*AuthenticateAccountRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*AccountAuthRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*AuthenticateAccountRequest) when calling interceptor")
 					}
 					return s.Shipgate.AuthenticateAccount(ctx, typedReq)
 				},
@@ -1010,7 +1610,7 @@ func (s *shipgateServer) serveAuthenticateAccountProtobuf(ctx context.Context, r
 		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
 		return
 	}
-	reqContent := new(AccountAuthRequest)
+	reqContent := new(AuthenticateAccountRequest)
 	if err = proto.Unmarshal(buf, reqContent); err != nil {
 		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
 		return
@@ -1018,12 +1618,12 @@ func (s *shipgateServer) serveAuthenticateAccountProtobuf(ctx context.Context, r
 
 	handler := s.Shipgate.AuthenticateAccount
 	if s.interceptor != nil {
-		handler = func(ctx context.Context, req *AccountAuthRequest) (*archon.Account, error) {
+		handler = func(ctx context.Context, req *AuthenticateAccountRequest) (*archon.Account, error) {
 			resp, err := s.interceptor(
 				func(ctx context.Context, req interface{}) (interface{}, error) {
-					typedReq, ok := req.(*AccountAuthRequest)
+					typedReq, ok := req.(*AuthenticateAccountRequest)
 					if !ok {
-						return nil, twirp.InternalError("failed type assertion req.(*AccountAuthRequest) when calling interceptor")
+						return nil, twirp.InternalError("failed type assertion req.(*AuthenticateAccountRequest) when calling interceptor")
 					}
 					return s.Shipgate.AuthenticateAccount(ctx, typedReq)
 				},
@@ -1052,6 +1652,1086 @@ func (s *shipgateServer) serveAuthenticateAccountProtobuf(ctx context.Context, r
 	}
 	if respContent == nil {
 		s.writeError(ctx, resp, twirp.InternalError("received a nil *archon.Account and nil error while calling AuthenticateAccount. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveFindCharacter(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveFindCharacterJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveFindCharacterProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveFindCharacterJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "FindCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(CharacterRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.FindCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CharacterRequest) (*FindCharacterResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.FindCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*FindCharacterResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*FindCharacterResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *FindCharacterResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *FindCharacterResponse and nil error while calling FindCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveFindCharacterProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "FindCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(CharacterRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.FindCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CharacterRequest) (*FindCharacterResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.FindCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*FindCharacterResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*FindCharacterResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *FindCharacterResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *FindCharacterResponse and nil error while calling FindCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveUpsertCharacter(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveUpsertCharacterJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveUpsertCharacterProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveUpsertCharacterJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(UpsertCharacterRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.UpsertCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertCharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertCharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.UpsertCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling UpsertCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveUpsertCharacterProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(UpsertCharacterRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.UpsertCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *UpsertCharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertCharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertCharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.UpsertCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling UpsertCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveDeleteCharacter(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveDeleteCharacterJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveDeleteCharacterProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveDeleteCharacterJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DeleteCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(CharacterRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.DeleteCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.DeleteCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling DeleteCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveDeleteCharacterProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "DeleteCharacter")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(CharacterRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.DeleteCharacter
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *CharacterRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*CharacterRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*CharacterRequest) when calling interceptor")
+					}
+					return s.Shipgate.DeleteCharacter(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling DeleteCharacter. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveGetGuildcardEntries(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveGetGuildcardEntriesJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveGetGuildcardEntriesProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveGetGuildcardEntriesJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetGuildcardEntries")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(GetGuildcardEntriesRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.GetGuildcardEntries
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetGuildcardEntriesRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetGuildcardEntriesRequest) when calling interceptor")
+					}
+					return s.Shipgate.GetGuildcardEntries(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetGuildcardEntriesResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetGuildcardEntriesResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetGuildcardEntriesResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetGuildcardEntriesResponse and nil error while calling GetGuildcardEntries. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveGetGuildcardEntriesProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetGuildcardEntries")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(GetGuildcardEntriesRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.GetGuildcardEntries
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetGuildcardEntriesRequest) (*GetGuildcardEntriesResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetGuildcardEntriesRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetGuildcardEntriesRequest) when calling interceptor")
+					}
+					return s.Shipgate.GetGuildcardEntries(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetGuildcardEntriesResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetGuildcardEntriesResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetGuildcardEntriesResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetGuildcardEntriesResponse and nil error while calling GetGuildcardEntries. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveGetPlayerOptions(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveGetPlayerOptionsJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveGetPlayerOptionsProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveGetPlayerOptionsJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetPlayerOptions")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(GetPlayerOptionsRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.GetPlayerOptions
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPlayerOptionsRequest) when calling interceptor")
+					}
+					return s.Shipgate.GetPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPlayerOptionsResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPlayerOptionsResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetPlayerOptionsResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetPlayerOptionsResponse and nil error while calling GetPlayerOptions. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveGetPlayerOptionsProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "GetPlayerOptions")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(GetPlayerOptionsRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.GetPlayerOptions
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *GetPlayerOptionsRequest) (*GetPlayerOptionsResponse, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*GetPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*GetPlayerOptionsRequest) when calling interceptor")
+					}
+					return s.Shipgate.GetPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*GetPlayerOptionsResponse)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*GetPlayerOptionsResponse) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *GetPlayerOptionsResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *GetPlayerOptionsResponse and nil error while calling GetPlayerOptions. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveUpsertPlayerOptions(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveUpsertPlayerOptionsJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveUpsertPlayerOptionsProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *shipgateServer) serveUpsertPlayerOptionsJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertPlayerOptions")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	d := json.NewDecoder(req.Body)
+	rawReqBody := json.RawMessage{}
+	if err := d.Decode(&rawReqBody); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+	reqContent := new(UpsertPlayerOptionsRequest)
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
+	if err = unmarshaler.Unmarshal(rawReqBody, reqContent); err != nil {
+		s.handleRequestBodyError(ctx, resp, "the json request could not be decoded", err)
+		return
+	}
+
+	handler := s.Shipgate.UpsertPlayerOptions
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertPlayerOptionsRequest) when calling interceptor")
+					}
+					return s.Shipgate.UpsertPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling UpsertPlayerOptions. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	marshaler := &protojson.MarshalOptions{UseProtoNames: !s.jsonCamelCase, EmitUnpopulated: !s.jsonSkipDefaults}
+	respBytes, err := marshaler.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		ctx = callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *shipgateServer) serveUpsertPlayerOptionsProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "UpsertPlayerOptions")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.handleRequestBodyError(ctx, resp, "failed to read request body", err)
+		return
+	}
+	reqContent := new(UpsertPlayerOptionsRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, malformedRequestError("the protobuf request could not be decoded"))
+		return
+	}
+
+	handler := s.Shipgate.UpsertPlayerOptions
+	if s.interceptor != nil {
+		handler = func(ctx context.Context, req *UpsertPlayerOptionsRequest) (*google_protobuf.Empty, error) {
+			resp, err := s.interceptor(
+				func(ctx context.Context, req interface{}) (interface{}, error) {
+					typedReq, ok := req.(*UpsertPlayerOptionsRequest)
+					if !ok {
+						return nil, twirp.InternalError("failed type assertion req.(*UpsertPlayerOptionsRequest) when calling interceptor")
+					}
+					return s.Shipgate.UpsertPlayerOptions(ctx, typedReq)
+				},
+			)(ctx, req)
+			if resp != nil {
+				typedResp, ok := resp.(*google_protobuf.Empty)
+				if !ok {
+					return nil, twirp.InternalError("failed type assertion resp.(*google_protobuf.Empty) when calling interceptor")
+				}
+				return typedResp, err
+			}
+			return nil, err
+		}
+	}
+
+	// Call service method
+	var respContent *google_protobuf.Empty
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = handler(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *google_protobuf.Empty and nil error while calling UpsertPlayerOptions. nil responses are not supported"))
 		return
 	}
 
@@ -1653,28 +3333,45 @@ func callClientError(ctx context.Context, h *twirp.ClientHooks, err twirp.Error)
 }
 
 var twirpFileDescriptor0 = []byte{
-	// 362 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0x3f, 0x6f, 0xdb, 0x30,
-	0x10, 0xc5, 0xa1, 0xfa, 0x4f, 0x5d, 0xda, 0x68, 0x0b, 0x1a, 0x28, 0x04, 0x79, 0xa8, 0xa0, 0xc9,
-	0x43, 0x41, 0x01, 0xee, 0xd6, 0xcd, 0x2e, 0x8a, 0x2e, 0x1e, 0x02, 0x65, 0xcb, 0x12, 0xd0, 0xd4,
-	0x45, 0x22, 0x60, 0x91, 0x0a, 0x79, 0x4a, 0xec, 0x4f, 0x99, 0xaf, 0x14, 0x50, 0x94, 0x94, 0x20,
-	0x4e, 0xb6, 0xbb, 0x7b, 0x0f, 0x77, 0x7c, 0x3f, 0x90, 0xc4, 0x52, 0x21, 0x18, 0xc5, 0x8f, 0xa9,
-	0x2d, 0x65, 0x5d, 0x70, 0x84, 0xa1, 0x60, 0xb5, 0xd1, 0xa8, 0xe9, 0x94, 0x1b, 0x51, 0x6a, 0x15,
-	0xbd, 0x38, 0x85, 0x36, 0x90, 0xb6, 0x62, 0xea, 0x35, 0xef, 0x8c, 0x56, 0x85, 0xd6, 0xc5, 0xb1,
-	0x93, 0x0e, 0xcd, 0x5d, 0x0a, 0x55, 0x8d, 0x67, 0x2f, 0x26, 0x8c, 0xcc, 0xae, 0x4b, 0x59, 0xef,
-	0xa5, 0x45, 0x9a, 0x90, 0x89, 0x3b, 0x62, 0xc3, 0x20, 0x1e, 0xad, 0xe7, 0x9b, 0x05, 0xeb, 0xd6,
-	0x38, 0x43, 0xe6, 0xa5, 0xe4, 0x44, 0x96, 0x19, 0x14, 0xd2, 0xa2, 0xe1, 0x28, 0xb5, 0xca, 0xe0,
-	0xbe, 0x01, 0x8b, 0x94, 0x92, 0xb1, 0xe2, 0x15, 0x84, 0x41, 0x1c, 0xac, 0xbf, 0x64, 0x6d, 0x4d,
-	0x43, 0xf2, 0x99, 0xe7, 0xb9, 0x01, 0x6b, 0xc3, 0x4f, 0xed, 0xb8, 0x6f, 0x9d, 0xbb, 0xd6, 0x06,
-	0xc3, 0x91, 0x77, 0xbb, 0x9a, 0xfe, 0x24, 0xf3, 0x8a, 0x9f, 0x6e, 0xeb, 0x23, 0x3f, 0x83, 0xb1,
-	0xe1, 0x38, 0x0e, 0xd6, 0x93, 0x8c, 0x54, 0xfc, 0x74, 0xe5, 0x27, 0xc9, 0x9e, 0xd0, 0xad, 0x10,
-	0xba, 0x51, 0xb8, 0x6d, 0xb0, 0xec, 0x0f, 0x47, 0x64, 0xd6, 0x58, 0x97, 0x7f, 0x38, 0x3e, 0xf4,
-	0x4e, 0xab, 0xb9, 0xb5, 0x8f, 0xda, 0xe4, 0xdd, 0x0b, 0x86, 0x7e, 0xf3, 0x14, 0xf8, 0xe0, 0x8e,
-	0x28, 0xfd, 0x43, 0xbe, 0xfe, 0x07, 0xdc, 0x0a, 0x94, 0x0f, 0xe0, 0x86, 0x96, 0xfe, 0x60, 0x1e,
-	0x1a, 0xeb, 0xa1, 0xb1, 0x7f, 0x0e, 0x5a, 0xf4, 0xfd, 0x35, 0x93, 0x16, 0xda, 0x5f, 0xb2, 0xf0,
-	0x40, 0xc0, 0xb8, 0x19, 0x5d, 0xf5, 0x8e, 0x77, 0x30, 0x45, 0x1f, 0xac, 0xa5, 0x3b, 0xb2, 0x74,
-	0xa1, 0x40, 0xa1, 0x14, 0x1c, 0xa1, 0xcb, 0x49, 0xa3, 0x7e, 0xd7, 0x65, 0xf0, 0xe8, 0xdb, 0x1b,
-	0x6d, 0xc7, 0x6e, 0x7e, 0x15, 0x12, 0xcb, 0xe6, 0xc0, 0x84, 0xae, 0xd2, 0x5c, 0x18, 0x9d, 0x57,
-	0x5c, 0x75, 0x5f, 0x21, 0xbd, 0xf8, 0x4f, 0x87, 0x69, 0xfb, 0x86, 0xdf, 0xcf, 0x01, 0x00, 0x00,
-	0xff, 0xff, 0xea, 0xc9, 0x74, 0x8b, 0x6b, 0x02, 0x00, 0x00,
+	// 638 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x55, 0x5f, 0x6f, 0xd3, 0x3e,
+	0x14, 0x55, 0x7f, 0xfb, 0x7f, 0xf7, 0xf7, 0xe7, 0x6a, 0x25, 0xca, 0x34, 0x56, 0x85, 0x97, 0x3d,
+	0xa0, 0x04, 0x8d, 0x17, 0x04, 0xbc, 0x8c, 0x31, 0xca, 0x10, 0xd2, 0x20, 0xb0, 0x17, 0x1e, 0x18,
+	0x5e, 0x72, 0x69, 0x2c, 0xb5, 0xb1, 0xb1, 0x1d, 0x68, 0x3f, 0x1b, 0x5f, 0x0e, 0x25, 0xb6, 0xdb,
+	0x6e, 0x4b, 0xa0, 0x83, 0x37, 0xfb, 0xde, 0x73, 0x8f, 0x4f, 0x6e, 0xee, 0xb1, 0xa1, 0xcb, 0x72,
+	0x8d, 0x32, 0xa7, 0x83, 0x48, 0x65, 0x4c, 0xf4, 0xa9, 0xc6, 0xc9, 0x22, 0x14, 0x92, 0x6b, 0x4e,
+	0x96, 0xa9, 0x4c, 0x32, 0x9e, 0xfb, 0x53, 0x64, 0xc2, 0x25, 0x46, 0x55, 0x32, 0x32, 0x39, 0x83,
+	0xf4, 0xf7, 0xfa, 0x9c, 0xf7, 0x07, 0x36, 0x75, 0x55, 0x7c, 0x8d, 0x70, 0x28, 0xf4, 0xd8, 0x24,
+	0x83, 0x10, 0x56, 0x3f, 0x64, 0x4c, 0xbc, 0x65, 0x4a, 0x93, 0x00, 0x96, 0xca, 0x43, 0x94, 0xd7,
+	0xea, 0x2e, 0x1c, 0xae, 0x1f, 0x6d, 0x84, 0x96, 0xa6, 0x04, 0xc4, 0x26, 0x15, 0x8c, 0xa0, 0x1d,
+	0x63, 0x9f, 0x29, 0x8d, 0xb2, 0x0a, 0xe3, 0xb7, 0x02, 0x95, 0x26, 0x04, 0x16, 0x73, 0x3a, 0x44,
+	0xaf, 0xd5, 0x6d, 0x1d, 0xae, 0xc5, 0xd5, 0x9a, 0x78, 0xb0, 0x42, 0xd3, 0x54, 0xa2, 0x52, 0xde,
+	0x7f, 0x55, 0xd8, 0x6d, 0x4b, 0xb4, 0xe0, 0x52, 0x7b, 0x0b, 0x06, 0x5d, 0xae, 0xc9, 0x01, 0xac,
+	0x0f, 0xe9, 0xe8, 0x52, 0x0c, 0xe8, 0x18, 0xa5, 0xf2, 0x16, 0xbb, 0xad, 0xc3, 0xa5, 0x18, 0x86,
+	0x74, 0xf4, 0xce, 0x44, 0x82, 0x8f, 0xe0, 0x1f, 0x17, 0x3a, 0xc3, 0x5c, 0xb3, 0x84, 0x6a, 0x3c,
+	0x4e, 0x12, 0x5e, 0xe4, 0xda, 0x09, 0xf0, 0x61, 0xb5, 0x50, 0x65, 0x1f, 0x26, 0x22, 0x26, 0xfb,
+	0x32, 0x27, 0xa8, 0x52, 0x3f, 0xb8, 0x4c, 0xad, 0x92, 0xc9, 0x3e, 0x38, 0x85, 0x9d, 0x93, 0x8c,
+	0x4a, 0x9a, 0x68, 0x94, 0x8e, 0x6b, 0x1f, 0x80, 0x1a, 0xf6, 0x4b, 0x96, 0x56, 0x6c, 0x8b, 0xf1,
+	0x9a, 0x8d, 0x9c, 0xa5, 0xa5, 0x7a, 0x35, 0xe0, 0xba, 0xa2, 0xda, 0x8c, 0xab, 0x75, 0xf0, 0x05,
+	0x76, 0x5f, 0xb1, 0x3c, 0x9d, 0xa1, 0x52, 0x82, 0xe7, 0x0a, 0x49, 0x07, 0x96, 0x71, 0xc4, 0x94,
+	0x56, 0x15, 0xcf, 0x6a, 0x6c, 0x77, 0x24, 0x82, 0xb5, 0xc4, 0x81, 0x2b, 0xa6, 0xf5, 0xa3, 0xff,
+	0x5d, 0xbf, 0xa7, 0x2c, 0x53, 0x4c, 0x90, 0x41, 0xe7, 0x42, 0x28, 0x94, 0xfa, 0xae, 0x72, 0xef,
+	0x7c, 0xd2, 0x33, 0xf0, 0x7b, 0xa8, 0x7b, 0x05, 0x1b, 0xa4, 0x09, 0x95, 0xe9, 0x69, 0xae, 0x25,
+	0x43, 0x35, 0xdf, 0x69, 0xc1, 0x39, 0xec, 0xd5, 0x16, 0xdb, 0x76, 0x3c, 0x82, 0x15, 0x34, 0x21,
+	0x3b, 0x64, 0x1d, 0x27, 0xe5, 0x5a, 0xc9, 0x38, 0x76, 0xb0, 0xe0, 0x09, 0xdc, 0xeb, 0xa1, 0x36,
+	0x43, 0x70, 0x2e, 0x34, 0xe3, 0xf9, 0xbc, 0x52, 0x04, 0x78, 0xb7, 0x2b, 0xff, 0xf0, 0x5b, 0x9e,
+	0xc3, 0x96, 0x99, 0xc0, 0x4b, 0x6e, 0x2a, 0x6c, 0xc7, 0x76, 0x9d, 0xcc, 0xeb, 0x74, 0x9b, 0x62,
+	0x76, 0x1b, 0x8c, 0xc1, 0x37, 0xff, 0xe8, 0x2f, 0xe4, 0xfe, 0xdb, 0xd1, 0x47, 0x3f, 0x97, 0x8c,
+	0x91, 0xcb, 0x1b, 0x82, 0x3c, 0x85, 0xad, 0x1e, 0xea, 0xe3, 0x44, 0xb3, 0xef, 0x58, 0x06, 0x15,
+	0xe9, 0x84, 0xe6, 0x12, 0x08, 0xdd, 0x25, 0x10, 0x9e, 0x96, 0x97, 0x80, 0xbf, 0x33, 0xeb, 0xf1,
+	0xea, 0x12, 0x38, 0x81, 0x8d, 0x59, 0x83, 0x93, 0x3d, 0x87, 0xa8, 0xb1, 0xbd, 0xdf, 0x40, 0x4b,
+	0xde, 0x40, 0xbb, 0xc6, 0xab, 0x24, 0x70, 0x5c, 0xcd, 0x46, 0xf6, 0xb7, 0x27, 0x18, 0x5b, 0xf4,
+	0x1a, 0x36, 0xaf, 0x59, 0x8b, 0x78, 0xb7, 0xa7, 0xd7, 0xd6, 0xee, 0xbb, 0x4c, 0xbd, 0x17, 0xcf,
+	0x60, 0xfb, 0x86, 0x85, 0xc8, 0x7d, 0x57, 0x51, 0xef, 0xad, 0xc6, 0x0f, 0x3c, 0x81, 0xed, 0x97,
+	0x38, 0x40, 0x8d, 0xf3, 0xc8, 0x6a, 0x22, 0xf9, 0x0c, 0xed, 0x1a, 0xaf, 0x4c, 0xbb, 0xd4, 0xec,
+	0x42, 0xff, 0xc1, 0x6f, 0x31, 0xf6, 0x7b, 0x2f, 0x60, 0xe7, 0xa6, 0x01, 0xc8, 0xc1, 0x4c, 0x61,
+	0xdd, 0x94, 0xfa, 0xdd, 0x66, 0x80, 0xa5, 0x7d, 0x0f, 0xed, 0x9a, 0x29, 0x9f, 0xca, 0x6e, 0xb6,
+	0x40, 0x53, 0x27, 0x5e, 0x84, 0x9f, 0x1e, 0xf6, 0x99, 0xce, 0x8a, 0xab, 0x30, 0xe1, 0xc3, 0x28,
+	0x4d, 0x24, 0x4f, 0x87, 0x34, 0xb7, 0xcf, 0x58, 0x74, 0xeb, 0x2d, 0xbc, 0x5a, 0xae, 0xea, 0x1f,
+	0xff, 0x0a, 0x00, 0x00, 0xff, 0xff, 0x29, 0x17, 0x4d, 0xee, 0x27, 0x07, 0x00, 0x00,
 }

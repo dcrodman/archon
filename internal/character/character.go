@@ -15,13 +15,10 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"gorm.io/gorm"
 
 	"github.com/dcrodman/archon/internal/core"
-	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
-	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/core/proto"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
@@ -110,16 +107,16 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
 	case packets.LoginOptionsRequestType:
-		err = s.handleOptionsRequest(c)
+		err = s.handleOptionsRequest(ctx, c)
 	case packets.LoginCharPreviewReqType:
 		var pkt packets.CharacterSelection
 		bytes.StructFromBytes(data, &pkt)
-		err = s.handleCharacterSelect(c, &pkt)
+		err = s.handleCharacterSelect(ctx, c, &pkt)
 	case packets.LoginChecksumType:
 		// Everybody else seems to ignore this, so...
 		err = s.sendChecksumAck(c)
 	case packets.LoginGuildcardReqType:
-		err = s.handleGuildcardDataStart(c)
+		err = s.handleGuildcardDataStart(ctx, c)
 	case packets.LoginGuildcardChunkReqType:
 		var chunkReq packets.GuildcardChunkRequest
 		bytes.StructFromBytes(data, &chunkReq)
@@ -137,7 +134,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	case packets.LoginCharPreviewType:
 		var charPkt packets.CharacterSummary
 		bytes.StructFromBytes(data, &charPkt)
-		err = s.handleCharacterUpdate(c, &charPkt)
+		err = s.handleCharacterUpdate(ctx, c, &charPkt)
 	case packets.MenuSelectType:
 		var menuSelectionPkt packets.MenuSelection
 		bytes.StructFromBytes(data, &menuSelectionPkt)
@@ -155,15 +152,15 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AccountAuthRequest{
+	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AuthenticateAccountRequest{
 		Username: username,
 		Password: password,
 	})
 	if err != nil {
 		switch err {
-		case auth.ErrInvalidCredentials:
+		case shipgate.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
+		case shipgate.ErrAccountBanned:
 			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
@@ -308,23 +305,33 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 }
 
 // LoadConfig key config and other option data from the database or provide defaults for new accounts.
-func (s *Server) handleOptionsRequest(c *client.Client) error {
-	account := c.Account
-	playerOptions, err := data.FindPlayerOptions(convertAccountProto(account))
-	if err != nil {
-		return err
+func (s *Server) handleOptionsRequest(ctx context.Context, c *client.Client) error {
+	var (
+		err           error
+		resp          *shipgate.GetPlayerOptionsResponse
+		playerOptions *proto.PlayerOptions
+	)
+	if resp, err = s.shipgateClient.GetPlayerOptions(ctx, &shipgate.GetPlayerOptionsRequest{
+		AccountId: c.Account.Id,
+	}); err != nil {
+		return fmt.Errorf("error handling options request: %w", err)
 	}
 
+	if resp.Exists {
+		playerOptions = resp.PlayerOptions
+	}
 	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
-		playerOptions = &data.PlayerOptions{
-			Account:   convertAccountProto(account),
+		playerOptions = &proto.PlayerOptions{
 			KeyConfig: make([]byte, 420),
 		}
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
 
-		if err = data.CreatePlayerOptions(playerOptions); err != nil {
-			return err
+		if _, err = s.shipgateClient.UpsertPlayerOptions(ctx, &shipgate.UpsertPlayerOptionsRequest{
+			AccountId:     c.Account.Id,
+			PlayerOptions: playerOptions,
+		}); err != nil {
+			return fmt.Errorf("error creating player options: %w", err)
 		}
 	}
 
@@ -335,7 +342,7 @@ func (s *Server) handleOptionsRequest(c *client.Client) error {
 // point to the default keys array or loaded from the database.
 func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 	if len(keyConfig) != 420 {
-		return fmt.Errorf("Received keyConfig of length %d; should be 420", len(keyConfig))
+		return fmt.Errorf("received keyConfig of length %d; should be 420", len(keyConfig))
 	}
 
 	pkt := &packets.Options{
@@ -358,27 +365,29 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 // The client will send one of these preview request packets for each of the character
 // slots (i.e. 4 times). The client also sends this packet when a character has
 // been selected from the list and the Selecting flag will be set.
-func (s *Server) handleCharacterSelect(c *client.Client, pkt *packets.CharacterSelection) error {
-	account := c.Account
-	char, err := data.FindCharacter(convertAccountProto(account), int(pkt.Slot))
+func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pkt *packets.CharacterSelection) error {
+	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
+		AccountId: c.Account.Id,
+		Slot:      pkt.Slot,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error selecting character: %w", err)
 	}
 
 	if pkt.Selecting == 0x01 {
-		if char == nil {
+		if !resp.Exists {
 			return fmt.Errorf("attempted to select nonexistent character in slot: %d", pkt.Slot)
 		}
 		// They've selected a character from the menu.
 		c.Config.SlotNum = uint8(pkt.Slot)
 		return s.sendCharacterAck(c, pkt.Slot, 1)
 	} else {
-		if char == nil {
+		if !resp.Exists {
 			// We don't have a character for this slot.
 			return s.sendCharacterAck(c, pkt.Slot, 2)
 		}
 		// They have a character in that slot; send the character preview.
-		return s.sendCharacterPreview(c, char)
+		return s.sendCharacterPreview(c, resp.Character)
 	}
 }
 
@@ -394,7 +403,7 @@ func (s *Server) sendCharacterAck(c *client.Client, slotNum uint32, flag uint32)
 }
 
 // send the preview packet containing basic details about a character in the selected slot.
-func (s *Server) sendCharacterPreview(c *client.Client, char *data.Character) error {
+func (s *Server) sendCharacterPreview(c *client.Client, char *proto.Character) error {
 	previewPacket := &packets.CharacterSummary{
 		Header: packets.BBHeader{Type: packets.LoginCharPreviewType},
 		Slot:   0,
@@ -402,21 +411,21 @@ func (s *Server) sendCharacterPreview(c *client.Client, char *data.Character) er
 			Experience:     char.Experience,
 			Level:          char.Level,
 			NameColor:      char.NameColor,
-			Model:          char.ModelType,
+			Model:          byte(char.ModelType),
 			NameColorChksm: char.NameColorChecksum,
-			SectionID:      char.SectionID,
-			Class:          char.Class,
-			V2Flags:        char.V2Flags,
-			Version:        char.Version,
+			SectionID:      byte(char.SectionId),
+			Class:          byte(char.Class),
+			V2Flags:        byte(char.V2Flags),
+			Version:        byte(char.Version),
 			V1Flags:        char.V1Flags,
-			Costume:        char.Costume,
-			Skin:           char.Skin,
-			Face:           char.Face,
-			Head:           char.Head,
-			Hair:           char.Hair,
-			HairRed:        char.HairRed,
-			HairGreen:      char.HairGreen,
-			HairBlue:       char.HairBlue,
+			Costume:        uint16(char.Costume),
+			Skin:           uint16(char.Skin),
+			Face:           uint16(char.Face),
+			Head:           uint16(char.Head),
+			Hair:           uint16(char.Hair),
+			HairRed:        uint16(char.HairRed),
+			HairGreen:      uint16(char.HairGreen),
+			HairBlue:       uint16(char.HairBlue),
 			PropX:          char.ProportionX,
 			PropY:          char.ProportionY,
 			Playtime:       char.Playtime,
@@ -438,16 +447,17 @@ func (s *Server) sendChecksumAck(c *client.Client) error {
 }
 
 // LoadConfig the player's saved guildcards, build the chunk data, and send the chunk header.
-func (s *Server) handleGuildcardDataStart(c *client.Client) error {
-	account := c.Account
-	guildcards, err := data.FindGuildcardEntries(convertAccountProto(account))
+func (s *Server) handleGuildcardDataStart(ctx context.Context, c *client.Client) error {
+	resp, err := s.shipgateClient.GetGuildcardEntries(ctx, &shipgate.GetGuildcardEntriesRequest{
+		AccountId: c.Account.Id,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error loading guildcards: %w", err)
 	}
 
 	gcData := new(GuildcardData)
 	// Maximum of 140 entries can be sent.
-	for i, entry := range guildcards {
+	for i, entry := range resp.Entries {
 		// TODO: This may not actually work yet, but I haven't gotten to
 		// figuring out how the other servers use it.
 		pktEntry := gcData.Entries[i]
@@ -455,9 +465,9 @@ func (s *Server) handleGuildcardDataStart(c *client.Client) error {
 		copy(pktEntry.Name[:], entry.Name)
 		copy(pktEntry.TeamName[:], entry.TeamName)
 		copy(pktEntry.Description[:], entry.Description)
-		pktEntry.Language = entry.Language
-		pktEntry.SectionID = entry.SectionID
-		pktEntry.CharClass = entry.Class
+		pktEntry.Language = uint8(entry.Language)
+		pktEntry.SectionID = uint8(entry.SectionId)
+		pktEntry.CharClass = uint8(entry.Class)
 		copy(pktEntry.Comment[:], entry.Comment)
 	}
 
@@ -539,73 +549,68 @@ func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
 }
 
 func clientFlagKey(c *client.Client) string {
-	return fmt.Sprintf("client-flags-%d", convertAccountProto(c.Account).ID)
+	return fmt.Sprintf("client-flags-%d", c.Account.Id)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
 // "dressing room" or "recreate" flows (as indicated by a client flag).
-func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.CharacterSummary) error {
+func (s *Server) handleCharacterUpdate(ctx context.Context, c *client.Client, charPkt *packets.CharacterSummary) error {
 	if s.hasDressingRoomFlag(c) {
 		// "Dressing room"; a request to update an existing character.
-		if err := s.updateCharacter(c, charPkt); err != nil {
+		if err := s.updateCharacter(ctx, c, charPkt); err != nil {
 			s.Logger.Error(err.Error())
 			return err
 		}
 	} else {
 		// The "recreate" option. This is a request to create a character in a slot and is used
 		// for both creating new characters and replacing existing ones.
-		account := convertAccountProto(c.Account)
-		existingCharacter, err := data.FindCharacter(account, int(charPkt.Slot))
-		if err != nil {
-			msg := fmt.Errorf("error locating character in slot %d for account %d", charPkt.Slot, account.ID)
+		if _, err := s.shipgateClient.DeleteCharacter(ctx, &shipgate.CharacterRequest{
+			AccountId: c.Account.Id,
+			Slot:      charPkt.Slot,
+		}); err != nil {
+			msg := fmt.Errorf("error deleting character for account %d in slot %d ", c.Account.Id, charPkt.Slot)
 			s.Logger.Error(msg)
 			return msg
-		}
-		if existingCharacter != nil {
-			if err := data.DeleteCharacter(existingCharacter); err != nil {
-				s.Logger.Error(err.Error())
-				return err
-			}
 		}
 
 		p := charPkt.Character
 		stats := BaseStats[p.Class]
 
-		newCharacter := &data.Character{
-			Account:           account,
-			Guildcard:         account.Guildcard,
+		newCharacter := &proto.Character{
+			Guildcard:         c.Account.Guildcard,
 			GuildcardStr:      p.GuildcardStr[:],
 			Slot:              charPkt.Slot,
 			Experience:        0,
 			Level:             0,
 			NameColor:         p.NameColor,
-			ModelType:         p.Model,
+			ModelType:         int32(p.Model),
 			NameColorChecksum: p.NameColorChksm,
-			SectionID:         p.SectionID,
-			Class:             p.Class,
-			V2Flags:           p.V2Flags,
-			Version:           p.Version,
+			SectionId:         int32(p.SectionID),
+			Class:             int32(p.Class),
+			V2Flags:           int32(p.V2Flags),
+			Version:           int32(p.Version),
 			V1Flags:           p.V1Flags,
-			Costume:           p.Costume,
-			Skin:              p.Skin,
-			Face:              p.Face,
-			Head:              p.Head,
-			Hair:              p.Hair,
-			HairRed:           p.HairRed,
-			HairGreen:         p.HairGreen,
-			HairBlue:          p.HairBlue,
+			Costume:           uint32(p.Costume),
+			Skin:              uint32(p.Skin),
+			Face:              uint32(p.Face),
+			Head:              uint32(p.Head),
+			Hair:              uint32(p.Hair),
+			HairRed:           uint32(p.HairRed),
+			HairGreen:         uint32(p.HairGreen),
+			HairBlue:          uint32(p.HairBlue),
 			ProportionX:       p.PropX,
 			ProportionY:       p.PropY,
 			Name:              p.Name[:],
-			ATP:               stats.ATP,
-			MST:               stats.MST,
-			EVP:               stats.EVP,
-			HP:                stats.HP,
-			DFP:               stats.DFP,
-			ATA:               stats.ATA,
-			LCK:               stats.LCK,
+			Atp:               uint32(stats.ATP),
+			Mst:               uint32(stats.MST),
+			Evp:               uint32(stats.EVP),
+			Hp:                uint32(stats.HP),
+			Dfp:               uint32(stats.DFP),
+			Ata:               uint32(stats.ATA),
+			Lck:               uint32(stats.LCK),
 			Meseta:            StartingMeseta,
 		}
+
 		// The string is UTF-16LE encoded and it needs to be converted from []uint8 to
 		// a []uint16 slice with the bytes reversed.
 		// Also drops what is presumably the language code (0x09006900) off of the front.
@@ -625,7 +630,10 @@ func (s *Server) handleCharacterUpdate(c *client.Client, charPkt *packets.Charac
 		//--techniques blob,
 		//--options blob,
 
-		if err := data.CreateCharacter(newCharacter); err != nil {
+		if _, err := s.shipgateClient.UpsertCharacter(ctx, &shipgate.UpsertCharacterRequest{
+			AccountId: c.Account.Id,
+			Character: newCharacter,
+		}); err != nil {
 			return err
 		}
 	}
@@ -646,36 +654,55 @@ func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
 	return false
 }
 
-func (s *Server) updateCharacter(c *client.Client, pkt *packets.CharacterSummary) error {
+func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *packets.CharacterSummary) error {
 	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
 	flags, _ := s.kvCache.Get(clientFlagKey(c))
 	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
 
-	account := c.Account
-	char, err := data.FindCharacter(convertAccountProto((account)), int(pkt.Slot))
+	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
+		AccountId: c.Account.Id,
+		Slot:      pkt.Slot,
+	})
 	if err != nil {
 		return err
-	} else if char == nil {
+	} else if !resp.Exists {
 		return fmt.Errorf("character does not exist in slot %d for guildcard %d", pkt.Slot, c.Guildcard)
 	}
 
-	p := pkt.Character
-	char.NameColor = p.NameColor
-	char.ModelType = p.Model
-	char.NameColorChecksum = p.NameColorChksm
-	char.SectionID = p.SectionID
-	char.Class = p.Class
-	char.Costume = p.Costume
-	char.Skin = p.Skin
-	char.Head = p.Head
-	char.HairRed = p.HairRed
-	char.HairGreen = p.HairGreen
-	char.HairBlue = p.HairBlue
-	char.ProportionX = p.PropX
-	char.ProportionY = p.PropY
-	copy(char.Name, p.Name[:])
+	character := resp.Character
+	pc := pkt.Character
+	character.NameColor = pc.NameColor
+	character.ModelType = int32(pc.Model)
+	character.NameColorChecksum = pc.NameColorChksm
+	character.SectionId = int32(pc.SectionID)
+	character.Class = int32(pc.Class)
+	character.Costume = uint32(pc.Costume)
+	character.Skin = uint32(pc.Skin)
+	character.Head = uint32(pc.Head)
+	character.HairRed = uint32(pc.HairRed)
+	character.HairGreen = uint32(pc.HairGreen)
+	character.HairBlue = uint32(pc.HairBlue)
+	character.ProportionX = pc.PropX
+	character.ProportionY = pc.PropY
+	character.Name = pc.Name[:]
 
-	return data.UpdateCharacter(char)
+	// TODO: duplicated with the above; make this better.
+	cleanedName := pc.Name[4:]
+	utfName := make([]uint16, 0)
+	for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
+		if cleanedName[i]|cleanedName[i+1] == 0 {
+			break
+		}
+		utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
+		j++
+	}
+	character.ReadableName = string(utf16.Decode(utfName))
+
+	_, err = s.shipgateClient.UpsertCharacter(ctx, &shipgate.UpsertCharacterRequest{
+		AccountId: c.Account.Id,
+		Character: character,
+	})
+	return err
 }
 
 // Player selected one of the items on the ship select screen; respond with the
@@ -700,22 +727,4 @@ func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menu
 		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
 		Port:   uint16(port),
 	})
-}
-
-func convertAccountProto(account *proto.Account) *data.Account {
-	return &data.Account{
-		Model: gorm.Model{
-			ID: uint(account.Id),
-		},
-		Username:         account.Username,
-		Password:         "",
-		Email:            account.Email,
-		RegistrationDate: time.Time{},
-		Guildcard:        int(account.Guildcard),
-		GM:               account.Gm,
-		Banned:           account.Banned,
-		Active:           account.Active,
-		TeamID:           int(account.TeamId),
-		PrivilegeLevel:   account.PriviledgeLevel[0],
-	}
 }

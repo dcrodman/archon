@@ -2,18 +2,19 @@ package data
 
 import (
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 // Character is an instance of a character in one of the slots for an account.
 type Character struct {
-	gorm.Model
+	ID uint64 `gorm:"primaryKey"`
 
 	Account   *Account
-	AccountID int
+	AccountID uint64
 
-	Guildcard         int
+	Guildcard         uint64
 	GuildcardStr      []byte
 	Slot              uint32
 	Experience        uint32
@@ -47,13 +48,17 @@ type Character struct {
 	ATA               uint16
 	LCK               uint16
 	Meseta            uint32
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
 }
 
 // FindCharacter returns the Character associated with the account in
 // the given slot or nil if none exists.
-func FindCharacter(account *Account, slot int) (*Character, error) {
+func FindCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error) {
 	var character Character
-	err := db.Where("slot = ? AND account_id = ?", slot, &account.ID).First(&character).Error
+	err := db.Where("slot = ? AND account_id = ?", slot, &accountID).First(&character).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -66,21 +71,25 @@ func FindCharacter(account *Account, slot int) (*Character, error) {
 }
 
 // CreateCharacter persists a Character to the database.
-func CreateCharacter(character *Character) error {
+func CreateCharacter(db *gorm.DB, character *Character) error {
 	return db.Create(&character).Error
 }
 
 // UpdateCharacter updates an existing Character row with the contents of character.
-func UpdateCharacter(character *Character) error {
+func UpdateCharacter(db *gorm.DB, character *Character) error {
 	return db.Updates(&character).Error
 }
 
 // DeleteCharacter soft-deletes a character record from the database.
-func DeleteCharacter(character *Character) error {
+func DeleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
+	character, err := FindCharacter(db, accountID, slot)
+	if err != nil {
+		return err
+	}
 	return db.Delete(character).Error
 }
 
 // PermanentlyDeleteCharacter permanently deletes a character record from the database.
-func PermanentlyDeleteCharacter(character *Character) error {
+func PermanentlyDeleteCharacter(db *gorm.DB, character *Character) error {
 	return db.Unscoped().Delete(character).Error
 }

@@ -5,22 +5,79 @@ package archon;
 option go_package = "github.com/dcrodman/archon/internal/core/proto";
 
 message Ship {
-  int32  id = 1;
+  int32 id = 1;
   string name = 2;
   string ip = 3;
   string port = 4;
   int32 player_count = 5;
 }
 
+// TODO: Can IDs be removed?
 message Account {
   uint64 id = 1;
   string username = 2;
   string email = 3;
   string registration_date = 4;
-  int64 guildcard = 5;
+  uint64 guildcard = 5;
   bool gm = 6;
   bool banned = 7;
   bool active = 8;
   int64 team_id = 9;
   bytes priviledge_level = 10;
+}
+
+message Character {
+  uint64 id = 1;
+  uint64 guildcard = 2;
+  bytes guildcard_str = 3;
+  uint32 slot = 4;
+  uint32 experience = 5;
+  uint32 level = 6;
+  uint32 name_color = 7;
+  int32 model_type = 8;
+  uint32 name_color_checksum = 9;
+  int32 section_id = 10;
+  int32 class = 11;
+  int32 v2_flags = 12;
+  int32 version = 13;
+  uint32 v1_flags = 14;
+  uint32 costume = 15;
+  uint32 skin = 16;
+  uint32 face = 17;
+  uint32 head = 18;
+  uint32 hair = 19;
+  uint32 hair_red = 20;
+  uint32 hair_green = 21;
+  uint32 hair_blue = 22;
+  float proportion_x = 23;
+  float proportion_y = 24;
+  string readable_name = 25;
+  bytes name = 26;
+  uint32 playtime = 27;
+  uint32 atp = 28;
+  uint32 mst = 29;
+  uint32 evp = 30;
+  uint32 hp = 31;
+  uint32 dfp = 32;
+  uint32 ata = 33;
+  uint32 lck = 34;
+  uint32 meseta = 35;
+}
+
+message GuildcardEntry {
+  uint32 id = 1;
+  uint64 guildcard = 2;
+  uint64 friend_guildcard = 3;
+  bytes name = 4;
+  bytes team_name = 5;
+  bytes description = 6;
+  uint32 language = 7;
+  uint32 section_id = 8;
+  uint32 class = 9;
+  bytes comment = 10;
+}
+
+message PlayerOptions {
+  uint32 id = 1;
+  bytes key_config = 2;
 }

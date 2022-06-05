@@ -7,7 +7,7 @@ import (
 )
 
 type PlayerOptions struct {
-	gorm.Model
+	ID uint64 `gorm:"primaryKey"`
 
 	Account   *Account
 	AccountID int
@@ -16,9 +16,9 @@ type PlayerOptions struct {
 }
 
 // FindPlayerOptions returns all of hte PlayerOptions associated with an Account.
-func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
+func FindPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
 	var playerOptions PlayerOptions
-	err := db.Where("account_id = ?", &account.ID).First(&playerOptions).Error
+	err := db.Where("account_id = ?", accountId).First(&playerOptions).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -30,10 +30,10 @@ func FindPlayerOptions(account *Account) (*PlayerOptions, error) {
 	return &playerOptions, nil
 }
 
-func CreatePlayerOptions(po *PlayerOptions) error {
+func CreatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
 	return db.Create(po).Error
 }
 
-func UpdatePlayerOptions(po *PlayerOptions) error {
+func UpdatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
 	return db.Updates(&po).Error
 }

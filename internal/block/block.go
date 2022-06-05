@@ -8,7 +8,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon/internal/core"
-	"github.com/dcrodman/archon/internal/core/auth"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/data"
@@ -75,15 +74,15 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
-	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AccountAuthRequest{
+	account, err := s.shipgateClient.AuthenticateAccount(ctx, &shipgate.AuthenticateAccountRequest{
 		Username: username,
 		Password: password,
 	})
 	if err != nil {
 		switch err {
-		case auth.ErrInvalidCredentials:
+		case shipgate.ErrInvalidCredentials:
 			return s.sendSecurity(c, packets.BBLoginErrorPassword)
-		case auth.ErrAccountBanned:
+		case shipgate.ErrAccountBanned:
 			return s.sendSecurity(c, packets.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))

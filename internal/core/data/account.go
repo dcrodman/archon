@@ -9,8 +9,7 @@ import (
 
 // Account contains the login information specific to each registered user.
 type Account struct {
-	gorm.Model
-
+	ID               uint64 `gorm:"primaryKey"`
 	Username         string `gorm:"unique; not null"`
 	Password         string `gorm:"not null"`
 	Email            string `gorm:"unique"`
@@ -23,9 +22,23 @@ type Account struct {
 	PrivilegeLevel   byte
 }
 
-// FindAccount searches for an account with the specified username, returning the
+func FindAccountByID(db *gorm.DB, id uint) (*Account, error) {
+	var account Account
+	err := db.First(&account, id).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &account, nil
+}
+
+// FindAccountByUsername searches for an account with the specified username, returning the
 // *Account instance if found or nil if there is no match.
-func FindAccount(username string) (*Account, error) {
+func FindAccountByUsername(db *gorm.DB, username string) (*Account, error) {
 	var account Account
 	err := db.Where("username = ?", username).First(&account).Error
 
@@ -42,7 +55,7 @@ func FindAccount(username string) (*Account, error) {
 // FindUnscopedAccount searches for a potentially soft-deleted account with the
 // specified username, returning the *Account instance if found or nil if
 // there is no match.
-func FindUnscopedAccount(username string) (*Account, error) {
+func FindUnscopedAccount(db *gorm.DB, username string) (*Account, error) {
 	var account Account
 	err := db.Unscoped().Where("username = ?", username).First(&account).Error
 
@@ -57,16 +70,16 @@ func FindUnscopedAccount(username string) (*Account, error) {
 }
 
 // CreateAccount persists the Account record to the database.
-func CreateAccount(account *Account) error {
+func CreateAccount(db *gorm.DB, account *Account) error {
 	return db.Create(account).Error
 }
 
 // DeleteAccount soft-deletes an Account record from the database.
-func DeleteAccount(account *Account) error {
+func DeleteAccount(db *gorm.DB, account *Account) error {
 	return db.Delete(account).Error
 }
 
 // PermanentlyDeleteAccount permanently deletes an Account record from the database.
-func PermanentlyDeleteAccount(account *Account) error {
+func PermanentlyDeleteAccount(db *gorm.DB, account *Account) error {
 	return db.Unscoped().Delete(account).Error
 }

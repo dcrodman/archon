@@ -7,20 +7,57 @@ option go_package = "github.com/dcrodman/archon/internal/shipgate";
 import "internal/core/proto/archon.proto";
 import "google/protobuf/empty.proto";
 
-message ShipList {
-  repeated Ship ships = 1;
+message ShipList { 
+  repeated Ship ships = 1; 
 }
 
-message RegistrationRequest {
+message RegisterShipRequest {
   string name = 1;
   string address = 2;
   string port = 3;
   int32 max_players = 4;
 }
 
-message AccountAuthRequest {
+message AuthenticateAccountRequest {
   string username = 1;
   string password = 2;
+}
+
+message CharacterRequest {
+  uint64 account_id = 1;
+  uint32 slot = 2;
+}
+
+message FindCharacterResponse {
+  bool exists = 1;
+  Character character = 2;
+}
+
+message UpsertCharacterRequest {
+  uint64 account_id = 1;
+  Character character = 2;
+}
+
+message GetGuildcardEntriesRequest {
+  uint64 account_id = 1;
+}
+
+message GetGuildcardEntriesResponse {
+  repeated GuildcardEntry entries = 1;
+}
+
+message GetPlayerOptionsRequest {
+  uint64 account_id = 1;
+}
+
+message GetPlayerOptionsResponse {
+  bool exists = 1;
+  PlayerOptions player_options = 2;
+}
+
+message UpsertPlayerOptionsRequest {
+  uint64 account_id = 1;
+  PlayerOptions player_options = 2;
 }
 
 // ShipgateService provides game functionality and is intended for use by
@@ -28,13 +65,26 @@ message AccountAuthRequest {
 service Shipgate {
   // GetActiveShips returns the list of Ships that currently connected to the
   // shipgate and ready to receive players.
-  rpc GetActiveShips (google.protobuf.Empty) returns (ShipList);
-
+  rpc GetActiveShips(google.protobuf.Empty) returns (ShipList);
   // RegisterShip informs the shipgate that it is able to serve players.
-  rpc RegisterShip(RegistrationRequest) returns (google.protobuf.Empty);
+  rpc RegisterShip(RegisterShipRequest) returns (google.protobuf.Empty);
 
   // AuthenticateAccount verifies an account. A password should be provided
   // via the rpc call metadata.
-  rpc AuthenticateAccount(AccountAuthRequest) returns (Account);
-}
+  rpc AuthenticateAccount(AuthenticateAccountRequest) returns (Account);
 
+  // FindCharacter looks up character in a slot on an account.
+  rpc FindCharacter(CharacterRequest) returns (FindCharacterResponse);
+  // UpsertCharacter creates a new character in a slot on an account.
+  rpc UpsertCharacter(UpsertCharacterRequest) returns (google.protobuf.Empty);
+  // DeleteCharacter deletes the character data in a slot on an account.
+  rpc DeleteCharacter(CharacterRequest) returns (google.protobuf.Empty);
+
+  // GetGuildcardEntires returns the list of guildcards on an account.
+  rpc GetGuildcardEntries(GetGuildcardEntriesRequest) returns (GetGuildcardEntriesResponse);
+
+  // GetPlayerOptions returns the player options tied to an account.
+  rpc GetPlayerOptions(GetPlayerOptionsRequest) returns (GetPlayerOptionsResponse);
+  // GetPlayerOptions updates or creates the player options tied to an account.
+  rpc UpsertPlayerOptions(UpsertPlayerOptionsRequest) returns (google.protobuf.Empty);
+}

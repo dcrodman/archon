@@ -7,12 +7,12 @@ import (
 )
 
 type GuildcardEntry struct {
-	gorm.Model
+	ID uint64 `gorm:"primaryKey"`
 
 	Account   *Account
 	AccountID int
 
-	Guildcard       int
+	Guildcard       uint64
 	FriendGuildcard int
 	Name            []byte
 	TeamName        []byte
@@ -24,9 +24,9 @@ type GuildcardEntry struct {
 }
 
 // FindGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
-func FindGuildcardEntries(account *Account) ([]GuildcardEntry, error) {
+func FindGuildcardEntries(db *gorm.DB, accountId uint64) ([]GuildcardEntry, error) {
 	var guildcardEntries []GuildcardEntry
-	err := db.Where("account_id = ?", &account.ID).Find(&guildcardEntries).Error
+	err := db.Where("account_id = ?", accountId).Find(&guildcardEntries).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

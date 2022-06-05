@@ -81,6 +81,8 @@ block_server:
 debugging:
   # Enable extra info-providing mechanisms for the server. Only enable for development.
   enabled: false
+  # Enable database-level query logging.
+  database_logging_enabled: false
   # For use with the packet_analyzer command (see cmd.packet_analyzer).
   packet_analyzer_address: "localhost:8081"
   # Port on which a pprof server will be started if debug mode is enabled.

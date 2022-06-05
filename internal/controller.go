@@ -10,7 +10,6 @@ import (
 	"github.com/dcrodman/archon/internal/block"
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/core"
-	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/login"
 	"github.com/dcrodman/archon/internal/patch"
@@ -41,13 +40,6 @@ func (c *Controller) Start(ctx context.Context) {
 		c.logger.Errorf("error initializing logger: %v", err)
 		return
 	}
-
-	// Connect to the database.
-	if err := data.Initialize(c.Config.DatabaseURL(), c.Config.Debugging.Enabled); err != nil {
-		c.logger.Errorf("error initializing database connection: %v", err)
-		return
-	}
-	c.logger.Infof("connected to database %s:%d", c.Config.Database.Host, c.Config.Database.Port)
 
 	// Start any debug utilities if we're configured to do so.
 	if c.Config.Debugging.Enabled {
@@ -159,10 +151,6 @@ func (c *Controller) buildAddress(port int) string {
 }
 
 func (c *Controller) Shutdown(ctx context.Context) {
-	if err := data.Shutdown(); err != nil {
-		c.logger.Error(err)
-	}
-
 	// Stop the shipgate after all of the other servers have stopped in order to avoid
 	// errors from any shipgate calls during the shutdown process.
 	c.wg.Wait()
