@@ -40,7 +40,6 @@ type BankItem struct {
 }
 
 // FullCharacter is the full dataset for one character.
-// TODO: Someday, figure out what more of these fields do.
 type FullCharacter struct {
 	Header                BBHeader
 	NumInventoryItems     uint8

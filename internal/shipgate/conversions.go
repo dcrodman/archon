@@ -5,12 +5,11 @@ import (
 	"github.com/dcrodman/archon/internal/core/proto"
 )
 
-// TODO: Can IDs be removed from proto output?
-// TODO: Guildcards + names can probably just be straight assignments? (make player options consistent)
 func characterToProto(character *data.Character) *proto.Character {
 	protoCharacter := &proto.Character{
+		Id:                character.ID,
 		Guildcard:         uint64(character.Guildcard),
-		GuildcardStr:      make([]byte, len(character.GuildcardStr)),
+		GuildcardStr:      character.GuildcardStr,
 		Slot:              character.Slot,
 		Experience:        character.Experience,
 		Level:             character.Level,
@@ -32,7 +31,7 @@ func characterToProto(character *data.Character) *proto.Character {
 		HairBlue:          uint32(character.HairBlue),
 		ProportionX:       character.ProportionX,
 		ProportionY:       character.ProportionY,
-		Name:              make([]byte, len(character.Name)),
+		Name:              character.Name,
 		ReadableName:      character.ReadableName,
 		Playtime:          character.Playtime,
 		Atp:               uint32(character.ATP),
@@ -44,15 +43,13 @@ func characterToProto(character *data.Character) *proto.Character {
 		Lck:               uint32(character.LCK),
 		Meseta:            character.Meseta,
 	}
-	copy(protoCharacter.GuildcardStr, character.GuildcardStr)
-	copy(protoCharacter.Name, character.Name)
 	return protoCharacter
 }
 
 func characterFromProto(character *proto.Character) *data.Character {
 	dbCharacter := &data.Character{
 		Guildcard:         character.Guildcard,
-		GuildcardStr:      make([]byte, len(character.GuildcardStr)),
+		GuildcardStr:      character.GuildcardStr,
 		Slot:              character.Slot,
 		Experience:        character.Experience,
 		Level:             character.Level,
@@ -75,7 +72,7 @@ func characterFromProto(character *proto.Character) *data.Character {
 		ProportionX:       character.ProportionX,
 		ProportionY:       character.ProportionY,
 		ReadableName:      character.ReadableName,
-		Name:              make([]byte, len(character.Name)),
+		Name:              character.Name,
 		Playtime:          character.Playtime,
 		ATP:               uint16(character.Atp),
 		MST:               uint16(character.Mst),
@@ -86,8 +83,6 @@ func characterFromProto(character *proto.Character) *data.Character {
 		LCK:               uint16(character.Lck),
 		Meseta:            character.Meseta,
 	}
-	copy(dbCharacter.GuildcardStr, character.GuildcardStr)
-	copy(dbCharacter.Name, character.Name)
 	return dbCharacter
 }
 
@@ -107,6 +102,7 @@ func guildcardEntryToProto(gcEntry *data.GuildcardEntry) *proto.GuildcardEntry {
 
 func playerOptionsToProto(playerOptions *data.PlayerOptions) *proto.PlayerOptions {
 	return &proto.PlayerOptions{
+		Id:        uint32(playerOptions.ID),
 		KeyConfig: playerOptions.KeyConfig,
 	}
 }

@@ -12,7 +12,6 @@ message Ship {
   int32 player_count = 5;
 }
 
-// TODO: Can IDs be removed?
 message Account {
   uint64 id = 1;
   string username = 2;
