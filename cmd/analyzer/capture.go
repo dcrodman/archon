@@ -14,13 +14,45 @@ import (
 	"syscall"
 	"time"
 	"unicode"
+
+	"github.com/spf13/cobra"
 )
 
-// SessionFile represents the file format of the persisted session data.
-type SessionFile struct {
-	SessionID string
-	Packets   []Packet
+var (
+	captureCmd = &cobra.Command{
+		Use:   "capture",
+		Short: "Captures and records packets from a PSOBB server",
+		Run: func(cmd *cobra.Command, args []string) {
+			startCapturing()
+		},
+	}
+
+	address  string
+	httpPort int
+	tcpPort  int
+	uiPort   int
+	auto     bool
+	include  string
+	folder   string
+)
+
+func init() {
+	rootCmd.AddCommand(captureCmd)
+	rootCmd.Flags().StringVar(&address, "host", "0.0.0.0", "Address and port on which to bind")
+	rootCmd.Flags().IntVar(&httpPort, "http", 8081, "Port on which the HTTP service should listen")
+	rootCmd.Flags().IntVar(&tcpPort, "tcp", 8082, "Port on which the raw TCP service should listen")
+	rootCmd.Flags().IntVar(&uiPort, "ui", 0, "Port on which HTTP UI server (disabled by default)")
+	rootCmd.Flags().BoolVar(&auto, "auto", false, "Automatically runs both compact and summarize on generated session file")
+	rootCmd.Flags().StringVar(&include, "include", "", "Delimited list of session names to capture")
+	rootCmd.Flags().StringVar(&folder, "folder", "", "Folder to which the resulting session files will be written")
 }
+
+var (
+	// Mapping of server names to channels of PacketRequests acting as queues.
+	packetChannels = make(map[string]chan *PacketRequest)
+	// Mapping of server names to the ordered packets.
+	packetQueues = make(map[string][]Packet)
+)
 
 // HTTP request from the server implementations containing the packet data.
 type PacketRequest struct {
@@ -38,24 +70,41 @@ type PacketRequest struct {
 	Timestamp time.Time
 }
 
-var (
-	// Mapping of server names to channels of PacketRequests acting as queues.
-	packetChannels = make(map[string]chan *PacketRequest)
-	// Mapping of server names to the ordered packets.
-	packetQueues = make(map[string][]Packet)
-)
+// Packet is this tool's representation of a packet received from a server.
+type Packet struct {
+	Source      string
+	Destination string
+
+	Type string
+	Size string
+
+	Contents          []int
+	PrintableContents []string
+
+	Timestamp time.Time
+}
+
+// SessionFile represents the file format of the persisted session data.
+type SessionFile struct {
+	SessionID string
+	Packets   []Packet
+}
 
 // startCapturing spins up an HTTP handler to await packet submissions from one
 // or more running servers. On exit it will write the contents of each session
 // to a file for you to do what you will.
 func startCapturing() {
+	if uiPort > 0 {
+		go startManageServer(address, uiPort)
+	}
+
 	// Register a signal handler to dump the packet lists before exiting.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGABRT, syscall.SIGTERM)
-	go captureExitHandler(signalChan, *folder, *auto)
+	go captureExitHandler(signalChan, folder, auto)
 
-	go listenForTCPPackets(*address, *tcpPort)
-	listenForHTTPPackets(*address, *httpPort)
+	go listenForTCPPackets(address, tcpPort)
+	listenForHTTPPackets(address, httpPort)
 }
 
 func captureExitHandler(c chan os.Signal, folder string, auto bool) {
@@ -165,7 +214,7 @@ func recordPacket(p *PacketRequest) {
 	channelKey := key(p.ServerName, p.SessionID)
 	pc, ok := packetChannels[channelKey]
 
-	if *include != "" && !strings.Contains(*include, p.SessionID) {
+	if include != "" && !strings.Contains(include, p.SessionID) {
 		return
 	}
 

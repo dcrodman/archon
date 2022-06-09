@@ -9,16 +9,26 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
+
+var compactCmd = &cobra.Command{
+	Use:   "compact",
+	Short: "Generates a human-readable view of the session files",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		compactFiles()
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(compactCmd)
+}
 
 const PacketLineLength = 16
 
 func compactFiles() {
-	if flag.NArg() < 2 {
-		fmt.Println("usage: compact [file.session...]")
-		return
-	}
-
 	for i := 1; i < flag.NArg(); i++ {
 		sessionFile := flag.Arg(i)
 		compact, err := compactSession(sessionFile)

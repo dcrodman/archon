@@ -6,14 +6,24 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
-func summarizeFiles() {
-	if flag.NArg() == 0 {
-		fmt.Println("usage: summarize [file.session...]")
-		return
-	}
+var summarizeCmd = &cobra.Command{
+	Use:   "summarize",
+	Short: "Generates a shortened, human-readable view of the session files",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		summarizeFiles()
+	},
+}
 
+func init() {
+	rootCmd.AddCommand(summarizeCmd)
+}
+
+func summarizeFiles() {
 	for i := 0; i < flag.NArg(); i++ {
 		sessionFilename := flag.Arg(i)
 		sum, err := summarizeSession(sessionFilename)

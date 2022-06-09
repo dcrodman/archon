@@ -55,9 +55,9 @@ services:
       context: .
     command:
       - /usr/bin/analyzer
-      - -folder=sessions
-      - -ui=8083
-      - -auto
+      - --folder=sessions
+      - --ui=8083
+      - --auto
     environment:
       ARCHON_DEBUGGING_ENABLED: "true"
       ARCHON_PACKET_ANALYZER_ADDRESS: packet_analyzer:8081
