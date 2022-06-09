@@ -38,13 +38,13 @@ var (
 
 func init() {
 	rootCmd.AddCommand(captureCmd)
-	rootCmd.Flags().StringVar(&address, "host", "0.0.0.0", "Address and port on which to bind")
-	rootCmd.Flags().IntVar(&httpPort, "http", 8081, "Port on which the HTTP service should listen")
-	rootCmd.Flags().IntVar(&tcpPort, "tcp", 8082, "Port on which the raw TCP service should listen")
-	rootCmd.Flags().IntVar(&uiPort, "ui", 0, "Port on which HTTP UI server (disabled by default)")
-	rootCmd.Flags().BoolVar(&auto, "auto", false, "Automatically runs both compact and summarize on generated session file")
-	rootCmd.Flags().StringVar(&include, "include", "", "Delimited list of session names to capture")
-	rootCmd.Flags().StringVar(&folder, "folder", "", "Folder to which the resulting session files will be written")
+	captureCmd.Flags().StringVar(&address, "host", "0.0.0.0", "Address and port on which to bind")
+	captureCmd.Flags().IntVar(&httpPort, "http", 8081, "Port on which the HTTP service should listen")
+	captureCmd.Flags().IntVar(&tcpPort, "tcp", 8082, "Port on which the raw TCP service should listen")
+	captureCmd.Flags().IntVar(&uiPort, "ui", 0, "Port on which HTTP UI server (disabled by default)")
+	captureCmd.Flags().BoolVar(&auto, "auto", false, "Automatically runs both compact and summarize on generated session file")
+	captureCmd.Flags().StringVar(&include, "include", "", "Delimited list of session names to capture")
+	captureCmd.Flags().StringVar(&folder, "folder", "", "Folder to which the resulting session files will be written")
 }
 
 var (

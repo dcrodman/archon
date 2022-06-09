@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -15,7 +14,7 @@ var summarizeCmd = &cobra.Command{
 	Short: "Generates a shortened, human-readable view of the session files",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		summarizeFiles()
+		summarizeFiles(args)
 	},
 }
 
@@ -23,9 +22,8 @@ func init() {
 	rootCmd.AddCommand(summarizeCmd)
 }
 
-func summarizeFiles() {
-	for i := 0; i < flag.NArg(); i++ {
-		sessionFilename := flag.Arg(i)
+func summarizeFiles(args []string) {
+	for _, sessionFilename := range args {
 		sum, err := summarizeSession(sessionFilename)
 		if err != nil {
 			fmt.Printf("unable to generate summary for session %s: %s\n", sessionFilename, err)

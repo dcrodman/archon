@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,7 +17,7 @@ var compactCmd = &cobra.Command{
 	Short: "Generates a human-readable view of the session files",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		compactFiles()
+		compactFiles(args)
 	},
 }
 
@@ -28,9 +27,8 @@ func init() {
 
 const PacketLineLength = 16
 
-func compactFiles() {
-	for i := 1; i < flag.NArg(); i++ {
-		sessionFile := flag.Arg(i)
+func compactFiles(args []string) {
+	for _, sessionFile := range args {
 		compact, err := compactSession(sessionFile)
 		if err != nil {
 			fmt.Printf("unable to compact session %s: %s\n", sessionFile, err)
