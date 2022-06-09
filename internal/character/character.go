@@ -610,20 +610,7 @@ func (s *Server) handleCharacterUpdate(ctx context.Context, c *client.Client, ch
 			Lck:               uint32(stats.LCK),
 			Meseta:            StartingMeseta,
 		}
-
-		// The string is UTF-16LE encoded and it needs to be converted from []uint8 to
-		// a []uint16 slice with the bytes reversed.
-		// Also drops what is presumably the language code (0x09006900) off of the front.
-		cleanedName := p.Name[4:]
-		utfName := make([]uint16, 0)
-		for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
-			if cleanedName[i]|cleanedName[i+1] == 0 {
-				break
-			}
-			utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
-			j++
-		}
-		newCharacter.ReadableName = string(utf16.Decode(utfName))
+		newCharacter.ReadableName = convertReadableName(p.Name[:])
 
 		// TODO: Add the rest of these.
 		//--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
@@ -640,6 +627,22 @@ func (s *Server) handleCharacterUpdate(ctx context.Context, c *client.Client, ch
 
 	c.Config.SlotNum = uint8(charPkt.Slot)
 	return s.sendCharacterAck(c, charPkt.Slot, 0)
+}
+
+func convertReadableName(name []uint8) string {
+	// The string is UTF-16LE encoded; convert it from from []uint8 to a []uint16
+	// slice with the bytes reversed and drops the language code prefix (0x09006900).
+	cleanedName := name[4:]
+	utfName := make([]uint16, 0)
+	for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
+		if cleanedName[i]|cleanedName[i+1] == 0 {
+			break
+		}
+		utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
+		j++
+	}
+
+	return string(utf16.Decode(utfName))
 }
 
 func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
@@ -669,8 +672,8 @@ func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *pac
 		return fmt.Errorf("character does not exist in slot %d for guildcard %d", pkt.Slot, c.Guildcard)
 	}
 
-	character := resp.Character
 	pc := pkt.Character
+	character := resp.Character
 	character.NameColor = pc.NameColor
 	character.ModelType = int32(pc.Model)
 	character.NameColorChecksum = pc.NameColorChksm
@@ -685,18 +688,7 @@ func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *pac
 	character.ProportionX = pc.PropX
 	character.ProportionY = pc.PropY
 	character.Name = pc.Name[:]
-
-	// TODO: duplicated with the above; make this better.
-	cleanedName := pc.Name[4:]
-	utfName := make([]uint16, 0)
-	for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
-		if cleanedName[i]|cleanedName[i+1] == 0 {
-			break
-		}
-		utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
-		j++
-	}
-	character.ReadableName = string(utf16.Decode(utfName))
+	character.ReadableName = convertReadableName(pc.Name[:])
 
 	_, err = s.shipgateClient.UpsertCharacter(ctx, &shipgate.UpsertCharacterRequest{
 		AccountId: c.Account.Id,
