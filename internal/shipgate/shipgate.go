@@ -65,7 +65,7 @@ func (s *Server) Start(ctx context.Context) {
 			s.Logger.Errorf("error initializing database connection: %v", err)
 			return
 		}
-		s.Logger.Infof("connected to database %s:%d", s.Config.Database.Host, s.Config.Database.Port)
+		s.Logger.Infof("[SHIPGATE] connected to database %s:%d", s.Config.Database.Host, s.Config.Database.Port)
 
 		// Set up and start the HTTP handler for handling the RPC requests.
 		s.httpServer = http.Server{

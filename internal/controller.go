@@ -3,7 +3,9 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -52,6 +54,28 @@ func (c *Controller) Start(ctx context.Context) {
 	// Start the shipgate RPC service and make sure it launches before the other servers start.
 	c.shipgateServer = &shipgate.Server{Config: c.Config, Logger: c.logger}
 	c.shipgateServer.Start(ctx)
+
+	shipgateAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", c.Config.ShipgateServer.Port))
+	if err != nil {
+		c.logger.Errorf("error resolving shipgate address: %v", err)
+		return
+	}
+	t := time.NewTimer(30 * time.Second)
+	for {
+		select {
+		case <-t.C:
+			c.logger.Errorf("timed out waiting for shipgate to initialize")
+			return
+		default:
+		}
+
+		conn, err := net.DialTCP("tcp", nil, shipgateAddr)
+		if err == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(time.Second)
+	}
 
 	// Configure and run all of our servers.
 	c.declareServers()
