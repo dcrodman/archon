@@ -328,7 +328,8 @@ func (s *Server) handleOptionsRequest(ctx context.Context, c *client.Client) err
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
 
 		if _, err = s.shipgateClient.UpsertPlayerOptions(ctx, &shipgate.UpsertPlayerOptionsRequest{
-			AccountId:     c.Account.Id,
+			AccountId: c.Account.Id,
+
 			PlayerOptions: playerOptions,
 		}); err != nil {
 			return fmt.Errorf("error creating player options: %w", err)

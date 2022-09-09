@@ -208,7 +208,9 @@ func (s *service) UpsertPlayerOptions(ctx context.Context, req *UpsertPlayerOpti
 	s.logger.Debug("UpsertPlayerOptions")
 
 	playerOptions := playerOptionsFromProto(req.PlayerOptions)
-	playerOptions.Account.ID = req.AccountId
+	playerOptions.Account = &data.Account{
+		ID: req.AccountId,
+	}
 	if err := data.CreatePlayerOptions(s.db, playerOptions); err != nil {
 		return nil, fmt.Errorf("error creating player options: %v", err)
 	}
