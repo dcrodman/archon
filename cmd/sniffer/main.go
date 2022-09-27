@@ -10,19 +10,45 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-var device = flag.String("d", "en0", "Device on which to listen for packets")
+var (
+	list   = flag.Bool("l", false, "List devices")
+	device = flag.String("d", "en0", "Device on which to listen for packets")
+)
 
 func main() {
-	deviceIP := getDeviceIP()
-	if deviceIP == "" {
-		exit("invalid device: ", *device)
+	flag.Parse()
+
+	// Get a handle to the network interface, or just list them out.
+	var deviceIP string
+	devs, err := pcap.FindAllDevs()
+	if err != nil {
+		exit("error finding devices: %v", err)
+	}
+	for _, dev := range devs {
+		if dev.Name == *device {
+			for _, address := range dev.Addresses {
+				deviceIP = address.IP.String()
+				break
+			}
+		}
+		if *list {
+			fmt.Println(dev.Name)
+		}
+	}
+	if *list {
+		return
+	} else if deviceIP == "" {
+		exit("unrecognized device: %s", *device)
 	}
 
+	// Open the interface for capture.
 	handle, err := pcap.OpenLive(*device, math.MaxInt32, false, pcap.BlockForever)
 	if err != nil {
 		exit("error opening handle: %v", err)
 	}
-	_ = handle.SetBPFFilter("tcp and not port 443 and not port 80")
+	if err := handle.SetBPFFilter("tcp and not port 443 and not port 80"); err != nil {
+		exit("error setting BPF filter: %s", err)
+	}
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
@@ -34,18 +60,6 @@ func main() {
 }
 
 func exit(format string, args ...interface{}) {
-	fmt.Printf(format, args, "\n")
+	fmt.Printf(format+"\n", args)
 	os.Exit(1)
-}
-
-func getDeviceIP() string {
-	devs, _ := pcap.FindAllDevs()
-	for _, dev := range devs {
-		if dev.Name == *device {
-			for _, address := range dev.Addresses {
-				return address.IP.String()
-			}
-		}
-	}
-	return ""
 }
