@@ -26,7 +26,11 @@ type PSOCrypt struct {
 // Returns a newly allocated PSOCrypt with randomly generated, appropriately
 // sized keys for encrypting packets over PSOPC connections.
 func NewPCCrypt() *PSOCrypt {
-	crypt := &PSOCrypt{Vector: createKey(4)}
+	return NewPCCryptWithVector(createKey(4))
+}
+
+func NewPCCryptWithVector(vector []uint8) *PSOCrypt {
+	crypt := &PSOCrypt{Vector: vector}
 	var err error
 
 	if crypt.cipher, err = newPCCipher(crypt.Vector); err != nil {
@@ -39,7 +43,11 @@ func NewPCCrypt() *PSOCrypt {
 // Returns a newly allocated PSOCrypt with randomly generated, appropriately
 // sized keys for encrypting packets over PSOBB connections.
 func NewBBCrypt() *PSOCrypt {
-	crypt := &PSOCrypt{Vector: createKey(48)}
+	return NewBBCryptWithVector(createKey(48))
+}
+
+func NewBBCryptWithVector(vector []uint8) *PSOCrypt {
+	crypt := &PSOCrypt{Vector: vector}
 	var err error
 
 	if crypt.cipher, err = newCipher(crypt.Vector); err != nil {

@@ -62,6 +62,10 @@ func startSniffer() {
 		exit("error setting BPF filter: %s", err)
 	}
 
+	packetChan := make(chan gopacket.Packet)
+	sniffer := &sniffer{}
+	go sniffer.startIngesting(packetChan)
+
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
 		if err != nil {
@@ -70,9 +74,7 @@ func startSniffer() {
 
 		// We don't care about the TCP handshake packets or anything lower level than layer 4.
 		if packet.ApplicationLayer() != nil {
-			flow := packet.TransportLayer().TransportFlow()
-			fmt.Printf("source: %v, destination: %v\n", flow.Src(), flow.Dst())
-			fmt.Println(packet.Dump())
+			packetChan <- packet
 		}
 	}
 }
