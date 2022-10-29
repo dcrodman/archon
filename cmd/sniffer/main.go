@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"math"
@@ -11,7 +12,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-const defaultFilter = "tcp portrange 11000-11001"
+const defaultFilter = "tcp portrange 11000-11002 or tcp portrange 12001-12003 or tcp portrange 15000-15003 or tcp portrange 5278-5290"
 
 var (
 	list   = flag.Bool("l", false, "List devices")
@@ -63,7 +64,9 @@ func startSniffer() {
 	}
 
 	packetChan := make(chan gopacket.Packet)
-	sniffer := &sniffer{}
+	sniffer := &sniffer{
+		Writer: bufio.NewWriter(os.Stdout),
+	}
 	go sniffer.startIngesting(packetChan)
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
