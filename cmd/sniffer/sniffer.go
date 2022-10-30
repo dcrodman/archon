@@ -54,7 +54,7 @@ type sniffer struct {
 	ciphers map[ServerType]CipherPair
 }
 
-func (s *sniffer) startIngesting(packetChan chan gopacket.Packet) {
+func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 	s.ciphers = make(map[ServerType]CipherPair)
 
 	for packet := range packetChan {

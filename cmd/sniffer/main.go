@@ -18,6 +18,7 @@ var (
 	list   = flag.Bool("l", false, "List devices")
 	device = flag.String("d", "en0", "Device on which to listen for packets")
 	filter = flag.String("f", defaultFilter, "BPF packet filter to apply")
+	output = flag.String("o", "", "File to which to output logs (default stdout")
 )
 
 func main() {
@@ -63,11 +64,18 @@ func startSniffer() {
 		exit("error setting BPF filter: %s", err)
 	}
 
-	packetChan := make(chan gopacket.Packet)
-	sniffer := &sniffer{
-		Writer: bufio.NewWriter(os.Stdout),
+	outputFile := bufio.NewWriter(os.Stdout)
+	if *output != "" {
+		f, err := os.OpenFile(*output, os.O_CREATE, 0666)
+		if err != nil {
+			exit("error opening file for output: %v", err)
+		}
+		outputFile = bufio.NewWriter(f)
 	}
-	go sniffer.startIngesting(packetChan)
+
+	sniffer := &sniffer{Writer: outputFile}
+	packetChan := make(chan gopacket.Packet)
+	go sniffer.startReading(packetChan)
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
