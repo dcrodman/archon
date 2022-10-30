@@ -63,7 +63,7 @@ func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 		dstPort := binary.BigEndian.Uint16(flow.Dst().Raw())
 		data := packet.ApplicationLayer().Payload()
 
-		clientPacket, server := getPacketType(srcPort, dstPort)
+		clientPacket, server := getServerType(srcPort, dstPort)
 		s.handlePacket(server, clientPacket, data)
 	}
 }
@@ -71,7 +71,7 @@ func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 // Guesses the server type based on the sender of the packet and what ports the
 // packet was sent between. Also returns whether or not this packet was sent
 // by the client.
-func getPacketType(srcPort, dstPort uint16) (bool, ServerType) {
+func getServerType(srcPort, dstPort uint16) (bool, ServerType) {
 	if server, ok := serverPorts[dstPort]; ok {
 		return true, server
 	}
@@ -104,12 +104,11 @@ func (s *sniffer) handlePacket(server ServerType, clientPacket bool, data []byte
 		}
 	default:
 		// Anything else is meaningless since it's encrypted, so decrypt it
-		// and read the hader again.
+		// and read the hader again. Choose which cipher to use depending on
+		// which side sent it since they're different vectors.
 		if clientPacket {
-			// Decrypt the packet with our client cipher.
 			s.ciphers[server].clientCrypt.Decrypt(data, uint32(len(data)))
 		} else {
-			// Decrypt the packet with our server cipher.
 			s.ciphers[server].serverCrypt.Decrypt(data, uint32(len(data)))
 		}
 		bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
@@ -170,7 +169,6 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 			j = 0
 			// line.WriteString("  ")
 		}
-
 		line.WriteString(fmt.Sprintf("%02x ", data[i]))
 		j++
 	}
