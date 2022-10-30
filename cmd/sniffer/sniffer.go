@@ -43,21 +43,21 @@ var serverPorts = map[uint16]ServerType{
 	5280: BLOCK_SERVER,
 }
 
-type sniffer struct {
-	Writer *bufio.Writer
-
-	patchClientCrypt *encryption.PSOCrypt
-	patchServerCrypt *encryption.PSOCrypt
-
+type CipherPair struct {
 	clientCrypt *encryption.PSOCrypt
 	serverCrypt *encryption.PSOCrypt
 }
 
-func (s *sniffer) startIngesting(packetChan chan gopacket.Packet) {
-	// for packet := range packetChan {
-	for i := 0; i < 10; i++ {
-		packet := <-packetChan
+type sniffer struct {
+	Writer *bufio.Writer
 
+	ciphers map[ServerType]CipherPair
+}
+
+func (s *sniffer) startIngesting(packetChan chan gopacket.Packet) {
+	s.ciphers = make(map[ServerType]CipherPair)
+
+	for packet := range packetChan {
 		flow := packet.TransportLayer().TransportFlow()
 		srcPort := binary.BigEndian.Uint16(flow.Src().Raw())
 		dstPort := binary.BigEndian.Uint16(flow.Dst().Raw())
@@ -82,33 +82,42 @@ func getPacketType(srcPort, dstPort uint16) (bool, ServerType) {
 }
 
 func (s *sniffer) handlePacket(server ServerType, clientPacket bool, data []byte) {
-	fmt.Printf("server: %v\n", server)
-	decrypt := true
-	// Make sure we've initialized our encryption vectors.
-	if (server == PATCH_SERVER || server == DATA_SERVER) && s.patchClientCrypt == nil {
-		var welcomePacket packets.PatchWelcome
-		bytes.StructFromBytes(data, &welcomePacket)
-		s.patchClientCrypt = encryption.NewPCCryptWithVector(welcomePacket.ClientVector[:])
-		s.patchServerCrypt = encryption.NewPCCryptWithVector(welcomePacket.ServerVector[:])
-		decrypt = false
-	} else if (server != PATCH_SERVER && server != DATA_SERVER) && s.clientCrypt == nil {
-		var welcomePacket packets.Welcome
-		bytes.StructFromBytes(data, &welcomePacket)
-		s.clientCrypt = encryption.NewBBCryptWithVector(welcomePacket.ClientVector[:])
-		s.serverCrypt = encryption.NewBBCryptWithVector(welcomePacket.ServerVector[:])
-		decrypt = false
-	}
-
-	if decrypt {
-		s.decryptData(server, clientPacket, data)
-	}
-	// Extract the header so that we know what type and how large it is.
+	// Peek at the header
 	var header packets.PCHeader
 	bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
 
+	// Any time we see a welcome packet, initialize a new set of ciphers for the corresponding server.
+	switch header.Type {
+	case packets.PatchWelcomeType:
+		var welcomePacket packets.PatchWelcome
+		bytes.StructFromBytes(data, &welcomePacket)
+		s.ciphers[server] = CipherPair{
+			clientCrypt: encryption.NewPCCryptWithVector(welcomePacket.ClientVector[:]),
+			serverCrypt: encryption.NewPCCryptWithVector(welcomePacket.ServerVector[:]),
+		}
+	case packets.LoginWelcomeType:
+		var welcomePacket packets.Welcome
+		bytes.StructFromBytes(data, &welcomePacket)
+		s.ciphers[server] = CipherPair{
+			clientCrypt: encryption.NewBBCryptWithVector(welcomePacket.ClientVector[:]),
+			serverCrypt: encryption.NewBBCryptWithVector(welcomePacket.ServerVector[:]),
+		}
+	default:
+		// Anything else is meaningless since it's encrypted, so decrypt it
+		// and read the hader again.
+		if clientPacket {
+			// Decrypt the packet with our client cipher.
+			s.ciphers[server].clientCrypt.Decrypt(data, uint32(len(data)))
+		} else {
+			// Decrypt the packet with our server cipher.
+			s.ciphers[server].serverCrypt.Decrypt(data, uint32(len(data)))
+		}
+		bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
+	}
+
 	// Write a header line for each packet with some metadata.
 	var headerLine strings.Builder
-	headerLine.WriteString(fmt.Sprintf("[%s] 0x%02x ", string(server), header.Type))
+	headerLine.WriteString(fmt.Sprintf("[%s] 0x%02X ", string(server), header.Type))
 	headerLine.WriteString(fmt.Sprintf("(?) "))
 	if clientPacket {
 		headerLine.WriteString("| client->server ")
@@ -128,26 +137,6 @@ func (s *sniffer) handlePacket(server ServerType, clientPacket bool, data []byte
 	}
 	s.Writer.WriteString("\n")
 	s.Writer.Flush()
-}
-
-func (s *sniffer) decryptData(server ServerType, clientPacket bool, data []byte) {
-	if server == PATCH_SERVER || server == DATA_SERVER {
-		if clientPacket {
-			// Decrypt the packet with our client cipher.
-			s.patchClientCrypt.Decrypt(data, uint32(len(data)))
-		} else {
-			// Decrypt the packet with our server cipher.
-			s.patchServerCrypt.Decrypt(data, uint32(len(data)))
-		}
-	} else {
-		if clientPacket {
-			// Decrypt the packet with our client cipher.
-			s.clientCrypt.Decrypt(data, uint32(len(data)))
-		} else {
-			// Decrypt the packet with our server cipher.
-			s.serverCrypt.Decrypt(data, uint32(len(data)))
-		}
-	}
 }
 
 func (s *sniffer) writePacketBodyToFile(data []byte) error {
