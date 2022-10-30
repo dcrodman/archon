@@ -118,7 +118,7 @@ func (s *sniffer) handlePacket(server ServerType, clientPacket bool, data []byte
 	// Write a header line for each packet with some metadata.
 	var headerLine strings.Builder
 	headerLine.WriteString(fmt.Sprintf("[%s] 0x%02X ", string(server), header.Type))
-	headerLine.WriteString(fmt.Sprintf("(?) "))
+	headerLine.WriteString(fmt.Sprintf("(%s) ", getPacketName(server, header.Type)))
 	if clientPacket {
 		headerLine.WriteString("| client->server ")
 	} else {
