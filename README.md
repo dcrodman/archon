@@ -17,23 +17,19 @@ whose servers I'm studying as I write Archon.
 This is a long running project that I work on when I have time, which is pretty sporadic
 given how time-intensive this endeavor is. That said, forks, bug fixes, issue reports,
 explanations of some of the client's bizarre behavior, questions, etc. are welcome to
-help move things along. If you'd like to get involved, the
-[Developer's Guide](https://github.com/dcrodman/archon/wiki/Developer's-Guide) is a good
-place to start.
+help move things along. Some starter information can be found in CONTRIBUTING.md.
 
 * [Installation](#Installation)
+* [Running in Docker](#running-in-docker)
 * [Setup Script](#setup-script)
 * [Manual Installation](#manual-installation)
-* [Running in Docker](#running-in-docker)
-* [Administration](#administration)
-  + [Updating the server](#updating-the-server)
 
 ## Installation
 
 There are three ways to set up the server:
 - using the setup script
-- manually
 - running the server in docker
+- manually
 
 Most people will want to use the setup script, which just automates the manual installation
 process. However if you'd prefer to test the server in an isolated environment or prefer to
@@ -68,6 +64,27 @@ If the install-path is omitted, the setup script will install to:
 The script will guide you through the initial server configuration as well as prompt for credentials for the first PSO
 account. Once the setup is complete, the script will provide additional configuration scripts, and a command to run the
 server.
+
+## Running in Docker
+
+### Docker Prerequisites:
+* [Docker](https://www.docker.com)
+* Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
+
+### How-to
+
+Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
+
+There are 4 services available in current docker-compose version:
+- `postgres` - PostgreSQL database with initial DB and tables created via script
+- `account` - account tool which creates initial account for login (can be disabled or commented out if not needed)
+- `server` - actual server running on 127.0.0.1 with PSO ports exposed
+- `analyzer` - the packet_analyzer tool
+
+In the dockerized setup, the server is running the same commands as in the manual setup.
+
+\* Note: Once the account service runs successfully, it will fail on subsequent runs.
+
 
 ## Manual Installation
 
@@ -198,40 +215,3 @@ The moment of truth; run the server by running this from your server directory:
 
 If everything's been configured correctly, you should get a bunch of messages about the different
 sub-servers waiting for connections on the configured ports.
-
-## Running in Docker
-
-### Docker Prerequisites:
-* [Docker](https://www.docker.com)
-* Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
-
-### How-to
-
-Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
-
-There are 4 services available in current docker-compose version:
-- `postgres` - PostgreSQL database with initial DB and tables created via script
-- `account` - account tool which creates initial account for login (can be disabled or commented out if not needed)
-- `server` - actual server running on 127.0.0.1 with PSO ports exposed
-- `analyzer` - the packet_analyzer tool
-
-In the dockerized setup, the server is running the same commands as in the manual setup.
-
-\* Note: Once the account service runs successfully, it will fail on subsequent runs.
-
-## Administration
-
-### Updating the server
-
-While individual commits may at points break `master`, the current HEAD of `master` should at all
-times reference a fully functioning server. It should generally be safe to update your version by
-doing the following:
-
-    cd path-to-cloned-code
-    git pull
-    make build
-    cp bin/* your-server-directory
-
-At the time of writing Archon doesn't yet have a recommended way of doing a no-downtime upgrade.
-There are ways to mitigate this (like running a script to do this when nobody is connected) but
-for now this is up to server admins to work out what works for them.
