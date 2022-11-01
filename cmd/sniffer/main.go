@@ -18,7 +18,7 @@ var (
 	list   = flag.Bool("l", false, "List devices")
 	device = flag.String("d", "en0", "Device on which to listen for packets")
 	filter = flag.String("f", defaultFilter, "BPF packet filter to apply")
-	output = flag.String("o", "", "File to which to output logs (default stdout")
+	output = flag.String("o", "", "File to which to output logs (default stdout)")
 )
 
 func main() {

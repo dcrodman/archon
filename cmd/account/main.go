@@ -30,6 +30,9 @@ func main() {
 
 	cfg := core.LoadConfig(*config)
 	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL()))
+	if err != nil {
+		os.Exit(1)
+	}
 
 	// defer so os.Exit doesn't prevent our clean up.
 	retCode := 0

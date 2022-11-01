@@ -5,9 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	ioutil "io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -28,7 +28,7 @@ func NewRPCClient(cfg *core.Config) Shipgate {
 	}
 
 	// Load CA cert
-	caCert, err := ioutil.ReadFile(cfg.ShipgateCertFile)
+	caCert, err := os.ReadFile(cfg.ShipgateCertFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +40,6 @@ func NewRPCClient(cfg *core.Config) Shipgate {
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
 	}
-	tlsConfig.BuildNameToCertificate()
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,

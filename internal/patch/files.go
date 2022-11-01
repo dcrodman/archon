@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -110,7 +109,7 @@ func buildPatchFileTree(logger *logrus.Logger, rootNode *directoryNode) error {
 		currentNode := directories[0]
 		directories = directories[1:]
 
-		files, err := ioutil.ReadDir(currentNode.path)
+		files, err := os.ReadDir(currentNode.path)
 		if err != nil {
 			return fmt.Errorf("error loading directory %s: %v", currentNode.path, err)
 		}
@@ -142,16 +141,17 @@ func buildPatchFileTree(logger *logrus.Logger, rootNode *directoryNode) error {
 				directories = append(directories, node)
 				childDirs = append(childDirs, node)
 			} else {
-				data, err := ioutil.ReadFile(path.Join(currentNode.path, filename))
+				data, err := os.ReadFile(path.Join(currentNode.path, filename))
 				if err != nil {
 					return err
 				}
 
+				fileInfo, _ := file.Info()
 				patchFiles = append(patchFiles, &fileEntry{
 					filename: filename,
 					path:     path.Join(currentNode.path, filename),
 					checksum: crc32.ChecksumIEEE(data),
-					fileSize: uint32(file.Size()),
+					fileSize: uint32(fileInfo.Size()),
 				})
 			}
 		}

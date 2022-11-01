@@ -2,7 +2,8 @@
 // key for TLSv1 authentication between the shipgate's API  server and a client.
 //
 // Usage:
-//     generate_cert
+//
+//	generate_cert
 //
 // The tool will prompt for an IP address _OR_ CIDR range for the C.509 certificate.
 // If you want to make your life a little easier (albeit technically less secure),

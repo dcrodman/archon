@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -120,7 +120,7 @@ func captureExitHandler(c chan os.Signal, folder string, auto bool) {
 		b, _ := json.MarshalIndent(sessionFile, "", "\t")
 		filename := path.Join(".", folder, sessionName) + ".session"
 
-		if err := ioutil.WriteFile(filename, b, 0666); err != nil {
+		if err := os.WriteFile(filename, b, 0666); err != nil {
 			fmt.Printf("failed to save session data: %s\n", err.Error())
 			break
 		}
@@ -159,7 +159,7 @@ func listenForTCPPackets(serverAddr string, tcpPort int) {
 
 		// Sloppily grab the data out of the packet and convert it into a
 		// PacketRequest so that the handler paths converge.
-		packet, err := ioutil.ReadAll(conn)
+		packet, err := io.ReadAll(conn)
 		if err != nil {
 			fmt.Println("failed to read from client:", err.Error())
 			break

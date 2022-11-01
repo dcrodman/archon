@@ -45,9 +45,11 @@ var (
 )
 
 // Server is the CHARACTER server implementation. Clients are sent to this server
-//  after authenticating with LOGIN. Each client connects to the server in four
+//
+//	after authenticating with LOGIN. Each client connects to the server in four
+//
 // different phases (each one is a new connection):
-// 	1. Data download (login options, guildcard, and character previews).
+//  1. Data download (login options, guildcard, and character previews).
 //  2. Character selection
 //  3. (Optional) Character creation/modification (recreate and dressing room)
 //  4. Confirmation and ship selection
@@ -361,7 +363,7 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 }
 
 // Handle the character select/preview request. For the preview request, this
-//method will either send info about a character given a particular slot in an
+// method will either send info about a character given a particular slot in an
 // 0xE5 response or ack the selection with an 0xE4 (also used for an empty slot).
 // The client will send one of these preview request packets for each of the character
 // slots (i.e. 4 times). The client also sends this packet when a character has

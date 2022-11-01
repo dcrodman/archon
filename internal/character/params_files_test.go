@@ -3,7 +3,7 @@ package character
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	bytes2 "github.com/dcrodman/archon/internal/core/bytes"
@@ -13,19 +13,19 @@ import (
 
 func TestPRS(t *testing.T) {
 	decompressedFile := "./testdata/decompressed_stats_file.prs"
-	wantDecompressed, err := ioutil.ReadFile(decompressedFile)
+	wantDecompressed, err := os.ReadFile(decompressedFile)
 	if err != nil {
 		t.Fatalf("error opening decompressed_stats_file.prs: %v", err)
 	}
 
 	characterStatsFile := "./testdata/wantedCharacterStats.json"
-	wantCharacterStats, err := ioutil.ReadFile(characterStatsFile)
+	wantCharacterStats, err := os.ReadFile(characterStatsFile)
 	if err != nil {
 		t.Fatalf("error opening wantedCharacterStats.json: %v", err)
 	}
 
 	testFile := "../../setup/parameters/PlyLevelTbl.prs"
-	wantCompressed, err := ioutil.ReadFile(testFile)
+	wantCompressed, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("error opening parameters/PlyLevelTbl.prs: %v", err)
 	}

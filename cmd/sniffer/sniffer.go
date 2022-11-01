@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/gopacket"
+
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/encryption"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/google/gopacket"
 )
 
 const PacketLineLength = 16
@@ -134,7 +135,7 @@ func (s *sniffer) handlePacket(server ServerType, clientPacket bool, data []byte
 		fmt.Printf("error writing packet body to file: %v\n", err)
 		return
 	}
-	s.Writer.WriteString("\n")
+	_, _ = s.Writer.WriteString("\n")
 	s.Writer.Flush()
 }
 

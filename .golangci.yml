@@ -1,12 +1,10 @@
 linters:
   enable:
-    - deadcode
+    - unused
     - errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
     - typecheck
-    - unused
-    - varcheck
     - goimports

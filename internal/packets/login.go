@@ -199,7 +199,7 @@ type SetFlag struct {
 }
 
 // CharacterSummary is the common intermediate representation of a Character as it gets
-//passed around various servers and/or stored.
+// passed around various servers and/or stored.
 type CharacterPreview struct {
 	Experience     uint32
 	Level          uint32

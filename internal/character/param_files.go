@@ -3,7 +3,7 @@ package character
 import (
 	"fmt"
 	"hash/crc32"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -76,7 +76,7 @@ func initParameterData(logger *logrus.Logger, paramFileDir string) error {
 
 		// LoadConfig the base stats for creating new characters.
 		statsFile, _ := os.Open(filepath.Join(paramFileDir, "PlyLevelTbl.prs"))
-		compressedStatsFile, err := ioutil.ReadAll(statsFile)
+		compressedStatsFile, err := io.ReadAll(statsFile)
 		if err != nil {
 			initErr = fmt.Errorf("error loading PlyLevelTbl.prs:" + err.Error())
 			return
@@ -111,7 +111,7 @@ func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
 	var tmpChunkData []byte
 
 	for _, paramFile := range paramFiles {
-		data, err := ioutil.ReadFile(filepath.Join(paramFileDir, paramFile))
+		data, err := os.ReadFile(filepath.Join(paramFileDir, paramFile))
 		if err != nil {
 			return fmt.Errorf("error reading parameter file: %v", err)
 		}

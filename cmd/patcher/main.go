@@ -2,7 +2,8 @@
 // in order to force them to connect to a different IP address.
 //
 // For CLI usage instructions:
-//     patcher -help
+//
+//	patcher -help
 //
 // Before running the tool you may need to uncomment one of the offset
 // blocks at the top (or define your own). These offsets are the addresses
