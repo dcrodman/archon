@@ -3,4 +3,4 @@
 *.sublime-*
 *archon.debug
 bin/
-/analyzer/
+cmd/server/__debug_bin
