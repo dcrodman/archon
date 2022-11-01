@@ -113,7 +113,6 @@ go build -o bin ./cmd/*
 golangci-lint run
 go test ./...
 ?   	github.com/dcrodman/archon/cmd/account	[no test files]
-?   	github.com/dcrodman/archon/cmd/analyzer	[no test files]
 ?   	github.com/dcrodman/archon/cmd/certgen	[no test files]
 ?   	github.com/dcrodman/archon/cmd/patcher	[no test files]
 ?   	github.com/dcrodman/archon/cmd/server	[no test files]

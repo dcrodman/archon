@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -119,7 +121,7 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 
 	c := client.NewClient(connection)
 	f.Backend.SetUpClient(c)
-	c.Debug = f.Config.Debugging.Enabled
+	c.Debug = f.Config.Debugging.PacketLoggingEnabled
 
 	f.Logger.Infof("[%s] accepted connection from %s", f.Backend.Identifier(), c.IPAddr())
 
@@ -163,9 +165,13 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 			break
 		}
 
-		if f.Config.Debugging.Enabled {
-			size := f.determinePacketSize(buffer, c.CryptoSession.HeaderSize())
-			archdebug.SendClientPacketToAnalyzer(c.DebugTags, buffer, uint16(size))
+		if f.Config.Debugging.PacketLoggingEnabled {
+			archdebug.PrintPacket(archdebug.PrintPacketParams{
+				Writer:       bufio.NewWriter(os.Stdout),
+				ServerType:   archdebug.ServerType(c.DebugTags[archdebug.SERVER_TYPE]),
+				ClientPacket: true,
+				Data:         buffer,
+			})
 		}
 
 		if err = f.Backend.Handle(ctx, c, buffer); err != nil {

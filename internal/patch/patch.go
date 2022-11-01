@@ -8,6 +8,7 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
+	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/packets"
 )
 
@@ -47,7 +48,7 @@ func (s *Server) Init(ctx context.Context) error {
 
 func (s *Server) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewPCCryptoSession()
-	c.DebugTags["server_type"] = "patch"
+	c.DebugTags[debug.SERVER_TYPE] = debug.PATCH_SERVER
 }
 
 func (s *Server) Handshake(c *client.Client) error {

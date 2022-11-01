@@ -44,11 +44,8 @@ func (c *Controller) Start(ctx context.Context) {
 	}
 
 	// Start any debug utilities if we're configured to do so.
-	if c.Config.Debugging.Enabled {
-		debug.StartUtilities(c.logger,
-			c.Config.Debugging.PprofPort,
-			c.Config.Debugging.PacketAnalyzerAddress,
-		)
+	if c.Config.Debugging.PacketLoggingEnabled {
+		debug.StartPprofServer(c.logger, c.Config.Debugging.PprofPort)
 	}
 
 	// Start the shipgate RPC service and make sure it launches before the other servers start.

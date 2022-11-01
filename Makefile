@@ -1,6 +1,5 @@
 CONFIG_PATH=/usr/local/etc/archon
 BIN_DIR ?= bin
-ANALYZER_DST ?= analyzer
 
 .DEFAULT_TARGET := all
 .PHONY: build lint test
@@ -24,9 +23,3 @@ run: build
 protos:
 	protoc --proto_path=. --go_out=paths=source_relative:. internal/core/proto/archon.proto
 	protoc --proto_path=. --go_out=paths=source_relative:. --twirp_out=paths=source_relative:. internal/shipgate/shipgate.proto
-
-
-analyzer: build
-	${BIN_DIR}/analyzer -auto -folder ${ANALYZER_DST} capture && \
-		${BIN_DIR}/analyzer compact ${ANALYZER_DST}/*.session && \
-		${BIN_DIR}/analyzer -collapse aggregate ${ANALYZER_DST}/*.session

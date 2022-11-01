@@ -13,6 +13,7 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
+	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/packets"
 )
 
@@ -38,7 +39,7 @@ func (s *DataServer) Init(ctx context.Context) error {
 func (s *DataServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewPCCryptoSession()
 	c.FilesToUpdate = make(map[int]interface{})
-	c.DebugTags["server_type"] = "data"
+	c.DebugTags[debug.SERVER_TYPE] = debug.DATA_SERVER
 }
 
 func (s *DataServer) Handshake(c *client.Client) error {

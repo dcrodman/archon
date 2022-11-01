@@ -95,14 +95,14 @@ type Config struct {
 	} `mapstructure:"block_server"`
 
 	Debugging struct {
-		// Enable extra info-providing mechanisms for the server. Only enable for development.
-		Enabled bool `mapstructure:"enabled"`
-		//  Enable database-level query logging.
-		DatabaseLoggingEnabled bool `mapstructure:"database_logging_enabled"`
-		// For use with the packet_analyzer command (see cmd.packet_analyzer).
-		PacketAnalyzerAddress string `mapstructure:"packet_analyzer_address"`
+		// Enable extra info-providing mechanisms for the server.
+		PprofEnabled bool `mapstructure:"pprof_enabled"`
 		// Port on which a pprof server will be started if debug mode is enabled.
 		PprofPort int `mapstructure:"pprof_port"`
+		// # Log packets to stdout.
+		PacketLoggingEnabled bool `mapstructure:"packet_logging_enabled"`
+		//  Enable database-level query logging.
+		DatabaseLoggingEnabled bool `mapstructure:"database_logging_enabled"`
 	} `mapstructure:"debugging"`
 
 	cachedIPBytes [4]byte

@@ -1,8 +1,10 @@
 package client
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -52,7 +54,7 @@ type Client struct {
 
 	// Debugging information used for logging purposes.
 	Debug     bool
-	DebugTags map[string]interface{}
+	DebugTags map[string]debug.Tag
 }
 
 func NewClient(connection *net.TCPConn) *Client {
@@ -62,7 +64,7 @@ func NewClient(connection *net.TCPConn) *Client {
 		connection: connection,
 		ipAddr:     addr[0],
 		port:       addr[1],
-		DebugTags:  make(map[string]interface{}),
+		DebugTags:  make(map[string]debug.Tag),
 	}
 }
 
@@ -90,7 +92,12 @@ func (c *Client) SendRaw(packet interface{}) error {
 	bytes, size := bytes.BytesFromStruct(packet)
 
 	if c.Debug {
-		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, uint16(size))
+		debug.PrintPacket(debug.PrintPacketParams{
+			Writer:       bufio.NewWriter(os.Stdout),
+			ServerType:   debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ClientPacket: true,
+			Data:         bytes,
+		})
 	}
 
 	return c.transmit(bytes, uint16(size))
@@ -119,7 +126,12 @@ func (c *Client) Send(packet interface{}) error {
 	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
 	if c.Debug {
-		debug.SendServerPacketToAnalyzer(c.DebugTags, bytes, size)
+		debug.PrintPacket(debug.PrintPacketParams{
+			Writer:       bufio.NewWriter(os.Stdout),
+			ServerType:   debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ClientPacket: true,
+			Data:         bytes,
+		})
 	}
 
 	c.CryptoSession.Encrypt(bytes, uint32(size))

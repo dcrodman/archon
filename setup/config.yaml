@@ -78,12 +78,15 @@ block_server:
   # Number of lobbies to create per block.
   num_lobbies: 15
 
+# With the exception of pprof, these should only be enabled for development.
 debugging:
-  # Enable extra info-providing mechanisms for the server. Only enable for development.
-  enabled: false
+  # Enable extra info-providing mechanisms for the server.
+  pprof_enabled: true
+  # Port on which a pprof server will be started if enabled.
+  pprof_port: 4000
+  # Log packets to stdout. It's recommended to set log_file_path if enabling this as the
+  # server logging output can get intermingled with the packets.
+  # TODO: Support logging packets to a file.
+  packet_logging_enabled: false
   # Enable database-level query logging.
   database_logging_enabled: false
-  # For use with the packet_analyzer command (see cmd.packet_analyzer).
-  packet_analyzer_address: "localhost:8081"
-  # Port on which a pprof server will be started if debug mode is enabled.
-  pprof_port: 4000

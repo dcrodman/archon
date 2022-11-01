@@ -75,11 +75,10 @@ server.
 
 Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
 
-There are 4 services available in current docker-compose version:
+There are 3 services available in current docker-compose version:
 - `postgres` - PostgreSQL database with initial DB and tables created via script
 - `account` - account tool which creates initial account for login (can be disabled or commented out if not needed)
 - `server` - actual server running on 127.0.0.1 with PSO ports exposed
-- `analyzer` - the packet_analyzer tool
 
 In the dockerized setup, the server is running the same commands as in the manual setup.
 

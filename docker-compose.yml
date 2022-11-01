@@ -50,23 +50,3 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-  packet_analyzer:
-    build:
-      context: .
-    command:
-      - /usr/bin/analyzer
-      - --folder=sessions
-      - --ui=8083
-      - --auto
-    environment:
-      ARCHON_DEBUGGING_ENABLED: "true"
-      ARCHON_PACKET_ANALYZER_ADDRESS: packet_analyzer:8081
-    ports:
-      - 8081:8081
-      - 8082:8082
-      - 8083:8083
-    volumes:
-      - /tmp/sessions:/go/archon/archon_server/sessions
-    depends_on:
-      postgres:
-        condition: service_healthy

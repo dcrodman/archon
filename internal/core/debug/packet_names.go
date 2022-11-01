@@ -1,4 +1,4 @@
-package main
+package debug
 
 import "github.com/dcrodman/archon/internal/packets"
 
