@@ -156,7 +156,7 @@ func (s *service) UpsertCharacter(ctx context.Context, req *UpsertCharacterReque
 
 	character := characterFromProto(req.Character)
 	character.AccountID = req.AccountId
-	if err := data.UpdateCharacter(s.db, character); err != nil {
+	if err := data.UpsertCharacter(s.db, character); err != nil {
 		return nil, fmt.Errorf("error updating character for account %d slot %d: %w", req.AccountId, req.Character.Slot, err)
 	}
 	return &emptypb.Empty{}, nil

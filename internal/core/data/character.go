@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Character is an instance of a character in one of the slots for an account.
@@ -75,9 +76,12 @@ func CreateCharacter(db *gorm.DB, character *Character) error {
 	return db.Create(&character).Error
 }
 
-// UpdateCharacter updates an existing Character row with the contents of character.
-func UpdateCharacter(db *gorm.DB, character *Character) error {
-	return db.Updates(&character).Error
+// UpsertCharacter updates an existing Character row with the contents of character.
+func UpsertCharacter(db *gorm.DB, character *Character) error {
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "slot"}},
+		UpdateAll: true,
+	}).Create(&character).Error
 }
 
 // DeleteCharacter soft-deletes a character record from the database.
@@ -85,8 +89,10 @@ func DeleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
 	character, err := FindCharacter(db, accountID, slot)
 	if err != nil {
 		return err
+	} else if character != nil {
+		return db.Delete(character).Error
 	}
-	return db.Delete(character).Error
+	return nil
 }
 
 // PermanentlyDeleteCharacter permanently deletes a character record from the database.
