@@ -90,7 +90,7 @@ func (s *Server) Start(ctx context.Context) {
 func (s *Server) initDatabase() error {
 	var err error
 	// By default only log errors but enable full SQL query prints-to-console with debug mode
-	log := logger.Default.LogMode(logger.Error)
+	log := logger.Default.LogMode(logger.Silent)
 	if s.Config.Debugging.DatabaseLoggingEnabled {
 		log = logger.Default.LogMode(logger.Info)
 	}
