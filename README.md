@@ -62,7 +62,9 @@ Prerequisites:
 * [Docker](https://www.docker.com)
 * Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
 
-Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
+Run Docker Compose, which will download required images and run both Postgres DB and the server.
+
+    docker-compose up
 
 There are 3 services available in current docker-compose version:
 - `postgres` - PostgreSQL database with initial DB and tables created via script
@@ -71,20 +73,17 @@ There are 3 services available in current docker-compose version:
 
 In the dockerized setup, the server is running the same commands as in the manual setup.
 
-\* Note: Once the account service runs successfully, it will fail on subsequent runs.
-
-
 ### Manual
 
 **Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
 
-### Manual Prerequisites:
+#### Manual Prerequisites:
 * [Go](https://golang.org)
 * [Git](https://git-scm.com/)
 * [PostgreSQL](https://www.postgresql.org/)
 
-1. Compile the code
+#### 1. Compile the code
 
 Assuming Go installed:
 
@@ -95,7 +94,7 @@ Assuming Go installed:
 This will install the Archon server and tools to the `bin` subdirectory in the root 
 of your project's directory.
 
-2. Create a directory for the server files
+#### 2. Create a directory for the server files
 
 This isn't necessary to run the server, however you may find it easier to have the 
 server executable, tools, and supporting files all in once place. If you choose to 
@@ -111,7 +110,7 @@ any subdirectories you create (for instance, `patch_server.patch_dir`).
 **Note**: For the remainder of this guide, the commands assume that your current working
 directory is the server directory you've just created. 
 
-3. Copy the supporting files
+#### 3. Copy the supporting files
 
 Archon expects a few files in order to run, which can be retrieved from the setip directory:
 
@@ -123,7 +122,7 @@ set to (hopefully) sane defaults.
 Archon will also look for the config file in `/usr/local/etc/archon` if you're running
 the server binary separately from the of the support files.
 
-### 4. Create the database
+#### 4. Create the database
 
 Archon uses Postgres for persistent storage, which means you'll need to have a PostgreSQL
 database instance running. Once you have one ready to go (assuming you have the Postgres
@@ -137,7 +136,7 @@ CLI tools available on your PATH):
 Feel free to choose your own credentials or database location, just make sure the settings in your 
 `config.yaml` reflect them. Archon takes care of creating the tables and performing any migrations.
  
-### 5. Set the hostname
+#### 5. Set the hostname
 
 In order for clients outside your network to connect, Archon needs to listen on a network interface. Once
 you know your server's IP address, update `hostname` and `external_ip` in `config.yaml`. These values may
@@ -147,7 +146,7 @@ should be set to the IP assigned by the router and the `external_ip` to the inte
 Note: If the server will be hosted on a machine in a private network, you'll need to set up port forwarding
 on the router between the server ports and the machine running Archon. 
 
-### 6. Point a PSOBB client at the server
+#### 6. Point a PSOBB client at the server
 
 There are a few possible ways to accomplish this:  
   1. Update the connection addresses in the PSOBB client executable
@@ -168,7 +167,7 @@ https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1
 in `patcher.go` that correspond to your client. If none exist, you'll have to find the offsets with a
 hex editor.
 
-### 7. Add files to the patch directory
+#### 7. Add files to the patch directory
 
 It's recommended that you take the critical files from the copy of the client you intend for people to
 use and put the majority of them in the patch directory (`patch_server.patch_dir` in the config file).
@@ -178,7 +177,7 @@ which can help improve stability as well as make cheating harder.
     mkdir patches
     # copy your client files into ^
 
-### 8. Generate the shipgate SSL certificates
+#### 8. Generate the shipgate SSL certificates
 
 The shipgate API server requires clients to connect over SSL as both a form of security as well as
 mutual authentication. Archon includes a tool for generating these certificates, which need to be
@@ -189,13 +188,13 @@ present in the server's config directory:
 The tool will prompt you for your server's external_ip (which should be the same as `external_ip`
 in `config.yaml`). You may also provide a CIDR block.
 
-### 9. Add the first player account
+#### 9. Add the first player account
 
 You can do this with your own tool (or SQL) Archon comes with a small utility for adding accounts:
 
     ./account -config /path/to/config add
 
-### 10. Run the server
+#### 10. Run the server
 
 The moment of truth; run the server by running this from your server directory:
 
