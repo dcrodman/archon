@@ -19,35 +19,28 @@ given how time-intensive this endeavor is. That said, forks, bug fixes, issue re
 explanations of some of the client's bizarre behavior, questions, etc. are welcome to
 help move things along. Some starter information can be found in CONTRIBUTING.md.
 
-* [Installation](#Installation)
-* [Running in Docker](#running-in-docker)
-* [Setup Script](#setup-script)
-* [Manual Installation](#manual-installation)
-
 ## Installation
 
 There are three ways to set up the server:
-- using the setup script
-- running the server in docker
+- run the setup script
+- docker-compose
 - manually
 
 Most people will want to use the setup script, which just automates the manual installation
 process. However if you'd prefer to test the server in an isolated environment or prefer to
 use fewer tools, the Dockerized setup may work better for you.
 
-## Setup Script
+### Setup Script
 
-### Script Prerequisites
+Prerequisites
 
 * [Go](https://golang.org)
 * [Git](https://git-scm.com/)
 * [PostgreSQL](https://www.postgresql.org/)
 
-### 1. Clone Archon
+First, clone Archon:
 
     git clone https://github.com/dcrodman/archon.git
-
-### 2. Run the setup script
 
 The setup script is located in the `setup` directory. To run the script, execute the following with an optional
 parameter specifying the install path:
@@ -59,19 +52,15 @@ If the install-path is omitted, the setup script will install to:
 
     path-to-cloned-code/archon_server
 
-### 3. Follow the prompts
-
 The script will guide you through the initial server configuration as well as prompt for credentials for the first PSO
 account. Once the setup is complete, the script will provide additional configuration scripts, and a command to run the
 server.
 
-## Running in Docker
+### Docker Compose
 
-### Docker Prerequisites:
+Prerequisites:
 * [Docker](https://www.docker.com)
 * Assumes a recent docker version bundled together with **docker-compose** - otherwise compose should be installed too
-
-### How-to
 
 Run with `docker-compose up` - it will download required images and run both Postgres DB and the server.
 
@@ -85,7 +74,7 @@ In the dockerized setup, the server is running the same commands as in the manua
 \* Note: Once the account service runs successfully, it will fail on subsequent runs.
 
 
-## Manual Installation
+### Manual
 
 **Note**: The provided commands are aimed at MacOS/Linux but running their Windows
 equivalents on a Windows system should still set the server up correctly.   
@@ -95,7 +84,7 @@ equivalents on a Windows system should still set the server up correctly.
 * [Git](https://git-scm.com/)
 * [PostgreSQL](https://www.postgresql.org/)
 
-### 1. Compile the code
+1. Compile the code
 
 Assuming Go installed:
 
@@ -106,7 +95,7 @@ Assuming Go installed:
 This will install the Archon server and tools to the `bin` subdirectory in the root 
 of your project's directory.
 
-### 2. Create a directory for the server files
+2. Create a directory for the server files
 
 This isn't necessary to run the server, however you may find it easier to have the 
 server executable, tools, and supporting files all in once place. If you choose to 
@@ -122,7 +111,7 @@ any subdirectories you create (for instance, `patch_server.patch_dir`).
 **Note**: For the remainder of this guide, the commands assume that your current working
 directory is the server directory you've just created. 
 
-### 3. Copy the supporting files
+3. Copy the supporting files
 
 Archon expects a few files in order to run, which can be retrieved from the setip directory:
 
