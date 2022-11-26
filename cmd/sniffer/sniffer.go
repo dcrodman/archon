@@ -22,6 +22,8 @@ var serverPorts = map[uint16]debug.ServerType{
 	// Archon's ports.
 	15000: debug.SHIP_SERVER,
 	15001: debug.BLOCK_SERVER,
+	15002: debug.BLOCK_SERVER,
+	15003: debug.BLOCK_SERVER,
 	// Tethealla's ports.
 	5278: debug.SHIP_SERVER,
 	5279: debug.BLOCK_SERVER,
@@ -36,11 +38,15 @@ type CipherPair struct {
 type sniffer struct {
 	Writer *bufio.Writer
 
-	ciphers map[debug.ServerType]CipherPair
+	ciphers           map[debug.ServerType]CipherPair
+	currentPacketSize uint16
+	currentPacketRead uint16
+	currentPacket     []byte
 }
 
 func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 	s.ciphers = make(map[debug.ServerType]CipherPair)
+	s.currentPacket = make([]byte, 100000)
 
 	for packet := range packetChan {
 		flow := packet.TransportLayer().TransportFlow()
@@ -67,6 +73,11 @@ func getServerType(srcPort, dstPort uint16) (bool, debug.ServerType) {
 }
 
 func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data []byte) {
+	emitPacket := true
+
+	// Copy the data we just got into the working slice for the current packet.
+	s.currentPacketRead += uint16(copy(s.currentPacket[s.currentPacketRead:], data))
+
 	// Peek at the header.
 	var header packets.PCHeader
 	bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
@@ -80,6 +91,7 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 			clientCrypt: encryption.NewPCCryptWithVector(welcomePacket.ClientVector[:]),
 			serverCrypt: encryption.NewPCCryptWithVector(welcomePacket.ServerVector[:]),
 		}
+		s.currentPacketSize = header.Size
 	case packets.LoginWelcomeType:
 		var welcomePacket packets.Welcome
 		bytes.StructFromBytes(data, &welcomePacket)
@@ -87,22 +99,45 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 			clientCrypt: encryption.NewBBCryptWithVector(welcomePacket.ClientVector[:]),
 			serverCrypt: encryption.NewBBCryptWithVector(welcomePacket.ServerVector[:]),
 		}
+		s.currentPacketSize = header.Size
 	default:
-		// Anything else is meaningless since it's encrypted, so decrypt it
-		// and read the hader again. Choose which cipher to use depending on
-		// which side sent it since they're different vectors.
-		if clientPacket {
-			s.ciphers[server].clientCrypt.Decrypt(data, uint32(len(data)))
-		} else {
-			s.ciphers[server].serverCrypt.Decrypt(data, uint32(len(data)))
+		var expectedHeaderSize uint16 = packets.BBHeaderSize
+		if server == debug.PATCH_SERVER || server == debug.DATA_SERVER {
+			expectedHeaderSize = packets.PCHeaderSize
 		}
-		bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
+
+		// If we're expecting a new packet, read it in and decrypt it.
+		if s.currentPacketSize == 0 {
+			if clientPacket {
+				s.ciphers[server].clientCrypt.Decrypt(s.currentPacket, uint32(expectedHeaderSize))
+			} else {
+				s.ciphers[server].serverCrypt.Decrypt(s.currentPacket, uint32(expectedHeaderSize))
+			}
+			bytes.StructFromBytes(s.currentPacket[:expectedHeaderSize], &header)
+			s.currentPacketSize = header.Size
+		}
+
+		// Once have the entire packet, decrypt and print it out .
+		if s.currentPacketRead >= s.currentPacketSize {
+			if clientPacket {
+				s.ciphers[server].clientCrypt.Decrypt(s.currentPacket[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
+			} else {
+				s.ciphers[server].serverCrypt.Decrypt(s.currentPacket[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
+			}
+		} else {
+			emitPacket = false
+		}
 	}
 
-	debug.PrintPacket(debug.PrintPacketParams{
-		Writer:       s.Writer,
-		ServerType:   server,
-		ClientPacket: clientPacket,
-		Data:         data,
-	})
+	if emitPacket {
+		debug.PrintPacket(debug.PrintPacketParams{
+			Writer:       s.Writer,
+			ServerType:   server,
+			ClientPacket: clientPacket,
+			Data:         s.currentPacket[:s.currentPacketSize],
+		})
+
+		s.currentPacketRead = 0
+		s.currentPacketSize = 0
+	}
 }
