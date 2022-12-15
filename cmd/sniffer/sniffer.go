@@ -115,6 +115,11 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 			}
 			bytes.StructFromBytes(s.currentPacket[:expectedHeaderSize], &header)
 			s.currentPacketSize = header.Size
+			// Like we do elsewhere in the server, make sure we're reading packet lengths that are
+			// multiples of the header size. Sometimes the client messes up the size.
+			if s.currentPacketSize%expectedHeaderSize != 0 {
+				s.currentPacketSize += expectedHeaderSize - (s.currentPacketSize % expectedHeaderSize)
+			}
 		}
 
 		// Once have the entire packet, decrypt and print it out .
