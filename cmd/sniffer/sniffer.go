@@ -76,7 +76,8 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 	emitPacket := true
 
 	// Copy the data we just got into the working slice for the current packet.
-	s.currentPacketRead += uint16(copy(s.currentPacket[s.currentPacketRead:], data))
+	bytesRead := uint16(copy(s.currentPacket[s.currentPacketRead:], data))
+	s.currentPacketRead += bytesRead
 
 	// Peek at the header.
 	var header packets.PCHeader
@@ -142,7 +143,15 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 			Data:         s.currentPacket[:s.currentPacketSize],
 		})
 
-		s.currentPacketRead = 0
+		// Sometimes multiple payloads might be sent as part of the same pocket. To account
+		// for this, recursively call handlePacket with the remaining bytes we read and
+		// process it as if it were a new block of data.
+		handledPacketSize := s.currentPacketSize
 		s.currentPacketSize = 0
+		s.currentPacketRead = 0
+
+		if bytesRead > handledPacketSize {
+			s.handlePacket(server, clientPacket, data[handledPacketSize:])
+		}
 	}
 }
