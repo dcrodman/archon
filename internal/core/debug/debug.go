@@ -46,10 +46,11 @@ const (
 )
 
 type PrintPacketParams struct {
-	Writer       *bufio.Writer
-	ServerType   ServerType
-	ClientPacket bool
-	Data         []byte
+	Writer            *bufio.Writer
+	ServerType        ServerType
+	ClientPacket      bool
+	Data              []byte
+	TruncateThreshold int
 }
 
 // PrintPacket prints the contents of a packet to a specified writer along with some
@@ -74,7 +75,7 @@ func PrintPacket(params PrintPacketParams) {
 		fmt.Printf("error writing packet header: %v\n", err)
 		return
 	}
-	if err := writePacketBodyToFile(params.Writer, params.Data); err != nil {
+	if err := writePacketBodyToFile(params); err != nil {
 		fmt.Printf("error writing packet body: %v\n", err)
 		return
 	}
@@ -84,19 +85,24 @@ func PrintPacket(params PrintPacketParams) {
 
 const PacketLineLength = 16
 
-func writePacketBodyToFile(writer *bufio.Writer, data []byte) error {
-	pktLen := len(data)
+func writePacketBodyToFile(params PrintPacketParams) error {
+	pktLen := len(params.Data)
 	for rem, offset := pktLen, 0; rem > 0; rem -= PacketLineLength {
+		if offset > params.TruncateThreshold {
+			_, _ = params.Writer.WriteString("...(truncated)...\n")
+			break
+		}
+
 		var line string
 
 		if rem < PacketLineLength {
-			line = buildPacketLine(data[(pktLen-rem):pktLen], rem, offset)
+			line = buildPacketLine(params.Data[(pktLen-rem):pktLen], rem, offset)
 		} else {
-			line = buildPacketLine(data[offset:offset+PacketLineLength], PacketLineLength, offset)
+			line = buildPacketLine(params.Data[offset:offset+PacketLineLength], PacketLineLength, offset)
 		}
 		offset += PacketLineLength
 
-		if _, err := writer.WriteString(line); err != nil {
+		if _, err := params.Writer.WriteString(line); err != nil {
 			return err
 		}
 	}

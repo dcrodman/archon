@@ -136,10 +136,11 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 
 	if emitPacket {
 		debug.PrintPacket(debug.PrintPacketParams{
-			Writer:       s.Writer,
-			ServerType:   server,
-			ClientPacket: clientPacket,
-			Data:         s.buffer[:s.currentPacketSize],
+			Writer:            s.Writer,
+			ServerType:        server,
+			ClientPacket:      clientPacket,
+			Data:              s.buffer[:s.currentPacketSize],
+			TruncateThreshold: truncatePacketLimit,
 		})
 
 		// Sometimes multiple payloads might be sent as part of the same pocket. To account

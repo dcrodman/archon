@@ -12,13 +12,19 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-const defaultFilter = "tcp portrange 11000-11002 or tcp portrange 12001-12003 or tcp portrange 15000-15003 or tcp portrange 5278-5290"
+const (
+	// Default BPF filter set on pcap.
+	defaultFilter = "tcp portrange 11000-11002 or tcp portrange 12001-12003 or tcp portrange 15000-15003 or tcp portrange 5278-5290"
+	// Threshold after which packets will be truncated.
+	truncatePacketLimit = 0x1000
+)
 
 var (
-	list   = flag.Bool("l", false, "List devices")
-	device = flag.String("d", "en0", "Device on which to listen for packets")
-	filter = flag.String("f", defaultFilter, "BPF packet filter to apply")
-	output = flag.String("o", "", "File to which to output logs (default stdout)")
+	list     = flag.Bool("l", false, "List devices")
+	device   = flag.String("d", "en0", "Device on which to listen for packets")
+	filter   = flag.String("f", defaultFilter, "BPF packet filter to apply")
+	output   = flag.String("o", "", "File to which to output logs (default stdout)")
+	truncate = flag.Bool("truncate", false, fmt.Sprintf("Truncate packets over %d bytes long", truncatePacketLimit))
 )
 
 func main() {
