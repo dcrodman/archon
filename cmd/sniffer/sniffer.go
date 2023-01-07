@@ -40,13 +40,13 @@ type sniffer struct {
 
 	ciphers           map[debug.ServerType]CipherPair
 	currentPacketSize uint16
-	currentPacketRead uint16
-	currentPacket     []byte
+	bufferBytesRead   uint16
+	buffer            []byte
 }
 
 func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 	s.ciphers = make(map[debug.ServerType]CipherPair)
-	s.currentPacket = make([]byte, 100000)
+	s.buffer = make([]byte, 100000)
 
 	for packet := range packetChan {
 		flow := packet.TransportLayer().TransportFlow()
@@ -76,8 +76,7 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 	emitPacket := true
 
 	// Copy the data we just got into the working slice for the current packet.
-	bytesRead := uint16(copy(s.currentPacket[s.currentPacketRead:], data))
-	s.currentPacketRead += bytesRead
+	s.bufferBytesRead += uint16(copy(s.buffer[s.bufferBytesRead:], data))
 
 	// Peek at the header.
 	var header packets.PCHeader
@@ -110,11 +109,11 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		// If we're expecting a new packet, read it in and decrypt it.
 		if s.currentPacketSize == 0 {
 			if clientPacket {
-				s.ciphers[server].clientCrypt.Decrypt(s.currentPacket, uint32(expectedHeaderSize))
+				s.ciphers[server].clientCrypt.Decrypt(s.buffer, uint32(expectedHeaderSize))
 			} else {
-				s.ciphers[server].serverCrypt.Decrypt(s.currentPacket, uint32(expectedHeaderSize))
+				s.ciphers[server].serverCrypt.Decrypt(s.buffer, uint32(expectedHeaderSize))
 			}
-			bytes.StructFromBytes(s.currentPacket[:expectedHeaderSize], &header)
+			bytes.StructFromBytes(s.buffer[:expectedHeaderSize], &header)
 			s.currentPacketSize = header.Size
 			// Like we do elsewhere in the server, make sure we're reading packet lengths that are
 			// multiples of the header size. Sometimes the client messes up the size.
@@ -124,11 +123,11 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		}
 
 		// Once have the entire packet, decrypt and print it out .
-		if s.currentPacketRead >= s.currentPacketSize {
+		if s.bufferBytesRead >= s.currentPacketSize {
 			if clientPacket {
-				s.ciphers[server].clientCrypt.Decrypt(s.currentPacket[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
+				s.ciphers[server].clientCrypt.Decrypt(s.buffer[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
 			} else {
-				s.ciphers[server].serverCrypt.Decrypt(s.currentPacket[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
+				s.ciphers[server].serverCrypt.Decrypt(s.buffer[expectedHeaderSize:], uint32(s.currentPacketSize-expectedHeaderSize))
 			}
 		} else {
 			emitPacket = false
@@ -140,18 +139,19 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 			Writer:       s.Writer,
 			ServerType:   server,
 			ClientPacket: clientPacket,
-			Data:         s.currentPacket[:s.currentPacketSize],
+			Data:         s.buffer[:s.currentPacketSize],
 		})
 
 		// Sometimes multiple payloads might be sent as part of the same pocket. To account
 		// for this, recursively call handlePacket with the remaining bytes we read and
 		// process it as if it were a new block of data.
-		handledPacketSize := s.currentPacketSize
+		packetSize := s.currentPacketSize
+		bufferLength := s.bufferBytesRead
 		s.currentPacketSize = 0
-		s.currentPacketRead = 0
+		s.bufferBytesRead = 0
 
-		if bytesRead > handledPacketSize {
-			s.handlePacket(server, clientPacket, data[handledPacketSize:])
+		if bufferLength > packetSize {
+			s.handlePacket(server, clientPacket, data[packetSize:bufferLength])
 		}
 	}
 }
