@@ -12,7 +12,7 @@ const (
 	LoginClientMessageType      = 0x1A
 	LoginOptionsRequestType     = 0xE0
 	LoginOptionsType            = 0xE2
-	LoginCharPreviewReqType     = 0xE3
+	LoginCharSelectType         = 0xE3
 	LoginCharAckType            = 0xE4
 	LoginCharPreviewType        = 0xE5
 	LoginChecksumType           = 0x01E8

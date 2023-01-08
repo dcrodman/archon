@@ -37,7 +37,7 @@ var packetNames = map[uint16]string{
 	packets.LoginClientMessageType:      "LoginClientMessageType",
 	packets.LoginOptionsRequestType:     "LoginOptionsRequestType",
 	packets.LoginOptionsType:            "LoginOptionsType",
-	packets.LoginCharPreviewReqType:     "LoginCharPreviewReqType",
+	packets.LoginCharSelectType:         "LoginCharSelectType",
 	packets.LoginCharAckType:            "LoginCharAckType",
 	packets.LoginCharPreviewType:        "LoginCharPreviewType",
 	packets.LoginChecksumType:           "LoginChecksumType",

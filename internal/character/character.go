@@ -44,6 +44,10 @@ var (
 	shipSelectionScrollMessageInit sync.Once
 )
 
+func clientFlagCacheKey(c *client.Client) string {
+	return fmt.Sprintf("client-flags-%d", c.Account.Id)
+}
+
 // Server is the CHARACTER server implementation. Clients are sent to this server
 //
 //	after authenticating with LOGIN. Each client connects to the server in four
@@ -110,7 +114,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		err = s.handleLogin(ctx, c, &loginPkt)
 	case packets.LoginOptionsRequestType:
 		err = s.handleOptionsRequest(ctx, c)
-	case packets.LoginCharPreviewReqType:
+	case packets.LoginCharSelectType:
 		var pkt packets.CharacterSelection
 		bytes.StructFromBytes(data, &pkt)
 		err = s.handleCharacterSelect(ctx, c, &pkt)
@@ -362,12 +366,15 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 	return c.Send(pkt)
 }
 
-// Handle the character select/preview request. For the preview request, this
-// method will either send info about a character given a particular slot in an
-// 0xE5 response or ack the selection with an 0xE4 (also used for an empty slot).
-// The client will send one of these preview request packets for each of the character
-// slots (i.e. 4 times). The client also sends this packet when a character has
-// been selected from the list and the Selecting flag will be set.
+// Handle the character select/preview request.
+//
+// For the preview request, this method will either send info about a character given
+// a particular slot in an 0xE5 response or ack the selection with an 0xE4 (also used
+// for an empty slot). The client will send one of these preview request packets for
+// each of the character slots (i.e. 4 times).
+//
+// The client also sends this packet when  a character has been selected from the menu
+// (or after the dressing room or recreate), as indicated by the Selecting flag.
 func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pkt *packets.CharacterSelection) error {
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,
@@ -384,19 +391,19 @@ func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pk
 		// They've selected a character from the menu.
 		c.Config.SlotNum = uint8(pkt.Slot)
 		return s.sendCharacterAck(c, pkt.Slot, 1)
-	} else {
-		if !resp.Exists {
-			// We don't have a character for this slot.
-			return s.sendCharacterAck(c, pkt.Slot, 2)
-		}
+	}
+
+	if resp.Exists {
 		// They have a character in that slot; send the character preview.
 		return s.sendCharacterPreview(c, resp.Character)
 	}
+	// We don't have a character for this slot.
+	return s.sendCharacterAck(c, pkt.Slot, 2)
 }
 
-// Send the character acknowledgement packet. Setting flag to 0 indicates a creation
-// ack, 1 acks a selected character, and 2 indicates that a character doesn't exist
-// in the slot requested via preview request.
+// Send the character acknowledgement packet in response to the action taken. Setting flag
+// to 0 indicates a creation ack, 1 acks a selected character, and 2 indicates that a character
+// doesn't exist in the slot requested via preview request.
 func (s *Server) sendCharacterAck(c *client.Client, slotNum uint32, flag uint32) error {
 	return c.Send(&packets.CharacterAck{
 		Header: packets.BBHeader{Type: packets.LoginCharAckType},
@@ -548,11 +555,7 @@ func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
 	// Some flags are set right before the client disconnects, which means saving them
 	// on the Client struct alone isn't safe since the state is lost. To fix this the
 	// flags are also kept in memory to avoid bugs like accidentally recreating characters.
-	s.kvCache.Set(clientFlagKey(c), c.Flag, -1)
-}
-
-func clientFlagKey(c *client.Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Account.Id)
+	s.kvCache.Put(clientFlagCacheKey(c), c.Flag, -1)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
@@ -653,7 +656,7 @@ func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
 		return true
 	}
 
-	flags, found := s.kvCache.Get(clientFlagKey(c))
+	flags, found := s.kvCache.Get(clientFlagCacheKey(c))
 	if found {
 		return (flags.(uint32) & 0x02) != 0
 	}
@@ -662,8 +665,8 @@ func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
 
 func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *packets.CharacterSummary) error {
 	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
-	flags, _ := s.kvCache.Get(clientFlagKey(c))
-	s.kvCache.Set(clientFlagKey(c), flags.(uint32)^0x02, -1)
+	flags, _ := s.kvCache.Get(clientFlagCacheKey(c))
+	s.kvCache.Put(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
 
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,

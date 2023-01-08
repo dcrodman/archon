@@ -17,9 +17,9 @@ func NewCache() *Cache {
 	return &Cache{cacheInstance: gocache.New(-1, 10*time.Second)}
 }
 
-// Set sets a key/value pair in the cache with an optional duration. Passing 0 for
+// Put sets a key/value pair in the cache with an optional duration. Passing 0 for
 // ttl will cause the default expiration to be used and -1 will not set a ttl.
-func (c *Cache) Set(key string, value interface{}, ttl time.Duration) {
+func (c *Cache) Put(key string, value interface{}, ttl time.Duration) {
 	c.cacheInstance.Set(key, value, ttl)
 }
 
