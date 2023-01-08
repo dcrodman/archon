@@ -22,7 +22,7 @@ message Account {
   bool banned = 7;
   bool active = 8;
   int64 team_id = 9;
-  bytes priviledge_level = 10;
+  bytes privilege_level = 10;
 }
 
 message Character {
