@@ -198,6 +198,6 @@ func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.P
 		}
 	}
 
-	params.Writer.WriteString(spew.Sdump(packet.Interface()))
+	_, _ = params.Writer.WriteString(spew.Sdump(packet.Interface()))
 	return nil
 }
