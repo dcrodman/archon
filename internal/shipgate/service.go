@@ -110,7 +110,7 @@ func (s *service) AuthenticateAccount(ctx context.Context, req *AuthenticateAcco
 		Banned:           account.Banned,
 		Active:           account.Active,
 		TeamId:           int64(account.TeamID),
-		PriviledgeLevel:  []byte{account.PrivilegeLevel},
+		PrivilegeLevel:   []byte{account.PrivilegeLevel},
 	}, nil
 }
 
