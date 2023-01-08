@@ -3,6 +3,7 @@ module github.com/dcrodman/archon
 go 1.16
 
 require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-test/deep v1.0.7
 	github.com/google/gopacket v1.1.19
 	github.com/patrickmn/go-cache v2.1.0+incompatible

@@ -20,11 +20,12 @@ const (
 )
 
 var (
-	list     = flag.Bool("l", false, "List devices")
-	device   = flag.String("d", "en0", "Device on which to listen for packets")
-	filter   = flag.String("f", defaultFilter, "BPF packet filter to apply")
-	output   = flag.String("o", "", "File to which to output logs (default stdout)")
-	truncate = flag.Bool("truncate", false, fmt.Sprintf("Truncate packets over %d bytes long", truncatePacketLimit))
+	list      = flag.Bool("l", false, "List devices")
+	device    = flag.String("d", "en0", "Device on which to listen for packets")
+	filter    = flag.String("f", defaultFilter, "BPF packet filter to apply")
+	output    = flag.String("o", "", "File to which to output logs (default stdout)")
+	truncate  = flag.Bool("truncate", false, fmt.Sprintf("Truncate packets over %d bytes long", truncatePacketLimit))
+	interpret = flag.Bool("interpret", false, "For known packet types, transform the output into JSON")
 )
 
 func main() {

@@ -144,6 +144,9 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		if *truncate {
 			params.TruncateThreshold = truncatePacketLimit
 		}
+		if *interpret {
+			params.Interpret = *interpret
+		}
 		debug.PrintPacket(params)
 
 		// Sometimes multiple payloads might be sent as part of the same pocket. To account

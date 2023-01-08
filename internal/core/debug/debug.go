@@ -2,15 +2,20 @@ package debug
 
 import (
 	"bufio"
+	stdbytes "bytes"
+	"encoding/binary"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/packets"
-	"github.com/sirupsen/logrus"
 )
 
 // This function starts the default pprof HTTP server that can be accessed via localhost
@@ -52,6 +57,9 @@ type PrintPacketParams struct {
 	Data         []byte
 	// Cut off the packet output after a certain size.
 	TruncateThreshold int
+	// For known packet types, read the data into each packet and
+	// emit it as formatted JSON.
+	Interpret bool
 }
 
 // PrintPacket prints the contents of a packet to a specified writer along with some
@@ -71,14 +79,26 @@ func PrintPacket(params PrintPacketParams) {
 	}
 	headerLine.WriteString(fmt.Sprintf("(%d bytes)\n", header.Size))
 
+	var err error
 	// Write out the contents of the actual packet.
-	if _, err := params.Writer.WriteString(headerLine.String()); err != nil {
+	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
 		fmt.Printf("error writing packet header: %v\n", err)
 		return
 	}
-	if err := writePacketBodyToFile(params); err != nil {
-		fmt.Printf("error writing packet body: %v\n", err)
-		return
+	if params.Interpret {
+		// Attempt to print out any known packets as JSON, falling back to the standard
+		// format for any we don't recognize.
+		err = writeInterpretedPacketBodyToFile(params, header)
+		if err != nil {
+			fmt.Println("error from writeInterpretedPacketBodyToFile: ", err)
+		}
+	}
+
+	if !params.Interpret || err != nil {
+		if err := writePacketBodyToFile(params); err != nil {
+			fmt.Printf("error writing packet body: %v\n", err)
+			return
+		}
 	}
 	_, _ = params.Writer.WriteString("\n")
 	params.Writer.Flush()
@@ -86,6 +106,8 @@ func PrintPacket(params PrintPacketParams) {
 
 const PacketLineLength = 16
 
+// Print the standard output of one column with the bytes in hexadecimal followed
+// by another column with the corresponding bytes translated to unicode where possible.
 func writePacketBodyToFile(params PrintPacketParams) error {
 	pktLen := len(params.Data)
 	for rem, offset := pktLen, 0; rem > 0; rem -= PacketLineLength {
@@ -148,4 +170,34 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 
 	line.WriteString("\n")
 	return line.String()
+}
+
+func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.PCHeader) error {
+	newPacket := getPacket(params.ServerType, params.ClientPacket, header.Type)
+	if newPacket.IsNil() {
+		return fmt.Errorf("unrecognized packet type: %02X", header.Type)
+	}
+
+	packet := newPacket.Elem()
+	reader := stdbytes.NewReader(params.Data)
+
+	for i := 0; i < packet.NumField(); i++ {
+		field := packet.Field(i)
+		var err error
+		switch field.Kind() {
+		case reflect.Ptr:
+			err = binary.Read(reader, binary.LittleEndian, field.Interface())
+		default:
+			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
+		}
+		if err != nil {
+			fmt.Printf("error parsing %s of packet %v\n", field.String(), getPacketName(params.ServerType, header.Type))
+			fmt.Printf("server: %s client packet: %t\n", params.ServerType, params.ClientPacket)
+			fmt.Println("(make sure the packet type is correctly mapped)")
+			panic(err.Error())
+		}
+	}
+
+	params.Writer.WriteString(spew.Sdump(packet.Interface()))
+	return nil
 }
