@@ -34,6 +34,10 @@ func main() {
 	if *list {
 		printNetworkDevices()
 	} else {
+		if *truncate && *interpret {
+			fmt.Println("only one of --truncate or --interpret can be provided")
+			os.Exit(1)
+		}
 		startSniffer()
 	}
 }
