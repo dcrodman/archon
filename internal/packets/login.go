@@ -78,7 +78,7 @@ type Login struct {
 	Password      [16]byte
 	Unknown3      [40]byte
 	HardwareInfo  [8]byte
-	Security      [48]byte
+	Security      [40]byte
 	Padding2      uint32
 }
 
