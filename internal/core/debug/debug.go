@@ -46,10 +46,11 @@ const (
 )
 
 type PrintPacketParams struct {
-	Writer            *bufio.Writer
-	ServerType        ServerType
-	ClientPacket      bool
-	Data              []byte
+	Writer       *bufio.Writer
+	ServerType   ServerType
+	ClientPacket bool
+	Data         []byte
+	// Cut off the packet output after a certain size.
 	TruncateThreshold int
 }
 
@@ -88,7 +89,7 @@ const PacketLineLength = 16
 func writePacketBodyToFile(params PrintPacketParams) error {
 	pktLen := len(params.Data)
 	for rem, offset := pktLen, 0; rem > 0; rem -= PacketLineLength {
-		if offset > params.TruncateThreshold {
+		if params.TruncateThreshold > 0 && offset > params.TruncateThreshold {
 			_, _ = params.Writer.WriteString("...(truncated)...\n")
 			break
 		}

@@ -135,13 +135,16 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 	}
 
 	if emitPacket {
-		debug.PrintPacket(debug.PrintPacketParams{
-			Writer:            s.Writer,
-			ServerType:        server,
-			ClientPacket:      clientPacket,
-			Data:              s.buffer[:s.currentPacketSize],
-			TruncateThreshold: truncatePacketLimit,
-		})
+		params := debug.PrintPacketParams{
+			Writer:       s.Writer,
+			ServerType:   server,
+			ClientPacket: clientPacket,
+			Data:         s.buffer[:s.currentPacketSize],
+		}
+		if *truncate {
+			params.TruncateThreshold = truncatePacketLimit
+		}
+		debug.PrintPacket(params)
 
 		// Sometimes multiple payloads might be sent as part of the same pocket. To account
 		// for this, recursively call handlePacket with the remaining bytes we read and
