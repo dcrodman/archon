@@ -10,7 +10,6 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
-	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
@@ -93,6 +92,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		}
 	}
 	c.Account = account
+	c.ActiveSlot = loginPkt.Slot
 
 	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
@@ -100,7 +100,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	if err := s.sendLobbyList(c); err != nil {
 		return err
 	}
-	if err := s.fetchAndSendCharacter(c); err != nil {
+	if err := s.fetchAndSendCharacter(ctx, c); err != nil {
 		return err
 	}
 
@@ -153,9 +153,15 @@ func (s *Server) sendLobbyList(c *client.Client) error {
 	})
 }
 
-func (s *Server) fetchAndSendCharacter(c *client.Client) error {
-	// TODO: Load this from shipgate
-	character := &data.Character{}
+func (s *Server) fetchAndSendCharacter(ctx context.Context, c *client.Client) error {
+	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
+		AccountId: c.Account.Id,
+		Slot:      c.ActiveSlot,
+	})
+	if err != nil {
+		return fmt.Errorf("error loading selected character: %v", err)
+	}
+	character := resp.Character
 
 	charPkt := &packets.FullCharacter{
 		Header: packets.BBHeader{Type: packets.FullCharacterType},
@@ -165,13 +171,13 @@ func (s *Server) fetchAndSendCharacter(c *client.Client) error {
 		// TPMaterials       uint8
 		// Language          uint8
 		// Inventory         [30]InventorySlot
-		ATP:        character.ATP,
-		MST:        character.MST,
-		EVP:        character.EVP,
-		HP:         character.HP,
-		DFP:        character.DFP,
-		ATA:        character.ATA,
-		LCK:        character.LCK,
+		ATP:        uint16(character.Atp),
+		MST:        uint16(character.Mst),
+		EVP:        uint16(character.Evp),
+		HP:         uint16(character.Hp),
+		DFP:        uint16(character.Dfp),
+		ATA:        uint16(character.Ata),
+		LCK:        uint16(character.Lck),
 		Level:      uint16(character.Level),
 		Experience: character.Experience,
 		Meseta:     character.Meseta,
@@ -180,20 +186,20 @@ func (s *Server) fetchAndSendCharacter(c *client.Client) error {
 		// NameColorRed
 		// NameColorTransparency
 		// SkinID
-		SectionID: character.SectionID,
-		Class:     character.Class,
+		SectionID: uint8(character.SectionId),
+		Class:     uint8(character.Class),
 		// SkinFlag
-		Costume:        character.Costume,
-		Skin:           character.Skin,
-		Face:           character.Face,
-		Head:           character.Head,
-		Hair:           character.Hair,
-		HairColorRed:   character.HairRed,
-		HairColorGreen: character.HairGreen,
-		HairColorBlue:  character.HairBlue,
-		// ProportionX:    uint32(character.ProportionX),
-		// ProportionY:    uint32(character.ProportionY),
-		PlayTime: character.Playtime,
+		Costume:        uint16(character.Costume),
+		Skin:           uint16(character.Skin),
+		Face:           uint16(character.Face),
+		Head:           uint16(character.Head),
+		Hair:           uint16(character.Hair),
+		HairColorRed:   uint16(character.HairRed),
+		HairColorGreen: uint16(character.HairGreen),
+		HairColorBlue:  uint16(character.HairBlue),
+		ProportionX:    uint32(character.ProportionX),
+		ProportionY:    uint32(character.ProportionY),
+		PlayTime:       character.Playtime,
 	}
 	copy(charPkt.GuildcardStr[:], character.GuildcardStr)
 	copy(charPkt.Name[:], character.Name)

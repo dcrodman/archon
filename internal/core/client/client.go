@@ -42,6 +42,8 @@ type Client struct {
 	Flag   uint32
 	TeamID uint32
 	IsGm   bool
+	// The slot corresponding to the currently active character.
+	ActiveSlot uint32
 	// Guildcard linked to the account.
 	Guildcard     uint32
 	GuildcardData []byte

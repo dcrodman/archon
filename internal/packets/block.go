@@ -43,8 +43,8 @@ type BankItem struct {
 type FullCharacter struct {
 	Header                BBHeader
 	NumInventoryItems     uint8
-	HPMaterials           uint8
-	TPMaterials           uint8
+	HPMaterials           uint8 // TODO: Is this total HP materials consumed (i.e. for the limit)?
+	TPMaterials           uint8 // TODO: Is this total HP materials consumed (i.e. for the limit)?
 	Language              uint8
 	Inventory             [30]InventorySlot
 	ATP                   uint16
