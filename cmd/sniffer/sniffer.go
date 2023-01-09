@@ -158,7 +158,7 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		s.bufferBytesRead = 0
 
 		if bufferLength > packetSize {
-			s.handlePacket(server, clientPacket, data[packetSize:bufferLength])
+			s.handlePacket(server, clientPacket, s.buffer[packetSize:bufferLength])
 		}
 	}
 }

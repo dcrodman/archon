@@ -89,9 +89,6 @@ func PrintPacket(params PrintPacketParams) {
 		// Attempt to print out any known packets as JSON, falling back to the standard
 		// format for any we don't recognize.
 		err = writeInterpretedPacketBodyToFile(params, header)
-		if err != nil {
-			fmt.Println("error from writeInterpretedPacketBodyToFile: ", err)
-		}
 	}
 
 	if !params.Interpret || err != nil {
@@ -174,16 +171,17 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 
 func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.PCHeader) error {
 	newPacket := getPacket(params.ServerType, params.ClientPacket, header.Type)
-	if newPacket.IsNil() {
+	if !newPacket.IsValid() {
+		_, _ = params.Writer.WriteString("(cannot interpret - unrecognized packet type)\n")
 		return fmt.Errorf("unrecognized packet type: %02X", header.Type)
 	}
 
 	packet := newPacket.Elem()
 	reader := stdbytes.NewReader(params.Data)
 
+	var err error
 	for i := 0; i < packet.NumField(); i++ {
 		field := packet.Field(i)
-		var err error
 		switch field.Kind() {
 		case reflect.Ptr:
 			err = binary.Read(reader, binary.LittleEndian, field.Interface())
@@ -191,13 +189,16 @@ func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.P
 			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
 		}
 		if err != nil {
-			fmt.Printf("error parsing %s of packet %v\n", field.String(), getPacketName(params.ServerType, header.Type))
-			fmt.Printf("server: %s client packet: %t\n", params.ServerType, params.ClientPacket)
-			fmt.Println("(make sure the packet type is correctly mapped)")
-			panic(err.Error())
+			err = fmt.Errorf("error constructing field %s: %w", field.String(), err)
 		}
 	}
 
+	spew.Config.Indent = "\t"
 	_, _ = params.Writer.WriteString(spew.Sdump(packet.Interface()))
+	if err != nil {
+		_, _ = params.Writer.WriteString("WARNING: PARTIAL RESULT\n")
+		_, _ = params.Writer.WriteString("(make sure the packet type is correctly mapped)\n")
+		_, _ = params.Writer.WriteString(err.Error() + "\n")
+	}
 	return nil
 }
