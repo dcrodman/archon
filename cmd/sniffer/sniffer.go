@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
+	"os"
 
 	"github.com/google/gopacket"
 
@@ -104,6 +106,12 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		var expectedHeaderSize uint16 = packets.BBHeaderSize
 		if server == debug.PATCH_SERVER || server == debug.DATA_SERVER {
 			expectedHeaderSize = packets.PCHeaderSize
+		}
+
+		if s.ciphers[server].serverCrypt == nil {
+			fmt.Println("exiting: encryption vectors are not initialized")
+			fmt.Println("sniffer must be started before starting the game session")
+			os.Exit(1)
 		}
 
 		// If we're expecting a new packet, read it in and decrypt it.
