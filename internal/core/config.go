@@ -32,6 +32,8 @@ type Config struct {
 	} `mapstructure:"web"`
 
 	Database struct {
+		// Database engine.
+		Engine string `mapstructure:"engine"`
 		// Hostname of the Postgres database instance.
 		Host string `mapstructure:"host"`
 		// Port on db_host on which the Postgres instance is accepting connections.

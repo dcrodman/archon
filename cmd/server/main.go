@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -35,7 +34,7 @@ func main() {
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if err := os.Chdir(filepath.Dir(*configFlag)); err != nil {
+	if err := os.Chdir(*configFlag); err != nil {
 		fmt.Println("error changing to config directory:", err)
 		os.Exit(1)
 	}

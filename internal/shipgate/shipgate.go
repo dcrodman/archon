@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -64,7 +66,7 @@ func (s *Server) Start(ctx context.Context) {
 			s.Logger.Errorf("error initializing database connection: %v", err)
 			return
 		}
-		s.Logger.Infof("[SHIPGATE] connected to database %s:%d", s.Config.Database.Host, s.Config.Database.Port)
+		s.Logger.Infof("[SHIPGATE] connected to database %s", s.db.Name())
 
 		// Set up and start the HTTP handler for handling the RPC requests.
 		s.httpServer = http.Server{
@@ -95,7 +97,17 @@ func (s *Server) initDatabase() error {
 		log = logger.Default.LogMode(logger.Info)
 	}
 
-	s.db, err = gorm.Open(postgres.Open(s.Config.DatabaseURL()), &gorm.Config{Logger: log})
+	var dialector gorm.Dialector
+	switch strings.ToLower(s.Config.Database.Engine) {
+	case "sqlite":
+		dialector = sqlite.Open("archon.db")
+	case "postgres":
+		dialector = postgres.Open(s.Config.DatabaseURL())
+	default:
+		return fmt.Errorf("unsupported database engine: %s", s.Config.Database.Engine)
+	}
+
+	s.db, err = gorm.Open(dialector, &gorm.Config{Logger: log})
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %s", err)
 	}

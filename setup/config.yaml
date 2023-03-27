@@ -23,17 +23,17 @@ web:
   http_port: 10000
 
 database:
-  # Hostname of the Postgres database instance.
-  host: 127.0.0.1
-  # Port on db_host on which the Postgres instance is accepting connections.
-  port: 5432
-  # Name of the database in Postgres for archon.
-  name: archondb
-  # Username and password of a user with full RW privileges to ${db_name}.
-  username: archonadmin
-  password: psoadminpassword
-  # Set to verify-full if the Postgres instance supports SSL.
-  sslmode: disable
+  # Database engine (supported: sqlite, postgres).
+  engine: sqlite
+  # Uncomment the parameters below to use Postgres.
+  # engine: postgres
+  # host: 127.0.0.1
+  # port: 5432
+  # name: archondb
+  # username: archonadmin
+  # password: psoadminpassword
+  ## Set to verify-full if the Postgres instance supports SSL.
+  # sslmode: disable
 
 patch_server:
   # Port on whith the PATCH server will listen.
