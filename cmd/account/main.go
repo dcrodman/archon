@@ -30,6 +30,13 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// Change to the same directory as the config file so that any relative
+	// paths in the config file will resolve.
+	if err := os.Chdir(*config); err != nil {
+		fmt.Println("error changing to config directory:", err)
+		os.Exit(1)
+	}
+
 	cfg := core.LoadConfig(*config)
 	var dialector gorm.Dialector
 	switch strings.ToLower(cfg.Database.Engine) {
@@ -44,7 +51,7 @@ func main() {
 
 	db, err := gorm.Open(dialector, &gorm.Config{Logger: nil})
 	if err != nil {
-		os.Exit(1)
+		fmt.Println("error connecting to database:", err.Error())
 	}
 
 	// defer so os.Exit doesn't prevent our clean up.
