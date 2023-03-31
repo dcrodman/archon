@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gorm.io/driver/postgres"
@@ -15,6 +16,7 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/data"
 	"github.com/dcrodman/archon/internal/shipgate"
+	"github.com/glebarez/sqlite"
 )
 
 var (
@@ -29,7 +31,18 @@ func main() {
 	flag.Parse()
 
 	cfg := core.LoadConfig(*config)
-	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL()))
+	var dialector gorm.Dialector
+	switch strings.ToLower(cfg.Database.Engine) {
+	case "sqlite":
+		dialector = sqlite.Open(filepath.Join(*config, "archon.db"))
+	case "postgres":
+		dialector = postgres.Open(cfg.DatabaseURL())
+	default:
+		fmt.Println("unsupported database engine:", cfg.Database.Engine)
+		os.Exit(1)
+	}
+
+	db, err := gorm.Open(dialector, &gorm.Config{Logger: nil})
 	if err != nil {
 		os.Exit(1)
 	}
