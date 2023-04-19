@@ -13,11 +13,11 @@ type Character struct {
 	ID uint64 `gorm:"primaryKey"`
 
 	Account   *Account
-	AccountID uint64
+	AccountID uint64 `gorm:"uniqueIndex:character_account_slot"`
 
 	Guildcard         uint64
 	GuildcardStr      []byte
-	Slot              uint32
+	Slot              uint32 `gorm:"uniqueIndex:character_account_slot"`
 	Experience        uint32
 	Level             uint32
 	NameColor         uint32
@@ -79,7 +79,7 @@ func CreateCharacter(db *gorm.DB, character *Character) error {
 // UpsertCharacter updates an existing Character row with the contents of character.
 func UpsertCharacter(db *gorm.DB, character *Character) error {
 	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "slot"}},
+		Columns:   []clause.Column{{Name: "account_id"}, {Name: "slot"}},
 		UpdateAll: true,
 	}).Create(&character).Error
 }
