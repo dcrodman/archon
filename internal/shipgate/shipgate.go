@@ -124,12 +124,14 @@ func (s *Server) initDatabase() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-	database, err := s.db.DB()
-	if err != nil {
-		s.Logger.Errorf("error while getting current connection: %v", err)
-	} else {
-		if err := database.Close(); err != nil {
-			s.Logger.Errorf("error while closing database connection: %v", err)
+	if s.db != nil {
+		database, err := s.db.DB()
+		if err != nil {
+			s.Logger.Errorf("error while getting current connection: %v", err)
+		} else {
+			if err := database.Close(); err != nil {
+				s.Logger.Errorf("error while closing database connection: %v", err)
+			}
 		}
 	}
 
