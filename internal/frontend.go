@@ -39,7 +39,7 @@ type frontend struct {
 // added to the WaitGroup. Context cancellations will stop the server.
 func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
 	if err := f.Backend.Init(ctx); err != nil {
-		return fmt.Errorf("error initializing %s server: %v", f.Backend.Identifier(), err)
+		return err
 	}
 
 	socket, err := f.createSocket()

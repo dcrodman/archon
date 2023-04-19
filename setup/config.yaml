@@ -40,7 +40,7 @@ patch_server:
   patch_port: 11000
   # Port on which the patch DATA Server will listen.
   data_port: 11001
-  # Full (or relative to the current directory) path to the directory containing the patch files.
+  # Full (or relative to the current directory) path to the directory containing any patch files.
   patch_dir: "/usr/local/etc/archon/patches"
   # Welcome message displayed on the patch screen.
   welcome_message: "Unconfigured"
@@ -52,9 +52,6 @@ login_server:
 character_server:
   # Port on which the CHARACTER server will listen.
   port: 12001
-  # Full (or relative to the current directory) path to the directory containing your
-  # parameter files (defaults to /usr/local/etc/archon/parameters).
-  parameters_dir: "/usr/local/etc/archon/parameters"
   # Scrolling welcome message to display to the user on the ship selection screen.
   scroll_message: "Add a welcome message..."
 

@@ -1,10 +1,9 @@
 package character
 
 import (
+	"embed"
 	"fmt"
 	"hash/crc32"
-	"io"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -17,22 +16,19 @@ const (
 	NumCharacterClasses = 12
 	// Amount of meseta new characters are given when created.
 	StartingMeseta = 300
+
+	parametersDirName = "parameters"
 )
 
 var (
-	// Parameter files we're expecting. I still don't really know what they're
-	// for yet, so emulating what I've seen others do.
-	paramFiles = []string{
-		"ItemMagEdit.prs",
-		"ItemPMT.prs",
-		"BattleParamEntry.dat",
-		"BattleParamEntry_on.dat",
-		"BattleParamEntry_lab.dat",
-		"BattleParamEntry_lab_on.dat",
-		"BattleParamEntry_ep4.dat",
-		"BattleParamEntry_ep4_on.dat",
-		"PlyLevelTbl.prs",
-	}
+	paramInitLock sync.Once
+
+	// Directly embedding the vanilla parameter files to make it a little easier to
+	// run the server for most people.
+	// TODO: Support overriding these (see config.go).
+	//
+	//go:embed parameters/*
+	paramFiles embed.FS
 
 	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
@@ -41,8 +37,6 @@ var (
 	// Starting stats for any new character. The CharClass constants can be used
 	// to index into this array to obtain the base stats for each class.
 	BaseStats [NumCharacterClasses]stats
-
-	paramInitLock sync.Once
 )
 
 // Per-character stats as stored in config files.
@@ -65,32 +59,35 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData(logger *logrus.Logger, paramFileDir string) error {
-	var initErr error
+func initParameterData(logger *logrus.Logger) (int, error) {
+	var (
+		numFilesLoaded int
+		initErr        error
+	)
 
 	paramInitLock.Do(func() {
-		if err := loadParameterFiles(logger, paramFileDir); err != nil {
-			initErr = fmt.Errorf("error loading parameter files:" + err.Error())
+		var err error
+		if numFilesLoaded, err = loadParameterFiles(logger); err != nil {
+			initErr = fmt.Errorf("error loading parameter files: %w", err)
 			return
 		}
 
 		// LoadConfig the base stats for creating new characters.
-		statsFile, _ := os.Open(filepath.Join(paramFileDir, "PlyLevelTbl.prs"))
-		compressedStatsFile, err := io.ReadAll(statsFile)
+		compressedStatsData, err := paramFiles.ReadFile(filepath.Join(parametersDirName, "PlyLevelTbl.prs"))
 		if err != nil {
-			initErr = fmt.Errorf("error loading PlyLevelTbl.prs:" + err.Error())
+			initErr = fmt.Errorf("error loading PlyLevelTbl.prs: %w", err)
 			return
 		}
 
-		decompressedSize, err := prs.DecompressSize(compressedStatsFile)
+		decompressedSize, err := prs.DecompressSize(compressedStatsData)
 		if err != nil {
-			initErr = fmt.Errorf("error decompressing size of PlyLevelTbl.prs: %v", err)
+			initErr = fmt.Errorf("error decompressing size of PlyLevelTbl.prs: %w", err)
 			return
 		}
 
-		decompressedStatsFile, err := prs.Decompress(compressedStatsFile, decompressedSize)
+		decompressedStatsFile, err := prs.Decompress(compressedStatsData, decompressedSize)
 		if err != nil {
-			initErr = fmt.Errorf("error decompressing PlyLevelTbl.prs: %v", err)
+			initErr = fmt.Errorf("error decompressing PlyLevelTbl.prs: %w", err)
 		}
 
 		// Base character class stats are stored sequentially, each 14 bytes long.
@@ -99,23 +96,30 @@ func initParameterData(logger *logrus.Logger, paramFileDir string) error {
 		}
 	})
 
-	return initErr
+	return numFilesLoaded, initErr
 }
 
 // LoadConfig the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
-func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
-	logger.Infof("loading parameters from %s", paramFileDir)
+func loadParameterFiles(logger *logrus.Logger) (int, error) {
+	logger.Info("loading embedded parameter files")
 
 	offset := 0
 	var tmpChunkData []byte
 
-	for _, paramFile := range paramFiles {
-		data, err := os.ReadFile(filepath.Join(paramFileDir, paramFile))
+	defaultFiles, err := paramFiles.ReadDir(parametersDirName)
+	if err != nil {
+		return 0, fmt.Errorf("error loading embedded parameter files: %w", err)
+	}
+
+	var numFilesLoaded int
+	for _, paramFile := range defaultFiles {
+		data, err := paramFiles.ReadFile(fmt.Sprintf("%s/%s", parametersDirName, paramFile.Name()))
 		if err != nil {
-			return fmt.Errorf("error reading parameter file: %v", err)
+			return 0, fmt.Errorf("error reading parameter file: %w", err)
 		}
 
+		numFilesLoaded++
 		fileSize := len(data)
 
 		entry := &parameterEntry{
@@ -124,7 +128,7 @@ func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
 			Offset:   uint32(offset),
 			Filename: [64]uint8{},
 		}
-		copy(entry.Filename[:], paramFile)
+		copy(entry.Filename[:], []uint8(paramFile.Name()))
 
 		bytes, _ := bytes.BytesFromStruct(entry)
 		paramHeaderData = append(paramHeaderData, bytes...)
@@ -132,7 +136,7 @@ func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
 
 		offset += fileSize
 
-		logger.Infof("%s (%v bytes, checksum: 0x%x)", paramFile, fileSize, entry.Checksum)
+		logger.Infof("%s (%v bytes, checksum: 0x%x)", paramFile.Name(), fileSize, entry.Checksum)
 	}
 
 	// Offset should at this point be the total size of the files
@@ -149,5 +153,5 @@ func loadParameterFiles(logger *logrus.Logger, paramFileDir string) error {
 	if offset > 0 {
 		paramChunkData[numChunks] = tmpChunkData[numChunks*maxDataChunkSize:]
 	}
-	return nil
+	return numFilesLoaded, nil
 }

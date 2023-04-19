@@ -24,7 +24,7 @@ func TestPRS(t *testing.T) {
 		t.Fatalf("error opening wantedCharacterStats.json: %v", err)
 	}
 
-	testFile := "../../setup/parameters/PlyLevelTbl.prs"
+	testFile := "parameters/PlyLevelTbl.prs"
 	wantCompressed, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("error opening parameters/PlyLevelTbl.prs: %v", err)

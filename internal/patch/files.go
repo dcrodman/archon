@@ -1,7 +1,6 @@
 package patch
 
 import (
-	"errors"
 	"fmt"
 	"hash/crc32"
 	"os"
@@ -85,10 +84,6 @@ func initializePatchData(logger *logrus.Logger, patchDir string) error {
 		}
 
 		buildPatchIndex(rootNode)
-
-		if len(patchIndex) < 1 {
-			initErr = errors.New("error loading patch files: at least one patch file must be present")
-		}
 	})
 
 	return initErr

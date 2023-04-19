@@ -65,8 +65,9 @@ type Server struct {
 	Config *core.Config
 	Logger *logrus.Logger
 
-	kvCache        *Cache
-	shipgateClient shipgate.Shipgate
+	numParameterFiles int
+	kvCache           *Cache
+	shipgateClient    shipgate.Shipgate
 }
 
 func (s *Server) Identifier() string {
@@ -77,7 +78,8 @@ func (s *Server) Init(ctx context.Context) error {
 	s.kvCache = NewCache()
 	s.shipgateClient = shipgate.NewRPCClient(s.Config)
 
-	if err := initParameterData(s.Logger, s.Config.CharacterServer.ParametersDir); err != nil {
+	var err error
+	if s.numParameterFiles, err = initParameterData(s.Logger); err != nil {
 		return err
 	}
 	return nil
@@ -128,7 +130,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		bytes.StructFromBytes(data, &chunkReq)
 		err = s.handleGuildcardChunk(c, &chunkReq)
 	case packets.LoginParameterHeaderReqType:
-		err = s.sendParameterHeader(c, uint32(len(paramFiles)), paramHeaderData)
+		err = s.sendParameterHeader(c, uint32(s.numParameterFiles), paramHeaderData)
 	case packets.LoginParameterChunkReqType:
 		var pkt packets.BBHeader
 		bytes.StructFromBytes(data, &pkt)

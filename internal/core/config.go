@@ -75,7 +75,8 @@ type Config struct {
 		Port int `mapstructure:"port"`
 		// Full (or relative to the current directory) path to the directory containing your
 		// parameter files (defaults to /usr/local/etc/archon/parameters).
-		ParametersDir string `mapstructure:"parameters_dir"`
+		// TODO: Restore this config option when adding support for overriding these files.
+		// ParametersDir string `mapstructure:"parameters_dir"`
 		// Scrolling welcome message to display to the user on the ship selection screen.
 		ScrollMessage string `mapstructure:"scroll_message"`
 	} `mapstructure:"character_server"`
