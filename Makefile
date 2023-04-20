@@ -1,4 +1,3 @@
-CONFIG_PATH=/usr/local/etc/archon
 BIN_DIR ?= bin
 
 .DEFAULT_TARGET := all
@@ -17,7 +16,7 @@ test:
 	go test ./...
 
 run: build
-	${BIN_DIR}/server -config ${CONFIG_PATH}
+	${BIN_DIR}/server
 
 # Requires that protobuf be installed: https://twitchtv.github.io/twirp/docs/install.html
 protos:

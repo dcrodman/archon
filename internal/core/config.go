@@ -80,9 +80,12 @@ const envVarPrefix = "ARCHON"
 
 // LoadConfig initializes Viper with the contents of the config file under configPath.
 func LoadConfig(configPath string) *Config {
-	viper.AddConfigPath(configPath)
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
+	if configPath != "" {
+		viper.AddConfigPath(configPath)
+	}
+	viper.AddConfigPath(".")
 
 	viper.SetEnvPrefix(envVarPrefix)
 	viper.AutomaticEnv()

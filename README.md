@@ -28,25 +28,39 @@ only two requirements are [Git](https://git-scm.com/) and [Go](https://go.dev/do
     git clone https://github.com/dcrodman/archon.git && cd archon
     make && bin/sever
 
-#### Add the first player account
-
-You can do this with your own tool (or SQL) Archon comes with a small utility for managing accounts:
+Archon comes with a small utility for managing accounts, unless you want to run the SQL yourself. To add
+player accounts, just run the tool and follow the prompts:
 
     bin/account add
 
 ### Overriding configs
 
-#### Hostname and Broadcast IP
+The default configuration should be fine for most cases, though if you want other players to be able
+to connect there are a couple of configs you'll need to change. The default configuration can be overridden
+one of two ways:
 
-In order for clients outside your network to connect, Archon needs to listen on a network interface. Once
-you know your server's IP address, update `hostname` and `external_ip` in `config.yaml`. These values may
+1. Pass the `-config` flag to `bin/server` with a path to a directory containing the config file. This also
+alters where the database will be created.
+```
+# if your config file is in /usr/local/etc/archon/config.yaml:
+bin/server -config /usr/local/etc/archon
+```
+2. Set `ARCHON_` prefixed environment variables, for example `ARCHON_HOSTNAME` or `ARCHON_DATABASE_ENGINE`.
+
+All configuration are defined and commented in `config.yaml`. Feel free to copy this file as a starting point.
+
+### Hostname and Broadcast IP
+
+In order for clients outside your network to connect, Archon needs to listen on an external network interface.
+Once you know your server's IP address, update `hostname` and `external_ip` in `config.yaml`. These values may
 be the same but if the server will be running on a private subnet (like a home network) then `hostname` 
 should be set to the IP assigned by the router and the `external_ip` to the internet-facing address.
 
 Note: If the server will be hosted on a machine in a private network, you'll need to set up port forwarding
-on the router between the server ports and the machine running Archon. 
+on the router between the server ports and the machine running Archon. Even then this is only recommended
+if you have a static IP; you're better off hosting this on a cloud server somewhere for actual gameplay.
 
-#### Add files to the patch directory
+### Add files to the patch directory
 
 It's recommended that you take the critical files from the copy of the client you intend for people to
 use and put the majority of them in the patch directory (`patch_server.patch_dir` in the config file).

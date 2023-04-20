@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	config   = flag.String("config", "./", "Path to the directory containing the server config file")
+	config   = flag.String("config", "", "Path to the config/data directory")
 	username = flag.String("username", "", "Username for user operation")
 	password = flag.String("password", "", "Password for user operation")
 	email    = flag.String("email", "", "Email for user operation")
@@ -32,9 +32,11 @@ func main() {
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if err := os.Chdir(*config); err != nil {
-		fmt.Println("error changing to config directory:", err)
-		os.Exit(1)
+	if *config != "" {
+		if err := os.Chdir(*config); err != nil {
+			fmt.Println("error changing to config directory:", err)
+			os.Exit(1)
+		}
 	}
 
 	cfg := core.LoadConfig(*config)

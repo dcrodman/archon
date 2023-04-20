@@ -34,7 +34,7 @@ database:
   # sslmode: disable
 
 patch_server:
-  # Port on whith the PATCH server will listen.
+  # Port on which the PATCH server will listen.
   patch_port: 11000
   # Port on which the patch DATA Server will listen.
   data_port: 11001
@@ -69,7 +69,7 @@ block_server:
   # Base block port.
   port: 15001
   # Number of lobbies to create per block.
-  num_lobbies: 15
+  num_lobbies: 16
 
 # With the exception of pprof, these should only be enabled for development.
 debugging:
