@@ -2,12 +2,8 @@ package shipgate
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -21,34 +17,8 @@ import (
 	"github.com/dcrodman/archon/internal/core/data"
 )
 
-// NewRPCClient returns a Shipgate client initialized with the configured certificates.
 func NewRPCClient(cfg *core.Config) Shipgate {
-	// Load client cert
-	cert, err := tls.LoadX509KeyPair(cfg.ShipgateCertFile, cfg.ShipgateServer.SSLKeyFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Load CA cert
-	caCert, err := os.ReadFile(cfg.ShipgateCertFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	// Setup HTTPS client
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-	}
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
-
-	return NewShipgateProtobufClient(cfg.ShipgateAddress(), httpClient)
+	return NewShipgateProtobufClient(cfg.ShipgateAddress(), http.DefaultClient)
 }
 
 type Server struct {
@@ -78,13 +48,9 @@ func (s *Server) Start(ctx context.Context) {
 			}),
 		}
 
-		if err := s.httpServer.ListenAndServeTLS(
-			s.Config.ShipgateCertFile,
-			s.Config.ShipgateServer.SSLKeyFile,
-		); err != nil {
+		if err := s.httpServer.ListenAndServe(); err != nil {
 			s.Logger.Errorf("[SHIPGATE] error: %v", err)
 		}
-
 		s.Logger.Printf("[SHIPGATE] exited")
 	}()
 }

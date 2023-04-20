@@ -76,17 +76,6 @@ then create the database (substitute the credentials if you wish, they just have
     > CREATE USER archonadmin WITH ENCRYPTED PASSWORD 'psoadminpassword';
     > GRANT ALL ON ALL TABLES IN SCHEMA public TO archonadmin;
 
-#### Generate the shipgate SSL certificates
-
-The shipgate API server requires clients to connect over SSL as both a form of security as well as
-mutual authentication. Archon includes a tool for generating these certificates, which need to be
-present in the server's config directory:
-
-    ./certgen
-
-The tool will prompt you for your server's external_ip (which should be the same as `external_ip`
-in `config.yaml`). You may also provide a CIDR block.
-
 ## Connecting clients
 
 There are a few possible ways to accomplish this:  

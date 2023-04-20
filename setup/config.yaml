@@ -15,8 +15,6 @@ max_connections: 3000
 log_file_path: ""
 # Minimum level of a log required to be written. Options: debug, info, warn, error
 log_level: debug
-# X.509 certificate for the shipgate server.
-shipgate_certificate_file: "certificate.pem"
 
 web:
   # HTTP endpoint port for publically accessible API endpoints.
@@ -58,8 +56,6 @@ character_server:
 shipgate_server:
   # Port on which the Shipgate's gRPC server will listen.
   port: 13000
-  # Private key file corresponding to shipgate_certificate_file (above).
-  ssl_key_file: "key.pem"
 
 ship_server:
   # Port on which the SHIP server will listen.
