@@ -146,7 +146,7 @@ func (c *Config) BroadcastIP() [4]byte {
 	// Hacky, but chances are the IP address isn't going to start with 0 and a
 	// fixed-length array can't be null.
 	if c.cachedIPBytes[0] == 0x00 {
-		parts := strings.Split(viper.GetString("external_ip"), ".")
+		parts := strings.Split(c.ExternalIP, ".")
 		for i := 0; i < 4; i++ {
 			tmp, _ := strconv.ParseUint(parts[i], 10, 8)
 			c.cachedIPBytes[i] = uint8(tmp)

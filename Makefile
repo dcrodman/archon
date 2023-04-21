@@ -13,7 +13,7 @@ lint:
 	golangci-lint run
 
 test:
-	go test ./...
+	go test ./internal/...
 
 run: build
 	${BIN_DIR}/server
