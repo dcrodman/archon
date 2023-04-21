@@ -7,22 +7,20 @@ import (
 	"unicode/utf16"
 )
 
-// ExpandUtf16 converts an array of UTF-16 elements to a slice of uint8 elements in
-// little endian order. E.g: [0x1234] -> [0x34, 0x12]
-func ExpandUtf16(src []uint16) []uint8 {
-	expanded := make([]uint8, 2*len(src))
-	for i, v := range src {
+// ConvertToUtf16 converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
+func ConvertToUtf16(str string) []byte {
+	strRunes := bytes.Runes([]byte(str))
+	encoded := utf16.Encode(strRunes)
+
+	// Convert the array of UTF-16 elements to a slice of uint8 elements in
+	// little endian order. E.g: [0x1234] -> [0x34, 0x12]
+	expanded := make([]uint8, 2*len(encoded))
+	for i, v := range encoded {
 		idx := i * 2
 		expanded[idx] = uint8(v)
 		expanded[idx+1] = uint8((v >> 8) & 0xFF)
 	}
 	return expanded
-}
-
-// ConvertToUtf16 converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
-func ConvertToUtf16(str string) []byte {
-	strRunes := bytes.Runes([]byte(str))
-	return ExpandUtf16(utf16.Encode(strRunes))
 }
 
 // StripPadding returns a slice of b without the trailing 0s.
@@ -32,12 +30,12 @@ func StripPadding(b []byte) []byte {
 			return b[:i+1]
 		}
 	}
-	return b
+	return []byte{}
 }
 
 // BytesFromStruct serializes the fields of a struct to an array of bytes in the
-// order in which the fields are declared. Calls panic() if data is not a struct
-// or pointer to struct, or if there was an error writing a field.
+// order in which the fields are declared and returns total number of bytes converted.
+// Panics if data is not a struct or pointer to struct, or if there was an error writing a field.
 func BytesFromStruct(data interface{}) ([]byte, int) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()

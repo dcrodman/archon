@@ -141,8 +141,10 @@ func (c *Client) Send(packet interface{}) error {
 }
 
 // adjustPacketLength pads the length of a packet to a multiple of the header length and
-// adjusts first two bytes of the header to the corrected size (may be a no-op). PSOBB
-// clients will reject packets that are not padded in this manner.
+// adjusts first two bytes of the header to the corrected size (may be a no-op). Returns
+// the adjusted packet as well as the new length.
+//
+// PSOBB clients will reject packets that are not multiples of the header size.
 func adjustPacketLength(data []byte, length uint16, headerSize uint16) ([]byte, uint16) {
 	for length%headerSize != 0 {
 		length++

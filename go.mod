@@ -6,6 +6,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/glebarez/sqlite v1.7.0
 	github.com/go-test/deep v1.0.7
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gopacket v1.1.19
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
