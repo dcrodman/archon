@@ -20,6 +20,10 @@ type Account struct {
 	Active           bool `gorm:"default:true"`
 	TeamID           int
 	PrivilegeLevel   byte
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt
 }
 
 func FindAccountByID(db *gorm.DB, id uint) (*Account, error) {

@@ -59,7 +59,11 @@ type Character struct {
 // the given slot or nil if none exists.
 func FindCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error) {
 	var character Character
-	err := db.Where("slot = ? AND account_id = ?", slot, &accountID).First(&character).Error
+	err := db.
+		Where("slot = ? AND account_id = ?", slot, &accountID).
+		Preload("Account").
+		First(&character).
+		Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -69,11 +73,6 @@ func FindCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error)
 	}
 
 	return &character, nil
-}
-
-// CreateCharacter persists a Character to the database.
-func CreateCharacter(db *gorm.DB, character *Character) error {
-	return db.Create(&character).Error
 }
 
 // UpsertCharacter updates an existing Character row with the contents of character.
