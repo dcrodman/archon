@@ -63,8 +63,8 @@ func (s *Server) Init(ctx context.Context) error {
 	// Register this ship with the shipgate so that it can start accepting players.
 	if _, err := s.shipgateClient.RegisterShip(ctx, &shipgate.RegisterShipRequest{
 		Name:    s.Config.ShipServer.Name,
+		Address: s.Config.ExternalIP,
 		Port:    strconv.Itoa(s.Config.ShipServer.Port),
-		Address: s.Config.Hostname,
 	}); err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}

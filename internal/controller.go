@@ -87,7 +87,7 @@ func (c *Controller) declareServers() {
 	var blockServers []*frontend
 	for i := 1; i <= c.Config.ShipServer.NumBlocks; i++ {
 		name := fmt.Sprintf("BLOCK%02d", i)
-		address := c.buildAddress(c.Config.BlockServer.Port + i)
+		address := fmt.Sprintf("%s:%v", c.Config.ExternalIP, c.Config.BlockServer.Port+i)
 
 		blocks = append(blocks, ship.Block{
 			Name: name, Address: address, ID: i,
