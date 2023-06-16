@@ -49,6 +49,8 @@ type Character struct {
 	ATA               uint16
 	LCK               uint16
 	Meseta            uint32
+	HPMaterialsUsed   byte
+	TPMaterialsUsed   byte
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

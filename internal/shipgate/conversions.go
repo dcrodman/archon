@@ -42,6 +42,8 @@ func characterToProto(character *data.Character) *proto.Character {
 		Ata:               uint32(character.ATA),
 		Lck:               uint32(character.LCK),
 		Meseta:            character.Meseta,
+		HpMaterialsUsed:   int32(character.HPMaterialsUsed),
+		TpMaterialsUsed:   int32(character.TPMaterialsUsed),
 	}
 	return protoCharacter
 }
@@ -82,6 +84,8 @@ func characterFromProto(character *proto.Character) *data.Character {
 		ATA:               uint16(character.Ata),
 		LCK:               uint16(character.Lck),
 		Meseta:            character.Meseta,
+		HPMaterialsUsed:   byte(character.HpMaterialsUsed),
+		TPMaterialsUsed:   byte(character.TpMaterialsUsed),
 	}
 	return dbCharacter
 }

@@ -61,6 +61,8 @@ message Character {
   uint32 ata = 33;
   uint32 lck = 34;
   uint32 meseta = 35;
+  int32 hp_materials_used = 36;
+  int32 tp_materials_used = 37;
 }
 
 message GuildcardEntry {

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
@@ -64,6 +65,9 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		var loginPkt packets.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
+	case packets.CharacterDataType:
+		// TODO: Probably have some data to copy in here.
+		err = s.sendPacket67(c)
 	default:
 		s.Logger.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
 	}
@@ -154,6 +158,12 @@ func (s *Server) sendLobbyList(c *client.Client) error {
 	})
 }
 
+const (
+	// Values stolen from Tethealla, though it almost certainly doesn't matter.
+	NameColorNormal = 0xFFFFFFFF
+	NameColorGM     = 0xFF1D94F7
+)
+
 func (s *Server) fetchAndSendCharacter(ctx context.Context, c *client.Client) error {
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,
@@ -162,52 +172,52 @@ func (s *Server) fetchAndSendCharacter(ctx context.Context, c *client.Client) er
 	if err != nil {
 		return fmt.Errorf("error loading selected character: %v", err)
 	}
-	character := resp.Character
+	dbCharacter := resp.Character
 
 	charPkt := &packets.FullCharacter{
 		Header: packets.BBHeader{Type: packets.FullCharacterType},
-		// TODO: All of these.
-		// NumInventoryItems uint8
-		// HPMaterials       uint8
-		// TPMaterials       uint8
-		// Language          uint8
-		// Inventory         [30]InventorySlot
-		ATP:        uint16(character.Atp),
-		MST:        uint16(character.Mst),
-		EVP:        uint16(character.Evp),
-		HP:         uint16(character.Hp),
-		DFP:        uint16(character.Dfp),
-		ATA:        uint16(character.Ata),
-		LCK:        uint16(character.Lck),
-		Level:      uint16(character.Level),
-		Experience: character.Experience,
-		Meseta:     character.Meseta,
-		// NameColorBlue
-		// NameColorGreen
-		// NameColorRed
-		// NameColorTransparency
-		// SkinID
-		SectionID: uint8(character.SectionId),
-		Class:     uint8(character.Class),
-		// SkinFlag
-		Costume:        uint16(character.Costume),
-		Skin:           uint16(character.Skin),
-		Face:           uint16(character.Face),
-		Head:           uint16(character.Head),
-		Hair:           uint16(character.Hair),
-		HairColorRed:   uint16(character.HairRed),
-		HairColorGreen: uint16(character.HairGreen),
-		HairColorBlue:  uint16(character.HairBlue),
-		ProportionX:    uint32(character.ProportionX),
-		ProportionY:    uint32(character.ProportionY),
-		PlayTime:       character.Playtime,
+		// NumInventoryItems: 0,
+		HPMaterials:    uint8(dbCharacter.HpMaterialsUsed),
+		TPMaterials:    uint8(dbCharacter.TpMaterialsUsed),
+		Language:       0,
+		ATP:            uint16(dbCharacter.Atp),
+		MST:            uint16(dbCharacter.Mst),
+		EVP:            uint16(dbCharacter.Evp),
+		HP:             uint16(dbCharacter.Hp),
+		DFP:            uint16(dbCharacter.Dfp),
+		ATA:            uint16(dbCharacter.Ata),
+		LCK:            uint16(dbCharacter.Lck),
+		Level:          uint16(dbCharacter.Level),
+		Experience:     dbCharacter.Experience,
+		SkinID:         uint16(dbCharacter.ModelType),
+		SectionID:      uint8(dbCharacter.SectionId),
+		Class:          uint8(dbCharacter.Class),
+		SkinFlag:       uint8(dbCharacter.V2Flags),
+		Costume:        uint16(dbCharacter.Costume),
+		Skin:           uint16(dbCharacter.Skin),
+		Face:           uint16(dbCharacter.Face),
+		Head:           uint16(dbCharacter.Head),
+		Hair:           uint16(dbCharacter.Hair),
+		HairColorRed:   uint16(dbCharacter.HairRed),
+		HairColorGreen: uint16(dbCharacter.HairGreen),
+		HairColorBlue:  uint16(dbCharacter.HairBlue),
+		ProportionX:    uint32(dbCharacter.ProportionX),
+		ProportionY:    uint32(dbCharacter.ProportionY),
+		PlayTime:       dbCharacter.Playtime,
 	}
-	copy(charPkt.GuildcardStr[:], character.GuildcardStr)
-	copy(charPkt.Name[:], character.Name)
-	// copy(charPkt.KeyConfig[:], character.)
-	// copy(charPkt.Techniques[:], character.)
-	// copy(charPkt.Options[:], )
-	// copy(charPkt.QuestData[:], )
+	copy(charPkt.GuildcardStr[:], dbCharacter.GuildcardStr)
+	copy(charPkt.Name[:], dbCharacter.Name)
+
+	charPkt.NameColor = NameColorNormal
+	if c.IsGm {
+		charPkt.NameColor = NameColorGM
+	}
+
+	// TODO: Tethealla doesn't really support editing this either, so will need to figure out
+	// how to save this and return it to the player rather than using the default.
+	copy(charPkt.KeyConfig[:], character.BaseKeyConfig[:])
+
+	// TODO: Copy the techniques and inventory here.
 
 	return c.Send(charPkt)
 }
@@ -216,5 +226,16 @@ func (s *Server) sendFullCharacterEnd(c *client.Client) error {
 	// Acts as an EOF for the full character data.
 	return c.Send(&packets.BBHeader{
 		Type: packets.FullCharacterEndType,
+	})
+}
+
+func (s *Server) sendPacket67(c *client.Client) error {
+	return c.Send(&packets.Packet67{
+		Header: packets.BBHeader{
+			Type: 0x67,
+		},
+		Unknown1:  0x01,
+		PlayerTag: 0x00010000,
+		// Something: ,
 	})
 }
