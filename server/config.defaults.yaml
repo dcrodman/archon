@@ -38,8 +38,6 @@ patch_server:
   patch_port: 11000
   # Port on which the patch DATA Server will listen.
   data_port: 11001
-  # Full (or relative to the current directory) path to the directory containing any patch files.
-  patch_dir: "/usr/local/etc/archon/patches"
   # Welcome message displayed on the patch screen.
   welcome_message: "Unconfigured"
 

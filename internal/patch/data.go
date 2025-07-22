@@ -33,7 +33,7 @@ func (s DataServer) Identifier() string {
 }
 
 func (s *DataServer) Init(ctx context.Context) error {
-	return initializePatchData(s.Logger, s.Config.PatchServer.PatchDir)
+	return initializePatchData(s.Logger, s.Config)
 }
 
 func (s *DataServer) SetUpClient(c *client.Client) {

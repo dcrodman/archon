@@ -12,8 +12,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/spf13/viper"
-
 	"github.com/dcrodman/archon/internal"
 	"github.com/dcrodman/archon/internal/core"
 )
@@ -24,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	config := core.LoadConfig(*configFlag)
-	fmt.Println("loaded configuration from ", viper.ConfigFileUsed())
+	fmt.Println("loaded configuration from", config.FilePath)
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.

@@ -5,13 +5,20 @@ import (
 	"hash/crc32"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
+	"github.com/dcrodman/archon/internal/core"
 	"github.com/sirupsen/logrus"
 )
 
-// maxFileChunkSize is the maximum number of bytes we can send of a file at a time.
-const maxFileChunkSize = 24576
+const (
+	// PatchDirectory is the (relative) directory in which to look for patch files.
+	PatchDirectory = "patches"
+
+	// maxFileChunkSize is the maximum number of bytes we can send of a file at a time.
+	maxFileChunkSize = 24576
+)
 
 var (
 	patchInitLock sync.Once
@@ -66,18 +73,19 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData(logger *logrus.Logger, patchDir string) error {
+func initializePatchData(logger *logrus.Logger, c *core.Config) error {
 	var initErr error
 
 	patchInitLock.Do(func() {
+		patchDir := filepath.Join(c.BaseDir, PatchDirectory)
 		if _, err := os.Stat(patchDir); os.IsNotExist(err) {
 			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", patchDir)
 			return
 		}
 
-		rootNode = &directoryNode{path: patchDir, clientPath: "./"}
-
 		logger.Infof("loading patch files from %s", patchDir)
+
+		rootNode = &directoryNode{path: patchDir, clientPath: "./"}
 		if err := buildPatchFileTree(logger, rootNode); err != nil {
 			initErr = fmt.Errorf("error loading patch files: %s", err)
 			return

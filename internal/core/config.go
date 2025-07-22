@@ -3,15 +3,21 @@ package core
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 )
 
+const envVarPrefix = "ARCHON"
+
 // Config contains all of the configuration options available to any of Archon's
 // server components. Descriptions are in config.yaml.
 type Config struct {
+	FilePath string
+	BaseDir  string
+
 	Hostname       string `mapstructure:"hostname"`
 	ExternalIP     string `mapstructure:"external_ip"`
 	MaxConnections int    `mapstructure:"max_connections"`
@@ -39,7 +45,6 @@ type Config struct {
 	PatchServer struct {
 		PatchPort      int    `mapstructure:"patch_port"`
 		DataPort       int    `mapstructure:"data_port"`
-		PatchDir       string `mapstructure:"patch_dir"`
 		WelcomeMessage string `mapstructure:"welcome_message"`
 	} `mapstructure:"patch_server"`
 
@@ -74,8 +79,6 @@ type Config struct {
 
 	cachedIPBytes [4]byte
 }
-
-const envVarPrefix = "ARCHON"
 
 // LoadConfig initializes Viper with the contents of the config file under configPath.
 func LoadConfig(configPath string) *Config {
@@ -115,6 +118,9 @@ func LoadConfig(configPath string) *Config {
 		fmt.Printf("error unmrarshaling config object: %v", err)
 		os.Exit(1)
 	}
+
+	config.FilePath = viper.ConfigFileUsed()
+	config.BaseDir = filepath.Dir(viper.ConfigFileUsed())
 	return config
 }
 
