@@ -74,7 +74,7 @@ func (c *Controller) Start(ctx context.Context) {
 		time.Sleep(time.Second)
 	}
 
-	// Configure and run all of our servers.
+	// Configure, initialize, run all of our servers.
 	c.declareServers()
 	c.run(ctx)
 }
@@ -153,11 +153,16 @@ func (c *Controller) declareServers() {
 }
 
 func (c *Controller) run(ctx context.Context) {
-	// Start all of our servers. Failure to initialize one of the registered servers is considered terminal.
 	for _, server := range c.servers {
 		server.Config = c.Config
 		server.Logger = c.logger
 
+		if err := server.Backend.Init(ctx); err != nil {
+			c.logger.Errorf("error initializing %s server: %v", server.Backend.Identifier(), err)
+			return
+		}
+	}
+	for _, server := range c.servers {
 		if err := server.Start(ctx, &c.wg); err != nil {
 			c.logger.Errorf("error starting %s server: %v", server.Backend.Identifier(), err)
 			return

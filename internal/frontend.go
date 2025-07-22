@@ -38,10 +38,6 @@ type frontend struct {
 // A blocking loop for accepting client connections is spun off in its own goroutine and
 // added to the WaitGroup. Context cancellations will stop the server.
 func (f *frontend) Start(ctx context.Context, wg *sync.WaitGroup) error {
-	if err := f.Backend.Init(ctx); err != nil {
-		return err
-	}
-
 	socket, err := f.createSocket()
 	if err != nil {
 		return fmt.Errorf("error creating socket on %s: %v", f.Address, err)

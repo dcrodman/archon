@@ -136,7 +136,7 @@ func loadParameterFiles(logger *logrus.Logger) (int, error) {
 
 		offset += fileSize
 
-		logger.Infof("%s (%v bytes, checksum: 0x%x)", paramFile.Name(), fileSize, entry.Checksum)
+		logger.Debugf("%s (%v bytes)", paramFile.Name(), fileSize)
 	}
 
 	// Offset should at this point be the total size of the files
