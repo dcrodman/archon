@@ -1,6 +1,7 @@
-*.iml
-*.idea
-*.sublime-*
-*archon.debug
+# User directory for server configuration.
+server/config.yaml
+server/archon.db
+server/patches/*
+
+# Compiled Go binaries.
 bin/
-cmd/server/__debug_bin

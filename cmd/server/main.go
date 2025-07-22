@@ -18,7 +18,7 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 )
 
-var configFlag = flag.String("config", "", "Path to the config/data directory")
+var configFlag = flag.String("config", "", "Path to the server config/data directory")
 
 func main() {
 	flag.Parse()
@@ -32,7 +32,7 @@ func main() {
 		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
 
 	config := core.LoadConfig(*configFlag)
-	fmt.Println("using configuration file:", viper.ConfigFileUsed())
+	fmt.Println("loaded configuration from ", viper.ConfigFileUsed())
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.

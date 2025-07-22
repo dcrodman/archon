@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -80,22 +79,24 @@ const envVarPrefix = "ARCHON"
 
 // LoadConfig initializes Viper with the contents of the config file under configPath.
 func LoadConfig(configPath string) *Config {
-	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	if configPath != "" {
 		viper.AddConfigPath(configPath)
 	}
-	viper.AddConfigPath(".")
+	viper.AddConfigPath("./server")
 
 	viper.SetEnvPrefix(envVarPrefix)
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err != nil {
-		if errors.Is(err, viper.ConfigFileNotFoundError{}) {
-			fmt.Printf("error reading config file: no config file in path %s", configPath)
-		} else {
-			fmt.Printf("error reading config file: %v", err)
+	var err error
+	for _, filename := range []string{"config", "config.defaults"} {
+		viper.SetConfigName(filename)
+		if err = viper.ReadInConfig(); err == nil {
+			break
 		}
+	}
+	if err != nil {
+		fmt.Printf("error reading config file: %v", err)
 		os.Exit(1)
 	}
 
