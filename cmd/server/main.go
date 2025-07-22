@@ -23,14 +23,6 @@ var configFlag = flag.String("config", "", "Path to the server config/data direc
 func main() {
 	flag.Parse()
 
-	fmt.Println("Archon PSO Backend, Copyright (C) 2014 Andrew Rodman\n" +
-		"=====================================================\n" +
-		"This program is free software: you can redistribute it and/or\n" +
-		"modify it under the terms of the GNU General Public License as\n" +
-		"published by the Free Software Foundation, either version 3 of\n" +
-		"the License, or (at your option) any later version. This program\n" +
-		"is distributed WITHOUT ANY WARRANTY; See LICENSE for details.")
-
 	config := core.LoadConfig(*configFlag)
 	fmt.Println("loaded configuration from ", viper.ConfigFileUsed())
 
