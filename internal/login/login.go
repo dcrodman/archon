@@ -3,7 +3,7 @@ package login
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -25,7 +25,7 @@ var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyr
 type Server struct {
 	Name   string
 	Config *core.Config
-	Logger *logrus.Logger
+	Logger *zap.SugaredLogger
 
 	shipgateClient shipgate.Shipgate
 }

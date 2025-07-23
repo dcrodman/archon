@@ -9,7 +9,7 @@ import (
 
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/prs"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -59,7 +59,7 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData(logger *logrus.Logger) (int, error) {
+func initParameterData(logger *zap.SugaredLogger) (int, error) {
 	var (
 		numFilesLoaded int
 		initErr        error
@@ -101,7 +101,7 @@ func initParameterData(logger *logrus.Logger) (int, error) {
 
 // LoadConfig the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB packets.
-func loadParameterFiles(logger *logrus.Logger) (int, error) {
+func loadParameterFiles(logger *zap.SugaredLogger) (int, error) {
 	logger.Info("loading embedded parameter files")
 
 	offset := 0

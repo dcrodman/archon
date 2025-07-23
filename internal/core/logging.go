@@ -2,41 +2,33 @@ package core
 
 import (
 	"fmt"
-	"io"
-	"os"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-func NewLogger(cfg *Config) (*logrus.Logger, error) {
-	var w io.Writer
-	var err error
-
-	if cfg.LogFilePath == "" {
-		w = os.Stdout
-	} else {
-		w, err = os.OpenFile(cfg.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return nil, fmt.Errorf("error opening log file: %w", err)
-		}
-	}
-
-	logLvl, err := logrus.ParseLevel(viper.GetString("log_level"))
+// NewLogger returns a logger intended to be used for general application logs.
+func NewLogger(cfg *Config) (*zap.SugaredLogger, error) {
+	logLvl, err := zapcore.ParseLevel(cfg.Logging.LogLevel)
 	if err != nil {
-		fmt.Println("error parsing Log level: " + err.Error())
+		return nil, fmt.Errorf("parsing log level: %w", err)
 	}
 
-	logger := &logrus.Logger{
-		Out: w,
-		Formatter: &logrus.TextFormatter{
-			TimestampFormat: "2006-01-02 15:04:05",
-			FullTimestamp:   true,
-			DisableSorting:  true,
-		},
-		Hooks: make(logrus.LevelHooks),
-		Level: logLvl,
+	logConfig := zap.NewDevelopmentConfig()
+	logConfig.Level = zap.NewAtomicLevelAt(logLvl)
+	if cfg.Logging.LogFilePath != "" {
+		logConfig.OutputPaths = []string{cfg.Logging.LogFilePath}
+	}
+	logConfig.DisableCaller = !cfg.Logging.IncludeCaller
+
+	logConfig.EncoderConfig = zap.NewDevelopmentEncoderConfig()
+	logConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05")
+	logConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	logger, err := logConfig.Build()
+	if err != nil {
+		return nil, fmt.Errorf("building logger: %w", err)
 	}
 
-	return logger, nil
+	return logger.Sugar(), nil
 }

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/dcrodman/archon/internal/block"
 	"github.com/dcrodman/archon/internal/character"
@@ -25,7 +25,7 @@ import (
 type Controller struct {
 	Config *core.Config
 
-	logger *logrus.Logger
+	logger *zap.SugaredLogger
 	wg     sync.WaitGroup
 
 	shipgateServer *shipgate.Server
@@ -39,7 +39,7 @@ func (c *Controller) Start(ctx context.Context) {
 	// Set up the logger, which will be used by all sub-servers.
 	c.logger, err = core.NewLogger(c.Config)
 	if err != nil {
-		c.logger.Errorf("error initializing logger: %v", err)
+		fmt.Println("error initializing logger:", err)
 		return
 	}
 

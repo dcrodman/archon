@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"gorm.io/gorm"
 
@@ -31,7 +31,7 @@ type ship struct {
 // layer between the other server components. It never directly interacts with the client,
 // only handling RPC requests from other trusted servers.
 type service struct {
-	logger              *logrus.Logger
+	logger              *zap.SugaredLogger
 	db                  *gorm.DB
 	connectedShips      map[string]*ship
 	connectedShipsMutex sync.RWMutex

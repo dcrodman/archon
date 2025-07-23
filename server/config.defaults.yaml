@@ -11,13 +11,9 @@ hostname: 0.0.0.0
 external_ip: 127.0.0.1
 # Maximum number of concurrent connections the server will allow.
 max_connections: 3000
-# Full path to file to which logs will be written. Blank will write to stdout.
-log_file_path: ""
-# Minimum level of a log required to be written. Options: debug, info, warn, error
-log_level: debug
 
 web:
-  # HTTP endpoint port for publically accessible API endpoints.
+  # HTTP endpoint port for publicly accessible API endpoints.
   http_port: 10000
 
 database:
@@ -68,6 +64,14 @@ block_server:
   port: 15001
   # Number of lobbies to create per block.
   num_lobbies: 16
+
+logging:
+  # Full path to file to which logs will be written. Blank will write to stdout.
+  log_file_path: ""
+  # Minimum level of a log required to be written. Options: debug, info, warn, error
+  log_level: debug
+  # Enable to show include a reference to the line of code that emitted the line.
+  include_caller: false
 
 # With the exception of pprof, these should only be enabled for development.
 debugging:

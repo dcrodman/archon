@@ -21,8 +21,6 @@ type Config struct {
 	Hostname       string `mapstructure:"hostname"`
 	ExternalIP     string `mapstructure:"external_ip"`
 	MaxConnections int    `mapstructure:"max_connections"`
-	LogFilePath    string `mapstructure:"log_file_path"`
-	LogLevel       string `mapstructure:"log_level"`
 
 	Web struct {
 		HTTPPort int `mapstructure:"http_port"`
@@ -69,6 +67,12 @@ type Config struct {
 		Port       int `mapstructure:"port"`
 		NumLobbies int `mapstructure:"num_lobbies"`
 	} `mapstructure:"block_server"`
+
+	Logging struct {
+		LogFilePath   string `mapstructure:"log_file_path"`
+		LogLevel      string `mapstructure:"log_level"`
+		IncludeCaller bool   `mapstructure:"include_caller"`
+	} `mapstructure:"logging"`
 
 	Debugging struct {
 		PprofEnabled           bool `mapstructure:"pprof_enabled"`

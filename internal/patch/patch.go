@@ -3,13 +3,12 @@ package patch
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/packets"
+	"go.uber.org/zap"
 )
 
 // Convert the welcome message to UTF-16LE and cache it. PSOBB expects this prefix to the message,
@@ -24,7 +23,7 @@ var copyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 type Server struct {
 	Name   string
 	Config *core.Config
-	Logger *logrus.Logger
+	Logger *zap.SugaredLogger
 
 	welcomeMessage []byte
 }

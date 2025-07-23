@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/dcrodman/archon/internal/core"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -73,7 +73,7 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData(logger *logrus.Logger, c *core.Config) error {
+func initializePatchData(logger *zap.SugaredLogger, c *core.Config) error {
 	var initErr error
 
 	patchInitLock.Do(func() {
@@ -104,7 +104,7 @@ func initializePatchData(logger *logrus.Logger, c *core.Config) error {
 // Files in the patch directory mirror the expected file structure on the client side
 // and in order to tell the client which files to check the server must instruct it to
 // check files relative to the game's executable.
-func buildPatchFileTree(logger *logrus.Logger, rootNode *directoryNode) error {
+func buildPatchFileTree(logger *zap.SugaredLogger, rootNode *directoryNode) error {
 	directories := make([]*directoryNode, 0)
 	directories = append(directories, rootNode)
 

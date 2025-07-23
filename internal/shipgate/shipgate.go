@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/glebarez/sqlite"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -23,7 +23,7 @@ func NewRPCClient(cfg *core.Config) Shipgate {
 
 type Server struct {
 	Config *core.Config
-	Logger *logrus.Logger
+	Logger *zap.SugaredLogger
 
 	db         *gorm.DB
 	httpServer http.Server
@@ -51,7 +51,7 @@ func (s *Server) Start(ctx context.Context) {
 		if err := s.httpServer.ListenAndServe(); err != nil {
 			s.Logger.Errorf("[SHIPGATE] error: %v", err)
 		}
-		s.Logger.Printf("[SHIPGATE] exited")
+		s.Logger.Infof("[SHIPGATE] exited")
 	}()
 }
 

@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -63,7 +63,7 @@ func clientFlagCacheKey(c *client.Client) string {
 type Server struct {
 	Name   string
 	Config *core.Config
-	Logger *logrus.Logger
+	Logger *zap.SugaredLogger
 
 	numParameterFiles int
 	kvCache           *Cache

@@ -14,11 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
+	"go.uber.org/zap"
 )
 
 var connectedClients = make(map[string]*client.Client)
@@ -31,7 +30,7 @@ type frontend struct {
 	Address string
 	Backend Backend
 	Config  *core.Config
-	Logger  *logrus.Logger
+	Logger  *zap.SugaredLogger
 }
 
 // Start initializes the server backend and opens a TCP socket for the specified server.
@@ -70,7 +69,7 @@ func (f *frontend) createSocket() (*net.TCPListener, error) {
 func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListener, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	f.Logger.Printf("[%s] waiting for connections on %v", f.Backend.Identifier(), f.Address)
+	f.Logger.Infof("[%s] waiting for connections on %v", f.Backend.Identifier(), f.Address)
 
 	connections := make(chan *net.TCPConn)
 	go func() {

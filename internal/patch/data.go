@@ -8,13 +8,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/packets"
+	"go.uber.org/zap"
 )
 
 // DataServer is responsible for exchanging file metadata with game clients
@@ -25,7 +24,7 @@ import (
 type DataServer struct {
 	Name   string
 	Config *core.Config
-	Logger *logrus.Logger
+	Logger *zap.SugaredLogger
 }
 
 func (s DataServer) Identifier() string {
