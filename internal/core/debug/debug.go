@@ -69,9 +69,9 @@ func PrintPacket(params PrintPacketParams) {
 
 	// Set the output colors depending on the direction of the packet.
 	if params.ClientPacket {
-		params.Writer.WriteString("\033[32m")
+		_, _ = params.Writer.WriteString("\033[32m")
 	} else {
-		params.Writer.WriteString("\033[33m")
+		_, _ = params.Writer.WriteString("\033[33m")
 	}
 
 	// Write a header line for each packet with some metadata.
@@ -104,9 +104,8 @@ func PrintPacket(params PrintPacketParams) {
 		}
 	}
 
-	_, _ = params.Writer.WriteString("\n")
 	// Reset the color.
-	params.Writer.WriteString("\033[0m")
+	_, _ = params.Writer.WriteString("\n\033[0m")
 	params.Writer.Flush()
 }
 
