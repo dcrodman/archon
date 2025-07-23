@@ -26,28 +26,34 @@ configuration file, the initialization files for the game, and uses SQLite by de
 only two requirements are [Git](https://git-scm.com/) and [Go](https://go.dev/doc/install).
 
     git clone https://github.com/dcrodman/archon.git && cd archon
-    make && bin/sever
+    make run
 
 Archon comes with a small utility for managing accounts, unless you want to run the SQL yourself. To add
 player accounts, just run the tool and follow the prompts:
 
     bin/account add
 
-### Overriding configs
+### Configuration
 
-The default configuration should be fine for most cases, though if you want other players to be able
-to connect there are a couple of configs you'll need to change. The default configuration can be overridden
-one of two ways:
+A sensible default configuration is provided for running the server locally, though if you want other players
+to be able to connect there are a couple of configs you'll want to change. The default configs are located in
+`./server/config.defaults.yaml` but are overridden by anything in `./server/config.yaml`. To make changes, simply
+copy the defaults and then override them in your new `config.yaml`:
 
-1. Pass the `-config` flag to `bin/server` with a path to a directory containing the config file. This also
-alters where the database will be created.
 ```
-# if your config file is in /usr/local/etc/archon/config.yaml:
+cp server/config.defaults.yaml server/config.yaml
+```
+
+Archon also looks for `ARCHON_` prefixed environment variables to override these configs. For example, setting
+`ARCHON_HOSTNAME` or `ARCHON_DATABASE_ENGINE` in your shell will set them without needing a new config file.
+
+By default, the server will look in `$(cwd)/server/` for its configuration and any supporting files. If for some
+reason you'd like to change that, it can be overridden with the `-config` flag:
+
+```
+# For example, if your config file were in /usr/local/etc/archon/config.yaml:
 bin/server -config /usr/local/etc/archon
 ```
-2. Set `ARCHON_` prefixed environment variables, for example `ARCHON_HOSTNAME` or `ARCHON_DATABASE_ENGINE`.
-
-All configuration are defined and commented in `config.yaml`. Feel free to copy this file as a starting point.
 
 ### Hostname and Broadcast IP
 
