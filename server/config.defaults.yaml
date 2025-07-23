@@ -19,6 +19,7 @@ web:
 database:
   # Database engine (supported: sqlite, postgres).
   engine: sqlite
+  filename: archon.db
   # Uncomment the parameters below to use Postgres.
   # engine: postgres
   # host: 127.0.0.1

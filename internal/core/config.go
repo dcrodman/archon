@@ -27,7 +27,10 @@ type Config struct {
 	} `mapstructure:"web"`
 
 	Database struct {
-		Engine   string `mapstructure:"engine"`
+		Engine string `mapstructure:"engine"`
+		// SQLite things.
+		Filename string `mapstructure:"filename"`
+		// SQL things.
 		Host     string `mapstructure:"host"`
 		Port     int    `mapstructure:"port"`
 		Name     string `mapstructure:"name"`
@@ -128,12 +131,10 @@ func LoadConfig(configPath string) *Config {
 	return config
 }
 
-const databaseURITemplate = "host=%s port=%d dbname=%s user=%s password=%s sslmode=%s"
-
 // DatabaseURL returns a database URL generated from the provided config values.
 func (c *Config) DatabaseURL() string {
 	return fmt.Sprintf(
-		databaseURITemplate,
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
 		c.Database.Host,
 		c.Database.Port,
 		c.Database.Name,
@@ -164,4 +165,10 @@ func (c *Config) BroadcastIP() [4]byte {
 		}
 	}
 	return c.cachedIPBytes
+}
+
+// QualifiedPath returns the fully qualified path of files relative to c.BaseDir.
+func (c *Config) QualifiedPath(files ...string) string {
+	args := append([]string{c.BaseDir}, files...)
+	return filepath.Join(args...)
 }

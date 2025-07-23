@@ -77,7 +77,7 @@ func initializePatchData(logger *zap.SugaredLogger, c *core.Config) error {
 	var initErr error
 
 	patchInitLock.Do(func() {
-		patchDir := filepath.Join(c.BaseDir, PatchDirectory)
+		patchDir := filepath.Join(c.QualifiedPath(PatchDirectory))
 		if _, err := os.Stat(patchDir); os.IsNotExist(err) {
 			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", patchDir)
 			return

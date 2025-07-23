@@ -10,6 +10,7 @@ func TestConfig_DatabaseURL(t *testing.T) {
 	cfg := &Config{
 		Database: struct {
 			Engine   string `mapstructure:"engine"`
+			Filename string `mapstructure:"filename"`
 			Host     string `mapstructure:"host"`
 			Port     int    `mapstructure:"port"`
 			Name     string `mapstructure:"name"`

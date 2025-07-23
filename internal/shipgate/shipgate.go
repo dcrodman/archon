@@ -66,7 +66,7 @@ func (s *Server) initDatabase() error {
 	var dialector gorm.Dialector
 	switch strings.ToLower(s.Config.Database.Engine) {
 	case "sqlite":
-		dialector = sqlite.Open("archon.db")
+		dialector = sqlite.Open(s.Config.QualifiedPath(s.Config.Database.Filename))
 	case "postgres":
 		dialector = postgres.Open(s.Config.DatabaseURL())
 	default:
