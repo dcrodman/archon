@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,20 +13,17 @@ import (
 
 	"github.com/dcrodman/archon/internal"
 	"github.com/dcrodman/archon/internal/core"
+	"github.com/spf13/cobra"
 )
 
-var configFlag = flag.String("config", "", "Path to the server config/data directory")
-
-func main() {
-	flag.Parse()
-
-	config := core.LoadConfig(*configFlag)
+func ServerCommand(cmd *cobra.Command, args []string) {
+	config := core.LoadConfig(ConfigFlag)
 	fmt.Println("loaded configuration from", config.FilePath)
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if *configFlag != "" {
-		if err := os.Chdir(*configFlag); err != nil {
+	if ConfigFlag != "" {
+		if err := os.Chdir(ConfigFlag); err != nil {
 			fmt.Println("error changing to config directory:", err)
 			os.Exit(1)
 		}

@@ -16,7 +16,7 @@ test:
 	go test ./internal/...
 
 run: build
-	${BIN_DIR}/server
+	${BIN_DIR}/archon
 
 # Requires that protobuf be installed: https://twitchtv.github.io/twirp/docs/install.html
 protos:

@@ -1,5 +1,4 @@
 # Archon
-![build](https://github.com/dcrodman/archon/actions/workflows/build.yml/badge.svg?branch=master) 
 ![discord](https://img.shields.io/discord/819749462468984923) 
 ![license](https://img.shields.io/github/license/dcrodman/archon) 
 
@@ -28,11 +27,6 @@ only two requirements are [Git](https://git-scm.com/) and [Go](https://go.dev/do
     git clone https://github.com/dcrodman/archon.git && cd archon
     make run
 
-Archon comes with a small utility for managing accounts, unless you want to run the SQL yourself. To add
-player accounts, just run the tool and follow the prompts:
-
-    bin/account add
-
 ### Configuration
 
 A sensible default configuration is provided for running the server locally, though if you want other players
@@ -52,7 +46,7 @@ reason you'd like to change that, it can be overridden with the `-config` flag:
 
 ```
 # For example, if your config file were in /usr/local/etc/archon/config.yaml:
-bin/server -config /usr/local/etc/archon
+bin/archon -config /usr/local/etc/archon
 ```
 
 ### Hostname and Broadcast IP
@@ -96,6 +90,13 @@ then create the database (substitute the credentials if you wish, they just have
     > CREATE USER archonadmin WITH ENCRYPTED PASSWORD 'psoadminpassword';
     > GRANT ALL ON ALL TABLES IN SCHEMA public TO archonadmin;
 
+### Adding Accounts
+
+Archon comes with a small utility for managing accounts, unless you for some reason want to run the SQL
+yourself (or script it). To add player accounts, just run the tool and follow the prompts:
+
+    bin/archon account add
+
 ## Connecting clients
 
 There are a few possible ways to accomplish this:  
@@ -105,14 +106,13 @@ There are a few possible ways to accomplish this:
 
 I may write a DNS server for this one day but for now option #1 is the simplest. You can either grab
 a hex editor and change the addresses in the client yourself OR use the patcher utility that comes 
-with Archon. To use the patcher (which should be in your server directory if you followed the optional)
-step above:
+with Archon. Run the following for instructions.
 
-    ./patcher -address <server-address> -exe <path-to-psobb-exe> 
+    bin/archon patcher -h
 
 A copy of the PSOBB client can be found here (as well as some additional instructions if they're helpful):
 https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1/
 
 **Note**: If you use a client other than the TethVer12513 executables, you may need to uncomment lines
-in `patcher.go` that correspond to your client. If none exist, you'll have to find the offsets with a
+in `cmd/archon/patcher.go` that correspond to your client. If none exist, you'll have to find the offsets with a
 hex editor.

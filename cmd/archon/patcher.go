@@ -12,30 +12,29 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
+
+	"github.com/spf13/cobra"
 )
+
+var patchCmd = &cobra.Command{
+	Use:   "patcher [exe]",
+	Short: "Updates the IP address in PSOBB executables",
+	Run:   PatchCommand,
+	Args:  cobra.ExactArgs(1),
+}
 
 const blockLen = 0x18
 
 var (
-	newAddress = flag.String("address", "127.0.0.1", "The new address or IPv4 address")
-	provider   = flag.String("provider", "TethVer12513", "Executable provider")
+	NewAddressFlag string
+	ExeVersionFlag string
 )
 
-func main() {
-	flag.Parse()
-	if flag.NArg() < 1 {
-		fmt.Println("usage: patcher [exe]")
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	exePath := flag.Args()[0]
-
+func PatchCommand(cmd *cobra.Command, args []string) {
 	var offsets []int64
-	switch *provider {
+	switch ExeVersionFlag {
 	case "TethVer12510":
 		// Use this block instead if you're using TethVer12510 executables.
 		offsets = []int64{
@@ -66,21 +65,21 @@ func main() {
 		}
 	}
 
-	if len(*newAddress) > blockLen {
+	if len(NewAddressFlag) > blockLen {
 		fmt.Printf("newAddress must be less than %d bytes long\n", blockLen)
 		os.Exit(1)
 	}
 
-	fmt.Printf("patching exe with new address: %s\n", *newAddress)
+	fmt.Printf("patching exe with new address: %s\n", NewAddressFlag)
 
-	file, err := os.OpenFile(exePath, os.O_RDWR, 0666)
+	file, err := os.OpenFile(args[0], os.O_RDWR, 0666)
 	if err != nil {
 		fmt.Println("error opening file: " + err.Error())
 		os.Exit(1)
 	}
 
 	replacementAddress := make([]byte, blockLen)
-	copy(replacementAddress, []byte(*newAddress)[:])
+	copy(replacementAddress, []byte(NewAddressFlag)[:])
 
 	for _, off := range offsets {
 		originalAddr := make([]byte, blockLen)
