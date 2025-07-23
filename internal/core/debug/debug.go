@@ -34,9 +34,7 @@ func StartPprofServer(logger *zap.SugaredLogger, pprofPort int) {
 // Used with Clients to attach debugging information.
 type Tag string
 
-var (
-	SERVER_TYPE = "server_type"
-)
+var SERVER_TYPE = "server_type"
 
 type ServerType string
 
@@ -51,8 +49,9 @@ const (
 )
 
 type PrintPacketParams struct {
-	Writer       *bufio.Writer
-	ServerType   ServerType
+	Writer     *bufio.Writer
+	ServerType ServerType
+	// True if this packet is client->server.
 	ClientPacket bool
 	Data         []byte
 	// Cut off the packet output after a certain size.
@@ -67,6 +66,13 @@ type PrintPacketParams struct {
 func PrintPacket(params PrintPacketParams) {
 	var header packets.PCHeader
 	bytes.StructFromBytes(params.Data[:packets.PCHeaderSize], &header)
+
+	// Set the output colors depending on the direction of the packet.
+	if params.ClientPacket {
+		params.Writer.WriteString("\033[32m")
+	} else {
+		params.Writer.WriteString("\033[33m")
+	}
 
 	// Write a header line for each packet with some metadata.
 	var headerLine strings.Builder
@@ -97,7 +103,10 @@ func PrintPacket(params PrintPacketParams) {
 			return
 		}
 	}
+
 	_, _ = params.Writer.WriteString("\n")
+	// Reset the color.
+	params.Writer.WriteString("\033[0m")
 	params.Writer.Flush()
 }
 
