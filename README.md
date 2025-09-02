@@ -25,7 +25,7 @@ Archon requires Git and Go to build and run. On Debian/Ubuntu-based systems you 
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential libc6-dev libpcap-dev
+sudo apt install -y git build-essential libc6-dev libpcap-dev
 ```
 
 These packages provide a compiler and headers (build-essential, libc6-dev), and the development headers for libpcap (libpcap-dev) used by the sniffer.
