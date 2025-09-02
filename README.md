@@ -18,14 +18,31 @@ given how time-intensive this endeavor is. That said, forks, bug fixes, issue re
 explanations of some of the client's bizarre behavior, questions, etc. are welcome to
 help move things along. Some starter information can be found in CONTRIBUTING.md.
 
+
+## Requirements
+
+Archon requires Git and Go to build and run. On Debian/Ubuntu-based systems you will also need a few native development packages for building cgo bindings and tools used by Archon:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential libc6-dev libpcap-dev
+```
+
+These packages provide a compiler and headers (build-essential, libc6-dev), and the development headers for libpcap (libpcap-dev) used by the sniffer.
+
+On other distributions install the equivalent packages (for example, glibc-devel, libpcap-devel on CentOS/RHEL/Fedora).
+
+
 ## Running the server
 
 Archon can be run out of the box with little to no configuration. It includes a starter
 configuration file, the initialization files for the game, and uses SQLite by default. The
 only two requirements are [Git](https://git-scm.com/) and [Go](https://go.dev/doc/install).
 
-    git clone https://github.com/dcrodman/archon.git && cd archon
-    make run
+```bash
+git clone https://github.com/dcrodman/archon.git && cd archon
+make run
+```
 
 ### Configuration
 
@@ -34,7 +51,7 @@ to be able to connect there are a couple of configs you'll want to change. The d
 `./server/config.defaults.yaml` but are overridden by anything in `./server/config.yaml`. To make changes, simply
 copy the defaults and then override them in your new `config.yaml`:
 
-```
+```bash
 cp server/config.defaults.yaml server/config.yaml
 ```
 
@@ -44,7 +61,7 @@ Archon also looks for `ARCHON_` prefixed environment variables to override these
 By default, the server will look in `$(cwd)/server/` for its configuration and any supporting files. If for some
 reason you'd like to change that, it can be overridden with the `-config` flag:
 
-```
+```bash
 # For example, if your config file were in /usr/local/etc/archon/config.yaml:
 bin/archon -config /usr/local/etc/archon
 ```
@@ -73,29 +90,38 @@ Archon uses SQLite by default, but can easily be switched to use a [PostgreSQL](
 database (or others, PRs welcome) if you prefer. Assuming a working Postgres installation, you need only add
 or uncomment and the following lines in the config file:
 
-    database:
-        engine: postgres
-        host: 127.0.0.1
-        port: 5432
-        name: archondb
-        username: archonadmin
-        password: psoadminpassword
-        ## Set to verify-full if the Postgres instance supports SSL.
-        sslmode: disable
+```yaml
+database:
+    engine: postgres
+    host: 127.0.0.1
+    port: 5432
+    name: archondb
+    username: archonadmin
+    password: psoadminpassword
+    ## Set to verify-full if the Postgres instance supports SSL.
+    sslmode: disable
+```
 
 then create the database (substitute the credentials if you wish, they just have to match the config file):
 
-    createdb archondb
-    psql archondb
-    > CREATE USER archonadmin WITH ENCRYPTED PASSWORD 'psoadminpassword';
-    > GRANT ALL ON ALL TABLES IN SCHEMA public TO archonadmin;
+```bash
+createdb archondb
+psql archondb
+```
+
+```sql
+CREATE USER archonadmin WITH ENCRYPTED PASSWORD 'psoadminpassword';
+GRANT ALL ON ALL TABLES IN SCHEMA public TO archonadmin;
+```
 
 ### Adding Accounts
 
 Archon comes with a small utility for managing accounts, unless you for some reason want to run the SQL
 yourself (or script it). To add player accounts, just run the tool and follow the prompts:
 
-    bin/archon account add
+```bash
+bin/archon account add
+```
 
 ## Connecting clients
 
@@ -108,7 +134,9 @@ I may write a DNS server for this one day but for now option #1 is the simplest.
 a hex editor and change the addresses in the client yourself OR use the patcher utility that comes 
 with Archon. Run the following for instructions.
 
-    bin/archon patcher -h
+```bash
+bin/archon patcher -h
+```
 
 A copy of the PSOBB client can be found here (as well as some additional instructions if they're helpful):
 https://www.pioneer2.net/community/threads/tethealla-server-setup-instructions.1/
