@@ -6,7 +6,8 @@ jobs:
     container:
       image: docker://golang:latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
       - name: Build and test
         run: make all
   test:
@@ -14,7 +15,8 @@ jobs:
     container:
       image: docker://golang:latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
       - name: Tests
         run: make test
 
