@@ -6,11 +6,6 @@ on:
       - master
   pull_request:
 
-permissions:
-  contents: read
-  # Optional: allow read access to pull requests. Use with `only-new-issues` option.
-  # pull-requests: read
-
 jobs:
   golangci:
     name: lint
@@ -21,7 +16,7 @@ jobs:
         with:
           go-version: stable
       - name: Install required packages
-        run: apt-get update && apt-get install -y libc6-dev libpcap-dev
+        run: sudo apt-get update && apt-get install -y libc6-dev libpcap-dev
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
