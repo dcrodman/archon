@@ -16,7 +16,7 @@ jobs:
         with:
           go-version: stable
       - name: Install required packages
-        run: sudo apt-get update && apt-get install -y libc6-dev libpcap-dev
+        run: sudo apt-get update && sudo apt-get install -y libc6-dev libpcap-dev
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
