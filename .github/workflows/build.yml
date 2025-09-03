@@ -13,7 +13,7 @@ jobs:
         with:
           go-version: stable
       - name: Install required packages
-        run: sudo apt install -y libc6-dev libpcap-dev
+        run: apt install -y libc6-dev libpcap-dev
       - name: Build binaries
         run: go build -buildvcs=false -o bin/ ./cmd/*
       - name: Run tests
