@@ -13,7 +13,7 @@ jobs:
         with:
           go-version: stable
       - name: Build and test
-        run: make all
+        run: go build -buildvcs=false -o bin ./cmd/*
   test:
     runs-on: ubuntu-latest
     container:
@@ -26,5 +26,5 @@ jobs:
         with:
           go-version: stable
       - name: Tests
-        run: make test
+        run: go test ./internal/...
 
