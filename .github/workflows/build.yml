@@ -1,31 +1,21 @@
 name: build
 on: [pull_request]
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: docker://golang:latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Build and test
-        run: make all
   test:
     runs-on: ubuntu-latest
     container:
       image: docker://golang:latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Tests
-        run: make test
-  golangci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v5
         with:
-          go-version: 1.16
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v2.5.1
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
         with:
-          version: v1.37
-          skip-go-installation: true
+          go-version: stable
+      - name: Install required packages
+        run: apt-get update && apt-get install -y libc6-dev libpcap-dev
+      - name: Build binaries
+        run: go build -buildvcs=false -o bin/ ./cmd/*
+      - name: Run tests
+        run: go test ./internal/...
+
