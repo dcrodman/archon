@@ -8,6 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
+        with:
+          go-version: stable
       - name: Build and test
         run: make all
   test:
@@ -17,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
+        with:
+          go-version: stable
       - name: Tests
         run: make test
 
