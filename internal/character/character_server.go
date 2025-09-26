@@ -22,6 +22,7 @@ import (
 	"github.com/dcrodman/archon/internal/core/proto"
 	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
@@ -42,15 +43,11 @@ var (
 	shipSelectionScrollMessageInit sync.Once
 )
 
-func clientFlagCacheKey(c *client.Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Account.Id)
-}
-
-// Server is the CHARACTER server implementation. Clients are sent to this server
+// Server contains the bulk of the implementation for character management and
+// selection. Clients are redirected here after authenticating with [AuthServer].
+// Each client can connect to this server in up to four different phases, with
+// each phase as a new connection:
 //
-//	after authenticating with LOGIN. Each client connects to the server in four
-//
-// different phases (each one is a new connection):
 //  1. Data download (login options, guildcard, and character previews).
 //  2. Character selection
 //  3. (Optional) Character creation/modification (recreate and dressing room)
@@ -63,7 +60,7 @@ type Server struct {
 	Logger *zap.SugaredLogger
 
 	numParameterFiles int
-	kvCache           *Cache
+	kvCache           *gocache.Cache
 	shipgateClient    shipgate.Shipgate
 }
 
@@ -72,7 +69,7 @@ func (s *Server) Identifier() string {
 }
 
 func (s *Server) Init(ctx context.Context) error {
-	s.kvCache = NewCache()
+	s.kvCache = gocache.New(-1, 10*time.Second)
 	s.shipgateClient = shipgate.NewRPCClient(s.Config)
 
 	var err error
@@ -554,7 +551,11 @@ func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
 	// Some flags are set right before the client disconnects, which means saving them
 	// on the Client struct alone isn't safe since the state is lost. To fix this the
 	// flags are also kept in memory to avoid bugs like accidentally recreating characters.
-	s.kvCache.Put(clientFlagCacheKey(c), c.Flag, -1)
+	s.kvCache.Set(clientFlagCacheKey(c), c.Flag, -1)
+}
+
+func clientFlagCacheKey(c *client.Client) string {
+	return fmt.Sprintf("client-flags-%d", c.Account.Id)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
@@ -665,7 +666,7 @@ func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
 func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *packets.CharacterSummary) error {
 	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
 	flags, _ := s.kvCache.Get(clientFlagCacheKey(c))
-	s.kvCache.Put(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
+	s.kvCache.Set(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
 
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,
