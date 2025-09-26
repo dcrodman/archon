@@ -76,7 +76,7 @@ func PrintPacket(params PrintPacketParams) {
 
 	// Write a header line for each packet with some metadata.
 	var headerLine strings.Builder
-	headerLine.WriteString(fmt.Sprintf("[%s] 0x%02X ", params.ServerType, header.Type))
+	headerLine.WriteString(fmt.Sprintf("[%s] %04X ", params.ServerType, header.Type))
 	headerLine.WriteString(fmt.Sprintf("(%s) ", getPacketName(params.ServerType, header.Type)))
 	if params.ClientPacket {
 		headerLine.WriteString("| client->server ")

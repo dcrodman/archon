@@ -35,9 +35,7 @@ const (
 )
 
 var (
-	// Copyright in the welcome packet. The client expects exactly this string and will
-	// crash if it does not exactly match.
-	loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
+	copyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 	// Scrolling message that appears across the top of the ship selection screen.
 	shipSelectionScrollMessage     []byte
@@ -61,7 +59,6 @@ func clientFlagCacheKey(c *client.Client) string {
 // The ship list is obtained by communicating with the shipgate server since ships
 // do not directly connect to this server.
 type Server struct {
-	Name   string
 	Config *core.Config
 	Logger *zap.SugaredLogger
 
@@ -71,7 +68,7 @@ type Server struct {
 }
 
 func (s *Server) Identifier() string {
-	return s.Name
+	return "CHARACTER:DATA"
 }
 
 func (s *Server) Init(ctx context.Context) error {
@@ -97,7 +94,7 @@ func (s *Server) Handshake(c *client.Client) error {
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
 	}
-	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.Copyright[:], copyright)
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 

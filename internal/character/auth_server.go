@@ -1,4 +1,4 @@
-package login
+package character
 
 import (
 	"context"
@@ -16,49 +16,48 @@ import (
 )
 
 // Copyright message expected by the client when connecting.
-var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
+var authCopyright = []byte("Phantasy Star Online Blue Burst Game Backend. Copyright 1999-2004 SONICTEAM.")
 
-// Server is the LOGIN server implementation. Clients connect to this server
-// after going through the DATA server, its main responsibility is to authenticate
-// the client's username/password and set some initial state on the client before
-// redirecting them to the CHARACTER server.
-type Server struct {
-	Name   string
+// AuthServer is the first connection point of the second "phase" for a client.
+// Its main responsibility is to authenticate the client's username/password and
+// set some initial state on the client before redirecting them to [SERVER]. Other
+// server implementations might call this the "LOGIN" server.
+type AuthServer struct {
 	Config *core.Config
 	Logger *zap.SugaredLogger
 
 	shipgateClient shipgate.Shipgate
 }
 
-func (s *Server) Identifier() string {
-	return s.Name
+func (s *AuthServer) Identifier() string {
+	return "CHARACTER:AUTH"
 }
 
-func (s *Server) Init(_ context.Context) error {
+func (s *AuthServer) Init(_ context.Context) error {
 	s.shipgateClient = shipgate.NewRPCClient(s.Config)
 	return nil
 }
 
-func (s *Server) SetUpClient(c *client.Client) {
+func (s *AuthServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
 	c.DebugTags[debug.SERVER_TYPE] = debug.LOGIN_SERVER
 }
 
-func (s *Server) Handshake(c *client.Client) error {
+func (s *AuthServer) Handshake(c *client.Client) error {
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
 	}
-	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.Copyright[:], authCopyright)
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
+func (s *AuthServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var header packets.BBHeader
 	bytes.StructFromBytes(data[:packets.BBHeaderSize], &header)
 
@@ -78,7 +77,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -123,7 +122,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 
 // send the security initialization packet with information about the user's
 // authentication status.
-func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+func (s *AuthServer) sendSecurity(c *client.Client, errorCode uint32) error {
 	cfg := packets.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
@@ -148,7 +147,7 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
-func (s *Server) sendMessage(c *client.Client, message string) error {
+func (s *AuthServer) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -158,7 +157,7 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *Server) sendCharacterRedirect(c *client.Client) error {
+func (s *AuthServer) sendCharacterRedirect(c *client.Client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},

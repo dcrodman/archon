@@ -43,7 +43,6 @@ type Block struct {
 // provide the client with the block list and then send the address of the
 // block that the user selects.
 type Server struct {
-	Name   string
 	Config *core.Config
 	Logger *zap.SugaredLogger
 	Blocks []Block
@@ -52,7 +51,7 @@ type Server struct {
 }
 
 func (s *Server) Identifier() string {
-	return s.Name
+	return "SHIP"
 }
 
 // Init connects the ship to the shipgate and registers so that it

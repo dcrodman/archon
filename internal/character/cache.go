@@ -7,8 +7,7 @@ import (
 )
 
 // Cache is an instance of a key-value store with contents specific to
-// each instance and are not shared between instances. By default its
-// entries do not expire without a TTL.
+// each instance and are not shared between instances.
 type Cache struct {
 	cacheInstance *gocache.Cache
 }

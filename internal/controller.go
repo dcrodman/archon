@@ -13,7 +13,6 @@ import (
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/login"
 	"github.com/dcrodman/archon/internal/patch"
 	"github.com/dcrodman/archon/internal/ship"
 	"github.com/dcrodman/archon/internal/shipgate"
@@ -106,24 +105,21 @@ func (c *Controller) declareServers() {
 	c.servers = []*frontend{
 		{
 			Address: c.buildAddress(c.Config.PatchServer.PatchPort),
-			Backend: &patch.Server{
-				Name:   "PATCH",
+			Backend: &patch.PatchAuthServer{
 				Config: c.Config,
 				Logger: c.logger,
 			},
 		},
 		{
 			Address: c.buildAddress(c.Config.PatchServer.DataPort),
-			Backend: &patch.DataServer{
-				Name:   "DATA",
+			Backend: &patch.PatchDataServer{
 				Config: c.Config,
 				Logger: c.logger,
 			},
 		},
 		{
 			Address: c.buildAddress(c.Config.LoginServer.Port),
-			Backend: &login.Server{
-				Name:   "LOGIN",
+			Backend: &character.AuthServer{
 				Config: c.Config,
 				Logger: c.logger,
 			},
@@ -131,7 +127,6 @@ func (c *Controller) declareServers() {
 		{
 			Address: c.buildAddress(c.Config.CharacterServer.Port),
 			Backend: &character.Server{
-				Name:   "CHARACTER",
 				Config: c.Config,
 				Logger: c.logger,
 			},
@@ -141,7 +136,6 @@ func (c *Controller) declareServers() {
 		{
 			Address: c.buildAddress(c.Config.ShipServer.Port),
 			Backend: &ship.Server{
-				Name:   "SHIP",
 				Config: c.Config,
 				Blocks: blocks,
 				Logger: c.logger,
