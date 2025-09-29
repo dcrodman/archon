@@ -42,7 +42,7 @@ var patchPacketTypes = map[uint16]interface{}{
 var packetTypes = map[uint16]interface{}{
 	packets.DisconnectType:              packets.BBHeader{},
 	packets.RedirectType:                packets.Redirect{},
-	packets.MenuSelectType:              packets.MenuSelection{},
+	packets.MenuSelectionType:           packets.MenuSelection{},
 	packets.LoginWelcomeType:            packets.Welcome{},
 	packets.LoginType:                   packets.Login{},
 	packets.LoginSecurityType:           packets.Security{},
@@ -67,7 +67,7 @@ var packetTypes = map[uint16]interface{}{
 	packets.LoginShipListType:           packets.ShipList{},
 	packets.LoginScrollMessageType:      packets.ScrollMessagePacket{},
 	packets.LobbyListType:               packets.LobbyList{},
-	packets.BlockListType:               packets.BlockList{},
+	packets.BlockListType:               packets.ShipMenu{},
 	packets.FullCharacterType:           packets.FullCharacter{},
 	packets.FullCharacterEndType:        packets.BBHeader{},
 }

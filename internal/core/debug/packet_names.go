@@ -30,7 +30,7 @@ var patchPacketNames = map[uint16]string{
 var packetNames = map[uint16]string{
 	packets.DisconnectType:              "DisconnectType",
 	packets.RedirectType:                "RedirectType",
-	packets.MenuSelectType:              "MenuSelectType",
+	packets.MenuSelectionType:           "MenuSelectType",
 	packets.LoginWelcomeType:            "LoginWelcomeType",
 	packets.LoginType:                   "LoginType",
 	packets.LoginSecurityType:           "LoginSecurityType",

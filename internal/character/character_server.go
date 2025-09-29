@@ -137,7 +137,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		var charPkt packets.CharacterSummary
 		bytes.StructFromBytes(data, &charPkt)
 		err = s.handleCharacterUpdate(ctx, c, &charPkt)
-	case packets.MenuSelectType:
+	case packets.MenuSelectionType:
 		var menuSelectionPkt packets.MenuSelection
 		bytes.StructFromBytes(data, &menuSelectionPkt)
 		err = s.handleShipSelection(ctx, c, &menuSelectionPkt)
@@ -248,42 +248,24 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 	return c.Send(pkt)
 }
 
-// Send the menu items for the ship select screen.
+// Send the menu items for the ship select screen. Since we're only supporting
+// a single (bundled) ship server for the moment, the entries are hardcoded
+// rather than bothering with anything fancy like retrieving a list of active
+// ships from the shipgate, etc.
 func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
-	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
-	if err != nil {
-		return fmt.Errorf("error retrieving ship list: %w", err)
-	}
-
-	pkt := &packets.ShipList{
+	pkt := &packets.ShipMenu{
 		Header: packets.BBHeader{
-			Type:  packets.LoginShipListType,
-			Flags: uint32(len(shipList.Ships)),
+			Type:  packets.BlockListType,
+			Flags: 1,
 		},
-		Unknown:  0x20,
-		Unknown2: 0xFFFFFFF4,
-		Unknown3: 0x04,
+		Entries: []packets.ShipMenuEntry{
+			// The first item is ignored and just used for the menu title.
+			{MenuID: 0x11000011, ItemID: 0},
+			{ItemID: 1},
+		},
 	}
-	copy(pkt.ServerName[:], bytes.ConvertToUtf16("Archon"))
-
-	if len(shipList.Ships) == 0 {
-		pkt.ShipEntries = append(pkt.ShipEntries, packets.ShipListEntry{
-			MenuID: 0xFF,
-			ShipID: 0xFF,
-		})
-		// pkt.Header.Flags = 1
-		copy(pkt.ShipEntries[0].ShipName[:], ("No Ships!")[:])
-	} else {
-
-		for i, ship := range shipList.Ships {
-			entry := packets.ShipListEntry{
-				MenuID: uint16(i + 1),
-				ShipID: uint32(ship.Id),
-			}
-			copy(entry.ShipName[:], bytes.ConvertToUtf16(ship.Name[:]))
-			pkt.ShipEntries = append(pkt.ShipEntries, entry)
-		}
-	}
+	copy(pkt.Entries[0].Name[:], bytes.ConvertToUtf16("Archon"))
+	copy(pkt.Entries[1].Name[:], bytes.ConvertToUtf16(s.Config.ShipServer.Name))
 
 	return c.Send(pkt)
 }
@@ -303,6 +285,30 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 	return c.Send(&packets.ScrollMessagePacket{
 		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
 		Message: shipSelectionScrollMessage,
+	})
+}
+
+// Player selected one of the items on the ship select screen; respond with the
+// IP address and port of the ship server to  which the client will connect after
+// disconnecting from this server.
+func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
+	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
+	if err != nil {
+		return fmt.Errorf("error retrieving ship list: %w", err)
+	}
+
+	selectedShip := menuSelectionPkt.ItemID - 1
+	if selectedShip >= uint32(len(shipList.Ships)) {
+		return fmt.Errorf("invalid ship selection: %d", selectedShip)
+	}
+
+	ip := net.ParseIP(shipList.Ships[selectedShip].Ip).To4()
+	port, _ := strconv.Atoi(shipList.Ships[selectedShip].Port)
+
+	return c.Send(&packets.Redirect{
+		Header: packets.BBHeader{Type: packets.RedirectType},
+		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
+		Port:   uint16(port),
 	})
 }
 
@@ -701,28 +707,4 @@ func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *pac
 		Character: character,
 	})
 	return err
-}
-
-// Player selected one of the items on the ship select screen; respond with the
-// IP address and port of the ship server to  which the client will connect after
-// disconnecting from this server.
-func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
-	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
-	if err != nil {
-		return fmt.Errorf("error retrieving ship list: %w", err)
-	}
-
-	selectedShip := menuSelectionPkt.ItemID - 1
-	if selectedShip >= uint32(len(shipList.Ships)) {
-		return fmt.Errorf("invalid ship selection: %d", selectedShip)
-	}
-
-	ip := net.ParseIP(shipList.Ships[selectedShip].Ip).To4()
-	port, _ := strconv.Atoi(shipList.Ships[selectedShip].Port)
-
-	return c.Send(&packets.Redirect{
-		Header: packets.BBHeader{Type: packets.RedirectType},
-		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
-		Port:   uint16(port),
-	})
 }

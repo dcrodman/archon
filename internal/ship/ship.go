@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
@@ -20,17 +19,7 @@ import (
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
-const (
-	// Menu "prefixes" that are OR'd with the menu IDs in order to
-	// distinguish between the menus from which the client is selecting.
-	shipListMenuType  = 0x10000000
-	blockListMenuType = 0x20000000
-
-	// BackMenuItem is the block ID reserved for returning to the ship select menu.
-	BackMenuItem = 0xFF
-)
-
-var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
+var copyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
 type Block struct {
 	Name    string
@@ -82,7 +71,7 @@ func (s *Server) Handshake(c *client.Client) error {
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
 	}
-	copy(pkt.Copyright[:], loginCopyright)
+	copy(pkt.Copyright[:], copyright)
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
@@ -99,10 +88,6 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 		var loginPkt packets.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleShipLogin(ctx, c, &loginPkt)
-	case packets.MenuSelectType:
-		var menuSelectPkt packets.MenuSelection
-		bytes.StructFromBytes(data, &menuSelectPkt)
-		err = s.handleMenuSelection(ctx, c, &menuSelectPkt)
 	default:
 		s.Logger.Infof("received unknown packet %02x from %s", header.Type, c.IPAddr())
 	}
@@ -135,8 +120,10 @@ func (s *Server) handleShipLogin(ctx context.Context, c *client.Client, loginPkt
 	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
 		return err
 	}
+	// Tethealla sends
 
-	return s.sendBlockList(c)
+	// s.sendBlockList(c)
+	return s.sendBlockRedirect(c, s.Blocks[0])
 }
 
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
@@ -166,141 +153,6 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  bytes.ConvertToUtf16(message),
-	})
-}
-
-// send the client the block list on the selection screen.
-func (s *Server) sendBlockList(c *client.Client) error {
-	var blocks []packets.Block
-	for _, blockCfg := range s.Blocks {
-		block := packets.Block{
-			Unknown: 0x12,
-			BlockID: blockListMenuType | uint32(blockCfg.ID),
-		}
-		copy(block.BlockName[:], bytes.ConvertToUtf16(blockCfg.Name))
-		blocks = append(blocks, block)
-	}
-
-	// The "back" menu item for returning to the ship select screen
-	// is sent to the client as another (final) block selection option.
-	blocks = append(blocks, packets.Block{
-		Unknown: 0x08,
-		BlockID: blockListMenuType | BackMenuItem,
-	})
-	copy(blocks[len(blocks)-1].BlockName[:], bytes.ConvertToUtf16("Ship Selection"))
-
-	blockListPkt := &packets.BlockList{
-		Header: packets.BBHeader{
-			Type:  packets.BlockListType,
-			Flags: uint32(len(blocks)),
-		},
-		Unknown: 0x08,
-		Blocks:  blocks,
-	}
-	copy(blockListPkt.ShipName[:], bytes.ConvertToUtf16(s.Config.ShipServer.Name))
-
-	return c.Send(blockListPkt)
-}
-
-func (s *Server) handleMenuSelection(ctx context.Context, c *client.Client, pkt *packets.MenuSelection) error {
-	// They can be at either the ship or block selection menu, so make sure we have the right one.
-	// Note: Should probably figure out what menuSelectPkt.MenuID is for (oandif that's the right name).
-	var err error
-	// Case if user gets back from block selection to ship selection
-	if pkt.MenuID == 1 && pkt.ItemID == 1 {
-		err = s.handleShipSelection(ctx, c, pkt.ItemID-1)
-		if err != nil {
-			return err
-		}
-	}
-	switch pkt.ItemID & 0xFF000000 {
-	case blockListMenuType:
-		err = s.handleBlockSelection(ctx, c, pkt.ItemID^blockListMenuType)
-	case shipListMenuType:
-		err = s.handleShipSelection(ctx, c, pkt.ItemID^shipListMenuType)
-	default:
-		err = fmt.Errorf("unrecognized menu ID: %v", pkt.MenuID)
-	}
-	return err
-}
-
-func (s *Server) handleBlockSelection(ctx context.Context, c *client.Client, selection uint32) error {
-	// The player selected a block to join from the menu. Redirect them to the block's address
-	// if a block was chosen or send them the ship list to take them back to the ship selection
-	// meny if "Ship List" was chosen.
-	if selection == BackMenuItem {
-		return s.sendShipList(ctx, c)
-	} else if int(selection) > len(s.Blocks) || int(selection) < 0 {
-		return fmt.Errorf("error selecting block: block ID %d out of range [0, %d]", selection, len(s.Blocks))
-	}
-
-	var err error
-	for _, block := range s.Blocks {
-		if block.ID == int(selection) {
-			err = s.sendBlockRedirect(c, block)
-			break
-		}
-	}
-	return err
-}
-
-func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
-	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
-	if err != nil {
-		return fmt.Errorf("error retrieving ship list: %w", err)
-	}
-
-	pkt := &packets.ShipList{
-		Header: packets.BBHeader{
-			Type:  packets.LoginShipListType,
-			Flags: uint32(len(shipList.Ships)),
-		},
-		Unknown:  0x20,
-		Unknown2: 0xFFFFFFF4,
-		Unknown3: 0x04,
-	}
-	copy(pkt.ServerName[:], bytes.ConvertToUtf16("Archon"))
-
-	if len(shipList.Ships) == 0 {
-		pkt.ShipEntries = append(pkt.ShipEntries, packets.ShipListEntry{
-			MenuID: 0xFF,
-			ShipID: 0xFF,
-		})
-		// pkt.Header.Flags = 1
-		copy(pkt.ShipEntries[0].ShipName[:], ("No Ships!")[:])
-	} else {
-
-		for i, ship := range shipList.Ships {
-			entry := packets.ShipListEntry{
-				MenuID: uint16(i + 1),
-				ShipID: uint32(ship.Id),
-			}
-			copy(entry.ShipName[:], bytes.ConvertToUtf16(ship.Name))
-			pkt.ShipEntries = append(pkt.ShipEntries, entry)
-		}
-	}
-
-	return c.Send(pkt)
-}
-
-// Player selected one of the items on the ship select screen.
-func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, selection uint32) error {
-	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
-	if err != nil {
-		return fmt.Errorf("error retrieving ship list: %w", err)
-	}
-
-	if selection >= uint32(len(shipList.Ships)) {
-		return fmt.Errorf("invalid ship selection: %d", selection)
-	}
-
-	ip := net.ParseIP(shipList.Ships[selection].Ip).To4()
-	port, _ := strconv.Atoi(shipList.Ships[selection].Port)
-
-	return c.Send(&packets.Redirect{
-		Header: packets.BBHeader{Type: packets.RedirectType},
-		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
-		Port:   uint16(port),
 	})
 }
 

@@ -42,7 +42,7 @@ const (
 
 // Packet types common to multiple servers.
 const (
-	DisconnectType = 0x05
-	RedirectType   = 0x19
-	MenuSelectType = 0x10
+	DisconnectType    = 0x05
+	RedirectType      = 0x19
+	MenuSelectionType = 0x10
 )

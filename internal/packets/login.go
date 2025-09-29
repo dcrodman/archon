@@ -275,28 +275,27 @@ type ScrollMessagePacket struct {
 	Message []byte
 }
 
-// MenuSelection is a client packet indicating a player's selection from
-// one of the various menus, such as the ship or block list.
-type MenuSelection struct {
-	Header  BBHeader
-	Unknown uint16
-	MenuID  uint16
-	ItemID  uint32
-}
-
 // List containing the available blocks on a ship.
-type BlockList struct {
-	Header   BBHeader
-	Padding  [10]byte
-	ShipName [32]byte
-	Unknown  uint32
-	Blocks   []Block
+type ShipMenu struct {
+	Header  BBHeader
+	Entries []ShipMenuEntry
 }
 
 // Info about the available block servers.
-type Block struct {
-	Unknown   uint16
-	BlockID   uint32
-	Padding   uint16
-	BlockName [36]byte
+type ShipMenuEntry struct {
+	MenuID     uint32
+	ItemID     uint32
+	Difficulty uint8
+	NumPlayers uint8
+	Name       [32]uint8
+	Episode    uint8
+	Flags      uint8
+}
+
+// MenuSelection is a client packet indicating a player's selection from
+// one of the various menus, such as the ship or block list.
+type MenuSelection struct {
+	Header BBHeader
+	MenuID uint32
+	ItemID uint32
 }
