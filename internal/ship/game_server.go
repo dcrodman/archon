@@ -1,4 +1,4 @@
-package block
+package ship
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 
 var loginCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-type Server struct {
+type GameServer struct {
 	Name   string
 	Config *core.Config
 	Logger *zap.SugaredLogger
@@ -26,22 +26,22 @@ type Server struct {
 	shipgateClient shipgate.Shipgate
 }
 
-func (s *Server) Identifier() string {
-	return s.Name
+func (s *GameServer) Identifier() string {
+	return "SHIP:GAME"
 }
 
 // Init connects to the shipgate.
-func (s *Server) Init(ctx context.Context) error {
+func (s *GameServer) Init(ctx context.Context) error {
 	s.shipgateClient = shipgate.NewClient(s.Config)
 	return nil
 }
 
-func (s *Server) SetUpClient(c *client.Client) {
+func (s *GameServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
 	c.DebugTags["server_type"] = "block"
 }
 
-func (s *Server) Handshake(c *client.Client) error {
+func (s *GameServer) Handshake(c *client.Client) error {
 	pkt := &packets.Welcome{
 		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -55,7 +55,7 @@ func (s *Server) Handshake(c *client.Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
+func (s *GameServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
 	var packetHeader packets.BBHeader
 	bytes.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
 
@@ -74,7 +74,7 @@ func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) erro
 	return err
 }
 
-func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -112,7 +112,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	return s.sendFullCharacterEnd(c)
 }
 
-func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
+func (s *GameServer) sendSecurity(c *client.Client, errorCode uint32) error {
 	cfg := packets.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
@@ -134,7 +134,7 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	})
 }
 
-func (s *Server) sendMessage(c *client.Client, message string) error {
+func (s *GameServer) sendMessage(c *client.Client, message string) error {
 	return c.Send(&packets.LoginClientMessage{
 		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
 		Language: 0x00450009,
@@ -142,7 +142,7 @@ func (s *Server) sendMessage(c *client.Client, message string) error {
 	})
 }
 
-func (s *Server) sendLobbyList(c *client.Client) error {
+func (s *GameServer) sendLobbyList(c *client.Client) error {
 	lobbyEntries := make([]packets.LobbyListEntry, s.Config.BlockServer.NumLobbies)
 	for i := 0; i < s.Config.BlockServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
@@ -164,7 +164,7 @@ const (
 	NameColorGM     = 0xFF1D94F7
 )
 
-func (s *Server) fetchAndSendCharacter(ctx context.Context, c *client.Client) error {
+func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *client.Client) error {
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,
 		Slot:      c.ActiveSlot,
@@ -222,14 +222,14 @@ func (s *Server) fetchAndSendCharacter(ctx context.Context, c *client.Client) er
 	return c.Send(charPkt)
 }
 
-func (s *Server) sendFullCharacterEnd(c *client.Client) error {
+func (s *GameServer) sendFullCharacterEnd(c *client.Client) error {
 	// Acts as an EOF for the full character data.
 	return c.Send(&packets.BBHeader{
 		Type: packets.FullCharacterEndType,
 	})
 }
 
-func (s *Server) sendPacket67(c *client.Client) error {
+func (s *GameServer) sendPacket67(c *client.Client) error {
 	return c.Send(&packets.Packet67{
 		Header: packets.BBHeader{
 			Type: 0x67,

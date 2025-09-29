@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/dcrodman/archon/internal/block"
 	"github.com/dcrodman/archon/internal/character"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/debug"
@@ -78,28 +77,6 @@ func (c *Controller) Start(ctx context.Context) {
 
 // Set up all of the client-facing servers we'll be running.
 func (c *Controller) createServers() {
-	// Automatically configure the block servers based on the number of
-	// ship blocks requested.
-	var blocks []ship.Block
-	var blockServers []*frontend
-	for i := 1; i <= c.Config.ShipServer.NumBlocks; i++ {
-		name := fmt.Sprintf("BLOCK%02d", i)
-		address := fmt.Sprintf("%s:%v", c.Config.ExternalIP, c.Config.BlockServer.Port+i)
-
-		blocks = append(blocks, ship.Block{
-			Name: name, Address: address, ID: i,
-		})
-		blockServer := &frontend{
-			Address: address,
-			Backend: &block.Server{
-				Name:   name,
-				Config: c.Config,
-				Logger: c.logger,
-			},
-		}
-		blockServers = append(blockServers, blockServer)
-	}
-
 	c.servers = []*frontend{
 		{
 			Address: c.buildAddress(c.Config.PatchServer.PatchPort),
@@ -133,15 +110,19 @@ func (c *Controller) createServers() {
 		// independently of the other four servers
 		{
 			Address: c.buildAddress(c.Config.ShipServer.Port),
-			Backend: &ship.Server{
+			Backend: &ship.AuthServer{
 				Config: c.Config,
-				Blocks: blocks,
+				Logger: c.logger,
+			},
+		},
+		{
+			Address: c.buildAddress(c.Config.BlockServer.Port),
+			Backend: &ship.GameServer{
+				Config: c.Config,
 				Logger: c.logger,
 			},
 		},
 	}
-
-	c.servers = append(c.servers, blockServers...)
 }
 
 func (c *Controller) run(ctx context.Context) {
