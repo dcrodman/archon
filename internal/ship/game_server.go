@@ -143,8 +143,8 @@ func (s *GameServer) sendMessage(c *client.Client, message string) error {
 }
 
 func (s *GameServer) sendLobbyList(c *client.Client) error {
-	lobbyEntries := make([]packets.LobbyListEntry, s.Config.BlockServer.NumLobbies)
-	for i := 0; i < s.Config.BlockServer.NumLobbies; i++ {
+	lobbyEntries := make([]packets.LobbyListEntry, s.Config.ShipServer.NumLobbies)
+	for i := 0; i < s.Config.ShipServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
 		lobbyEntries[i].LobbyID = uint32(i)
 	}

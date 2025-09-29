@@ -49,7 +49,7 @@ func (s *AuthServer) Init(ctx context.Context) error {
 	if _, err := s.shipgateClient.RegisterShip(ctx, &shipgate.RegisterShipRequest{
 		Name:    s.Config.ShipServer.Name,
 		Address: s.Config.ExternalIP,
-		Port:    strconv.Itoa(s.Config.ShipServer.Port),
+		Port:    strconv.Itoa(s.Config.ShipServer.GamePort),
 	}); err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}
@@ -156,7 +156,7 @@ func (s *AuthServer) sendMessage(c *client.Client, message string) error {
 func (s *AuthServer) sendGameServerRedirect(c *client.Client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
-		Port:   uint16(s.Config.ShipServer.Port + 1),
+		Port:   uint16(s.Config.ShipServer.GamePort),
 	}
 	ip := s.Config.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])

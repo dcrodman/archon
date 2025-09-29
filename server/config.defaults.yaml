@@ -30,40 +30,34 @@ database:
   ## Set to verify-full if the Postgres instance supports SSL.
   # sslmode: disable
 
-patch_server:
-  # Port on which the PATCH server will listen.
-  patch_port: 11000
-  # Port on which the patch DATA Server will listen.
-  data_port: 11001
-  # Welcome message displayed on the patch screen.
-  welcome_message: "Unconfigured"
-
-login_server:
-  # Port on which the LOGIN server will listen.
-  port: 12000
-
-character_server:
-  # Port on which the CHARACTER server will listen.
-  port: 12001
-  # Scrolling welcome message to display to the user on the ship selection screen.
-  scroll_message: "Add a welcome message..."
-
 shipgate_server:
   # Port on which the Shipgate's gRPC server will listen.
   port: 13000
 
+patch_server:
+  # Port on which the PATCH:AUTH server will listen.
+  auth_port: 11000
+  # Port on which the PATCH:DATA server will listen.
+  data_port: 11001
+  # Welcome message displayed on the patch screen.
+  welcome_message: "Unconfigured"
+
+character_server:
+  # Port on which the CHARACTER:AUTH server will listen.
+  auth_port: 12000
+  # Port on which the CHARACTER:DATA server will listen.
+  data_port: 12001
+  # Scrolling welcome message to display to the user on the ship selection screen.
+  scroll_message: "Add a welcome message..."
+
 ship_server:
-  # Port on which the SHIP server will listen.
-  port: 15000
+  # Port on which the SHIP:AUTH server will listen.
+  auth_port: 15000
+  # Port on which the SHIP:GAME server will listen.
+  game_port: 15001
   # Name of the ship that will appear in the selection screen.
   name: "Default"
-  # Number of block servers to run for this ship.
-  num_blocks: 2
-
-block_server:
-  # Base block port.
-  port: 15001
-  # Number of lobbies to create per block.
+  # Number of lobbies to create for the ship.
   num_lobbies: 16
 
 logging:

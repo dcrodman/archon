@@ -79,7 +79,7 @@ func (c *Controller) Start(ctx context.Context) {
 func (c *Controller) createServers() {
 	c.servers = []*frontend{
 		{
-			Address: c.buildAddress(c.Config.PatchServer.PatchPort),
+			Address: c.buildAddress(c.Config.PatchServer.AuthPort),
 			Backend: &patch.PatchAuthServer{
 				Config: c.Config,
 				Logger: c.logger,
@@ -93,14 +93,14 @@ func (c *Controller) createServers() {
 			},
 		},
 		{
-			Address: c.buildAddress(c.Config.LoginServer.Port),
+			Address: c.buildAddress(c.Config.CharacterServer.AuthPort),
 			Backend: &character.AuthServer{
 				Config: c.Config,
 				Logger: c.logger,
 			},
 		},
 		{
-			Address: c.buildAddress(c.Config.CharacterServer.Port),
+			Address: c.buildAddress(c.Config.CharacterServer.DataPort),
 			Backend: &character.Server{
 				Config: c.Config,
 				Logger: c.logger,
@@ -109,14 +109,14 @@ func (c *Controller) createServers() {
 		// Note: Eventually the ship and block servers should be able to be run
 		// independently of the other four servers
 		{
-			Address: c.buildAddress(c.Config.ShipServer.Port),
+			Address: c.buildAddress(c.Config.ShipServer.AuthPort),
 			Backend: &ship.AuthServer{
 				Config: c.Config,
 				Logger: c.logger,
 			},
 		},
 		{
-			Address: c.buildAddress(c.Config.BlockServer.Port),
+			Address: c.buildAddress(c.Config.ShipServer.GamePort),
 			Backend: &ship.GameServer{
 				Config: c.Config,
 				Logger: c.logger,

@@ -117,7 +117,7 @@ func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	return s.sendCharacterRedirect(c)
+	return s.sendDataServerRedirect(c)
 }
 
 // send the security initialization packet with information about the user's
@@ -155,13 +155,13 @@ func (s *AuthServer) sendMessage(c *client.Client, message string) error {
 	})
 }
 
-// Send the IP address and port of the character server to  which the client will
+// Send the IP address and port of the character server to which the client will
 // connect after disconnecting from this server.
-func (s *AuthServer) sendCharacterRedirect(c *client.Client) error {
+func (s *AuthServer) sendDataServerRedirect(c *client.Client) error {
 	pkt := &packets.Redirect{
 		Header: packets.BBHeader{Type: packets.RedirectType},
 		IPAddr: [4]uint8{},
-		Port:   uint16(s.Config.CharacterServer.Port),
+		Port:   uint16(s.Config.CharacterServer.DataPort),
 	}
 	ip := s.Config.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])

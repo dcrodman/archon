@@ -44,32 +44,25 @@ type Config struct {
 	} `mapstructure:"shipgate_server"`
 
 	PatchServer struct {
-		PatchPort      int    `mapstructure:"patch_port"`
+		AuthPort       int    `mapstructure:"auth_port"`
 		DataPort       int    `mapstructure:"data_port"`
 		WelcomeMessage string `mapstructure:"welcome_message"`
 	} `mapstructure:"patch_server"`
 
-	LoginServer struct {
-		Port int `mapstructure:"port"`
-	} `mapstructure:"login_server"`
-
 	CharacterServer struct {
-		Port int `mapstructure:"port"`
+		AuthPort int `mapstructure:"auth_port"`
+		DataPort int `mapstructure:"data_port"`
 		// TODO: Restore this config option when adding support for overriding these files.
 		// ParametersDir string `mapstructure:"parameters_dir"`
 		ScrollMessage string `mapstructure:"scroll_message"`
 	} `mapstructure:"character_server"`
 
 	ShipServer struct {
-		Port      int    `mapstructure:"port"`
-		Name      string `mapstructure:"name"`
-		NumBlocks int    `mapstructure:"num_blocks"`
+		AuthPort   int    `mapstructure:"auth_port"`
+		GamePort   int    `mapstructure:"game_port"`
+		Name       string `mapstructure:"name"`
+		NumLobbies int    `mapstructure:"num_lobbies"`
 	} `mapstructure:"ship_server"`
-
-	BlockServer struct {
-		Port       int `mapstructure:"port"`
-		NumLobbies int `mapstructure:"num_lobbies"`
-	} `mapstructure:"block_server"`
 
 	Logging struct {
 		LogFilePath   string `mapstructure:"log_file_path"`
