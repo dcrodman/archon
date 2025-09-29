@@ -32,7 +32,7 @@ func (s *Server) Identifier() string {
 
 // Init connects to the shipgate.
 func (s *Server) Init(ctx context.Context) error {
-	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipgateClient = shipgate.NewClient(s.Config)
 	return nil
 }
 

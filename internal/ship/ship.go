@@ -46,7 +46,7 @@ func (s *Server) Identifier() string {
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
 func (s *Server) Init(ctx context.Context) error {
-	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipgateClient = shipgate.NewClient(s.Config)
 
 	// Register this ship with the shipgate so that it can start accepting players.
 	if _, err := s.shipgateClient.RegisterShip(ctx, &shipgate.RegisterShipRequest{

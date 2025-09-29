@@ -27,8 +27,7 @@ type Controller struct {
 	logger *zap.SugaredLogger
 	wg     sync.WaitGroup
 
-	shipgateServer *shipgate.Server
-	servers        []*frontend
+	servers []*frontend
 }
 
 func (c *Controller) Start(ctx context.Context) {
@@ -48,8 +47,7 @@ func (c *Controller) Start(ctx context.Context) {
 	}
 
 	// Start the shipgate RPC service and make sure it launches before the other servers start.
-	c.shipgateServer = &shipgate.Server{Config: c.Config, Logger: c.logger}
-	c.shipgateServer.Start(ctx)
+	shipgate.Start(c.Config, c.logger)
 
 	shipgateAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", c.Config.ShipgateServer.Port))
 	if err != nil {
@@ -74,12 +72,12 @@ func (c *Controller) Start(ctx context.Context) {
 	}
 
 	// Configure, initialize, run all of our servers.
-	c.declareServers()
+	c.createServers()
 	c.run(ctx)
 }
 
-// Set up all of the servers we want to run.
-func (c *Controller) declareServers() {
+// Set up all of the client-facing servers we'll be running.
+func (c *Controller) createServers() {
 	// Automatically configure the block servers based on the number of
 	// ship blocks requested.
 	var blocks []ship.Block
@@ -174,5 +172,5 @@ func (c *Controller) Shutdown(ctx context.Context) {
 	// Stop the shipgate after all of the other servers have stopped in order to avoid
 	// errors from any shipgate calls during the shutdown process.
 	c.wg.Wait()
-	c.shipgateServer.Shutdown(ctx)
+	shipgate.Shutdown(ctx)
 }

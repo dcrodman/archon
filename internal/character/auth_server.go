@@ -34,7 +34,7 @@ func (s *AuthServer) Identifier() string {
 }
 
 func (s *AuthServer) Init(_ context.Context) error {
-	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipgateClient = shipgate.NewClient(s.Config)
 	return nil
 }
 

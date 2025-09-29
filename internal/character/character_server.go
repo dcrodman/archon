@@ -70,7 +70,7 @@ func (s *Server) Identifier() string {
 
 func (s *Server) Init(ctx context.Context) error {
 	s.kvCache = gocache.New(-1, 10*time.Second)
-	s.shipgateClient = shipgate.NewRPCClient(s.Config)
+	s.shipgateClient = shipgate.NewClient(s.Config)
 
 	var err error
 	if s.numParameterFiles, err = initParameterData(s.Logger); err != nil {
@@ -253,21 +253,31 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 // rather than bothering with anything fancy like retrieving a list of active
 // ships from the shipgate, etc.
 func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
-	pkt := &packets.ShipMenu{
+	entries := []packets.ShipMenuEntry{
+		// The first item is ignored and just used for the menu title.
+		{MenuID: 0x11000011, ItemID: 0},
+	}
+	copy(entries[0].Name[:], bytes.ConvertToUtf16("Archon"))
+
+	// Append our active ship list.
+	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
+	if err != nil {
+		return fmt.Errorf("retrieving list of active ships: %v", err)
+	}
+	for i, ship := range shipList.Ships {
+		var entry packets.ShipMenuEntry
+		entry.ItemID = uint32(i) + 1
+		copy(entry.Name[:], bytes.ConvertToUtf16(ship.Name))
+		entries = append(entries, entry)
+	}
+
+	return c.Send(&packets.ShipMenu{
 		Header: packets.BBHeader{
 			Type:  packets.BlockListType,
-			Flags: 1,
+			Flags: uint32(len(shipList.Ships)),
 		},
-		Entries: []packets.ShipMenuEntry{
-			// The first item is ignored and just used for the menu title.
-			{MenuID: 0x11000011, ItemID: 0},
-			{ItemID: 1},
-		},
-	}
-	copy(pkt.Entries[0].Name[:], bytes.ConvertToUtf16("Archon"))
-	copy(pkt.Entries[1].Name[:], bytes.ConvertToUtf16(s.Config.ShipServer.Name))
-
-	return c.Send(pkt)
+		Entries: entries,
+	})
 }
 
 // send whatever scrolling message was read out of the config file for the login screen.
