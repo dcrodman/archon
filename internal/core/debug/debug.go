@@ -86,11 +86,12 @@ func PrintPacket(params PrintPacketParams) {
 	headerLine.WriteString(fmt.Sprintf("(%d bytes)\n", header.Size))
 
 	var err error
-	// Write out the contents of the actual command.
 	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
 		fmt.Printf("error writing command header: %v\n", err)
 		return
 	}
+
+	// Write out the contents of the actual command.
 	if params.Interpret {
 		// Attempt to print out any known commands as JSON, falling back to the standard
 		// format for any we don't recognize.
@@ -98,7 +99,7 @@ func PrintPacket(params PrintPacketParams) {
 	}
 
 	if !params.Interpret || err != nil {
-		if err := writeCommandBodyToFile(params); err != nil {
+		if err := writeCommandBody(params, header.Size); err != nil {
 			fmt.Printf("error writing command body: %v\n", err)
 			return
 		}
@@ -109,27 +110,30 @@ func PrintPacket(params PrintPacketParams) {
 	params.Writer.Flush()
 }
 
-const CommandLineLength = 16
+const lineLength = 16
 
-// Print the standard output of one column with the bytes in hexadecimal followed
-// by another column with the corresponding bytes translated to unicode where possible.
-func writeCommandBodyToFile(params PrintPacketParams) error {
-	pktLen := len(params.Data)
-	for rem, offset := pktLen, 0; rem > 0; rem -= CommandLineLength {
-		if params.TruncateThreshold > 0 && offset > params.TruncateThreshold {
+// Takes the contents of params.Data and writes it to params.Writer. The data is written
+// in two formats: a line of the raw bytes (in hexadecimal) followed by a line of those
+// same bytes translated to unicode where possible.
+func writeCommandBody(params PrintPacketParams, pktLen uint16) error {
+	var (
+		totalLines = pktLen / lineLength
+		spillover  = pktLen % lineLength
+	)
+	for i := range totalLines {
+		offset := lineLength * i
+
+		if params.TruncateThreshold > 0 && int(offset) > params.TruncateThreshold {
 			_, _ = params.Writer.WriteString("...(truncated)...\n")
 			break
 		}
-
-		var line string
-
-		if rem < CommandLineLength {
-			line = buildCommandLine(params.Data[(pktLen-rem):pktLen], rem, offset)
-		} else {
-			line = buildCommandLine(params.Data[offset:offset+CommandLineLength], CommandLineLength, offset)
+		line := buildSingleLine(params.Data[offset:offset+lineLength], lineLength, offset)
+		if _, err := params.Writer.WriteString(line); err != nil {
+			return err
 		}
-		offset += CommandLineLength
-
+	}
+	if spillover > 0 {
+		line := buildSingleLine(params.Data[pktLen-spillover:], int(spillover), totalLines*lineLength)
 		if _, err := params.Writer.WriteString(line); err != nil {
 			return err
 		}
@@ -138,7 +142,7 @@ func writeCommandBodyToFile(params PrintPacketParams) error {
 }
 
 // Build one line of formatted command data.
-func buildCommandLine(data []uint8, length int, offset int) string {
+func buildSingleLine(data []uint8, length int, offset uint16) string {
 	var line strings.Builder
 
 	line.WriteString(fmt.Sprintf("(%04X) ", offset))
@@ -147,14 +151,13 @@ func buildCommandLine(data []uint8, length int, offset int) string {
 		if j == 8 {
 			// Visual aid - spacing between groups of 8 bytes.
 			j = 0
-			// line.WriteString("  ")
 		}
 		line.WriteString(fmt.Sprintf("%02x ", data[i]))
 		j++
 	}
 
 	// Fill in rest of the line gap if we don't have enough bytes.
-	for i := length; i < CommandLineLength; i++ {
+	for i := length; i < lineLength; i++ {
 		if i == 8 {
 			line.WriteString("  ")
 		}
