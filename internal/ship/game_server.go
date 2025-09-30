@@ -69,7 +69,7 @@ func (s *GameServer) Handle(ctx context.Context, c *client.Client, data []byte) 
 		// TODO: Probably have some data to copy in here.
 		err = s.sendPacket67(c)
 	default:
-		s.Logger.Infof("received unknown packet %x from %s", cmdHeader.Type, c.IPAddr())
+		s.Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr())
 	}
 	return err
 }

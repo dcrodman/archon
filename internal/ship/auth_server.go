@@ -19,12 +19,6 @@ import (
 
 var copyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-type Block struct {
-	Name    string
-	Address string
-	ID      int
-}
-
 // AuthServer is the SHIP server implementation. This is similar to PATCH and LOGIN
 // in that it really just exists to be a gateway. Is main responsibility is to
 // provide the client with the block list and then send the address of the
@@ -49,7 +43,7 @@ func (s *AuthServer) Init(ctx context.Context) error {
 	if _, err := s.shipgateClient.RegisterShip(ctx, &shipgate.RegisterShipRequest{
 		Name:    s.Config.ShipServer.Name,
 		Address: s.Config.ExternalIP,
-		Port:    strconv.Itoa(s.Config.ShipServer.GamePort),
+		Port:    strconv.Itoa(s.Config.ShipServer.AuthPort),
 	}); err != nil {
 		return fmt.Errorf("error registering with shipgate: %v", err)
 	}
