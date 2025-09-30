@@ -100,7 +100,7 @@ func initParameterData(logger *zap.SugaredLogger) (int, error) {
 }
 
 // LoadConfig the PSOBB parameter files, build the parameter header,
-// and init/cache the param file chunks for the EB packets.
+// and init/cache the param file chunks for the EB commands.
 func loadParameterFiles(logger *zap.SugaredLogger) (int, error) {
 	logger.Info("loading embedded parameter files")
 

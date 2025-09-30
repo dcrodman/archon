@@ -14,8 +14,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/packets"
 )
 
 // This function starts the default pprof HTTP server that can be accessed via localhost
@@ -51,34 +51,34 @@ const (
 type PrintPacketParams struct {
 	Writer     *bufio.Writer
 	ServerType ServerType
-	// True if this packet is client->server.
-	ClientPacket bool
-	Data         []byte
-	// Cut off the packet output after a certain size.
+	// True if this command is client->server.
+	ClientCommand bool
+	Data          []byte
+	// Cut off the command output after a certain size.
 	TruncateThreshold int
-	// For known packet types, read the data into each packet and
+	// For known command types, read the data into each command and
 	// emit it as formatted JSON.
 	Interpret bool
 }
 
-// PrintPacket prints the contents of a packet to a specified writer along with some
-// inferred metadata about the packet itself.
+// PrintCommand prints the contents of a command to a specified writer along with some
+// inferred metadata about the command itself.
 func PrintPacket(params PrintPacketParams) {
-	var header packets.PCHeader
-	bytes.StructFromBytes(params.Data[:packets.PCHeaderSize], &header)
+	var header commands.PCHeader
+	bytes.StructFromBytes(params.Data[:commands.PCHeaderSize], &header)
 
-	// Set the output colors depending on the direction of the packet.
-	if params.ClientPacket {
+	// Set the output colors depending on the direction of the command.
+	if params.ClientCommand {
 		_, _ = params.Writer.WriteString("\033[32m")
 	} else {
 		_, _ = params.Writer.WriteString("\033[33m")
 	}
 
-	// Write a header line for each packet with some metadata.
+	// Write a header line for each command with some metadata.
 	var headerLine strings.Builder
 	headerLine.WriteString(fmt.Sprintf("[%s] %04X ", params.ServerType, header.Type))
-	headerLine.WriteString(fmt.Sprintf("(%s) ", getPacketName(params.ServerType, header.Type)))
-	if params.ClientPacket {
+	headerLine.WriteString(fmt.Sprintf("(%s) ", getCommandName(params.ServerType, header.Type)))
+	if params.ClientCommand {
 		headerLine.WriteString("| client->server ")
 	} else {
 		headerLine.WriteString("| server->client ")
@@ -86,20 +86,20 @@ func PrintPacket(params PrintPacketParams) {
 	headerLine.WriteString(fmt.Sprintf("(%d bytes)\n", header.Size))
 
 	var err error
-	// Write out the contents of the actual packet.
+	// Write out the contents of the actual command.
 	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
-		fmt.Printf("error writing packet header: %v\n", err)
+		fmt.Printf("error writing command header: %v\n", err)
 		return
 	}
 	if params.Interpret {
-		// Attempt to print out any known packets as JSON, falling back to the standard
+		// Attempt to print out any known commands as JSON, falling back to the standard
 		// format for any we don't recognize.
-		err = writeInterpretedPacketBodyToFile(params, header)
+		err = writeInterpretedCommandBodyToFile(params, header)
 	}
 
 	if !params.Interpret || err != nil {
-		if err := writePacketBodyToFile(params); err != nil {
-			fmt.Printf("error writing packet body: %v\n", err)
+		if err := writeCommandBodyToFile(params); err != nil {
+			fmt.Printf("error writing command body: %v\n", err)
 			return
 		}
 	}
@@ -109,13 +109,13 @@ func PrintPacket(params PrintPacketParams) {
 	params.Writer.Flush()
 }
 
-const PacketLineLength = 16
+const CommandLineLength = 16
 
 // Print the standard output of one column with the bytes in hexadecimal followed
 // by another column with the corresponding bytes translated to unicode where possible.
-func writePacketBodyToFile(params PrintPacketParams) error {
+func writeCommandBodyToFile(params PrintPacketParams) error {
 	pktLen := len(params.Data)
-	for rem, offset := pktLen, 0; rem > 0; rem -= PacketLineLength {
+	for rem, offset := pktLen, 0; rem > 0; rem -= CommandLineLength {
 		if params.TruncateThreshold > 0 && offset > params.TruncateThreshold {
 			_, _ = params.Writer.WriteString("...(truncated)...\n")
 			break
@@ -123,12 +123,12 @@ func writePacketBodyToFile(params PrintPacketParams) error {
 
 		var line string
 
-		if rem < PacketLineLength {
-			line = buildPacketLine(params.Data[(pktLen-rem):pktLen], rem, offset)
+		if rem < CommandLineLength {
+			line = buildCommandLine(params.Data[(pktLen-rem):pktLen], rem, offset)
 		} else {
-			line = buildPacketLine(params.Data[offset:offset+PacketLineLength], PacketLineLength, offset)
+			line = buildCommandLine(params.Data[offset:offset+CommandLineLength], CommandLineLength, offset)
 		}
-		offset += PacketLineLength
+		offset += CommandLineLength
 
 		if _, err := params.Writer.WriteString(line); err != nil {
 			return err
@@ -137,8 +137,8 @@ func writePacketBodyToFile(params PrintPacketParams) error {
 	return nil
 }
 
-// Build one line of formatted packet data.
-func buildPacketLine(data []uint8, length int, offset int) string {
+// Build one line of formatted command data.
+func buildCommandLine(data []uint8, length int, offset int) string {
 	var line strings.Builder
 
 	line.WriteString(fmt.Sprintf("(%04X) ", offset))
@@ -154,7 +154,7 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 	}
 
 	// Fill in rest of the line gap if we don't have enough bytes.
-	for i := length; i < PacketLineLength; i++ {
+	for i := length; i < CommandLineLength; i++ {
 		if i == 8 {
 			line.WriteString("  ")
 		}
@@ -177,19 +177,19 @@ func buildPacketLine(data []uint8, length int, offset int) string {
 	return line.String()
 }
 
-func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.PCHeader) error {
-	newPacket := getPacket(params.ServerType, params.ClientPacket, header.Type)
-	if !newPacket.IsValid() {
-		_, _ = params.Writer.WriteString("(cannot interpret - unrecognized packet type)\n")
-		return fmt.Errorf("unrecognized packet type: %02X", header.Type)
+func writeInterpretedCommandBodyToFile(params PrintPacketParams, header commands.PCHeader) error {
+	newCommand := getCommand(params.ServerType, params.ClientCommand, header.Type)
+	if !newCommand.IsValid() {
+		_, _ = params.Writer.WriteString("(cannot interpret - unrecognized command type)\n")
+		return fmt.Errorf("unrecognized command type: %02X", header.Type)
 	}
 
-	packet := newPacket.Elem()
+	command := newCommand.Elem()
 	reader := stdbytes.NewReader(params.Data)
 
 	var err error
-	for i := 0; i < packet.NumField(); i++ {
-		field := packet.Field(i)
+	for i := 0; i < command.NumField(); i++ {
+		field := command.Field(i)
 		switch field.Kind() {
 		case reflect.Ptr:
 			err = binary.Read(reader, binary.LittleEndian, field.Interface())
@@ -202,10 +202,10 @@ func writeInterpretedPacketBodyToFile(params PrintPacketParams, header packets.P
 	}
 
 	spew.Config.Indent = "\t"
-	_, _ = params.Writer.WriteString(spew.Sdump(packet.Interface()))
+	_, _ = params.Writer.WriteString(spew.Sdump(command.Interface()))
 	if err != nil {
 		_, _ = params.Writer.WriteString("WARNING: PARTIAL RESULT\n")
-		_, _ = params.Writer.WriteString("(make sure the packet type is correctly mapped)\n")
+		_, _ = params.Writer.WriteString("(make sure the command type is correctly mapped)\n")
 		_, _ = params.Writer.WriteString(err.Error() + "\n")
 	}
 	return nil

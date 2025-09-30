@@ -1,5 +1,4 @@
-// Packets used by multiple server types.
-package packets
+package commands
 
 const (
 	PCHeaderSize = 0x04
@@ -14,14 +13,14 @@ type PCHeader struct {
 	Type uint16
 }
 
-// Packet header for every packet sent between the server and BlueBurst clients.
+// BBHeader is the header for every command sent between the server and BlueBurst clients.
 type BBHeader struct {
 	Size  uint16
 	Type  uint16
 	Flags uint32
 }
 
-// Error codes used by the 0xE6 security/auth response packet.
+// Error codes used by the 0xE6 security/auth response.
 type BBLoginError uint32
 
 const (
@@ -40,7 +39,7 @@ const (
 	BBLoginErrorDisconnect
 )
 
-// Packet types common to multiple servers.
+// Command types common to multiple servers.
 const (
 	DisconnectType    = 0x05
 	RedirectType      = 0x19

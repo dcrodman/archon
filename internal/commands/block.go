@@ -1,4 +1,4 @@
-package packets
+package commands
 
 const (
 	LobbyListType        = 0x83

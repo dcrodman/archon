@@ -5,11 +5,11 @@ import (
 )
 
 // CryptoSession is an interface for the cryptographic operations required
-// to exchange packets between a PSO game client and the server. It consists
-// of one or more ciphers that handle encrypting packets from the server and
-// decrypting packets from the client.
+// to exchange commands between a PSO game client and the server. It consists
+// of one or more ciphers that handle encrypting commands from the server and
+// decrypting commands from the client.
 type CryptoSession interface {
-	// HeaderSize returns the length of the header of all client packets.
+	// HeaderSize returns the length of the header of all client commands.
 	HeaderSize() uint16
 
 	// Encrypt encrypts bytes in place with the encryption key for the server.

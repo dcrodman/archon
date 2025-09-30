@@ -7,7 +7,7 @@
 
 # Hostname or IP address on which the servers will listen for connections.
 hostname: 0.0.0.0
-# IP broadcast to clients in the redirect packets.
+# IP broadcast to clients in the redirect commands.
 external_ip: 127.0.0.1
 # Maximum number of concurrent connections the server will allow.
 max_connections: 3000

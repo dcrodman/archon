@@ -4,16 +4,16 @@ import (
 	"net"
 	"testing"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/packets"
 	"github.com/google/go-cmp/cmp"
 )
 
 var (
-	testPacket = &packets.CharacterAck{
-		Header: packets.BBHeader{
+	testPacket = &commands.CharacterAck{
+		Header: commands.BBHeader{
 			Size: 0x10,
-			Type: packets.LoginCharAckType,
+			Type: commands.LoginCharAckType,
 		},
 		Slot: 1,
 		Flag: 1,
@@ -134,9 +134,9 @@ func TestClient_Send(t *testing.T) {
 }
 
 func Test_adjustPacketLength(t *testing.T) {
-	testPacketNoSize := &packets.CharacterAck{
-		Header: packets.BBHeader{
-			Type: packets.LoginCharAckType,
+	testPacketNoSize := &commands.CharacterAck{
+		Header: commands.BBHeader{
+			Type: commands.LoginCharAckType,
 		},
 		Slot: 1,
 		Flag: 1,
@@ -168,7 +168,7 @@ func Test_adjustPacketLength(t *testing.T) {
 			args: args{
 				data:       testPacketBytes,
 				length:     uint16(len(testPacketBytes)),
-				headerSize: packets.BBHeaderSize,
+				headerSize: commands.BBHeaderSize,
 			},
 			want:       testPacketBytes,
 			wantLength: uint16(len(testPacketBytes)),
@@ -178,7 +178,7 @@ func Test_adjustPacketLength(t *testing.T) {
 			args: args{
 				data:       testPacketBytesNoSize,
 				length:     uint16(len(testPacketBytesNoSize)),
-				headerSize: packets.BBHeaderSize,
+				headerSize: commands.BBHeaderSize,
 			},
 			want:       testPacketBytes,
 			wantLength: uint16(len(testPacketBytes)),
@@ -188,7 +188,7 @@ func Test_adjustPacketLength(t *testing.T) {
 			args: args{
 				data:       longerTestPacket,
 				length:     uint16(len(longerTestPacket)),
-				headerSize: packets.BBHeaderSize,
+				headerSize: commands.BBHeaderSize,
 			},
 			want:       expectedLongerTestPacket,
 			wantLength: uint16(len(expectedLongerTestPacket)),

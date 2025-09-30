@@ -3,11 +3,11 @@ package patch
 import (
 	"context"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/packets"
 	"go.uber.org/zap"
 )
 
@@ -48,9 +48,9 @@ func (s *PatchAuthServer) SetUpClient(c *client.Client) {
 }
 
 func (s *PatchAuthServer) Handshake(c *client.Client) error {
-	// Send the welcome packet to a client with the copyright message and encryption vectors.
-	pkt := packets.PatchWelcome{
-		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
+	// Send the welcome command to a client with the copyright message and encryption vectors.
+	pkt := commands.PatchWelcome{
+		Header: commands.PCHeader{Type: commands.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
@@ -60,37 +60,37 @@ func (s *PatchAuthServer) Handshake(c *client.Client) error {
 }
 
 func (s *PatchAuthServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	var header packets.PCHeader
-	bytes.StructFromBytes(data[:packets.PCHeaderSize], &header)
+	var header commands.PCHeader
+	bytes.StructFromBytes(data[:commands.PCHeaderSize], &header)
 
 	var err error
 	switch header.Type {
-	case packets.PatchWelcomeType:
+	case commands.PatchWelcomeType:
 		err = s.sendWelcomeAck(c)
-	case packets.PatchHandshakeType:
+	case commands.PatchHandshakeType:
 		if err = s.sendWelcomeMessage(c); err == nil {
 			err = s.sendPatchRedirect(c)
 		}
 	default:
-		s.Logger.Infof("received unknown packet %2x from %s", header.Type, c.IPAddr())
+		s.Logger.Infof("received unknown command %2x from %s", header.Type, c.IPAddr())
 	}
 	return err
 }
 
 func (s *PatchAuthServer) sendWelcomeAck(c *client.Client) error {
 	// PatchHandshakeType is treated as an ack in this case.
-	return c.Send(&packets.PCHeader{
+	return c.Send(&commands.PCHeader{
 		Size: 0x04,
-		Type: packets.PatchHandshakeType,
+		Type: commands.PatchHandshakeType,
 	})
 }
 
 // Message displayed on the patch download screen.
 func (s *PatchAuthServer) sendWelcomeMessage(c *client.Client) error {
-	pkt := &packets.PatchWelcomeMessage{
-		Header: packets.PCHeader{
-			Size: packets.PCHeaderSize + uint16(len(s.welcomeMessage)),
-			Type: packets.PatchMessageType,
+	pkt := &commands.PatchWelcomeMessage{
+		Header: commands.PCHeader{
+			Size: commands.PCHeaderSize + uint16(len(s.welcomeMessage)),
+			Type: commands.PatchMessageType,
 		},
 		Message: s.welcomeMessage,
 	}
@@ -98,12 +98,12 @@ func (s *PatchAuthServer) sendWelcomeMessage(c *client.Client) error {
 	return c.Send(pkt)
 }
 
-// send the redirect packet, providing the IP and port of the next server.
+// send the redirect command, providing the IP and port of the next server.
 func (s *PatchAuthServer) sendPatchRedirect(c *client.Client) error {
-	pkt := packets.PatchRedirect{
-		Header: packets.PCHeader{Type: packets.PatchRedirectType},
+	pkt := commands.PatchRedirect{
+		Header: commands.PCHeader{Type: commands.PatchRedirectType},
 		IPAddr: [4]uint8{},
-		// Convert the data port to a BE uint for the redirect packet.
+		// Convert the data port to a BE uint for the redirect command.
 		Port:    uint16((s.Config.PatchServer.DataPort >> 8) | (s.Config.PatchServer.DataPort << 8)),
 		Padding: 0,
 	}

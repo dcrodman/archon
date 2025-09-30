@@ -1,10 +1,6 @@
-/*
-* Packet constants and structures. All functions return 0 on success,
-* negative int on db error, and a positive int for any other errors.
- */
-package packets
+package commands
 
-// Packet types for packets sent to and from the login and character servers.
+// Numerical identifiers for commands sent to and from the login and character servers.
 const (
 	LoginWelcomeType            = 0x03
 	LoginType                   = 0x93
@@ -31,7 +27,7 @@ const (
 	LoginScrollMessageType      = 0xEE
 )
 
-// Welcome packet with encryption vectors sent to the client upon initial connection.
+// Welcome command with encryption vectors sent to the client upon initial connection.
 type Welcome struct {
 	Header       BBHeader
 	Copyright    [96]byte
@@ -64,7 +60,7 @@ const (
 	ShipSelection
 )
 
-// Login Packet (0x93) sent to both the login and character servers.
+// Login command sent to both the login and character servers.
 type Login struct {
 	Header        BBHeader
 	Unknown       [8]byte
@@ -94,7 +90,7 @@ type ClientConfig struct {
 	Unused2      [2]uint32
 }
 
-// Security packet (0xE6) sent to the client to indicate the state of client login.
+// Security command (0xE6) sent to the client to indicate the state of client login.
 type Security struct {
 	Header       BBHeader
 	ErrorCode    uint32
@@ -113,13 +109,13 @@ type Redirect struct {
 	Padding uint16
 }
 
-// Options packet containing keyboard and joystick config, team options, etc.
+// Options command containing keyboard and joystick config, team options, etc.
 type Options struct {
 	Header BBHeader
 	// Based on the key config structure from sylverant and newserv. KeyConfig
 	// and JoystickConfig are saved in the database.
 	//
-	// Note: This packet is shortened by dropping 4 bytes from TeamFlag in order
+	// Note: This command is shortened by dropping 4 bytes from TeamFlag in order
 	// to align it with tethealla. Sylverant and Newserv do not do this and this
 	// may not actually be right.
 	PlayerKeyConfig struct {
@@ -269,7 +265,7 @@ type ShipList struct {
 }
 
 // Scroll message the client should display on the ship select screen.
-type ScrollMessagePacket struct {
+type ScrollMessage struct {
 	Header  BBHeader
 	Padding [2]uint32
 	Message []byte
@@ -292,7 +288,7 @@ type ShipMenuEntry struct {
 	Flags      uint8
 }
 
-// MenuSelection is a client packet indicating a player's selection from
+// MenuSelection is a client command indicating a player's selection from
 // one of the various menus, such as the ship or block list.
 type MenuSelection struct {
 	Header BBHeader

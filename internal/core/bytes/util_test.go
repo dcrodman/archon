@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -90,19 +90,19 @@ func TestStructConversions(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x4c, 0x83, 0x58, 0x5e, 0xec, 0xd6, 0x0c, 0x7f,
 	}
 
-	var welcomePacket packets.PatchWelcome
-	StructFromBytes(command, &welcomePacket)
+	var welcomeCommand commands.PatchWelcome
+	StructFromBytes(command, &welcomeCommand)
 
-	if diff := cmp.Diff(welcomePacket.Copyright[:], []byte("Patch Server. Copyright SonicTeam, LTD. 2001")); diff != "" {
-		t.Errorf("welcome packet Copyright did not match expected, diff:\n%s", diff)
+	if diff := cmp.Diff(welcomeCommand.Copyright[:], []byte("Patch Server. Copyright SonicTeam, LTD. 2001")); diff != "" {
+		t.Errorf("welcome command Copyright did not match expected, diff:\n%s", diff)
 	}
 
-	convertedPacket, bytes := BytesFromStruct(welcomePacket)
+	convertedCommand, bytes := BytesFromStruct(welcomeCommand)
 	if bytes != len(command) {
-		t.Errorf("expected bytes to equal the length of the packet (%d), got = %v", convertedPacket, bytes)
+		t.Errorf("expected bytes to equal the length of the command (%d), got = %v", convertedCommand, bytes)
 	}
 
-	if diff := cmp.Diff(command, convertedPacket); diff != "" {
-		t.Errorf("expected converted packet to match original. diff:\n%s", diff)
+	if diff := cmp.Diff(command, convertedCommand); diff != "" {
+		t.Errorf("expected converted command to match original. diff:\n%s", diff)
 	}
 }

@@ -7,11 +7,11 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
@@ -44,8 +44,8 @@ func (s *AuthServer) SetUpClient(c *client.Client) {
 }
 
 func (s *AuthServer) Handshake(c *client.Client) error {
-	pkt := &packets.Welcome{
-		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
+	pkt := &commands.Welcome{
+		Header:       commands.BBHeader{Type: commands.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
@@ -58,26 +58,26 @@ func (s *AuthServer) Handshake(c *client.Client) error {
 }
 
 func (s *AuthServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	var header packets.BBHeader
-	bytes.StructFromBytes(data[:packets.BBHeaderSize], &header)
+	var header commands.BBHeader
+	bytes.StructFromBytes(data[:commands.BBHeaderSize], &header)
 
 	var err error
 	switch header.Type {
-	case packets.LoginType:
-		var loginPkt packets.Login
+	case commands.LoginType:
+		var loginPkt commands.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
-	case packets.DisconnectType:
+	case commands.DisconnectType:
 		// Just wait until we recv 0 from the client to disconnect.
 		break
 	default:
-		s.Logger.Infof("received unknown packet %x from %s", header.Type, c.IPAddr())
+		s.Logger.Infof("received unknown command %x from %s", header.Type, c.IPAddr())
 	}
 
 	return err
 }
 
-func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *commands.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -88,9 +88,9 @@ func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+			return s.sendSecurity(c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+			return s.sendSecurity(c, commands.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
@@ -100,10 +100,10 @@ func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 		}
 	}
 
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+	if err := s.sendSecurity(c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
-	// The first time we receive this packet the loginClientExtension will have included the
+	// The first time we receive this command the loginClientExtension will have included the
 	// version string in the security data; check it.
 	//if ClientVersionString != string(util.StripPadding(loginPkt.Security[:])) {
 	//	SendSecurity(loginClientExtension, BBLoginErrorPatch, 0, 0)
@@ -120,10 +120,10 @@ func (s *AuthServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	return s.sendDataServerRedirect(c)
 }
 
-// send the security initialization packet with information about the user's
+// send the security initialization command with information about the user's
 // authentication status.
 func (s *AuthServer) sendSecurity(c *client.Client, errorCode uint32) error {
-	cfg := packets.ClientConfig{
+	cfg := commands.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
 		SlotNum:      c.Config.SlotNum,
@@ -134,8 +134,8 @@ func (s *AuthServer) sendSecurity(c *client.Client, errorCode uint32) error {
 	copy(cfg.Unused2[:], c.Config.Unused2[:])
 
 	// Constants set according to how Newserv does it.
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+	return c.Send(&commands.Security{
+		Header:       commands.BBHeader{Type: commands.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
@@ -148,8 +148,8 @@ func (s *AuthServer) sendSecurity(c *client.Client, errorCode uint32) error {
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
 func (s *AuthServer) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+	return c.Send(&commands.LoginClientMessage{
+		Header:   commands.BBHeader{Type: commands.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  bytes.ConvertToUtf16(message),
 	})
@@ -158,8 +158,8 @@ func (s *AuthServer) sendMessage(c *client.Client, message string) error {
 // Send the IP address and port of the character server to which the client will
 // connect after disconnecting from this server.
 func (s *AuthServer) sendDataServerRedirect(c *client.Client) error {
-	pkt := &packets.Redirect{
-		Header: packets.BBHeader{Type: packets.RedirectType},
+	pkt := &commands.Redirect{
+		Header: commands.BBHeader{Type: commands.RedirectType},
 		IPAddr: [4]uint8{},
 		Port:   uint16(s.Config.CharacterServer.DataPort),
 	}

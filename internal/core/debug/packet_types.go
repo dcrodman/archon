@@ -3,93 +3,93 @@ package debug
 import (
 	"reflect"
 
-	"github.com/dcrodman/archon/internal/packets"
+	"github.com/dcrodman/archon/internal/commands"
 )
 
-// Janky (and simple) method of associating packet types with Archon's representation
-// of their implementations. Of course whenever new packet types are defined they must also
+// Janky (and simple) method of associating command types with Archon's representation
+// of their implementations. Of course whenever new command types are defined they must also
 // be added here in order for the sniffer to get the name correctly.
 
-// Keeping with the janky theme, this is a cheap way to fork the packet type used
-// depending on the direction the packet is coming from. True values correspond to
-// client packets. false to server packets.
-type multiDefinitionPacket map[bool]interface{}
+// Keeping with the janky theme, this is a cheap way to fork the command type used
+// depending on the direction the command is coming from. True values correspond to
+// client commands. false to server commands.
+type multiDefinitionCommand map[bool]interface{}
 
-var patchPacketTypes = map[uint16]interface{}{
-	packets.DisconnectType: packets.PCHeader{},
-	packets.RedirectType:   packets.PatchRedirect{},
-	packets.PatchWelcomeType: multiDefinitionPacket{
-		true:  packets.PCHeader{},
-		false: packets.PatchWelcome{},
+var patchcommandTypes = map[uint16]interface{}{
+	commands.DisconnectType: commands.PCHeader{},
+	commands.RedirectType:   commands.PatchRedirect{},
+	commands.PatchWelcomeType: multiDefinitionCommand{
+		true:  commands.PCHeader{},
+		false: commands.PatchWelcome{},
 	},
-	packets.PatchHandshakeType:      packets.PCHeader{},
-	packets.PatchMessageType:        packets.PatchWelcomeMessage{},
-	packets.PatchRedirectType:       packets.PatchRedirect{},
-	packets.PatchDataAckType:        packets.PCHeader{},
-	packets.PatchDirAboveType:       packets.PCHeader{},
-	packets.PatchChangeDirType:      packets.ChangeDir{},
-	packets.PatchCheckFileType:      packets.CheckFile{},
-	packets.PatchFileListDoneType:   packets.PCHeader{},
-	packets.PatchFileStatusType:     packets.FileStatus{},
-	packets.PatchClientListDoneType: packets.PCHeader{},
-	packets.PatchUpdateFilesType:    packets.StartFileUpdate{},
-	packets.PatchFileHeaderType:     packets.FileHeader{},
-	packets.PatchFileChunkType:      packets.FileChunk{},
-	packets.PatchFileCompleteType:   packets.PCHeader{},
-	packets.PatchUpdateCompleteType: packets.PCHeader{},
+	commands.PatchHandshakeType:      commands.PCHeader{},
+	commands.PatchMessageType:        commands.PatchWelcomeMessage{},
+	commands.PatchRedirectType:       commands.PatchRedirect{},
+	commands.PatchDataAckType:        commands.PCHeader{},
+	commands.PatchDirAboveType:       commands.PCHeader{},
+	commands.PatchChangeDirType:      commands.ChangeDir{},
+	commands.PatchCheckFileType:      commands.CheckFile{},
+	commands.PatchFileListDoneType:   commands.PCHeader{},
+	commands.PatchFileStatusType:     commands.FileStatus{},
+	commands.PatchClientListDoneType: commands.PCHeader{},
+	commands.PatchUpdateFilesType:    commands.StartFileUpdate{},
+	commands.PatchFileHeaderType:     commands.FileHeader{},
+	commands.PatchFileChunkType:      commands.FileChunk{},
+	commands.PatchFileCompleteType:   commands.PCHeader{},
+	commands.PatchUpdateCompleteType: commands.PCHeader{},
 }
 
-var packetTypes = map[uint16]interface{}{
-	packets.DisconnectType:              packets.BBHeader{},
-	packets.RedirectType:                packets.Redirect{},
-	packets.MenuSelectionType:           packets.MenuSelection{},
-	packets.LoginWelcomeType:            packets.Welcome{},
-	packets.LoginType:                   packets.Login{},
-	packets.LoginSecurityType:           packets.Security{},
-	packets.LoginClientMessageType:      packets.LoginClientMessage{},
-	packets.LoginOptionsRequestType:     packets.BBHeader{},
-	packets.LoginOptionsType:            packets.Options{},
-	packets.LoginCharSelectType:         packets.CharacterSelection{},
-	packets.LoginCharAckType:            packets.CharacterAck{},
-	packets.LoginCharPreviewType:        packets.CharacterPreview{},
-	packets.LoginChecksumType:           packets.BBHeader{},
-	packets.LoginChecksumAckType:        packets.ChecksumAck{},
-	packets.LoginGuildcardReqType:       packets.BBHeader{},
-	packets.LoginGuildcardHeaderType:    packets.GuildcardHeader{},
-	packets.LoginGuildcardChunkType:     packets.GuildcardChunk{},
-	packets.LoginGuildcardChunkReqType:  packets.GuildcardChunkRequest{},
-	packets.LoginParameterHeaderType:    packets.ParameterHeader{},
-	packets.LoginParameterChunkType:     packets.ParameterChunk{},
-	packets.LoginParameterChunkReqType:  packets.BBHeader{},
-	packets.LoginParameterHeaderReqType: packets.BBHeader{},
-	packets.LoginSetFlagType:            packets.SetFlag{},
-	packets.LoginTimestampType:          packets.Timestamp{},
-	packets.LoginShipListType:           packets.ShipList{},
-	packets.LoginScrollMessageType:      packets.ScrollMessagePacket{},
-	packets.LobbyListType:               packets.LobbyList{},
-	packets.BlockListType:               packets.ShipMenu{},
-	packets.FullCharacterType:           packets.FullCharacter{},
-	packets.FullCharacterEndType:        packets.BBHeader{},
+var commandTypes = map[uint16]interface{}{
+	commands.DisconnectType:              commands.BBHeader{},
+	commands.RedirectType:                commands.Redirect{},
+	commands.MenuSelectionType:           commands.MenuSelection{},
+	commands.LoginWelcomeType:            commands.Welcome{},
+	commands.LoginType:                   commands.Login{},
+	commands.LoginSecurityType:           commands.Security{},
+	commands.LoginClientMessageType:      commands.LoginClientMessage{},
+	commands.LoginOptionsRequestType:     commands.BBHeader{},
+	commands.LoginOptionsType:            commands.Options{},
+	commands.LoginCharSelectType:         commands.CharacterSelection{},
+	commands.LoginCharAckType:            commands.CharacterAck{},
+	commands.LoginCharPreviewType:        commands.CharacterPreview{},
+	commands.LoginChecksumType:           commands.BBHeader{},
+	commands.LoginChecksumAckType:        commands.ChecksumAck{},
+	commands.LoginGuildcardReqType:       commands.BBHeader{},
+	commands.LoginGuildcardHeaderType:    commands.GuildcardHeader{},
+	commands.LoginGuildcardChunkType:     commands.GuildcardChunk{},
+	commands.LoginGuildcardChunkReqType:  commands.GuildcardChunkRequest{},
+	commands.LoginParameterHeaderType:    commands.ParameterHeader{},
+	commands.LoginParameterChunkType:     commands.ParameterChunk{},
+	commands.LoginParameterChunkReqType:  commands.BBHeader{},
+	commands.LoginParameterHeaderReqType: commands.BBHeader{},
+	commands.LoginSetFlagType:            commands.SetFlag{},
+	commands.LoginTimestampType:          commands.Timestamp{},
+	commands.LoginShipListType:           commands.ShipList{},
+	commands.LoginScrollMessageType:      commands.ScrollMessage{},
+	commands.LobbyListType:               commands.LobbyList{},
+	commands.BlockListType:               commands.ShipMenu{},
+	commands.FullCharacterType:           commands.FullCharacter{},
+	commands.FullCharacterEndType:        commands.BBHeader{},
 }
 
-func getPacket(server ServerType, clientPacket bool, packetType uint16) reflect.Value {
+func getCommand(server ServerType, clientcommand bool, commandType uint16) reflect.Value {
 	var (
 		t     interface{}
 		found bool
 	)
 	if server == PATCH_SERVER || server == DATA_SERVER {
-		t, found = patchPacketTypes[packetType]
+		t, found = patchcommandTypes[commandType]
 	} else {
-		t, found = packetTypes[packetType]
+		t, found = commandTypes[commandType]
 	}
 
 	if !found {
 		return reflect.ValueOf(nil)
 	}
-	// Some packet structures may vary depending on the source, so index into the
+	// Some command structures may vary depending on the source, so index into the
 	// definition based on which side it's coming from.
-	if mvPacket, ok := t.(multiDefinitionPacket); ok {
-		t = mvPacket[clientPacket]
+	if mvcommand, ok := t.(multiDefinitionCommand); ok {
+		t = mvcommand[clientcommand]
 	}
 
 	return reflect.New(reflect.TypeOf(t))

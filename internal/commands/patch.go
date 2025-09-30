@@ -1,7 +1,7 @@
-// Packets specific to the patch and data servers.
-package packets
+// Commands specific to the patch and data servers.
+package commands
 
-// Packet types handled by the patch and data servers.
+// Command types handled by the patch and data servers.
 const (
 	PatchWelcomeType        = 0x02
 	PatchHandshakeType      = 0x04
@@ -21,7 +21,7 @@ const (
 	PatchUpdateCompleteType = 0x12
 )
 
-// Welcome packet with encryption vectors sent to the client upon initial connection.
+// Welcome command with encryption vectors sent to the client upon initial connection.
 type PatchWelcome struct {
 	Header       PCHeader
 	Copyright    [44]byte
@@ -30,13 +30,13 @@ type PatchWelcome struct {
 	ClientVector [4]byte
 }
 
-// Packet containing the patch server welcome message.
+// Command containing the patch server welcome message.
 type PatchWelcomeMessage struct {
 	Header  PCHeader
 	Message []byte
 }
 
-// Redirect packet for patch to send character server IP.
+// Redirect command for patch to send character server IP.
 type PatchRedirect struct {
 	Header  PCHeader
 	IPAddr  [4]uint8

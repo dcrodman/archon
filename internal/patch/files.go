@@ -43,7 +43,7 @@ var (
 
 	// Each index corresponds to a patch file. This is constructed in the order
 	// that the patch tree will be traversed and makes it faster to locate a
-	// patch entry when the client sends us an index in the FileStatusPacket.
+	// patch entry when the client sends us an index in the FileStatus command.
 	patchIndex []*fileEntry
 )
 

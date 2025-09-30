@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/gopacket"
 
+	packets "github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/core/encryption"
-	"github.com/dcrodman/archon/internal/packets"
 )
 
 // Best effort guess as to what ports correspond to which servers based on
@@ -144,10 +144,10 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 
 	if emitPacket {
 		params := debug.PrintPacketParams{
-			Writer:       s.Writer,
-			ServerType:   server,
-			ClientPacket: clientPacket,
-			Data:         s.buffer[:s.currentPacketSize],
+			Writer:        s.Writer,
+			ServerType:    server,
+			ClientCommand: clientPacket,
+			Data:          s.buffer[:s.currentPacketSize],
 		}
 		if *truncate {
 			params.TruncateThreshold = truncatePacketLimit

@@ -22,10 +22,10 @@ type Backend interface {
 	SetUpClient(c *client.Client)
 
 	// Handshake performs any connection initialization necessary to begin
-	// communicating with the client. This likely involves sending a "welcome" packet.
+	// communicating with the client. This likely involves sending a "welcome" command.
 	Handshake(c *client.Client) error
 
-	// Handle is the main entry point for processing client packets. It's responsible
-	// for generally handling all packets from a client as well as sending any responses.
+	// Handle is the main entry point for processing client commands. It's responsible
+	// for generally handling all commands from a client as well as sending any responses.
 	Handle(ctx context.Context, c *client.Client, data []byte) error
 }

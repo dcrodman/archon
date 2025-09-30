@@ -109,7 +109,7 @@ handleLoop:
 }
 
 // acceptClient takes a connection and attempts to initiate a "session" by setting up
-// the Client and sending the welcome packets. If it succeeds, the goroutine moves
+// the Client and sending the welcome command. If it succeeds, the goroutine moves
 // into the packet processing loop.
 func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -162,10 +162,10 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 
 		if f.Config.Debugging.PacketLoggingEnabled {
 			archdebug.PrintPacket(archdebug.PrintPacketParams{
-				Writer:       bufio.NewWriter(os.Stdout),
-				ServerType:   archdebug.ServerType(c.DebugTags[archdebug.SERVER_TYPE]),
-				ClientPacket: true,
-				Data:         buffer,
+				Writer:        bufio.NewWriter(os.Stdout),
+				ServerType:    archdebug.ServerType(c.DebugTags[archdebug.SERVER_TYPE]),
+				ClientCommand: true,
+				Data:          buffer,
 			})
 		}
 

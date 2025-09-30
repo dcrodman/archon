@@ -8,11 +8,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/packets"
 	"go.uber.org/zap"
 )
 
@@ -41,9 +41,9 @@ func (s *PatchDataServer) SetUpClient(c *client.Client) {
 }
 
 func (s *PatchDataServer) Handshake(c *client.Client) error {
-	// Send the welcome packet to a client with the copyright message and encryption vectors.
-	pkt := packets.PatchWelcome{
-		Header: packets.PCHeader{Type: packets.PatchWelcomeType, Size: 0x4C},
+	// Send the welcome command to a client with the copyright message and encryption vectors.
+	pkt := commands.PatchWelcome{
+		Header: commands.PCHeader{Type: commands.PatchWelcomeType, Size: 0x4C},
 	}
 	copy(pkt.Copyright[:], copyright)
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
@@ -53,33 +53,33 @@ func (s *PatchDataServer) Handshake(c *client.Client) error {
 }
 
 func (s *PatchDataServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	var hdr packets.PCHeader
+	var hdr commands.PCHeader
 
-	bytes.StructFromBytes(data[:packets.PCHeaderSize], &hdr)
+	bytes.StructFromBytes(data[:commands.PCHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
-	case packets.PatchWelcomeType:
+	case commands.PatchWelcomeType:
 		err = s.sendWelcomeAck(c)
-	case packets.PatchHandshakeType:
+	case commands.PatchHandshakeType:
 		err = s.handlePatchLogin(c)
-	case packets.PatchFileStatusType:
-		var fileStatus packets.FileStatus
+	case commands.PatchFileStatusType:
+		var fileStatus commands.FileStatus
 		bytes.StructFromBytes(data, &fileStatus)
 		s.handleFileStatus(c, &fileStatus)
-	case packets.PatchClientListDoneType:
+	case commands.PatchClientListDoneType:
 		err = s.updateClientFiles(c)
 	default:
-		s.Logger.Infof("received unknown packet %02x from %s", hdr.Type, c.IPAddr())
+		s.Logger.Infof("received unknown command %02x from %s", hdr.Type, c.IPAddr())
 	}
 	return err
 }
 
 // Simple acknowledgement to the welcome response.
 func (s *PatchDataServer) sendWelcomeAck(c *client.Client) error {
-	return c.Send(packets.PCHeader{
+	return c.Send(commands.PCHeader{
 		Size: 0x04,
-		Type: packets.PatchHandshakeType,
+		Type: commands.PatchHandshakeType,
 	})
 }
 
@@ -96,7 +96,7 @@ func (s *PatchDataServer) handlePatchLogin(c *client.Client) error {
 
 // Acknowledgement sent after the DATA connection handshake.
 func (s *PatchDataServer) sendDataAck(c *client.Client) error {
-	return c.Send(packets.PCHeader{Type: packets.PatchDataAckType, Size: 0x04})
+	return c.Send(commands.PCHeader{Type: commands.PatchDataAckType, Size: 0x04})
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
@@ -126,8 +126,8 @@ func (s *PatchDataServer) sendFileList(c *client.Client, node *directoryNode) er
 
 // Tell the client to change to some directory within its file tree.
 func (s *PatchDataServer) sendChangeDir(c *client.Client, dir string) error {
-	pkt := packets.ChangeDir{
-		Header:  packets.PCHeader{Type: packets.PatchChangeDirType},
+	pkt := commands.ChangeDir{
+		Header:  commands.PCHeader{Type: commands.PatchChangeDirType},
 		Dirname: [64]byte{},
 	}
 	copy(pkt.Dirname[:], dir)
@@ -137,8 +137,8 @@ func (s *PatchDataServer) sendChangeDir(c *client.Client, dir string) error {
 
 // Tell the client to check a file in its current working directory.
 func (s *PatchDataServer) sendCheckFile(c *client.Client, index uint32, filename string) error {
-	pkt := packets.CheckFile{
-		Header:  packets.PCHeader{Type: packets.PatchCheckFileType},
+	pkt := commands.CheckFile{
+		Header:  commands.PCHeader{Type: commands.PatchCheckFileType},
 		PatchID: index,
 	}
 	copy(pkt.Filename[:], filename)
@@ -148,17 +148,17 @@ func (s *PatchDataServer) sendCheckFile(c *client.Client, index uint32, filename
 
 // Tell the client to change to one directory above.
 func (s *PatchDataServer) sendDirAbove(c *client.Client) error {
-	return c.Send(packets.PCHeader{Type: packets.PatchDirAboveType, Size: 0x04})
+	return c.Send(commands.PCHeader{Type: commands.PatchDirAboveType, Size: 0x04})
 }
 
 // Tell the client that we've finished sending the patch list.
 func (s *PatchDataServer) sendFileListDone(c *client.Client) error {
-	return c.Send(packets.PCHeader{Type: packets.PatchFileListDoneType, Size: 0x04})
+	return c.Send(commands.PCHeader{Type: commands.PatchFileListDoneType, Size: 0x04})
 }
 
 // The client sent us a checksum for one of the patch files. Compare it to what we
 // have and add it to the list of files to update if there is any discrepancy.
-func (s *PatchDataServer) handleFileStatus(c *client.Client, fileStatus *packets.FileStatus) {
+func (s *PatchDataServer) handleFileStatus(c *client.Client, fileStatus *commands.FileStatus) {
 	patchFile := patchIndex[fileStatus.PatchID]
 
 	if fileStatus.Checksum != patchFile.checksum || fileStatus.FileSize != patchFile.fileSize {
@@ -166,7 +166,7 @@ func (s *PatchDataServer) handleFileStatus(c *client.Client, fileStatus *packets
 	}
 }
 
-// The client finished sending all of the file check packets. If they have
+// The client finished sending all of the file check commands. If they have
 // any files that need updating, now's the time to do it.
 func (s *PatchDataServer) updateClientFiles(c *client.Client) error {
 	var numFiles, totalSize uint32 = 0, 0
@@ -190,8 +190,8 @@ func (s *PatchDataServer) updateClientFiles(c *client.Client) error {
 
 // Send the total number and cumulative size of files that need updating.
 func (s *PatchDataServer) sendStartFileUpdate(c *client.Client, num, totalSize uint32) error {
-	return c.Send(packets.StartFileUpdate{
-		Header:    packets.PCHeader{Type: packets.PatchUpdateFilesType},
+	return c.Send(commands.StartFileUpdate{
+		Header:    commands.PCHeader{Type: commands.PatchUpdateFilesType},
 		NumFiles:  num,
 		TotalSize: totalSize,
 	})
@@ -259,8 +259,8 @@ func (s *PatchDataServer) updateClientFile(c *client.Client, patch *fileEntry) e
 
 // send the header for a file we're about to update.
 func (s *PatchDataServer) sendFileHeader(c *client.Client, patch *fileEntry) error {
-	pkt := packets.FileHeader{
-		Header:   packets.PCHeader{Type: packets.PatchFileHeaderType},
+	pkt := commands.FileHeader{
+		Header:   commands.PCHeader{Type: commands.PatchFileHeaderType},
 		FileSize: patch.fileSize,
 		Filename: [48]byte{},
 	}
@@ -277,8 +277,8 @@ func (s *PatchDataServer) sendFileChunk(c *client.Client, chunk, chksm, chunkSiz
 		panic(errors.New("file chunk size exceeds maximum"))
 	}
 
-	return c.Send(packets.FileChunk{
-		Header:   packets.PCHeader{Type: packets.PatchFileChunkType},
+	return c.Send(commands.FileChunk{
+		Header:   commands.PCHeader{Type: commands.PatchFileChunkType},
 		Chunk:    chunk,
 		Checksum: chksm,
 		Size:     chunkSize,
@@ -288,10 +288,10 @@ func (s *PatchDataServer) sendFileChunk(c *client.Client, chunk, chksm, chunkSiz
 
 // Finished sending a particular file.
 func (s *PatchDataServer) sendFileComplete(c *client.Client) error {
-	return c.Send(packets.PCHeader{Type: packets.PatchFileCompleteType, Size: 0x04})
+	return c.Send(commands.PCHeader{Type: commands.PatchFileCompleteType, Size: 0x04})
 }
 
 // We've finished updating files.
 func (s *PatchDataServer) sendUpdateComplete(c *client.Client) error {
-	return c.Send(packets.PCHeader{Type: packets.PatchUpdateCompleteType, Size: 0x04})
+	return c.Send(commands.PCHeader{Type: commands.PatchUpdateCompleteType, Size: 0x04})
 }

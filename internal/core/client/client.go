@@ -95,10 +95,10 @@ func (c *Client) SendRaw(packet interface{}) error {
 
 	if c.Debug {
 		debug.PrintPacket(debug.PrintPacketParams{
-			Writer:       bufio.NewWriter(os.Stdout),
-			ServerType:   debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
-			ClientPacket: false,
-			Data:         bytes,
+			Writer:        bufio.NewWriter(os.Stdout),
+			ServerType:    debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ClientCommand: false,
+			Data:          bytes,
 		})
 	}
 
@@ -129,10 +129,10 @@ func (c *Client) Send(packet interface{}) error {
 
 	if c.Debug {
 		debug.PrintPacket(debug.PrintPacketParams{
-			Writer:       bufio.NewWriter(os.Stdout),
-			ServerType:   debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
-			ClientPacket: false,
-			Data:         bytes,
+			Writer:        bufio.NewWriter(os.Stdout),
+			ServerType:    debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ClientCommand: false,
+			Data:          bytes,
 		})
 	}
 

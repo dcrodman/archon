@@ -9,10 +9,10 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon/internal/character"
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
-	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
@@ -42,8 +42,8 @@ func (s *GameServer) SetUpClient(c *client.Client) {
 }
 
 func (s *GameServer) Handshake(c *client.Client) error {
-	pkt := &packets.Welcome{
-		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
+	pkt := &commands.Welcome{
+		Header:       commands.BBHeader{Type: commands.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
@@ -56,25 +56,25 @@ func (s *GameServer) Handshake(c *client.Client) error {
 }
 
 func (s *GameServer) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	var packetHeader packets.BBHeader
-	bytes.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
+	var cmdHeader commands.BBHeader
+	bytes.StructFromBytes(data[:commands.BBHeaderSize], &cmdHeader)
 
 	var err error
-	switch packetHeader.Type {
-	case packets.LoginType:
-		var loginPkt packets.Login
+	switch cmdHeader.Type {
+	case commands.LoginType:
+		var loginPkt commands.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
-	case packets.CharacterDataType:
+	case commands.CharacterDataType:
 		// TODO: Probably have some data to copy in here.
 		err = s.sendPacket67(c)
 	default:
-		s.Logger.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+		s.Logger.Infof("received unknown packet %x from %s", cmdHeader.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt *commands.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -85,9 +85,9 @@ func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+			return s.sendSecurity(c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+			return s.sendSecurity(c, commands.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
@@ -99,7 +99,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	c.Account = account
 	c.ActiveSlot = loginPkt.Slot
 
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+	if err := s.sendSecurity(c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 	if err := s.sendLobbyList(c); err != nil {
@@ -113,7 +113,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 }
 
 func (s *GameServer) sendSecurity(c *client.Client, errorCode uint32) error {
-	cfg := packets.ClientConfig{
+	cfg := commands.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
 		SlotNum:      c.Config.SlotNum,
@@ -123,8 +123,8 @@ func (s *GameServer) sendSecurity(c *client.Client, errorCode uint32) error {
 	copy(cfg.Unused[:], c.Config.Unused[:])
 	copy(cfg.Unused2[:], c.Config.Unused2[:])
 
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+	return c.Send(&commands.Security{
+		Header:       commands.BBHeader{Type: commands.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
@@ -135,23 +135,23 @@ func (s *GameServer) sendSecurity(c *client.Client, errorCode uint32) error {
 }
 
 func (s *GameServer) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+	return c.Send(&commands.LoginClientMessage{
+		Header:   commands.BBHeader{Type: commands.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  bytes.ConvertToUtf16(message),
 	})
 }
 
 func (s *GameServer) sendLobbyList(c *client.Client) error {
-	lobbyEntries := make([]packets.LobbyListEntry, s.Config.ShipServer.NumLobbies)
+	lobbyEntries := make([]commands.LobbyListEntry, s.Config.ShipServer.NumLobbies)
 	for i := 0; i < s.Config.ShipServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
 		lobbyEntries[i].LobbyID = uint32(i)
 	}
 
-	return c.Send(&packets.LobbyList{
-		Header: packets.BBHeader{
-			Type:  packets.LobbyListType,
+	return c.Send(&commands.LobbyList{
+		Header: commands.BBHeader{
+			Type:  commands.LobbyListType,
 			Flags: 0x0F,
 		},
 		Lobbies: lobbyEntries,
@@ -174,8 +174,8 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *client.Client
 	}
 	dbCharacter := resp.Character
 
-	charPkt := &packets.FullCharacter{
-		Header: packets.BBHeader{Type: packets.FullCharacterType},
+	charPkt := &commands.FullCharacter{
+		Header: commands.BBHeader{Type: commands.FullCharacterType},
 		// NumInventoryItems: 0,
 		HPMaterials:    uint8(dbCharacter.HpMaterialsUsed),
 		TPMaterials:    uint8(dbCharacter.TpMaterialsUsed),
@@ -224,14 +224,14 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *client.Client
 
 func (s *GameServer) sendFullCharacterEnd(c *client.Client) error {
 	// Acts as an EOF for the full character data.
-	return c.Send(&packets.BBHeader{
-		Type: packets.FullCharacterEndType,
+	return c.Send(&commands.BBHeader{
+		Type: commands.FullCharacterEndType,
 	})
 }
 
 func (s *GameServer) sendPacket67(c *client.Client) error {
-	return c.Send(&packets.Packet67{
-		Header: packets.BBHeader{
+	return c.Send(&commands.Packet67{
+		Header: commands.BBHeader{
 			Type: 0x67,
 		},
 		Unknown1:  0x01,

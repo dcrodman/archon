@@ -1,72 +1,72 @@
 package debug
 
-import "github.com/dcrodman/archon/internal/packets"
+import "github.com/dcrodman/archon/internal/commands"
 
-// Janky (and simple) method of including the names of the packets as Archon
-// defines them. Of course whenever new packet types are defined they must also
+// Janky (and simple) method of including the names of the commands as Archon
+// defines them. Of course whenever new command types are defined they must also
 // be added here in order for the sniffer to get the name correctly.
 
-var patchPacketNames = map[uint16]string{
-	packets.DisconnectType:          "DisconnectType",
-	packets.RedirectType:            "RedirectType",
-	packets.PatchWelcomeType:        "PatchWelcomeType",
-	packets.PatchHandshakeType:      "PatchHandshakeType",
-	packets.PatchMessageType:        "PatchMessageType",
-	packets.PatchRedirectType:       "PatchRedirectType",
-	packets.PatchDataAckType:        "PatchDataAckType",
-	packets.PatchDirAboveType:       "PatchDirAboveType",
-	packets.PatchChangeDirType:      "PatchChangeDirType",
-	packets.PatchCheckFileType:      "PatchCheckFileType",
-	packets.PatchFileListDoneType:   "PatchFileListDoneType",
-	packets.PatchFileStatusType:     "PatchFileStatusType",
-	packets.PatchClientListDoneType: "PatchClientListDoneType",
-	packets.PatchUpdateFilesType:    "PatchUpdateFilesType",
-	packets.PatchFileHeaderType:     "PatchFileHeaderType",
-	packets.PatchFileChunkType:      "PatchFileChunkType",
-	packets.PatchFileCompleteType:   "PatchFileCompleteType",
-	packets.PatchUpdateCompleteType: "PatchUpdateCompleteType",
+var patchCommandNames = map[uint16]string{
+	commands.DisconnectType:          "Disconnect",
+	commands.RedirectType:            "Redirect",
+	commands.PatchWelcomeType:        "PatchWelcome",
+	commands.PatchHandshakeType:      "PatchHandshake",
+	commands.PatchMessageType:        "PatchMessage",
+	commands.PatchRedirectType:       "PatchRedirect",
+	commands.PatchDataAckType:        "PatchDataAck",
+	commands.PatchDirAboveType:       "PatchDirAbove",
+	commands.PatchChangeDirType:      "PatchChangeDir",
+	commands.PatchCheckFileType:      "PatchCheckFile",
+	commands.PatchFileListDoneType:   "PatchFileListDone",
+	commands.PatchFileStatusType:     "PatchFileStatus",
+	commands.PatchClientListDoneType: "PatchClientListDone",
+	commands.PatchUpdateFilesType:    "PatchUpdateFiles",
+	commands.PatchFileHeaderType:     "PatchFileHeader",
+	commands.PatchFileChunkType:      "PatchFileChunk",
+	commands.PatchFileCompleteType:   "PatchFileComplete",
+	commands.PatchUpdateCompleteType: "PatchUpdateComplete",
 }
 
-var packetNames = map[uint16]string{
-	packets.DisconnectType:              "DisconnectType",
-	packets.RedirectType:                "RedirectType",
-	packets.MenuSelectionType:           "MenuSelectType",
-	packets.LoginWelcomeType:            "LoginWelcomeType",
-	packets.LoginType:                   "LoginType",
-	packets.LoginSecurityType:           "LoginSecurityType",
-	packets.LoginClientMessageType:      "LoginClientMessageType",
-	packets.LoginOptionsRequestType:     "LoginOptionsRequestType",
-	packets.LoginOptionsType:            "LoginOptionsType",
-	packets.LoginCharSelectType:         "LoginCharSelectType",
-	packets.LoginCharAckType:            "LoginCharAckType",
-	packets.LoginCharPreviewType:        "LoginCharPreviewType",
-	packets.LoginChecksumType:           "LoginChecksumType",
-	packets.LoginChecksumAckType:        "LoginChecksumAckType",
-	packets.LoginGuildcardReqType:       "LoginGuildcardReqType",
-	packets.LoginGuildcardHeaderType:    "LoginGuildcardHeaderType",
-	packets.LoginGuildcardChunkType:     "LoginGuildcardChunkType",
-	packets.LoginGuildcardChunkReqType:  "LoginGuildcardChunkReqType",
-	packets.LoginParameterHeaderType:    "LoginParameterHeaderType",
-	packets.LoginParameterChunkType:     "LoginParameterChunkType",
-	packets.LoginParameterChunkReqType:  "LoginParameterChunkReqType",
-	packets.LoginParameterHeaderReqType: "LoginParameterHeaderReqType",
-	packets.LoginSetFlagType:            "LoginSetFlagType",
-	packets.LoginTimestampType:          "LoginTimestampType",
-	packets.LoginShipListType:           "LoginShipListType",
-	packets.LoginScrollMessageType:      "LoginScrollMessageType",
-	packets.LobbyListType:               "LobbyListType",
-	packets.BlockListType:               "BlockListType",
-	packets.FullCharacterType:           "FullCharacterType",
-	packets.FullCharacterEndType:        "FullCharacterEndType",
+var commandNames = map[uint16]string{
+	commands.DisconnectType:              "Disconnect",
+	commands.RedirectType:                "Redirect",
+	commands.MenuSelectionType:           "MenuSelect",
+	commands.LoginWelcomeType:            "LoginWelcome",
+	commands.LoginType:                   "Login",
+	commands.LoginSecurityType:           "LoginSecurity",
+	commands.LoginClientMessageType:      "LoginClientMessage",
+	commands.LoginOptionsRequestType:     "LoginOptionsRequest",
+	commands.LoginOptionsType:            "LoginOptions",
+	commands.LoginCharSelectType:         "LoginCharSelect",
+	commands.LoginCharAckType:            "LoginCharAck",
+	commands.LoginCharPreviewType:        "LoginCharPreview",
+	commands.LoginChecksumType:           "LoginChecksum",
+	commands.LoginChecksumAckType:        "LoginChecksumAck",
+	commands.LoginGuildcardReqType:       "LoginGuildcardReq",
+	commands.LoginGuildcardHeaderType:    "LoginGuildcardHeader",
+	commands.LoginGuildcardChunkType:     "LoginGuildcardChunk",
+	commands.LoginGuildcardChunkReqType:  "LoginGuildcardChunkReq",
+	commands.LoginParameterHeaderType:    "LoginParameterHeader",
+	commands.LoginParameterChunkType:     "LoginParameterChunk",
+	commands.LoginParameterChunkReqType:  "LoginParameterChunkReq",
+	commands.LoginParameterHeaderReqType: "LoginParameterHeaderReq",
+	commands.LoginSetFlagType:            "LoginSetFlag",
+	commands.LoginTimestampType:          "LoginTimestamp",
+	commands.LoginShipListType:           "LoginShipList",
+	commands.LoginScrollMessageType:      "LoginScrollMessage",
+	commands.LobbyListType:               "LobbyList",
+	commands.BlockListType:               "BlockList",
+	commands.FullCharacterType:           "FullCharacter",
+	commands.FullCharacterEndType:        "FullCharacterEnd",
 }
 
-func getPacketName(server ServerType, packetType uint16) string {
+func getCommandName(server ServerType, commandType uint16) string {
 	if server == PATCH_SERVER || server == DATA_SERVER {
-		if name, ok := patchPacketNames[packetType]; ok {
+		if name, ok := patchCommandNames[commandType]; ok {
 			return name
 		}
 	} else {
-		if name, ok := packetNames[packetType]; ok {
+		if name, ok := commandNames[commandType]; ok {
 			return name
 		}
 	}

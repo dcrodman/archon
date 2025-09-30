@@ -16,11 +16,11 @@ import (
 	"golang.org/x/text/language"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
 	"github.com/dcrodman/archon/internal/core/proto"
-	"github.com/dcrodman/archon/internal/packets"
 	"github.com/dcrodman/archon/internal/shipgate"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -30,7 +30,7 @@ const (
 	maxDataChunkSize = 0x6800
 	// Expected format of the timestamp sent to the client.
 	timeFormat = "2006:01:02: 15:05:05"
-	// Id sent in the menu selection packet to tell the client
+	// Id sent in the menu selection command to tell the client
 	// that the selection was made on the ship menu.
 	ShipSelectionMenuId uint16 = 0x12
 )
@@ -85,8 +85,8 @@ func (s *Server) SetUpClient(c *client.Client) {
 }
 
 func (s *Server) Handshake(c *client.Client) error {
-	pkt := &packets.Welcome{
-		Header:       packets.BBHeader{Type: packets.LoginWelcomeType, Size: 0xC8},
+	pkt := &commands.Welcome{
+		Header:       commands.BBHeader{Type: commands.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
 		ServerVector: [48]byte{},
 		ClientVector: [48]byte{},
@@ -99,58 +99,58 @@ func (s *Server) Handshake(c *client.Client) error {
 }
 
 func (s *Server) Handle(ctx context.Context, c *client.Client, data []byte) error {
-	var packetHeader packets.BBHeader
-	bytes.StructFromBytes(data[:packets.BBHeaderSize], &packetHeader)
+	var cmdHeader commands.BBHeader
+	bytes.StructFromBytes(data[:commands.BBHeaderSize], &cmdHeader)
 
 	var err error
-	switch packetHeader.Type {
-	case packets.LoginType:
-		var loginPkt packets.Login
+	switch cmdHeader.Type {
+	case commands.LoginType:
+		var loginPkt commands.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
-	case packets.LoginOptionsRequestType:
+	case commands.LoginOptionsRequestType:
 		err = s.handleOptionsRequest(ctx, c)
-	case packets.LoginCharSelectType:
-		var pkt packets.CharacterSelection
+	case commands.LoginCharSelectType:
+		var pkt commands.CharacterSelection
 		bytes.StructFromBytes(data, &pkt)
 		err = s.handleCharacterSelect(ctx, c, &pkt)
-	case packets.LoginChecksumType:
+	case commands.LoginChecksumType:
 		// Everybody else seems to ignore this, so...
 		err = s.sendChecksumAck(c)
-	case packets.LoginGuildcardReqType:
+	case commands.LoginGuildcardReqType:
 		err = s.handleGuildcardDataStart(ctx, c)
-	case packets.LoginGuildcardChunkReqType:
-		var chunkReq packets.GuildcardChunkRequest
+	case commands.LoginGuildcardChunkReqType:
+		var chunkReq commands.GuildcardChunkRequest
 		bytes.StructFromBytes(data, &chunkReq)
 		err = s.handleGuildcardChunk(c, &chunkReq)
-	case packets.LoginParameterHeaderReqType:
+	case commands.LoginParameterHeaderReqType:
 		err = s.sendParameterHeader(c, uint32(s.numParameterFiles), paramHeaderData)
-	case packets.LoginParameterChunkReqType:
-		var pkt packets.BBHeader
+	case commands.LoginParameterChunkReqType:
+		var pkt commands.BBHeader
 		bytes.StructFromBytes(data, &pkt)
 		err = s.sendParameterChunk(c, paramChunkData[int(pkt.Flags)], pkt.Flags)
-	case packets.LoginSetFlagType:
-		var pkt packets.SetFlag
+	case commands.LoginSetFlagType:
+		var pkt commands.SetFlag
 		bytes.StructFromBytes(data, &pkt)
 		s.setClientFlag(c, &pkt)
-	case packets.LoginCharPreviewType:
-		var charPkt packets.CharacterSummary
+	case commands.LoginCharPreviewType:
+		var charPkt commands.CharacterSummary
 		bytes.StructFromBytes(data, &charPkt)
 		err = s.handleCharacterUpdate(ctx, c, &charPkt)
-	case packets.MenuSelectionType:
-		var menuSelectionPkt packets.MenuSelection
+	case commands.MenuSelectionType:
+		var menuSelectionPkt commands.MenuSelection
 		bytes.StructFromBytes(data, &menuSelectionPkt)
 		err = s.handleShipSelection(ctx, c, &menuSelectionPkt)
-	case packets.DisconnectType:
+	case commands.DisconnectType:
 		// Just wait for the client to disconnect.
 		break
 	default:
-		s.Logger.Infof("received unknown packet %x from %s", packetHeader.Type, c.IPAddr())
+		s.Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr())
 	}
 	return err
 }
 
-func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *packets.Login) error {
+func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *commands.Login) error {
 	username := string(bytes.StripPadding(loginPkt.Username[:]))
 	password := string(bytes.StripPadding(loginPkt.Password[:]))
 
@@ -161,9 +161,9 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return s.sendSecurity(c, packets.BBLoginErrorPassword)
+			return s.sendSecurity(c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return s.sendSecurity(c, packets.BBLoginErrorBanned)
+			return s.sendSecurity(c, commands.BBLoginErrorBanned)
 		default:
 			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
@@ -173,7 +173,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 		}
 	}
 
-	if err := s.sendSecurity(c, packets.BBLoginErrorNone); err != nil {
+	if err := s.sendSecurity(c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 
@@ -183,7 +183,7 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
-	if loginPkt.Phase == packets.ShipSelection {
+	if loginPkt.Phase == commands.ShipSelection {
 		if err = s.sendTimestamp(c); err != nil {
 			return err
 		}
@@ -198,10 +198,10 @@ func (s *Server) handleLogin(ctx context.Context, c *client.Client, loginPkt *pa
 	return nil
 }
 
-// send the security initialization packet with information about the user's
+// send the security initialization command with information about the user's
 // authentication status.
 func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
-	cfg := packets.ClientConfig{
+	cfg := commands.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
 		SlotNum:      c.Config.SlotNum,
@@ -212,8 +212,8 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 	copy(cfg.Unused2[:], c.Config.Unused2[:])
 
 	// Constants set according to how Newserv does it.
-	return c.Send(&packets.Security{
-		Header:       packets.BBHeader{Type: packets.LoginSecurityType},
+	return c.Send(&commands.Security{
+		Header:       commands.BBHeader{Type: commands.LoginSecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
@@ -226,17 +226,17 @@ func (s *Server) sendSecurity(c *client.Client, errorCode uint32) error {
 // Sends a message to the client. In this case whatever message is sent
 // here will be displayed in a dialog box after the patch screen.
 func (s *Server) sendMessage(c *client.Client, message string) error {
-	return c.Send(&packets.LoginClientMessage{
-		Header:   packets.BBHeader{Type: packets.LoginClientMessageType},
+	return c.Send(&commands.LoginClientMessage{
+		Header:   commands.BBHeader{Type: commands.LoginClientMessageType},
 		Language: 0x00450009,
 		Message:  bytes.ConvertToUtf16(message),
 	})
 }
 
-// Send a timestamp packet in order to indicate the server's current time.
+// Send a timestamp command in order to indicate the server's current time.
 func (s *Server) sendTimestamp(c *client.Client) error {
-	pkt := &packets.Timestamp{
-		Header:    packets.BBHeader{Type: packets.LoginTimestampType},
+	pkt := &commands.Timestamp{
+		Header:    commands.BBHeader{Type: commands.LoginTimestampType},
 		Timestamp: [28]byte{},
 	}
 
@@ -253,7 +253,7 @@ func (s *Server) sendTimestamp(c *client.Client) error {
 // rather than bothering with anything fancy like retrieving a list of active
 // ships from the shipgate, etc.
 func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
-	entries := []packets.ShipMenuEntry{
+	entries := []commands.ShipMenuEntry{
 		// The first item is ignored and just used for the menu title.
 		{MenuID: 0x11000011, ItemID: 0},
 	}
@@ -265,15 +265,15 @@ func (s *Server) sendShipList(ctx context.Context, c *client.Client) error {
 		return fmt.Errorf("retrieving list of active ships: %v", err)
 	}
 	for i, ship := range shipList.Ships {
-		var entry packets.ShipMenuEntry
+		var entry commands.ShipMenuEntry
 		entry.ItemID = uint32(i) + 1
 		copy(entry.Name[:], bytes.ConvertToUtf16(ship.Name))
 		entries = append(entries, entry)
 	}
 
-	return c.Send(&packets.ShipMenu{
-		Header: packets.BBHeader{
-			Type:  packets.BlockListType,
+	return c.Send(&commands.ShipMenu{
+		Header: commands.BBHeader{
+			Type:  commands.BlockListType,
 			Flags: uint32(len(shipList.Ships)),
 		},
 		Entries: entries,
@@ -292,8 +292,8 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 		shipSelectionScrollMessage = append(shipSelectionScrollMessage, 0x00)
 	})
 
-	return c.Send(&packets.ScrollMessagePacket{
-		Header:  packets.BBHeader{Type: packets.LoginScrollMessageType},
+	return c.Send(&commands.ScrollMessage{
+		Header:  commands.BBHeader{Type: commands.LoginScrollMessageType},
 		Message: shipSelectionScrollMessage,
 	})
 }
@@ -301,7 +301,7 @@ func (s *Server) sendScrollMessage(c *client.Client) error {
 // Player selected one of the items on the ship select screen; respond with the
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
-func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menuSelectionPkt *packets.MenuSelection) error {
+func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menuSelectionPkt *commands.MenuSelection) error {
 	shipList, err := s.shipgateClient.GetActiveShips(ctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf("error retrieving ship list: %w", err)
@@ -315,8 +315,8 @@ func (s *Server) handleShipSelection(ctx context.Context, c *client.Client, menu
 	ip := net.ParseIP(shipList.Ships[selectedShip].Ip).To4()
 	port, _ := strconv.Atoi(shipList.Ships[selectedShip].Port)
 
-	return c.Send(&packets.Redirect{
-		Header: packets.BBHeader{Type: packets.RedirectType},
+	return c.Send(&commands.Redirect{
+		Header: commands.BBHeader{Type: commands.RedirectType},
 		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
 		Port:   uint16(port),
 	})
@@ -364,8 +364,8 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 		return fmt.Errorf("received keyConfig of length %d; should be 420", len(keyConfig))
 	}
 
-	pkt := &packets.Options{
-		Header: packets.BBHeader{Type: packets.LoginOptionsType},
+	pkt := &commands.Options{
+		Header: commands.BBHeader{Type: commands.LoginOptionsType},
 	}
 	pkt.PlayerKeyConfig.Guildcard = c.Guildcard
 	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
@@ -382,12 +382,12 @@ func (s *Server) sendOptions(c *client.Client, keyConfig []byte) error {
 //
 // For the preview request, this method will either send info about a character given
 // a particular slot in an 0xE5 response or ack the selection with an 0xE4 (also used
-// for an empty slot). The client will send one of these preview request packets for
+// for an empty slot). The client will send one of these preview request commands for
 // each of the character slots (i.e. 4 times).
 //
-// The client also sends this packet when  a character has been selected from the menu
+// The client also sends this command when  a character has been selected from the menu
 // (or after the dressing room or recreate), as indicated by the Selecting flag.
-func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pkt *packets.CharacterSelection) error {
+func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pkt *commands.CharacterSelection) error {
 	resp, err := s.shipgateClient.FindCharacter(ctx, &shipgate.CharacterRequest{
 		AccountId: c.Account.Id,
 		Slot:      pkt.Slot,
@@ -413,23 +413,23 @@ func (s *Server) handleCharacterSelect(ctx context.Context, c *client.Client, pk
 	return s.sendCharacterAck(c, pkt.Slot, 2)
 }
 
-// Send the character acknowledgement packet in response to the action taken. Setting flag
+// Send the character acknowledgement command in response to the action taken. Setting flag
 // to 0 indicates a creation ack, 1 acks a selected character, and 2 indicates that a character
 // doesn't exist in the slot requested via preview request.
 func (s *Server) sendCharacterAck(c *client.Client, slotNum uint32, flag uint32) error {
-	return c.Send(&packets.CharacterAck{
-		Header: packets.BBHeader{Type: packets.LoginCharAckType},
+	return c.Send(&commands.CharacterAck{
+		Header: commands.BBHeader{Type: commands.LoginCharAckType},
 		Slot:   slotNum,
 		Flag:   flag,
 	})
 }
 
-// send the preview packet containing basic details about a character in the selected slot.
+// send the preview command containing basic details about a character in the selected slot.
 func (s *Server) sendCharacterPreview(c *client.Client, char *proto.Character) error {
-	previewPacket := &packets.CharacterSummary{
-		Header: packets.BBHeader{Type: packets.LoginCharPreviewType},
+	previewCommand := &commands.CharacterSummary{
+		Header: commands.BBHeader{Type: commands.LoginCharPreviewType},
 		Slot:   0,
-		Character: packets.CharacterPreview{
+		Character: commands.CharacterPreview{
 			Experience:     char.Experience,
 			Level:          char.Level,
 			NameColor:      char.NameColor,
@@ -453,17 +453,17 @@ func (s *Server) sendCharacterPreview(c *client.Client, char *proto.Character) e
 			Playtime:       char.Playtime,
 		},
 	}
-	copy(previewPacket.Character.GuildcardStr[:], char.GuildcardStr[:])
-	copy(previewPacket.Character.Name[:], char.Name[:])
+	copy(previewCommand.Character.GuildcardStr[:], char.GuildcardStr[:])
+	copy(previewCommand.Character.Name[:], char.Name[:])
 
-	return c.Send(previewPacket)
+	return c.Send(previewCommand)
 }
 
 // Acknowledge the checksum the client sent us. We don't actually do
 // anything with it but the client won't proceed otherwise.
 func (s *Server) sendChecksumAck(c *client.Client) error {
-	return c.Send(&packets.ChecksumAck{
-		Header: packets.BBHeader{Type: packets.LoginChecksumAckType},
+	return c.Send(&commands.ChecksumAck{
+		Header: commands.BBHeader{Type: commands.LoginChecksumAckType},
 		Ack:    1,
 	})
 }
@@ -502,8 +502,8 @@ func (s *Server) handleGuildcardDataStart(ctx context.Context, c *client.Client)
 
 // send the header containing metadata about the guildcard chunk.
 func (s *Server) sendGuildcardHeader(c *client.Client, checksum uint32, dataLen uint16) error {
-	return c.Send(&packets.GuildcardHeader{
-		Header:   packets.BBHeader{Type: packets.LoginGuildcardHeaderType},
+	return c.Send(&commands.GuildcardHeader{
+		Header:   commands.BBHeader{Type: commands.LoginGuildcardHeaderType},
 		Unknown:  0x00000001,
 		Length:   dataLen,
 		Checksum: checksum,
@@ -511,7 +511,7 @@ func (s *Server) sendGuildcardHeader(c *client.Client, checksum uint32, dataLen 
 }
 
 // send another chunk of the client's guildcard data.
-func (s *Server) handleGuildcardChunk(c *client.Client, chunkReq *packets.GuildcardChunkRequest) error {
+func (s *Server) handleGuildcardChunk(c *client.Client, chunkReq *commands.GuildcardChunkRequest) error {
 	if chunkReq.Continue == 0x01 {
 		return s.sendGuildcardChunk(c, chunkReq.ChunkRequested)
 	}
@@ -521,12 +521,12 @@ func (s *Server) handleGuildcardChunk(c *client.Client, chunkReq *packets.Guildc
 
 // send the specified chunk of guildcard data.
 func (s *Server) sendGuildcardChunk(c *client.Client, chunkNum uint32) error {
-	pkt := &packets.GuildcardChunk{
-		Header: packets.BBHeader{Type: packets.LoginGuildcardChunkType},
+	pkt := &commands.GuildcardChunk{
+		Header: commands.BBHeader{Type: commands.LoginGuildcardChunkType},
 		Chunk:  chunkNum,
 	}
 
-	// The client will only accept 0x6800 bytes of a chunk per packet.
+	// The client will only accept 0x6800 bytes of a chunk per command.
 	offset := uint16(chunkNum) * maxDataChunkSize
 	remaining := uint16(len(c.GuildcardData)) - offset
 
@@ -541,9 +541,9 @@ func (s *Server) sendGuildcardChunk(c *client.Client, chunkNum uint32) error {
 
 // send the header for the parameter files we're about to start sending.
 func (s *Server) sendParameterHeader(c *client.Client, numEntries uint32, entries []byte) error {
-	return c.Send(&packets.ParameterHeader{
-		Header: packets.BBHeader{
-			Type:  packets.LoginParameterHeaderType,
+	return c.Send(&commands.ParameterHeader{
+		Header: commands.BBHeader{
+			Type:  commands.LoginParameterHeaderType,
 			Flags: numEntries,
 		},
 		Entries: entries,
@@ -552,8 +552,8 @@ func (s *Server) sendParameterHeader(c *client.Client, numEntries uint32, entrie
 
 // Index into chunkData and send the specified chunk of parameter data.
 func (s *Server) sendParameterChunk(c *client.Client, chunkData []byte, chunk uint32) error {
-	return c.Send(&packets.ParameterChunk{
-		Header: packets.BBHeader{Type: packets.LoginParameterChunkType},
+	return c.Send(&commands.ParameterChunk{
+		Header: commands.BBHeader{Type: commands.LoginParameterChunkType},
 		Chunk:  chunk,
 		Data:   chunkData,
 	})
@@ -562,7 +562,7 @@ func (s *Server) sendParameterChunk(c *client.Client, chunkData []byte, chunk ui
 // The client may send us flags as a result of user actions in order to indicate
 // a change in state or desired behavior. For instance, setting 0x02 indicates
 // that the character dressing room has been opened.
-func (s *Server) setClientFlag(c *client.Client, pkt *packets.SetFlag) {
+func (s *Server) setClientFlag(c *client.Client, pkt *commands.SetFlag) {
 	c.Flag = c.Flag | pkt.Flag
 	// Some flags are set right before the client disconnects, which means saving them
 	// on the Client struct alone isn't safe since the state is lost. To fix this the
@@ -576,7 +576,7 @@ func clientFlagCacheKey(c *client.Client) string {
 
 // Performs a create or update/delete depending on whether the user followed the
 // "dressing room" or "recreate" flows (as indicated by a client flag).
-func (s *Server) handleCharacterUpdate(ctx context.Context, c *client.Client, charPkt *packets.CharacterSummary) error {
+func (s *Server) handleCharacterUpdate(ctx context.Context, c *client.Client, charPkt *commands.CharacterSummary) error {
 	if s.hasDressingRoomFlag(c) {
 		// "Dressing room"; a request to update an existing character.
 		if err := s.updateCharacter(ctx, c, charPkt); err != nil {
@@ -679,7 +679,7 @@ func (s *Server) hasDressingRoomFlag(c *client.Client) bool {
 	return false
 }
 
-func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *packets.CharacterSummary) error {
+func (s *Server) updateCharacter(ctx context.Context, c *client.Client, pkt *commands.CharacterSummary) error {
 	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
 	flags, _ := s.kvCache.Get(clientFlagCacheKey(c))
 	s.kvCache.Set(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
