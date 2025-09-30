@@ -81,7 +81,6 @@ func (s *Server) Init(ctx context.Context) error {
 
 func (s *Server) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
-	c.DebugTags["server_type"] = "character"
 }
 
 func (s *Server) Handshake(c *client.Client) error {

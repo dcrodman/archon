@@ -56,7 +56,7 @@ type Client struct {
 
 	// Debugging information used for logging purposes.
 	Debug     bool
-	DebugTags map[string]debug.Tag
+	DebugTags map[debug.Tag]string
 }
 
 func NewClient(connection *net.TCPConn) *Client {
@@ -66,7 +66,7 @@ func NewClient(connection *net.TCPConn) *Client {
 		connection: connection,
 		ipAddr:     addr[0],
 		port:       addr[1],
-		DebugTags:  make(map[string]debug.Tag),
+		DebugTags:  make(map[debug.Tag]string),
 	}
 }
 
@@ -96,7 +96,7 @@ func (c *Client) SendRaw(packet interface{}) error {
 	if c.Debug {
 		debug.PrintPacket(debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
-			ServerType:    debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ServerType:    string(c.DebugTags[debug.ServerType]),
 			ClientCommand: false,
 			Data:          bytes,
 		})
@@ -130,7 +130,7 @@ func (c *Client) Send(packet interface{}) error {
 	if c.Debug {
 		debug.PrintPacket(debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
-			ServerType:    debug.ServerType(c.DebugTags[debug.SERVER_TYPE]),
+			ServerType:    c.DebugTags[debug.ServerType],
 			ClientCommand: false,
 			Data:          bytes,
 		})

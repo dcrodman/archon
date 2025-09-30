@@ -13,7 +13,6 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
-	"github.com/dcrodman/archon/internal/core/debug"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
@@ -52,7 +51,6 @@ func (s *AuthServer) Init(ctx context.Context) error {
 
 func (s *AuthServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
-	c.DebugTags[debug.SERVER_TYPE] = debug.SHIP_SERVER
 }
 
 func (s *AuthServer) Handshake(c *client.Client) error {

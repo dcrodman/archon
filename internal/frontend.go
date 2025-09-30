@@ -117,6 +117,7 @@ func (f *frontend) acceptClient(ctx context.Context, connection *net.TCPConn, wg
 	c := client.NewClient(connection)
 	f.Backend.SetUpClient(c)
 	c.Debug = f.Config.Debugging.PacketLoggingEnabled
+	c.DebugTags[archdebug.ServerType] = f.Backend.Identifier()
 
 	f.Logger.Infof("[%s] accepted connection from %s", f.Backend.Identifier(), c.IPAddr())
 
@@ -163,7 +164,7 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 		if f.Config.Debugging.PacketLoggingEnabled {
 			archdebug.PrintPacket(archdebug.PrintPacketParams{
 				Writer:        bufio.NewWriter(os.Stdout),
-				ServerType:    archdebug.ServerType(c.DebugTags[archdebug.SERVER_TYPE]),
+				ServerType:    f.Backend.Identifier(),
 				ClientCommand: true,
 				Data:          buffer,
 			})

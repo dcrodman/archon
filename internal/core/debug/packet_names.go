@@ -60,8 +60,8 @@ var commandNames = map[uint16]string{
 	commands.FullCharacterEndType:        "FullCharacterEnd",
 }
 
-func getCommandName(server ServerType, commandType uint16) string {
-	if server == PATCH_SERVER || server == DATA_SERVER {
+func getCommandName(server string, commandType uint16) string {
+	if server == "PATCH:AUTH" || server == "PATCH_DATA" {
 		if name, ok := patchCommandNames[commandType]; ok {
 			return name
 		}

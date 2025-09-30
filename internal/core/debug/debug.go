@@ -32,25 +32,16 @@ func StartPprofServer(logger *zap.SugaredLogger, pprofPort int) {
 }
 
 // Used with Clients to attach debugging information.
+
 type Tag string
 
-var SERVER_TYPE = "server_type"
-
-type ServerType string
-
-const (
-	UNKNOWN          = "?"
-	PATCH_SERVER     = "PATCH"
-	DATA_SERVER      = "DATA"
-	LOGIN_SERVER     = "LOGIN"
-	CHARACTER_SERVER = "CHARACTER"
-	SHIP_SERVER      = "SHIP"
-	BLOCK_SERVER     = "BLOCK"
+var (
+	ServerType Tag = "server_type"
 )
 
 type PrintPacketParams struct {
 	Writer     *bufio.Writer
-	ServerType ServerType
+	ServerType string
 	// True if this command is client->server.
 	ClientCommand bool
 	Data          []byte

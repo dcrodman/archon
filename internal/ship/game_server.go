@@ -38,7 +38,6 @@ func (s *GameServer) Init(ctx context.Context) error {
 
 func (s *GameServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewBlueBurstCryptoSession()
-	c.DebugTags["server_type"] = "block"
 }
 
 func (s *GameServer) Handshake(c *client.Client) error {

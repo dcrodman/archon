@@ -16,20 +16,18 @@ import (
 
 // Best effort guess as to what ports correspond to which servers based on
 // the defaults for the servers this tool will likely be used with.
-var serverPorts = map[uint16]debug.ServerType{
-	11000: debug.PATCH_SERVER,
-	11001: debug.DATA_SERVER,
-	12000: debug.LOGIN_SERVER,
-	12001: debug.CHARACTER_SERVER,
+var serverPorts = map[uint16]string{
+	11000: "PATCH:AUTH",
+	11001: "PATCH:DATA}",
+	12000: "CHARACTER:AUTH",
+	12001: "CHARACTER:DATA",
 	// Archon's ports.
-	15000: debug.SHIP_SERVER,
-	15001: debug.BLOCK_SERVER,
-	15002: debug.BLOCK_SERVER,
-	15003: debug.BLOCK_SERVER,
+	15000: "SHIP:AUTH",
+	15001: "SHIP:GAME",
 	// Tethealla's ports.
-	5278: debug.SHIP_SERVER,
-	5279: debug.BLOCK_SERVER,
-	5280: debug.BLOCK_SERVER,
+	5278: "SHIP",
+	5279: "BLOCK01",
+	5280: "BLOCK01",
 }
 
 type CipherPair struct {
@@ -40,14 +38,14 @@ type CipherPair struct {
 type sniffer struct {
 	Writer *bufio.Writer
 
-	ciphers           map[debug.ServerType]CipherPair
+	ciphers           map[string]CipherPair
 	currentPacketSize uint16
 	bufferBytesRead   uint16
 	buffer            []byte
 }
 
 func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
-	s.ciphers = make(map[debug.ServerType]CipherPair)
+	s.ciphers = make(map[string]CipherPair)
 	s.buffer = make([]byte, 100000)
 
 	for packet := range packetChan {
@@ -64,17 +62,17 @@ func (s *sniffer) startReading(packetChan chan gopacket.Packet) {
 // Guesses the server type based on the sender of the packet and what ports the
 // packet was sent between. Also returns whether or not this packet was sent
 // by the client.
-func getServerType(srcPort, dstPort uint16) (bool, debug.ServerType) {
+func getServerType(srcPort, dstPort uint16) (bool, string) {
 	if server, ok := serverPorts[dstPort]; ok {
 		return true, server
 	}
 	if server, ok := serverPorts[srcPort]; ok {
 		return false, server
 	}
-	return false, debug.UNKNOWN
+	return false, "???"
 }
 
-func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data []byte) {
+func (s *sniffer) handlePacket(server string, clientPacket bool, data []byte) {
 	emitPacket := true
 
 	// Copy the data we just got into the working slice for the current packet.
@@ -104,7 +102,7 @@ func (s *sniffer) handlePacket(server debug.ServerType, clientPacket bool, data 
 		s.currentPacketSize = header.Size
 	default:
 		var expectedHeaderSize uint16 = packets.BBHeaderSize
-		if server == debug.PATCH_SERVER || server == debug.DATA_SERVER {
+		if server == "PATCH:AUTH" || server == "PATCH:DATA" {
 			expectedHeaderSize = packets.PCHeaderSize
 		}
 

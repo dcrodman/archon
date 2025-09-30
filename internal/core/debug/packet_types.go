@@ -72,12 +72,12 @@ var commandTypes = map[uint16]interface{}{
 	commands.FullCharacterEndType:        commands.BBHeader{},
 }
 
-func getCommand(server ServerType, clientcommand bool, commandType uint16) reflect.Value {
+func getCommand(server string, clientcommand bool, commandType uint16) reflect.Value {
 	var (
 		t     interface{}
 		found bool
 	)
-	if server == PATCH_SERVER || server == DATA_SERVER {
+	if server == "PATCH:AUTH" || server == "PATCH:DATA" {
 		t, found = patchcommandTypes[commandType]
 	} else {
 		t, found = commandTypes[commandType]

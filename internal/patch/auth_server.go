@@ -7,7 +7,6 @@ import (
 	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/dcrodman/archon/internal/core/client"
-	"github.com/dcrodman/archon/internal/core/debug"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +43,6 @@ func (s *PatchAuthServer) Init(ctx context.Context) error {
 
 func (s *PatchAuthServer) SetUpClient(c *client.Client) {
 	c.CryptoSession = client.NewPCCryptoSession()
-	c.DebugTags[debug.SERVER_TYPE] = debug.PATCH_SERVER
 }
 
 func (s *PatchAuthServer) Handshake(c *client.Client) error {
