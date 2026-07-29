@@ -64,9 +64,6 @@ func (s *GameServer) Handle(ctx context.Context, c *client.Client, data []byte) 
 		var loginPkt commands.Login
 		bytes.StructFromBytes(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
-	case commands.CharacterDataType:
-		// TODO: Probably have some data to copy in here.
-		err = s.sendPacket67(c)
 	default:
 		s.Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr())
 	}
@@ -101,14 +98,10 @@ func (s *GameServer) handleLogin(ctx context.Context, c *client.Client, loginPkt
 	if err := s.sendSecurity(c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
-	if err := s.sendLobbyList(c); err != nil {
+	if err := s.sendLobbyMenu(c); err != nil {
 		return err
 	}
-	if err := s.fetchAndSendCharacter(ctx, c); err != nil {
-		return err
-	}
-
-	return s.sendFullCharacterEnd(c)
+	return s.fetchAndSendCharacter(ctx, c)
 }
 
 func (s *GameServer) sendSecurity(c *client.Client, errorCode uint32) error {
@@ -141,7 +134,7 @@ func (s *GameServer) sendMessage(c *client.Client, message string) error {
 	})
 }
 
-func (s *GameServer) sendLobbyList(c *client.Client) error {
+func (s *GameServer) sendLobbyMenu(c *client.Client) error {
 	lobbyEntries := make([]commands.LobbyListEntry, s.Config.ShipServer.NumLobbies)
 	for i := 0; i < s.Config.ShipServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
@@ -150,8 +143,8 @@ func (s *GameServer) sendLobbyList(c *client.Client) error {
 
 	return c.Send(&commands.LobbyList{
 		Header: commands.BBHeader{
-			Type:  commands.LobbyListType,
-			Flags: 0x0F,
+			Type:  commands.LobbyMenuType,
+			Flags: 0x0F, // PSOBB expects this to always contain 15 entries.
 		},
 		Lobbies: lobbyEntries,
 	})
@@ -171,70 +164,73 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *client.Client
 	if err != nil {
 		return fmt.Errorf("error loading selected character: %v", err)
 	}
-	dbCharacter := resp.Character
+	dbc := resp.Character
 
-	charPkt := &commands.FullCharacter{
-		Header: commands.BBHeader{Type: commands.FullCharacterType},
-		// NumInventoryItems: 0,
-		HPMaterials:    uint8(dbCharacter.HpMaterialsUsed),
-		TPMaterials:    uint8(dbCharacter.TpMaterialsUsed),
-		Language:       0,
-		ATP:            uint16(dbCharacter.Atp),
-		MST:            uint16(dbCharacter.Mst),
-		EVP:            uint16(dbCharacter.Evp),
-		HP:             uint16(dbCharacter.Hp),
-		DFP:            uint16(dbCharacter.Dfp),
-		ATA:            uint16(dbCharacter.Ata),
-		LCK:            uint16(dbCharacter.Lck),
-		Level:          uint16(dbCharacter.Level),
-		Experience:     dbCharacter.Experience,
-		SkinID:         uint16(dbCharacter.ModelType),
-		SectionID:      uint8(dbCharacter.SectionId),
-		Class:          uint8(dbCharacter.Class),
-		SkinFlag:       uint8(dbCharacter.V2Flags),
-		Costume:        uint16(dbCharacter.Costume),
-		Skin:           uint16(dbCharacter.Skin),
-		Face:           uint16(dbCharacter.Face),
-		Head:           uint16(dbCharacter.Head),
-		Hair:           uint16(dbCharacter.Hair),
-		HairColorRed:   uint16(dbCharacter.HairRed),
-		HairColorGreen: uint16(dbCharacter.HairGreen),
-		HairColorBlue:  uint16(dbCharacter.HairBlue),
-		ProportionX:    uint32(dbCharacter.ProportionX),
-		ProportionY:    uint32(dbCharacter.ProportionY),
-		PlayTime:       dbCharacter.Playtime,
+	charPkt := &commands.SyncCharacter{
+		Header: commands.BBHeader{Type: commands.SyncCharacterType},
+		Inventory: commands.PlayerInventory{
+			HPFromMaterials: uint8(dbc.HpMaterialsUsed),
+			TPFromMaterials: uint8(dbc.TpMaterialsUsed),
+			// Items: ,
+		},
+		DisplayData: commands.PlayerDisplayData{
+			Stats: commands.PlayerStats{
+				ATP: uint16(dbc.Atp),
+				MST: uint16(dbc.Mst),
+				EVP: uint16(dbc.Evp),
+				HP:  uint16(dbc.Hp),
+				DFP: uint16(dbc.Dfp),
+				ATA: uint16(dbc.Ata),
+				LCK: uint16(dbc.Lck),
+				// TODO: ESP, AttackRange, KnockbackRange
+				Level:      uint32(dbc.Level),
+				Experience: dbc.Experience,
+				Meseta:     dbc.Meseta,
+			},
+			Visual: commands.PlayerVisual{
+				NameColor:      NameColorNormal,
+				SkinID:         uint8(dbc.ModelType),
+				SectionID:      uint8(dbc.SectionId),
+				Class:          uint8(dbc.Class),
+				SkinFlag:       uint8(dbc.V2Flags),
+				Costume:        uint16(dbc.Costume),
+				Skin:           uint16(dbc.Skin),
+				Face:           uint16(dbc.Face),
+				Head:           uint16(dbc.Head),
+				Hair:           uint16(dbc.Hair),
+				HairColorRed:   uint16(dbc.HairRed),
+				HairColorGreen: uint16(dbc.HairGreen),
+				HairColorBlue:  uint16(dbc.HairBlue),
+				ProportionX:    uint32(dbc.ProportionX),
+				ProportionY:    uint32(dbc.ProportionY),
+			},
+			// TODO: Tech levels.
+		},
+		Signature: 0xC87ED5B1,
+		PlayTime:  dbc.Playtime,
 	}
-	copy(charPkt.GuildcardStr[:], dbCharacter.GuildcardStr)
-	copy(charPkt.Name[:], dbCharacter.Name)
-
-	charPkt.NameColor = NameColorNormal
+	copy(charPkt.GuildCard.Description[:], dbc.GuildcardStr)
+	copy(charPkt.DisplayData.Visual.Name[:], dbc.Name)
 	if c.IsGm {
-		charPkt.NameColor = NameColorGM
+		charPkt.DisplayData.Visual.NameColor = NameColorGM
 	}
+	copy(charPkt.DisplayData.DispName[:], dbc.Name)
 
 	// TODO: Tethealla doesn't really support editing this either, so will need to figure out
 	// how to save this and return it to the player rather than using the default.
-	copy(charPkt.KeyConfig[:], character.BaseKeyConfig[:])
+	copy(charPkt.KeyConfig[:], character.BaseKeyConfig[:0x16C])
+	copy(charPkt.JoystickConfig[:], character.BaseKeyConfig[0x16C:])
 
 	// TODO: Copy the techniques and inventory here.
 
 	return c.Send(charPkt)
 }
 
-func (s *GameServer) sendFullCharacterEnd(c *client.Client) error {
-	// Acts as an EOF for the full character data.
-	return c.Send(&commands.BBHeader{
-		Type: commands.FullCharacterEndType,
-	})
-}
-
-func (s *GameServer) sendPacket67(c *client.Client) error {
-	return c.Send(&commands.Packet67{
+func (s *GameServer) sendJoinLobby(c *client.Client) error {
+	return c.Send(&commands.JoinLobby{
 		Header: commands.BBHeader{
-			Type: 0x67,
+			Type: commands.JoinLobbyType,
 		},
-		Unknown1:  0x01,
-		PlayerTag: 0x00010000,
-		// Something: ,
+		DisableUDP: 1,
 	})
 }

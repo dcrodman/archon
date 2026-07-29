@@ -1,12 +1,6 @@
 package commands
 
-const (
-	LobbyListType        = 0x83
-	BlockListType        = 0x07
-	FullCharacterType    = 0xE7
-	FullCharacterEndType = 0x95
-	CharacterDataType    = 0x61
-)
+const BlockListType = 0x07
 
 type LobbyListEntry struct {
 	MenuID  uint32 // Always 0x01 0x00 0x1A 0x00
@@ -14,23 +8,84 @@ type LobbyListEntry struct {
 	Padding uint32
 }
 
-// LobbyList is the list of available lobbies in a block.
+// LobbyList is the list of available lobbies in a block for use in the teleporter.
+const LobbyMenuType = 0x83
+
 type LobbyList struct {
 	Header  BBHeader
 	Lobbies []LobbyListEntry
 }
 
-type Item struct {
+type ItemData struct {
 	Data    [12]uint8
 	ItemID  uint32
 	MagData uint32
 }
 
-type InventoryItem struct {
-	InUse   uint8 // 0x01 for in use, 0xFF is unused
-	Unknown [3]byte
+type PlayerInventoryItem struct {
+	Present uint8
+	// Newserv somehow unearthed that these four uint8s are used for some tricky
+	// multipurpose backwards compatibility between games, which appear limited
+	// to PSO V2 only and therefore we ignore them.
+	Unknown [3]uint8
 	Flags   uint32 // 0x08 is equipped
-	Item    Item
+	Item    ItemData
+}
+
+type PlayerInventory struct {
+	NumItems        uint8
+	HPFromMaterials uint8
+	TPFromMaterials uint8
+	Language        uint8
+	Items           [30]PlayerInventoryItem
+}
+
+type PlayerStats struct {
+	ATP            uint16
+	MST            uint16
+	EVP            uint16
+	HP             uint16
+	DFP            uint16
+	ATA            uint16
+	LCK            uint16
+	ESP            uint16
+	AttackRange    uint32 // float32
+	KnockbackRange uint32 // float32
+	Level          uint32
+	Experience     uint32
+	Meseta         uint32
+}
+
+type PlayerVisual struct {
+	Name              [16]uint8 // ASCII
+	Unknown2          [8]uint8
+	NameColor         uint32
+	SkinID            uint8 // extra_model; NPC skin/appearance override
+	Unknown3          [15]uint8
+	NameColorChecksum uint32
+	SectionID         uint8
+	Class             uint8
+	SkinFlag          uint8
+	Version           uint8
+	ClassFlags        uint32
+	Costume           uint16
+	Skin              uint16
+	Face              uint16
+	Head              uint16
+	Hair              uint16
+	HairColorRed      uint16
+	HairColorGreen    uint16
+	HairColorBlue     uint16
+	ProportionX       uint32 // float32
+	ProportionY       uint32 // float32
+}
+
+type PlayerDisplayData struct {
+	Stats      PlayerStats
+	Visual     PlayerVisual
+	DispName   [16]uint8  // UTF-16
+	Config     [232]uint8 // Player key/action-bar config
+	TechLevels [20]uint8  // Technique levels v1
 }
 
 type BankItem struct {
@@ -40,98 +95,122 @@ type BankItem struct {
 	BankCount uint32
 }
 
-// FullCharacter is the full dataset for one character.
-type FullCharacter struct {
-	Header               BBHeader
-	Flags                [4]uint8
-	NumInventoryItems    uint8
-	HPMaterials          uint8
-	TPMaterials          uint8
-	Language             uint8
-	Inventory            [30]InventoryItem
-	ATP                  uint16
-	MST                  uint16
-	EVP                  uint16
-	HP                   uint16
-	DFP                  uint16 // Note: Tethealla's login and block servers differ here.
-	ATA                  uint16
-	LCK                  uint16
-	Unknown              [10]byte
-	Level                uint16
-	Unknown2             uint16
-	Experience           uint32
-	Meseta               uint32
-	GuildcardStr         [10]byte
-	Unknown3             [14]uint8
-	NameColor            uint32 // Blue, Green, Red, Transparency
-	SkinID               uint16
-	Unknown4             [18]byte
-	SectionID            uint8
-	Class                uint8
-	SkinFlag             uint8
-	Unknown5             [5]byte
-	Costume              uint16
-	Skin                 uint16
-	Face                 uint16
-	Head                 uint16
-	Hair                 uint16
-	HairColorRed         uint16
-	HairColorBlue        uint16
-	HairColorGreen       uint16
-	ProportionX          uint32
-	ProportionY          uint32
-	Name                 [24]byte
-	PlayTime             uint32
-	Unknown6             [4]byte
-	KeyConfig            [232]uint8
-	Techniques           [20]uint8
-	Unknown7             [16]uint8
-	Options              [4]uint8
-	Reserved4            uint32
-	QuestData            [512]uint8
-	Reserved5            uint32
-	BankUse              uint32
-	BankMeseta           uint32
-	BankInventory        [200]BankItem
-	Guildcard            uint32
-	Name2                [24]uint8
-	Unknown9             [56]byte
-	GuildcardText        [176]uint8
-	Reserved1            uint8
-	Reserved2            uint8
-	SectionID2           uint8
-	Class2               uint8
-	Unknown10            [4]uint8
-	SymbolChats          [1248]uint8
-	Shortcuts            [2624]uint8
-	AutoReply            [344]uint8
-	GCBoard              [172]uint8
-	Unknown12            [200]uint8
-	ChallengeData        [320]uint8
-	TechConfig           [40]uint8
-	Unknown13            [40]uint8
-	QuestData2           [92]uint8
-	Unknown14            [276]uint8
-	KeyConfigGlobal      [364]uint8
-	JoystickConfigGlobal [56]uint8
-	Guildcard2           uint32
-	TeamID               uint32
-	TeamInformation      [8]uint8
-	PrivilegeLevel       uint16
-	Reserved3            uint16
-	TeamName             [28]uint8
-	Unknown15            uint32
-	TeamFlag             [2048]uint8
-	TeamRewards          [8]uint8
+// GuildCard is the guild card data embedded in the character file.
+type GuildCard struct {
+	GuildCardNumber uint32
+	Name            [48]uint8  // UTF-16, 0x18 chars
+	TeamName        [32]uint8  // UTF-16, 0x10 chars
+	Description     [176]uint8 // UTF-16, 0x58 chars; the player's guild card message
+	Present         uint8
+	Language        uint8
+	SectionID       uint8
+	Class           uint8
 }
 
-type Packet67 struct {
-	Header        BBHeader
-	Padding       uint32
-	Unknown1      uint32
-	Padding1      uint32
-	PlayerTag     uint32
-	Something     uint32
-	Padding2      [24]uint8
-	CharacterName [32]uint8
+// SyncCharacter is the full dataset for one character.
+const SyncCharacterType = 0xE7
+
+type SyncCharacter struct {
+	Header BBHeader
+
+	Inventory   PlayerInventory
+	DisplayData PlayerDisplayData
+
+	// Character file metadata.
+	ValidationFlags   uint32
+	CreationTimestamp uint32
+	Signature         uint32 // Always 0xC87ED5B1
+	PlayTime          uint32
+	OptionFlags       uint32
+	SaveCount         uint32
+
+	// Quest flags.
+	QuestFlags [512]uint8
+
+	NumDeaths uint32
+
+	// Bank.
+	BankNumItems uint32
+	BankMeseta   uint32
+	Bank         [200]BankItem
+
+	// Guild card (GuildCardBB, 0x0108 bytes).
+	GuildCard GuildCard
+
+	// Remaining character file sections (largely opaque).
+	GuildCardUnknown     uint32
+	SymbolChats          [0x4E0]uint8 // x12, 0x68 bytes each
+	Shortcuts            [0xA40]uint8 // x16, 0xA4 bytes each
+	AutoReply            [0x158]uint8 // UTF-16
+	InfoBoard            [0x158]uint8 // UTF-16
+	BattleRecords        [0x18]uint8
+	Unknown4             [4]uint8
+	ChallengeRecords     [0x140]uint8
+	TechMenuShortcuts    [20]uint16
+	ChoiceSearch         [0x18]uint8
+	Unknown5             [16]uint8
+	QuestCounters        [16]uint32
+	OfflineBattleRecords [0x18]uint8
+	Unknown6             [4]uint8
+
+	SystemChecksum          uint32
+	MusicVolume             int16
+	SoundVolume             int8
+	SystemLanguage          uint8
+	ServerTimeDeltaFrames   int32
+	UDPBehavior             uint16
+	SurroundSoundEnabled    uint16
+	EventFlags              [256]uint8
+	SystemCreationTimestamp uint32
+
+	// Key and joystick config.
+	KeyConfig      [364]uint8
+	JoystickConfig [56]uint8
+
+	TeamMasterGuildCard uint32
+	TeamID              uint32
+	TeamUnknownA5       uint32
+	TeamUnknownA6       uint32
+	TeamPrivilegeLevel  uint8
+	TeamMemberCount     uint8
+	TeamUnknownA8       uint8
+	TeamUnknownA9       uint8
+	TeamName            [32]uint8 // UTF-16
+
+	// Team flag image and reward flags.
+	TeamFlagData    [2048]uint8
+	TeamRewardFlags uint32
+}
+
+type LobbyEntry struct {
+	PlayerTag   uint32
+	Guildcard   uint32
+	TMGuildcard uint32
+	TeamID      uint32
+	Unknown     [12]uint8
+	ClientID    uint32
+	Name        [32]uint8 // UTF-18
+	// Per newserv, Should be set to 1 to hide the "Press F1 for help".
+	HideHelpPrompt uint32
+
+	Inventory   PlayerInventory
+	DisplayData PlayerDisplayData
+}
+
+const JoinLobbyType = 0x67
+
+type JoinLobby struct {
+	Header BBHeader
+
+	ClientID    uint8
+	LeaderID    uint8
+	DisableUDP  uint8 // Always 1.
+	LobbyNumber uint8
+	BlockNumber uint8
+	Unused      uint8 // Dreamcast battle mode, according to newserv. Not relevant to BB.
+	Event       uint8
+	Unused2     [5]uint8 // 1 byte for something to do with voice chat and 4 bytes for some random seed.
+
+	// Player entries.
+	Entries [12]LobbyEntry
 }

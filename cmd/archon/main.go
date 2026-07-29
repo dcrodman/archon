@@ -19,11 +19,10 @@ func main() {
 	accountCmd.AddCommand(accountAddCmd)
 	accountCmd.AddCommand(accountDeleteCmd)
 	accountDeleteCmd.Flags().BoolVar(&PermanentFlag, "permanent", false, "Permanently delete the account (as opposed to a soft delete)")
+	rootCmd.AddCommand(accountCmd)
 
 	patchCmd.Flags().StringVarP(&NewAddressFlag, "address", "a", "127.0.0.1", "The new address or IPv4 address")
 	patchCmd.Flags().StringVarP(&ExeVersionFlag, "version", "v", "TethVer12513", "Version of the PSOBB client")
-
-	rootCmd.AddCommand(accountCmd)
 	rootCmd.AddCommand(patchCmd)
 
 	if err := rootCmd.Execute(); err != nil {

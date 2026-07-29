@@ -66,10 +66,9 @@ var commandTypes = map[uint16]interface{}{
 	commands.LoginTimestampType:          commands.Timestamp{},
 	commands.LoginShipListType:           commands.ShipList{},
 	commands.LoginScrollMessageType:      commands.ScrollMessage{},
-	commands.LobbyListType:               commands.LobbyList{},
+	commands.LobbyMenuType:               commands.LobbyList{},
 	commands.BlockListType:               commands.ShipMenu{},
-	commands.FullCharacterType:           commands.FullCharacter{},
-	commands.FullCharacterEndType:        commands.BBHeader{},
+	commands.SyncCharacterType:           commands.SyncCharacter{},
 }
 
 func getCommand(server string, clientcommand bool, commandType uint16) reflect.Value {

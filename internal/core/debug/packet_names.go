@@ -54,10 +54,9 @@ var commandNames = map[uint16]string{
 	commands.LoginTimestampType:          "LoginTimestamp",
 	commands.LoginShipListType:           "LoginShipList",
 	commands.LoginScrollMessageType:      "LoginScrollMessage",
-	commands.LobbyListType:               "LobbyList",
+	commands.LobbyMenuType:               "LobbyList",
 	commands.BlockListType:               "BlockList",
-	commands.FullCharacterType:           "FullCharacter",
-	commands.FullCharacterEndType:        "FullCharacterEnd",
+	commands.SyncCharacterType:           "FullCharacter",
 }
 
 func getCommandName(server string, commandType uint16) string {
