@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -54,6 +55,11 @@ func ServerCommand(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// Start any debug utilities if we're configured to do so.
+	if archon.Config.Debugging.PprofEnabled {
+		StartPprofServer(archon.Config.Debugging.PprofPort)
+	}
+
 	// Bind the Controller to one top-level server context so that we can shut down cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -84,4 +90,17 @@ func exitHandler(cancelFn func(), c chan os.Signal) {
 	// If the user does it again, just exit without waiting.
 	fmt.Println("hard exiting (killed)")
 	os.Exit(0)
+}
+
+// This function starts the default pprof HTTP server that can be accessed via localhost
+// to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
+func StartPprofServer(pprofPort int) {
+	listenerAddr := fmt.Sprintf("localhost:%d", pprofPort)
+	fmt.Println("starting pprof server on", listenerAddr)
+
+	go func() {
+		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
+			fmt.Println("error starting pprof server: %s")
+		}
+	}()
 }

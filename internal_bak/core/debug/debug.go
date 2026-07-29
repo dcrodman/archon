@@ -5,31 +5,16 @@ import (
 	stdbytes "bytes"
 	"encoding/binary"
 	"fmt"
-	"net/http"
 	_ "net/http/pprof"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"go.uber.org/zap"
 
 	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/core/bytes"
 )
-
-// This function starts the default pprof HTTP server that can be accessed via localhost
-// to get runtime information about archon. See https://golang.org/pkg/net/http/pprof/
-func StartPprofServer(logger *zap.SugaredLogger, pprofPort int) {
-	listenerAddr := fmt.Sprintf("localhost:%d", pprofPort)
-	logger.Infof("starting pprof server on %s", listenerAddr)
-
-	go func() {
-		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
-			logger.Infof("error starting pprof server: %s", err)
-		}
-	}()
-}
 
 // Used with Clients to attach debugging information.
 
