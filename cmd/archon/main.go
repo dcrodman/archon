@@ -60,6 +60,12 @@ func ServerCommand(cmd *cobra.Command, args []string) {
 		StartPprofServer(archon.Config.Debugging.PprofPort)
 	}
 
+	// Set up the logger that will be used for server activity.
+	if err := archon.InitLogger(); err != nil {
+		fmt.Println("exiting; failed to initialize logger:", err)
+		return
+	}
+
 	// Bind the Controller to one top-level server context so that we can shut down cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
 

@@ -22,15 +22,8 @@ import (
 func Start(ctx context.Context) {
 	if Config.FilePath == "" {
 		panic("configuration must be initialized before starting the server")
-	}
-	if err := InitLogger(); err != nil {
-		fmt.Println("exiting; failed to initialize logger:", err)
-		return
-	}
-
-	// Start any debug utilities if we're configured to do so.
-	if Config.Debugging.PacketLoggingEnabled {
-		debug.StartPprofServer(Logger, Config.Debugging.PprofPort)
+	} else if Logger == nil {
+		panic("logger must be initialized before starting the server")
 	}
 
 	// Start the shipgate RPC service and make sure it launches before the other servers start.
