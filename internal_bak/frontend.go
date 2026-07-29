@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcrodman/archon/internal/core"
 	"github.com/dcrodman/archon/internal/core/client"
 	archdebug "github.com/dcrodman/archon/internal/core/debug"
 	"go.uber.org/zap"
@@ -29,7 +28,6 @@ var connectedClients = make(map[string]*client.Client)
 type frontend struct {
 	Address string
 	Backend Backend
-	Config  *core.Config
 	Logger  *zap.SugaredLogger
 }
 
@@ -75,7 +73,7 @@ func (f *frontend) startBlockingLoop(ctx context.Context, socket *net.TCPListene
 	go func() {
 		for {
 			// Poll until we can accept more clients.
-			for len(connectedClients) > f.Config.MaxConnections {
+			for len(connectedClients) > Config.MaxConnections {
 				time.Sleep(10 * time.Second)
 			}
 
@@ -161,7 +159,7 @@ func (f *frontend) processPackets(ctx context.Context, c *client.Client) {
 			break
 		}
 
-		if f.Config.Debugging.PacketLoggingEnabled {
+		if Config.Debugging.PacketLoggingEnabled {
 			archdebug.PrintPacket(archdebug.PrintPacketParams{
 				Writer:        bufio.NewWriter(os.Stdout),
 				ServerType:    f.Backend.Identifier(),
