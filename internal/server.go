@@ -8,13 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime/debug"
 	"sync"
 	"time"
-
-	"github.com/dcrodman/archon/internal/core/debug"
-	"github.com/dcrodman/archon/internal/patch"
-	"github.com/dcrodman/archon/internal/shipgate"
-	"github.com/dcrodman/archon/internal_bak/core/client"
 )
 
 // Start initializes all of Archon's servers and blocks, waiting until all of the servers
@@ -26,34 +22,34 @@ func Start(ctx context.Context) {
 		panic("logger must be initialized before starting the server")
 	}
 
-	// Start the shipgate RPC service and make sure it launches before the other servers start.
-	shipgate.Start(Config, Logger)
+	// // Start the shipgate RPC service and make sure it launches before the other servers start.
+	// shipgate.Start(Config, Logger)
 
-	shipgateAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", c.Config.ShipgateServer.Port))
-	if err != nil {
-		Logger.Errorf("error resolving shipgate address: %v", err)
-		return
-	}
-	t := time.NewTimer(30 * time.Second)
-	for {
-		select {
-		case <-t.C:
-			Logger.Errorf("timed out waiting for shipgate to initialize")
-			return
-		default:
-		}
+	// shipgateAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", c.Config.ShipgateServer.Port))
+	// if err != nil {
+	// 	Logger.Errorf("error resolving shipgate address: %v", err)
+	// 	return
+	// }
+	// t := time.NewTimer(30 * time.Second)
+	// for {
+	// 	select {
+	// 	case <-t.C:
+	// 		Logger.Errorf("timed out waiting for shipgate to initialize")
+	// 		return
+	// 	default:
+	// 	}
 
-		conn, err := net.DialTCP("tcp", nil, shipgateAddr)
-		if err == nil {
-			conn.Close()
-			break
-		}
-		time.Sleep(time.Second)
-	}
+	// 	conn, err := net.DialTCP("tcp", nil, shipgateAddr)
+	// 	if err == nil {
+	// 		conn.Close()
+	// 		break
+	// 	}
+	// 	time.Sleep(time.Second)
+	// }
 
-	// Stop the shipgate after all of the other servers have stopped in order to avoid
-	// errors from any shipgate calls during the shutdown process.
-	defer shipgate.Shutdown(ctx)
+	// // Stop the shipgate after all of the other servers have stopped in order to avoid
+	// // errors from any shipgate calls during the shutdown process.
+	// defer shipgate.Shutdown(ctx)
 
 	runServers(ctx)
 }
@@ -61,8 +57,8 @@ func Start(ctx context.Context) {
 func runServers(ctx context.Context) {
 	// Set up all of the client-facing servers we'll be running.
 	servers := map[int]Backend{
-		Config.PatchServer.AuthPort: &patch.PatchAuthServer{},
-		// Config.PatchServer.DataPort:     &patch.PatchDataServer{},
+		Config.PatchServer.AuthPort: &PatchAuthServer{},
+		Config.PatchServer.DataPort: &PatchDataServer{},
 		// Config.CharacterServer.AuthPort: &character.AuthServer{},
 		// Config.CharacterServer.DataPort: &character.Server{},
 		// Note: Eventually the ship and block servers should be able to be run
@@ -80,6 +76,7 @@ func runServers(ctx context.Context) {
 		}
 	}
 	for port, server := range servers {
+		wg.Add(1)
 		address := fmt.Sprintf("%s:%v", Config.Hostname, port)
 		if err := startAccepting(ctx, &wg, address, server); err != nil {
 			Logger.Errorf("error starting %s server: %v", server.Identifier(), err)
@@ -102,11 +99,11 @@ type Backend interface {
 	// Handshake performs any connection initialization necessary to begin
 	// communicating with the client. This likely involves sending a "welcome"
 	// command and choosing/initializing the appropriate encryption implementation.
-	Handshake(c *client.Client) error
+	Handshake(c *Client) error
 
 	// Handle is the main entry point for processing client commands. It's responsible
 	// for generally handling all commands from a client as well as sending any responses.
-	Handle(ctx context.Context, c *client.Client, data []byte) error
+	Handle(ctx context.Context, c *Client, data []byte) error
 }
 
 func startAccepting(ctx context.Context, wg *sync.WaitGroup, addr string, backend Backend) error {
@@ -125,7 +122,7 @@ func startAccepting(ctx context.Context, wg *sync.WaitGroup, addr string, backen
 	return nil
 }
 
-var connectedClients = make(map[string]*client.Client)
+var connectedClients = make(map[string]*Client)
 
 // startHandlingConnections implements a connection handling loop that's purely responsible for
 // accepting new connections and spinning off goroutines for the Backend to handle them.
@@ -175,27 +172,27 @@ handleLoop:
 // the Client and sending the welcome command. If it succeeds, the goroutine moves
 // into the packet processing loop.
 func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
-	c := client.NewClient(conn)
-	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c.IPAddr())
+	c := NewClient(conn)
+	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c.IPAddr)
 
 	if err := backend.Handshake(c); err != nil {
-		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr(), err)
+		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr, err)
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
-	if _, ok := connectedClients[c.IPAddr()]; ok {
-		Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr())
+	if _, ok := connectedClients[c.IPAddr]; ok {
+		Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr)
 		_ = conn.Close()
 		return
 	}
 
-	connectedClients[c.IPAddr()] = c
+	connectedClients[c.IPAddr] = c
 	processPackets(ctx, backend, c)
 }
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
-func processPackets(ctx context.Context, backend Backend, c *client.Client) {
+func processPackets(ctx context.Context, backend Backend, c *Client) {
 	defer closeConnectionAndRecover(backend.Identifier(), c)
 
 	buffer := make([]byte, 2048)
@@ -237,25 +234,25 @@ func processPackets(ctx context.Context, backend Backend, c *client.Client) {
 
 // closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
 // client, and removes them from the list regardless of the state of the connection.
-func closeConnectionAndRecover(serverName string, c *client.Client) {
+func closeConnectionAndRecover(serverName string, c *Client) {
 	if err := recover(); err != nil {
 		Logger.Errorf("error in client communication with %s: error=%s, trace: %s",
-			c.IPAddr(), err, debug.Stack())
+			c.IPAddr, err, debug.Stack())
 	}
 
 	if err := c.Close(); err != nil {
 		Logger.Warnf("failed to close client connection: %s", err)
 	}
 
-	delete(connectedClients, c.IPAddr())
+	delete(connectedClients, c.IPAddr)
 
-	Logger.Infof("[%s] disconnected client %s", serverName, c.IPAddr())
+	Logger.Infof("[%s] disconnected client %s", serverName, c.IPAddr)
 }
 
 // readNextPacket is a blocking call that only returns once the client has
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
-func readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
+func readNextPacket(c *Client, buffer []byte) ([]byte, error) {
 	headerSize := int(c.CryptoSession.HeaderSize())
 
 	// Read and decrypt the packet header.
@@ -284,7 +281,7 @@ func readNextPacket(c *client.Client, buffer []byte) ([]byte, error) {
 	return buffer, nil
 }
 
-func readDataFromClient(c *client.Client, n int, buffer []byte) error {
+func readDataFromClient(c *Client, n int, buffer []byte) error {
 	received := 0
 
 	for received < n {
@@ -294,7 +291,7 @@ func readDataFromClient(c *client.Client, n int, buffer []byte) error {
 		if bytesRead == 0 || err == io.EOF {
 			return err
 		} else if err != nil {
-			return errors.New("socket error (" + c.IPAddr() + ") " + err.Error())
+			return errors.New("socket error (" + c.IPAddr + ") " + err.Error())
 		}
 	}
 

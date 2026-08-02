@@ -1,8 +1,6 @@
-package client
+package internal
 
-import (
-	encryption2 "github.com/dcrodman/archon/internal/core/encryption"
-)
+import "github.com/dcrodman/archon/internal/encryption"
 
 // CryptoSession is an interface for the cryptographic operations required
 // to exchange commands between a PSO game client and the server. It consists
@@ -26,21 +24,21 @@ type CryptoSession interface {
 }
 
 type blueBurstCryptSession struct {
-	clientCrypt *encryption2.PSOCrypt
-	serverCrypt *encryption2.PSOCrypt
+	clientCrypt *encryption.PSOCrypt
+	serverCrypt *encryption.PSOCrypt
 }
 
 // NewBlueBurstCryptoSession returns a CryptoSession with newly initialized
 // ciphers that can be used to communicate with a PSO Blue Burst client.
 func NewBlueBurstCryptoSession() CryptoSession {
 	return &blueBurstCryptSession{
-		serverCrypt: encryption2.NewBBCrypt(),
-		clientCrypt: encryption2.NewBBCrypt(),
+		serverCrypt: encryption.NewBBCrypt(),
+		clientCrypt: encryption.NewBBCrypt(),
 	}
 }
 
 func (c *blueBurstCryptSession) HeaderSize() uint16 {
-	return encryption2.BlowfishBlockSize
+	return encryption.BlowfishBlockSize
 }
 
 func (c *blueBurstCryptSession) Encrypt(bytes []byte, length uint32) {
@@ -60,8 +58,8 @@ func (c *blueBurstCryptSession) ClientVector() []byte {
 }
 
 type pcCryptSession struct {
-	clientCrypt *encryption2.PSOCrypt
-	serverCrypt *encryption2.PSOCrypt
+	clientCrypt *encryption.PSOCrypt
+	serverCrypt *encryption.PSOCrypt
 }
 
 // NewPCCryptoSession returns a CryptoSession with newly initialized
@@ -69,13 +67,13 @@ type pcCryptSession struct {
 // patch protocol used by the PSO Blue Burst client.
 func NewPCCryptoSession() CryptoSession {
 	return &pcCryptSession{
-		serverCrypt: encryption2.NewPCCrypt(),
-		clientCrypt: encryption2.NewPCCrypt(),
+		serverCrypt: encryption.NewPCCrypt(),
+		clientCrypt: encryption.NewPCCrypt(),
 	}
 }
 
 func (c *pcCryptSession) HeaderSize() uint16 {
-	return encryption2.PSOPCBlockSize
+	return encryption.PSOPCBlockSize
 }
 
 func (c *pcCryptSession) Encrypt(bytes []byte, length uint32) {

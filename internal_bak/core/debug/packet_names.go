@@ -20,7 +20,7 @@ var patchCommandNames = map[uint16]string{
 	commands.PatchFileListDoneType:   "PatchFileListDone",
 	commands.PatchFileStatusType:     "PatchFileStatus",
 	commands.PatchClientListDoneType: "PatchClientListDone",
-	commands.PatchUpdateFilesType:    "PatchUpdateFiles",
+	commands.PatchStartFileUpdateType:    "PatchUpdateFiles",
 	commands.PatchFileHeaderType:     "PatchFileHeader",
 	commands.PatchFileChunkType:      "PatchFileChunk",
 	commands.PatchFileCompleteType:   "PatchFileComplete",

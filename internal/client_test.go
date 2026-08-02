@@ -1,11 +1,10 @@
-package client
+package internal
 
 import (
 	"net"
 	"testing"
 
 	"github.com/dcrodman/archon/internal/commands"
-	"github.com/dcrodman/archon/internal/core/bytes"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -18,7 +17,7 @@ var (
 		Slot: 1,
 		Flag: 1,
 	}
-	testPacketBytes, _ = bytes.BytesFromStruct(testPacket)
+	testPacketBytes, _ = BytesFromStruct(testPacket)
 )
 
 func newTestListener(t *testing.T) (*net.TCPListener, *net.TCPAddr) {
@@ -141,7 +140,7 @@ func Test_adjustPacketLength(t *testing.T) {
 		Slot: 1,
 		Flag: 1,
 	}
-	testPacketBytesNoSize, _ := bytes.BytesFromStruct(testPacketNoSize)
+	testPacketBytesNoSize, _ := BytesFromStruct(testPacketNoSize)
 
 	longerTestPacket := make([]byte, len(testPacketBytes))
 	copy(longerTestPacket, testPacketBytes)

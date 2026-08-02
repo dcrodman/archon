@@ -1,4 +1,4 @@
-package patch
+package internal
 
 import (
 	"fmt"
@@ -6,10 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sync"
-
-	"github.com/dcrodman/archon/internal/core"
-	"go.uber.org/zap"
 )
 
 const (
@@ -21,8 +17,6 @@ const (
 )
 
 var (
-	patchInitLock sync.Once
-
 	// File names that should be ignored when searching for patch files.
 	pathsToSkip = map[string]bool{
 		".":         true,
@@ -73,28 +67,22 @@ type directoryNode struct {
 
 // Load all of the patch files from the configured directory and store the
 // metadata in package-level constants for the DataServer instance(s).
-func initializePatchData(logger *zap.SugaredLogger, c *core.Config) error {
-	var initErr error
+func InitializePatchData() error {
+	patchDir := filepath.Join(Config.QualifiedPath(PatchDirectory))
+	if _, err := os.Stat(patchDir); os.IsNotExist(err) {
+		return fmt.Errorf("error loading patch files: directory does not exist: %s", patchDir)
+	}
 
-	patchInitLock.Do(func() {
-		patchDir := filepath.Join(c.QualifiedPath(PatchDirectory))
-		if _, err := os.Stat(patchDir); os.IsNotExist(err) {
-			initErr = fmt.Errorf("error loading patch files: directory does not exist: %s", patchDir)
-			return
-		}
+	Logger.Infof("loading patch files from %s", patchDir)
 
-		logger.Infof("loading patch files from %s", patchDir)
+	rootNode = &directoryNode{path: patchDir, clientPath: "./"}
+	if err := buildPatchFileTree(rootNode); err != nil {
+		return fmt.Errorf("error loading patch files: %s", err)
+	}
 
-		rootNode = &directoryNode{path: patchDir, clientPath: "./"}
-		if err := buildPatchFileTree(logger, rootNode); err != nil {
-			initErr = fmt.Errorf("error loading patch files: %s", err)
-			return
-		}
+	buildPatchIndex(rootNode)
 
-		buildPatchIndex(rootNode)
-	})
-
-	return initErr
+	return nil
 }
 
 // Build the list of patch files present in the patch directory to sync with the
@@ -104,7 +92,7 @@ func initializePatchData(logger *zap.SugaredLogger, c *core.Config) error {
 // Files in the patch directory mirror the expected file structure on the client side
 // and in order to tell the client which files to check the server must instruct it to
 // check files relative to the game's executable.
-func buildPatchFileTree(logger *zap.SugaredLogger, rootNode *directoryNode) error {
+func buildPatchFileTree(rootNode *directoryNode) error {
 	directories := make([]*directoryNode, 0)
 	directories = append(directories, rootNode)
 
@@ -127,7 +115,7 @@ func buildPatchFileTree(logger *zap.SugaredLogger, rootNode *directoryNode) erro
 			}
 			// ignore and warn if a directory we shouldn't parse exists
 			if _, ok := problematicPaths[filename]; ok {
-				logger.Warnf(
+				Logger.Warnf(
 					"ignoring %q - consider removing this directory from the patch folder",
 					filename,
 				)
