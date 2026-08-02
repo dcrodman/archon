@@ -49,7 +49,7 @@ func (s *PatchDataServer) Handle(ctx context.Context, c *Client, data []byte) er
 	var err error
 	switch hdr.Type {
 	case commands.PatchWelcomeType:
-		err = s.sendWelcomeAck(c)
+		err = SendPatchWelcomeAck(c)
 	case commands.PatchHandshakeType:
 		err = s.handlePatchLogin(c)
 	case commands.PatchFileStatusType:
@@ -57,55 +57,47 @@ func (s *PatchDataServer) Handle(ctx context.Context, c *Client, data []byte) er
 		StructFromBytes(data, &fileStatus)
 		s.handleFileStatus(c, &fileStatus)
 	case commands.PatchClientListDoneType:
-		err = s.updateClientFiles(c)
+		err = updateClientFiles(c)
 	default:
 		Logger.Infof("received unknown command %02x from %s", hdr.Type, c.IPAddr)
 	}
 	return err
 }
 
-// Simple acknowledgement to the welcome response.
-func (s *PatchDataServer) sendWelcomeAck(c *Client) error {
-	return c.Send(commands.PCHeader{
-		Size: 0x04,
-		Type: commands.PatchHandshakeType,
-	})
-}
-
 // Once the client has authenticated, send them the list of files to update.
 func (s *PatchDataServer) handlePatchLogin(c *Client) error {
-	if err := s.sendDataAck(c); err != nil {
+	if err := SendPatchDataAck(c); err != nil {
 		return err
 	}
-	if err := s.sendFileList(c, rootNode); err != nil {
+	if err := SendPatchFileList(c, rootNode); err != nil {
 		return err
 	}
-	return s.sendFileListDone(c)
+	return SendPatchFileListDone(c)
 }
 
 // Acknowledgement sent after the DATA connection handshake.
-func (s *PatchDataServer) sendDataAck(c *Client) error {
+func SendPatchDataAck(c *Client) error {
 	return c.Send(commands.PCHeader{Type: commands.PatchDataAckType, Size: 0x04})
 }
 
 // Traverse the patch tree depth-first and send the check file requests.
-func (s *PatchDataServer) sendFileList(c *Client, node *directoryNode) error {
-	if err := s.sendChangeDir(c, node.clientPath); err != nil {
+func SendPatchFileList(c *Client, node *directoryNode) error {
+	if err := SendPatchChangeDir(c, node.clientPath); err != nil {
 		return err
 	}
 
 	for _, patch := range node.patchFiles {
-		if err := s.sendCheckFile(c, patch.index, patch.filename); err != nil {
+		if err := SendPatchCheckFile(c, patch.index, patch.filename); err != nil {
 			return err
 		}
 	}
 
 	for _, subDirectory := range node.childNodes {
-		if err := s.sendFileList(c, subDirectory); err != nil {
+		if err := SendPatchFileList(c, subDirectory); err != nil {
 			return err
 		}
 		// Move them back up each time we leave a directory.
-		if err := s.sendDirAbove(c); err != nil {
+		if err := SendPatchDirAbove(c); err != nil {
 			return err
 		}
 	}
@@ -114,7 +106,7 @@ func (s *PatchDataServer) sendFileList(c *Client, node *directoryNode) error {
 }
 
 // Tell the client to change to some directory within its file tree.
-func (s *PatchDataServer) sendChangeDir(c *Client, dir string) error {
+func SendPatchChangeDir(c *Client, dir string) error {
 	pkt := commands.ChangeDir{
 		Header:  commands.PCHeader{Type: commands.PatchChangeDirType},
 		Dirname: [64]byte{},
@@ -125,7 +117,7 @@ func (s *PatchDataServer) sendChangeDir(c *Client, dir string) error {
 }
 
 // Tell the client to check a file in its current working directory.
-func (s *PatchDataServer) sendCheckFile(c *Client, index uint32, filename string) error {
+func SendPatchCheckFile(c *Client, index uint32, filename string) error {
 	pkt := commands.PatchCheckFile{
 		Header:  commands.PCHeader{Type: commands.PatchCheckFileType},
 		PatchID: index,
@@ -136,12 +128,12 @@ func (s *PatchDataServer) sendCheckFile(c *Client, index uint32, filename string
 }
 
 // Tell the client to change to one directory above.
-func (s *PatchDataServer) sendDirAbove(c *Client) error {
+func SendPatchDirAbove(c *Client) error {
 	return c.Send(commands.PCHeader{Type: commands.PatchDirAboveType, Size: 0x04})
 }
 
 // Tell the client that we've finished sending the patch list.
-func (s *PatchDataServer) sendFileListDone(c *Client) error {
+func SendPatchFileListDone(c *Client) error {
 	return c.Send(commands.PCHeader{Type: commands.PatchFileListDoneType, Size: 0x04})
 }
 
@@ -157,7 +149,7 @@ func (s *PatchDataServer) handleFileStatus(c *Client, fileStatus *commands.Patch
 
 // The client finished sending all of the file check commands. If they have
 // any files that need updating, now's the time to do it.
-func (s *PatchDataServer) updateClientFiles(c *Client) error {
+func updateClientFiles(c *Client) error {
 	var numFiles, totalSize uint32 = 0, 0
 
 	for _, patch := range c.FilesToUpdate {
@@ -166,19 +158,19 @@ func (s *PatchDataServer) updateClientFiles(c *Client) error {
 	}
 
 	if numFiles > 0 {
-		if err := s.sendStartFileUpdate(c, numFiles, totalSize); err != nil {
+		if err := SendPatchStartFileUpdate(c, numFiles, totalSize); err != nil {
 			return err
 		}
-		if err := s.traverseAndUpdate(c, rootNode); err != nil {
+		if err := traverseAndUpdate(c, rootNode); err != nil {
 			return err
 		}
 	}
 
-	return s.sendUpdateComplete(c)
+	return SendPatchUpdateComplete(c)
 }
 
 // Send the total number and cumulative size of files that need updating.
-func (s *PatchDataServer) sendStartFileUpdate(c *Client, num, totalSize uint32) error {
+func SendPatchStartFileUpdate(c *Client, num, totalSize uint32) error {
 	return c.Send(commands.PatchStartFileUpdate{
 		Header:    commands.PCHeader{Type: commands.PatchStartFileUpdateType},
 		NumFiles:  num,
@@ -188,20 +180,20 @@ func (s *PatchDataServer) sendStartFileUpdate(c *Client, num, totalSize uint32) 
 
 // Recursively traverse our tree of patch files, sending the file data to the client
 // when an out of date file is encountered.
-func (s *PatchDataServer) traverseAndUpdate(c *Client, node *directoryNode) error {
-	if err := s.sendChangeDir(c, node.name); err != nil {
+func traverseAndUpdate(c *Client, node *directoryNode) error {
+	if err := SendPatchChangeDir(c, node.name); err != nil {
 		return err
 	}
 
 	for _, file := range node.patchFiles {
 		if entry, ok := c.FilesToUpdate[int(file.index)]; ok {
-			if err := s.updateClientFile(c, entry.(*fileEntry)); err != nil {
+			if err := updateClientFile(c, entry.(*fileEntry)); err != nil {
 				return err
 			}
 		}
 
 		for _, dir := range node.childNodes {
-			if err := s.traverseAndUpdate(c, dir); err != nil {
+			if err := traverseAndUpdate(c, dir); err != nil {
 				return err
 			}
 		}
@@ -211,11 +203,11 @@ func (s *PatchDataServer) traverseAndUpdate(c *Client, node *directoryNode) erro
 	if node.path == "." {
 		return nil
 	}
-	return s.sendDirAbove(c)
+	return SendPatchDirAbove(c)
 }
 
-func (s *PatchDataServer) updateClientFile(c *Client, patch *fileEntry) error {
-	if err := s.sendFileHeader(c, patch); err != nil {
+func updateClientFile(c *Client, patch *fileEntry) error {
+	if err := SendPatchFileHeader(c, patch); err != nil {
 		return nil
 	}
 
@@ -238,16 +230,16 @@ func (s *PatchDataServer) updateClientFile(c *Client, patch *fileEntry) error {
 		}
 
 		checksum := crc32.ChecksumIEEE(chunkBuf)
-		if err := s.sendFileChunk(c, uint32(i), checksum, uint32(bytes), chunkBuf); err != nil {
+		if err := SendPatchFileChunk(c, uint32(i), checksum, uint32(bytes), chunkBuf); err != nil {
 			return err
 		}
 	}
 
-	return s.sendFileComplete(c)
+	return SendPatchFileComplete(c)
 }
 
 // send the header for a file we're about to update.
-func (s *PatchDataServer) sendFileHeader(c *Client, patch *fileEntry) error {
+func SendPatchFileHeader(c *Client, patch *fileEntry) error {
 	pkt := commands.PatchFileHeader{
 		Header:   commands.PCHeader{Type: commands.PatchFileHeaderType},
 		FileSize: patch.fileSize,
@@ -259,7 +251,7 @@ func (s *PatchDataServer) sendFileHeader(c *Client, patch *fileEntry) error {
 }
 
 // send a chunk of file data.
-func (s *PatchDataServer) sendFileChunk(c *Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
+func SendPatchFileChunk(c *Client, chunk, chksm, chunkSize uint32, fdata []byte) error {
 	if chunkSize > maxFileChunkSize {
 		Logger.Errorf("Attempted to send %v byte chunk; max is %v",
 			strconv.Itoa(int(chunkSize)), string(rune(maxFileChunkSize)))
@@ -276,11 +268,11 @@ func (s *PatchDataServer) sendFileChunk(c *Client, chunk, chksm, chunkSize uint3
 }
 
 // Finished sending a particular file.
-func (s *PatchDataServer) sendFileComplete(c *Client) error {
+func SendPatchFileComplete(c *Client) error {
 	return c.Send(commands.PCHeader{Type: commands.PatchFileCompleteType, Size: 0x04})
 }
 
 // We've finished updating files.
-func (s *PatchDataServer) sendUpdateComplete(c *Client) error {
+func SendPatchUpdateComplete(c *Client) error {
 	return c.Send(commands.PCHeader{Type: commands.PatchUpdateCompleteType, Size: 0x04})
 }
