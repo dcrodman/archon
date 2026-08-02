@@ -6,7 +6,7 @@ import (
 )
 
 func TestPSOCrypt_BB(t *testing.T) {
-	crypt := NewBBCrypt()
+	crypt := newBlowfishCipher(createKey(48))
 	testData := []byte("test data with padding _")
 
 	encBuffer := make([]byte, len(testData))
@@ -27,7 +27,7 @@ func TestPSOCrypt_BB(t *testing.T) {
 
 	buffer2 := make([]byte, len(testData))
 	copy(buffer2, testData)
-	NewBBCrypt().Encrypt(buffer2, uint32(len(buffer2)))
+	newBlowfishCipher(createKey(48)).Encrypt(buffer2, uint32(len(buffer2)))
 
 	if reflect.DeepEqual(buffer2, encBuffer) {
 		t.Fatalf("expected new cipher to have used a different vector")
@@ -35,23 +35,17 @@ func TestPSOCrypt_BB(t *testing.T) {
 }
 
 func TestPSOCrypt_PC(t *testing.T) {
-	vector := createKey(4)
-
 	// PCCrypt was presumably designed specifically for client/server interaction
 	// and attempting to encrypt and subsequently decrypt the same block of code
 	// will not yield the original string. To test the functionality, two crypt
 	// instances are used to mimic how the client and server use this cipher.
-	clientCipher, _ := newPCCipher(vector)
-	clientCrypt := &PSOCrypt{Vector: vector, cipher: clientCipher}
-
-	serverCipher, _ := newPCCipher(vector)
-	serverCrypt := &PSOCrypt{Vector: vector, cipher: serverCipher}
+	cryptSession := NewPCCryptoSession()
 
 	testData := []byte("test data with padding _")
 
 	encBuffer := make([]byte, len(testData))
 	copy(encBuffer, testData)
-	clientCrypt.Encrypt(encBuffer, uint32(len(encBuffer)))
+	cryptSession.Encrypt(encBuffer, uint32(len(encBuffer)))
 
 	if reflect.DeepEqual(encBuffer, testData) {
 		t.Fatalf("expected Encrypt() to have encrypted data")
@@ -59,7 +53,7 @@ func TestPSOCrypt_PC(t *testing.T) {
 
 	decBuffer := make([]byte, len(testData))
 	copy(decBuffer, encBuffer)
-	serverCrypt.Decrypt(decBuffer, uint32(len(decBuffer)))
+	cryptSession.Decrypt(decBuffer, uint32(len(decBuffer)))
 
 	if !reflect.DeepEqual(decBuffer, testData) {
 		t.Fatalf("expected Decrypt() to have decrypted to the original string")
@@ -67,7 +61,7 @@ func TestPSOCrypt_PC(t *testing.T) {
 
 	buffer2 := make([]byte, len(testData))
 	copy(buffer2, testData)
-	NewPCCrypt().Encrypt(buffer2, uint32(len(buffer2)))
+	NewPCCryptoSession().Encrypt(buffer2, uint32(len(buffer2)))
 
 	if reflect.DeepEqual(buffer2, encBuffer) {
 		t.Fatalf("expected new cipher to have used a different vector")

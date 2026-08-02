@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal_bak/core/proto"
 )
 
@@ -28,7 +29,7 @@ type Client struct {
 	Port   string
 
 	// Cipher implementation responsible for packet encryption.
-	CryptoSession CryptoSession
+	CryptoSession encryption.CryptoSession
 
 	// Account associated with the player.
 	Account *proto.Account

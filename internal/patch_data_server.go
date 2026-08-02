@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/dcrodman/archon/internal/commands"
+	"github.com/dcrodman/archon/internal/encryption"
 )
 
 // PatchDataServer is responsible for exchanging file metadata with game clients
@@ -27,7 +28,7 @@ func (s *PatchDataServer) Init(ctx context.Context) error {
 }
 
 func (s *PatchDataServer) Handshake(c *Client) error {
-	c.CryptoSession = NewPCCryptoSession()
+	c.CryptoSession = encryption.NewPCCryptoSession()
 	c.FilesToUpdate = make(map[int]interface{})
 
 	// Send the welcome command to a client with the copyright message and encryption vectors.

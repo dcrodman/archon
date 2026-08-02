@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dcrodman/archon/internal/commands"
+	"github.com/dcrodman/archon/internal/encryption"
 )
 
 // PatchCopyright is the message expected by the client for the patch welcome.
@@ -36,7 +37,7 @@ func (s *PatchAuthServer) Init(ctx context.Context) error {
 
 func (s *PatchAuthServer) Handshake(c *Client) error {
 	// Initialize new encryption vectors for this session.
-	c.CryptoSession = NewPCCryptoSession()
+	c.CryptoSession = encryption.NewPCCryptoSession()
 
 	// Send the welcome command to a client with the copyright message and encryption vectors.
 	pkt := commands.PatchWelcome{

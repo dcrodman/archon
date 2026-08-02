@@ -9,72 +9,30 @@ import (
 	"fmt"
 )
 
-// Internal representation of a cipher capable of performing
-// encryption and decryption on blocks.
-type psoCipher interface {
-	encrypt(data []byte)
-	decrypt(data []byte)
-	blockSize() int
-}
+// CryptoSession is an interface for the cryptographic operations required
+// to exchange commands between a PSO game client and the server. It consists
+// of one or more ciphers that handle encrypting commands from the server and
+// decrypting commands from the client.
+type CryptoSession interface {
+	// HeaderSize returns the length of the header of all client commands.
+	HeaderSize() uint16
 
-// PSOCrypt object to be used per-client for crypto.
-type PSOCrypt struct {
-	cipher psoCipher
-	Vector []uint8
-}
+	// Encrypt encrypts bytes in place with the encryption key for the server.
+	Encrypt(bytes []byte, length uint32)
 
-// Returns a newly allocated PSOCrypt with randomly generated, appropriately
-// sized keys for encrypting packets over PSOPC connections.
-func NewPCCrypt() *PSOCrypt {
-	return NewPCCryptWithVector(createKey(4))
-}
+	// Decrypt decrypts bytes in place with the encryption key for the client.
+	Decrypt(bytes []byte, length uint32)
 
-func NewPCCryptWithVector(vector []uint8) *PSOCrypt {
-	crypt := &PSOCrypt{Vector: vector}
-	var err error
+	// ServerVector returns the key used to initialize the server's block cipher.
+	ServerVector() []byte
 
-	if crypt.cipher, err = newPCCipher(crypt.Vector); err != nil {
-		panic(err)
-	}
+	// ClientVector returns the key used to initialize the client's's block cipher.
+	ClientVector() []byte
 
-	return crypt
-}
-
-// Returns a newly allocated PSOCrypt with randomly generated, appropriately
-// sized keys for encrypting packets over PSOBB connections.
-func NewBBCrypt() *PSOCrypt {
-	return NewBBCryptWithVector(createKey(48))
-}
-
-func NewBBCryptWithVector(vector []uint8) *PSOCrypt {
-	crypt := &PSOCrypt{Vector: vector}
-	var err error
-
-	if crypt.cipher, err = newCipher(crypt.Vector); err != nil {
-		panic(err)
-	}
-
-	return crypt
-}
-
-// Encrypt a block of data in place.
-func (crypt *PSOCrypt) Encrypt(data []byte, size uint32) {
-	blockSize := crypt.cipher.blockSize()
-
-	for i := 0; i < int(size); i += blockSize {
-		block := data[i : i+blockSize]
-		crypt.cipher.encrypt(block)
-	}
-}
-
-// Decrypt a block of data in place.
-func (crypt *PSOCrypt) Decrypt(data []byte, size uint32) {
-	blockSize := crypt.cipher.blockSize()
-
-	for i := 0; i < int(size); i += blockSize {
-		block := data[i : i+blockSize]
-		crypt.cipher.decrypt(block)
-	}
+	// Neither of these methods are used for communicating with the game but are
+	// available for tests to use.
+	DecryptServer(bytes []byte, length uint32)
+	EncryptClient(bytes []byte, length uint32)
 }
 
 // Generate a cryptographically secure random string of bytes.

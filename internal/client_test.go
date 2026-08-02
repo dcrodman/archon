@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dcrodman/archon/internal/commands"
+	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -106,7 +107,7 @@ func TestClient_Send(t *testing.T) {
 		t.Fatalf("error initializing client connection: %s", err)
 	}
 	client := NewClient(clientConn)
-	client.CryptoSession = NewBlueBurstCryptoSession()
+	client.CryptoSession = encryption.NewBlueBurstCryptoSession()
 
 	// Send bytes from the client and make sure they were encrypted.
 	if err := client.Send(testPacket); err != nil {
@@ -123,9 +124,7 @@ func TestClient_Send(t *testing.T) {
 		t.Fatalf("bytes read from test connection were not encrypted")
 	}
 
-	// Hack around the abstraction to decrypt the packet since we never
-	// need to do this and the design intentionally hides it.
-	client.CryptoSession.(*blueBurstCryptSession).serverCrypt.Decrypt(buf, uint32(len(testPacketBytes)))
+	client.CryptoSession.DecryptServer(buf, uint32(len(testPacketBytes)))
 
 	if diff := cmp.Diff(testPacketBytes, buf); diff != "" {
 		t.Fatalf("bytes decrypted from test connection did not match expected; diff:\n%s", diff)
