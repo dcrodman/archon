@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"testing"
@@ -35,7 +35,7 @@ func TestFindPlayerOptions(t *testing.T) {
 		{
 			name: "playeroptions exists",
 			seedData: func(db *gorm.DB) {
-				if err := CreatePlayerOptions(db, testPlayerOptions); err != nil {
+				if err := createPlayerOptions(db, testPlayerOptions); err != nil {
 					t.Fatalf("CreatePlayerOptions() returned an error: %v", err)
 				}
 			},
@@ -47,7 +47,7 @@ func TestFindPlayerOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.seedData(db)
 
-			playerOptions, err := FindPlayerOptions(db, testAccount.ID)
+			playerOptions, err := findPlayerOptions(db, testAccount.ID)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("FindPlayerOptions() wantErr = %v, error = %v", tt.wantErr, err)
 			}
@@ -72,16 +72,16 @@ func TestUpdatePlayerOptions(t *testing.T) {
 		KeyConfig: []byte{1, 2, 3, 4},
 	}
 
-	if err := CreatePlayerOptions(db, testPlayerOptions); err != nil {
+	if err := createPlayerOptions(db, testPlayerOptions); err != nil {
 		t.Fatalf("CreatePlayerOptions() returned an unexpected error: %s", err)
 	}
 
 	testPlayerOptions.KeyConfig = []byte{5, 6, 7, 8}
-	if err := UpdatePlayerOptions(db, testPlayerOptions); err != nil {
+	if err := updatePlayerOptions(db, testPlayerOptions); err != nil {
 		t.Fatalf("UpdatePlayerOptions() returned an unexpected error: %s", err)
 	}
 
-	updatedPlayerOptions, err := FindPlayerOptions(db, testAccount.ID)
+	updatedPlayerOptions, err := findPlayerOptions(db, testAccount.ID)
 	if err != nil {
 		t.Fatalf("FindPlayerOptions() returned an unexpected error: %s", err)
 	}

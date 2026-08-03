@@ -11,6 +11,8 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/dcrodman/archon/internal/shipgate"
 )
 
 // Start initializes all of Archon's servers and blocks, waiting until all of the servers
@@ -22,34 +24,17 @@ func Start(ctx context.Context) {
 		panic("logger must be initialized before starting the server")
 	}
 
-	// // Start the shipgate RPC service and make sure it launches before the other servers start.
-	// shipgate.Start(Config, Logger)
+	// Start the shipgate service and make sure it launches before the other servers start.
+	shipgate.Init(shipgate.DBConfig{
+		Engine:         Config.Database.Engine,
+		Filename:       Config.QualifiedPath(Config.Database.Filename),
+		URL:            Config.DatabaseURL(),
+		LoggingEnabled: Config.Debugging.DatabaseLoggingEnabled,
+	}, Logger)
 
-	// shipgateAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", c.Config.ShipgateServer.Port))
-	// if err != nil {
-	// 	Logger.Errorf("error resolving shipgate address: %v", err)
-	// 	return
-	// }
-	// t := time.NewTimer(30 * time.Second)
-	// for {
-	// 	select {
-	// 	case <-t.C:
-	// 		Logger.Errorf("timed out waiting for shipgate to initialize")
-	// 		return
-	// 	default:
-	// 	}
-
-	// 	conn, err := net.DialTCP("tcp", nil, shipgateAddr)
-	// 	if err == nil {
-	// 		conn.Close()
-	// 		break
-	// 	}
-	// 	time.Sleep(time.Second)
-	// }
-
-	// // Stop the shipgate after all of the other servers have stopped in order to avoid
-	// // errors from any shipgate calls during the shutdown process.
-	// defer shipgate.Shutdown(ctx)
+	// Stop the shipgate after all of the other servers have stopped in order to avoid
+	// errors from any shipgate calls during the shutdown process.
+	defer shipgate.Shutdown(ctx)
 
 	runServers(ctx)
 }

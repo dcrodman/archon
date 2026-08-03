@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"errors"
@@ -57,9 +57,9 @@ type Character struct {
 	DeletedAt gorm.DeletedAt
 }
 
-// FindCharacter returns the Character associated with the account in
+// findCharacter returns the Character associated with the account in
 // the given slot or nil if none exists.
-func FindCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error) {
+func findCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error) {
 	var character Character
 	err := db.
 		Where("slot = ? AND account_id = ?", slot, &accountID).
@@ -77,17 +77,17 @@ func FindCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error)
 	return &character, nil
 }
 
-// UpsertCharacter updates an existing Character row with the contents of character.
-func UpsertCharacter(db *gorm.DB, character *Character) error {
+// upsertCharacter updates an existing Character row with the contents of character.
+func upsertCharacter(db *gorm.DB, character *Character) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "account_id"}, {Name: "slot"}},
 		UpdateAll: true,
 	}).Create(&character).Error
 }
 
-// DeleteCharacter soft-deletes a character record from the database.
-func DeleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
-	character, err := FindCharacter(db, accountID, slot)
+// deleteCharacter soft-deletes a character record from the database.
+func deleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
+	character, err := findCharacter(db, accountID, slot)
 	if err != nil {
 		return err
 	} else if character != nil {
@@ -96,7 +96,7 @@ func DeleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
 	return nil
 }
 
-// PermanentlyDeleteCharacter permanently deletes a character record from the database.
-func PermanentlyDeleteCharacter(db *gorm.DB, character *Character) error {
+// permanentlyDeleteCharacter permanently deletes a character record from the database.
+func permanentlyDeleteCharacter(db *gorm.DB, character *Character) error {
 	return db.Unscoped().Delete(character).Error
 }

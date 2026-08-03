@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"errors"
@@ -48,7 +48,7 @@ func TestFindCharacter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.seedData(db)
 
-			character, err := FindCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+			character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("FindAccountByID() wantErr = %v, error = %v", tt.wantErr, err)
 			}
@@ -78,12 +78,12 @@ func TestUpsertCharacter(t *testing.T) {
 		t.Fatalf("error creating character: %v", err)
 	}
 
-	if err := UpsertCharacter(db, testCharacter); err != nil {
+	if err := upsertCharacter(db, testCharacter); err != nil {
 		t.Fatalf("UpsertCharacter() returned an unexpected error: %s", err)
 	}
 
 	// Ensure the upsert applied the change.
-	character, err := FindCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+	character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
 	if err != nil {
 		t.Fatalf("FindCharacter() returned an unexpected error: %s", err)
 	}
@@ -116,12 +116,12 @@ func TestDeleteCharacter(t *testing.T) {
 		t.Fatalf("error creating character: %v", err)
 	}
 
-	if err := DeleteCharacter(db, uint(testAccount.ID), testCharacter.Slot); err != nil {
+	if err := deleteCharacter(db, uint(testAccount.ID), testCharacter.Slot); err != nil {
 		t.Fatalf("DeleteCharacter() returned an unexpected error: %s", err)
 	}
 
 	// Once we've deleted it, make sure it's not returned by FindCharacter.
-	character, err := FindCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+	character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
 	if err != nil {
 		t.Fatalf("FindCharacter() returned an unexpected error: %s", err)
 	}
@@ -162,7 +162,7 @@ func TestPermanentlyDeleteCharacter(t *testing.T) {
 		t.Fatalf("error creating character: %v", err)
 	}
 
-	if err := PermanentlyDeleteCharacter(db, testCharacter); err != nil {
+	if err := permanentlyDeleteCharacter(db, testCharacter); err != nil {
 		t.Fatalf("PermanentlyDeleteCharacter() returned an unexpected error: %s", err)
 	}
 

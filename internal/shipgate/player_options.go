@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"errors"
@@ -15,8 +15,8 @@ type PlayerOptions struct {
 	KeyConfig []byte
 }
 
-// FindPlayerOptions returns all of hte PlayerOptions associated with an Account.
-func FindPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
+// findPlayerOptions returns all of hte PlayerOptions associated with an Account.
+func findPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
 	var playerOptions PlayerOptions
 	err := db.Where("account_id = ?", accountId).Preload("Account").First(&playerOptions).Error
 
@@ -30,10 +30,10 @@ func FindPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
 	return &playerOptions, nil
 }
 
-func CreatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
+func createPlayerOptions(db *gorm.DB, po *PlayerOptions) error {
 	return db.Create(po).Error
 }
 
-func UpdatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
+func updatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
 	return db.Updates(&po).Error
 }

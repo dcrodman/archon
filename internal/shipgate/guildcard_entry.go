@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"errors"
@@ -23,8 +23,8 @@ type GuildcardEntry struct {
 	Comment         []byte
 }
 
-// FindGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
-func FindGuildcardEntries(db *gorm.DB, accountId uint64) ([]GuildcardEntry, error) {
+// findGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
+func findGuildcardEntries(db *gorm.DB, accountId uint64) ([]GuildcardEntry, error) {
 	var guildcardEntries []GuildcardEntry
 	err := db.Where("account_id = ?", accountId).Find(&guildcardEntries).Error
 

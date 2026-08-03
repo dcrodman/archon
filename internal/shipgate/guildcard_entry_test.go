@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ func TestFindGuildcardEntries(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 
-	guildcardEntries, err := FindGuildcardEntries(db, testAccount.ID)
+	guildcardEntries, err := findGuildcardEntries(db, testAccount.ID)
 	if err != nil {
 		t.Fatalf("FindGuildcardEntries() returned an unexpected error: %v", err)
 	}

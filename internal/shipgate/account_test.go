@@ -1,4 +1,4 @@
-package data
+package shipgate
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 func seedRandomAccounts(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	for i := 0; i < 10; i++ {
-		if err := CreateAccount(db, generateAccount(t)); err != nil {
+		if err := createAccount(db, generateAccount(t)); err != nil {
 			t.Fatalf("error seeding test account: %v", err)
 		}
 	}
@@ -61,7 +61,7 @@ func TestFindAccountByID(t *testing.T) {
 		{
 			name: "account exists",
 			seedData: func(db *gorm.DB) {
-				if err := CreateAccount(db, testAccount); err != nil {
+				if err := createAccount(db, testAccount); err != nil {
 					t.Fatalf("error creating test account data: %s", err)
 				}
 			},
@@ -74,7 +74,7 @@ func TestFindAccountByID(t *testing.T) {
 			tt.seedData(db)
 
 			// gorm assigns IDs back to the struct on creation.
-			account, err := FindAccountByID(db, uint(testAccount.ID))
+			account, err := findAccountByID(db, uint(testAccount.ID))
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("FindAccountByID() wantErr = %v, error = %v", tt.wantErr, err)
 			}
@@ -103,7 +103,7 @@ func TestFindAccountByUsername(t *testing.T) {
 		{
 			name: "account exists",
 			seedData: func(db *gorm.DB) {
-				if err := CreateAccount(db, testAccount); err != nil {
+				if err := createAccount(db, testAccount); err != nil {
 					t.Fatalf("error creating test account data: %s", err)
 				}
 			},
@@ -115,7 +115,7 @@ func TestFindAccountByUsername(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.seedData(db)
 
-			account, err := FindAccountByUsername(db, testAccount.Username)
+			account, err := findAccountByUsername(db, testAccount.Username)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("FindAccountByUsername() wantErr = %v, error = %v", tt.wantErr, err)
 			}
@@ -131,27 +131,27 @@ func TestFindUnscopedAccount(t *testing.T) {
 	if err := db.Create(testAccount).Error; err != nil {
 		t.Fatalf("error creating test account: %v", err)
 	}
-	account, err := FindUnscopedAccount(db, testAccount.Username)
+	account, err := findUnscopedAccount(db, testAccount.Username)
 	if err != nil {
 		t.Fatalf("FindUnscopedAccount() returned an unexpected error: %v", err)
 	}
 	assertAccountsMatch(t, testAccount, account)
 
 	// Account exists, but has been soft deleted.
-	if err := DeleteAccount(db, account); err != nil {
+	if err := deleteAccount(db, account); err != nil {
 		t.Fatalf("error creating test account data: %s", err)
 	}
-	account, err = FindUnscopedAccount(db, testAccount.Username)
+	account, err = findUnscopedAccount(db, testAccount.Username)
 	if err != nil {
 		t.Fatalf("FindUnscopedAccount() returned an unexpected error: %v", err)
 	}
 	assertAccountsMatch(t, testAccount, account)
 
 	// Account has been hard deleted.
-	if err := PermanentlyDeleteAccount(db, account); err != nil {
+	if err := permanentlyDeleteAccount(db, account); err != nil {
 		t.Fatalf("error creating test account data: %s", err)
 	}
-	account, err = FindUnscopedAccount(db, testAccount.Username)
+	account, err = findUnscopedAccount(db, testAccount.Username)
 	if err != nil {
 		t.Fatalf("FindUnscopedAccount() returned an unexpected error: %v", err)
 	}
