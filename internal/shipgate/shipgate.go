@@ -109,7 +109,7 @@ type ShipgateService struct {
 	logger *zap.SugaredLogger
 	db     *gorm.DB
 
-	ships    []data.Ship
+	ships    []Ship
 	shipsMtx sync.RWMutex
 }
 
@@ -214,8 +214,15 @@ func (s *ShipgateService) UpsertPlayerOptions(ctx context.Context, accountID uin
 	return nil
 }
 
+// Ship contains the connection information for a Ship server.
+type Ship struct {
+	Address string
+	Port    int
+	Name    string
+}
+
 // RegisterShip adds a new Ship (i.e. game server) to its registry to indicate that players may join it.
-func (s *ShipgateService) RegisterShip(ctx context.Context, ship data.Ship) {
+func (s *ShipgateService) RegisterShip(ctx context.Context, ship Ship) {
 	s.logger.Debug("RegisterShip")
 
 	s.shipsMtx.Lock()
@@ -224,7 +231,7 @@ func (s *ShipgateService) RegisterShip(ctx context.Context, ship data.Ship) {
 }
 
 // GetAvailableShips returns a view of all known ships currently registered and active.
-func (s *ShipgateService) GetAvailableShips(ctx context.Context) []data.Ship {
+func (s *ShipgateService) GetAvailableShips(ctx context.Context) []Ship {
 	s.shipsMtx.RLock()
 	defer s.shipsMtx.RUnlock()
 	return s.ships

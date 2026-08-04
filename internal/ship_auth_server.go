@@ -7,7 +7,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon/internal/commands"
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
@@ -29,7 +28,7 @@ func (s *GameAuthServer) Identifier() string {
 // can begin receiving players.
 func (s *GameAuthServer) Init(ctx context.Context) error {
 	// Register this ship with the shipgate so that it can start accepting players.
-	shipgate.Shipgate.RegisterShip(ctx, data.Ship{
+	shipgate.Shipgate.RegisterShip(ctx, shipgate.Ship{
 		Name:    Config.ShipServer.Name,
 		Address: Config.ExternalIP,
 		Port:    Config.ShipServer.AuthPort,

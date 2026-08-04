@@ -8,7 +8,8 @@ import (
 
 // Account contains the login information specific to each registered user.
 type Account struct {
-	ID               uint64 `gorm:"primaryKey"`
+	ID uint64 `gorm:"primaryKey"`
+
 	Username         string `gorm:"unique; not null"`
 	Password         string `gorm:"not null"`
 	Email            string `gorm:"unique"`
@@ -98,11 +99,4 @@ type GuildcardEntry struct {
 	SectionID       uint8
 	Class           uint8
 	Comment         []uint8
-}
-
-// Ship contains the connection information for a Ship server.
-type Ship struct {
-	Address string
-	Port    int
-	Name    string
 }
