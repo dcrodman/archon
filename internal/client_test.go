@@ -112,7 +112,7 @@ func TestClient_Send(t *testing.T) {
 	client.CryptoSession = encryption.NewBlueBurstCryptoSession()
 
 	// Send bytes from the client and make sure they were encrypted.
-	if err := client.Send(testPacket); err != nil {
+	if err := client.Send(context.TODO(), testPacket); err != nil {
 		t.Fatalf("SendRaw() returned an unexpected error: %s", err)
 	}
 	client.Close()

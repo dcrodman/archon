@@ -57,11 +57,11 @@ func (s *PatchAuthServer) Handle(ctx context.Context, c *Client, data []byte) er
 	var err error
 	switch header.Type {
 	case commands.PatchWelcomeType:
-		err = SendPatchWelcomeAck(c)
+		err = SendPatchWelcomeAck(ctx, c)
 	case commands.PatchHandshakeType:
-		err = SendPatchWelcomeMessage(c, s.welcomeMessage)
+		err = SendPatchWelcomeMessage(ctx, c, s.welcomeMessage)
 		if err == nil {
-			err = SendPatchRedirect(c)
+			err = SendPatchRedirect(ctx, c)
 		}
 	default:
 		Logger.Infof("received unknown command %2x from %s", header.Type, c.IPAddr)
@@ -69,15 +69,15 @@ func (s *PatchAuthServer) Handle(ctx context.Context, c *Client, data []byte) er
 	return err
 }
 
-func SendPatchWelcomeAck(c *Client) error {
+func SendPatchWelcomeAck(ctx context.Context, c *Client) error {
 	// PatchHandshakeType is treated as an ack in this case.
-	return c.Send(&commands.PCHeader{
+	return c.Send(ctx, &commands.PCHeader{
 		Size: 0x04,
 		Type: commands.PatchHandshakeType,
 	})
 }
 
-func SendPatchWelcomeMessage(c *Client, m []byte) error {
+func SendPatchWelcomeMessage(ctx context.Context, c *Client, m []byte) error {
 	pkt := &commands.PatchWelcomeMessage{
 		Header: commands.PCHeader{
 			Size: commands.PCHeaderSize + uint16(len(m)),
@@ -86,10 +86,10 @@ func SendPatchWelcomeMessage(c *Client, m []byte) error {
 		Message: m,
 	}
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }
 
-func SendPatchRedirect(c *Client) error {
+func SendPatchRedirect(ctx context.Context, c *Client) error {
 	pkt := commands.PatchRedirect{
 		Header: commands.PCHeader{Type: commands.PatchRedirectType},
 		IPAddr: [4]uint8{},
@@ -101,5 +101,5 @@ func SendPatchRedirect(c *Client) error {
 	hostnameBytes := Config.BroadcastIP()
 	copy(pkt.IPAddr[:], hostnameBytes[:])
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }

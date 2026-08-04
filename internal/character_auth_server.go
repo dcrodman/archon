@@ -72,11 +72,11 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return SendSecurity(c, commands.BBLoginErrorPassword)
+			return SendSecurity(ctx, c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return SendSecurity(c, commands.BBLoginErrorBanned)
+			return SendSecurity(ctx, c, commands.BBLoginErrorBanned)
 		default:
-			sendErr := SendMessage(c, cases.Title(language.English).String(err.Error()))
+			sendErr := SendMessage(ctx, c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
@@ -84,7 +84,7 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 		}
 	}
 
-	if err := SendSecurity(c, commands.BBLoginErrorNone); err != nil {
+	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 	// The first time we receive this command the loginClientExtension will have included the
@@ -101,12 +101,12 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	return SendDataServerRedirect(c)
+	return SendDataServerRedirect(ctx, c)
 }
 
 // send the security initialization command with information about the user's
 // authentication status.
-func SendSecurity(c *Client, errorCode uint32) error {
+func SendSecurity(ctx context.Context, c *Client, errorCode uint32) error {
 	cfg := commands.ClientConfig{
 		Magic:        c.Config.Magic,
 		CharSelected: c.Config.CharSelected,
@@ -118,7 +118,7 @@ func SendSecurity(c *Client, errorCode uint32) error {
 	copy(cfg.Unused2[:], c.Config.Unused2[:])
 
 	// Constants set according to how Newserv does it.
-	return c.Send(&commands.Security{
+	return c.Send(ctx, &commands.Security{
 		Header:       commands.BBHeader{Type: commands.SecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
@@ -131,7 +131,7 @@ func SendSecurity(c *Client, errorCode uint32) error {
 
 // Send the IP address and port of the character server to which the client will
 // connect after disconnecting from this server.
-func SendDataServerRedirect(c *Client) error {
+func SendDataServerRedirect(ctx context.Context, c *Client) error {
 	pkt := &commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
 		IPAddr: [4]uint8{},
@@ -140,5 +140,5 @@ func SendDataServerRedirect(c *Client) error {
 	ip := Config.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }

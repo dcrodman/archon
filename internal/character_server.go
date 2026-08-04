@@ -103,19 +103,19 @@ func (s *CharacterServer) Handle(ctx context.Context, c *Client, data []byte) er
 		err = s.handleCharacterSelect(ctx, c, &pkt)
 	case commands.LoginChecksumType:
 		// Everybody else seems to ignore this, so...
-		err = SendChecksumAck(c)
+		err = SendChecksumAck(ctx, c)
 	case commands.LoginGuildcardReqType:
 		err = s.handleGuildcardDataStart(ctx, c)
 	case commands.LoginGuildcardChunkReqType:
 		var chunkReq commands.GuildcardChunkRequest
 		UnmarshalStruct(data, &chunkReq)
-		err = s.handleGuildcardChunk(c, &chunkReq)
+		err = s.handleGuildcardChunk(ctx, c, &chunkReq)
 	case commands.LoginParameterHeaderReqType:
-		err = SendParameterHeader(c, uint32(s.numParameterFiles), paramHeaderData)
+		err = SendParameterHeader(ctx, c, uint32(s.numParameterFiles), paramHeaderData)
 	case commands.LoginParameterChunkReqType:
 		var pkt commands.BBHeader
 		UnmarshalStruct(data, &pkt)
-		err = SendParameterChunk(c, paramChunkData[int(pkt.Flags)], pkt.Flags)
+		err = SendParameterChunk(ctx, c, paramChunkData[int(pkt.Flags)], pkt.Flags)
 	case commands.LoginSetFlagType:
 		var pkt commands.SetFlag
 		UnmarshalStruct(data, &pkt)
@@ -145,11 +145,11 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return SendSecurity(c, commands.BBLoginErrorPassword)
+			return SendSecurity(ctx, c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return SendSecurity(c, commands.BBLoginErrorBanned)
+			return SendSecurity(ctx, c, commands.BBLoginErrorBanned)
 		default:
-			sendErr := SendMessage(c, cases.Title(language.English).String(err.Error()))
+			sendErr := SendMessage(ctx, c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
@@ -157,7 +157,7 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 		}
 	}
 
-	if err := SendSecurity(c, commands.BBLoginErrorNone); err != nil {
+	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 
@@ -168,13 +168,13 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
 	if loginPkt.Phase == commands.ShipSelection {
-		if err = SendTimestamp(c); err != nil {
+		if err = SendTimestamp(ctx, c); err != nil {
 			return err
 		}
 		if err = SendShipList(ctx, c); err != nil {
 			return err
 		}
-		if err = SendScrollMessage(c); err != nil {
+		if err = SendScrollMessage(ctx, c); err != nil {
 			return err
 		}
 	}
@@ -183,7 +183,7 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 }
 
 // Send a timestamp command in order to indicate the server's current time.
-func SendTimestamp(c *Client) error {
+func SendTimestamp(ctx context.Context, c *Client) error {
 	pkt := &commands.Timestamp{
 		Header:    commands.BBHeader{Type: commands.LoginTimestampType},
 		Timestamp: [28]byte{},
@@ -194,7 +194,7 @@ func SendTimestamp(c *Client) error {
 	stamp := fmt.Sprintf("%s.%03d", time.Now().Format(timeFormat), uint64(tv.Usec/1000))
 	copy(pkt.Timestamp[:], stamp)
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }
 
 // Send the menu items for the ship select screen. Since we're only supporting
@@ -218,7 +218,7 @@ func SendShipList(ctx context.Context, c *Client) error {
 		entries = append(entries, entry)
 	}
 
-	return c.Send(&commands.ShipMenu{
+	return c.Send(ctx, &commands.ShipMenu{
 		Header: commands.BBHeader{
 			Type:  commands.BlockListType,
 			Flags: uint32(len(availableShips)),
@@ -228,7 +228,7 @@ func SendShipList(ctx context.Context, c *Client) error {
 }
 
 // send whatever scrolling message was read out of the config file for the login screen.
-func SendScrollMessage(c *Client) error {
+func SendScrollMessage(ctx context.Context, c *Client) error {
 	// Returns the scroll message displayed along the top of the ship selection screen,
 	// lazily computing it from the config file and storing it in a package var.
 	shipSelectionScrollMessageInit.Do(func() {
@@ -239,7 +239,7 @@ func SendScrollMessage(c *Client) error {
 		shipSelectionScrollMessage = append(shipSelectionScrollMessage, 0x00)
 	})
 
-	return c.Send(&commands.ScrollMessage{
+	return c.Send(ctx, &commands.ScrollMessage{
 		Header:  commands.BBHeader{Type: commands.LoginScrollMessageType},
 		Message: shipSelectionScrollMessage,
 	})
@@ -259,7 +259,7 @@ func (s *CharacterServer) handleShipSelection(ctx context.Context, c *Client, me
 	ip := net.ParseIP(availableShips[selectedShip].Address).To4()
 	port := availableShips[selectedShip].Port
 
-	return c.Send(&commands.Redirect{
+	return c.Send(ctx, &commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
 		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
 		Port:   uint16(port),
@@ -285,12 +285,12 @@ func (s *CharacterServer) handleOptionsRequest(ctx context.Context, c *Client) e
 			return fmt.Errorf("error creating player options: %w", err)
 		}
 	}
-	return SendOptions(c, playerOptions.KeyConfig)
+	return SendOptions(ctx, c, playerOptions.KeyConfig)
 }
 
 // send the client's configuration options. keyConfig should be 420 bytes long and either
 // point to the default keys array or loaded from the database.
-func SendOptions(c *Client, keyConfig []byte) error {
+func SendOptions(ctx context.Context, c *Client, keyConfig []byte) error {
 	if len(keyConfig) != 420 {
 		return fmt.Errorf("received keyConfig of length %d; should be 420", len(keyConfig))
 	}
@@ -306,7 +306,7 @@ func SendOptions(c *Client, keyConfig []byte) error {
 	pkt.PlayerKeyConfig.TeamRewards[0] = 0xFFFFFFFF
 	pkt.PlayerKeyConfig.TeamRewards[1] = 0xFFFFFFFF
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }
 
 // Handle the character select/preview request.
@@ -330,22 +330,22 @@ func (s *CharacterServer) handleCharacterSelect(ctx context.Context, c *Client, 
 		}
 		// They've selected a character from the menu.
 		c.Config.SlotNum = uint8(pkt.Slot)
-		return SendCharacterAck(c, pkt.Slot, 1)
+		return SendCharacterAck(ctx, c, pkt.Slot, 1)
 	}
 
 	if character != nil {
 		// They have a character in that slot; send the character preview.
-		return SendCharacterPreview(c, character)
+		return SendCharacterPreview(ctx, c, character)
 	}
 	// We don't have a character for this slot.
-	return SendCharacterAck(c, pkt.Slot, 2)
+	return SendCharacterAck(ctx, c, pkt.Slot, 2)
 }
 
 // Send the character acknowledgement command in response to the action taken. Setting flag
 // to 0 indicates a creation ack, 1 acks a selected character, and 2 indicates that a character
 // doesn't exist in the slot requested via preview request.
-func SendCharacterAck(c *Client, slotNum uint32, flag uint32) error {
-	return c.Send(&commands.CharacterAck{
+func SendCharacterAck(ctx context.Context, c *Client, slotNum uint32, flag uint32) error {
+	return c.Send(ctx, &commands.CharacterAck{
 		Header: commands.BBHeader{Type: commands.LoginCharAckType},
 		Slot:   slotNum,
 		Flag:   flag,
@@ -353,7 +353,7 @@ func SendCharacterAck(c *Client, slotNum uint32, flag uint32) error {
 }
 
 // send the preview command containing basic details about a character in the selected slot.
-func SendCharacterPreview(c *Client, char *data.Character) error {
+func SendCharacterPreview(ctx context.Context, c *Client, char *data.Character) error {
 	previewCommand := &commands.CharacterSummary{
 		Header: commands.BBHeader{Type: commands.LoginCharPreviewType},
 		Slot:   0,
@@ -384,13 +384,13 @@ func SendCharacterPreview(c *Client, char *data.Character) error {
 	copy(previewCommand.Character.GuildcardStr[:], char.GuildcardStr[:])
 	copy(previewCommand.Character.Name[:], char.Name[:])
 
-	return c.Send(previewCommand)
+	return c.Send(ctx, previewCommand)
 }
 
 // Acknowledge the checksum the client sent us. We don't actually do
 // anything with it but the client won't proceed otherwise.
-func SendChecksumAck(c *Client) error {
-	return c.Send(&commands.ChecksumAck{
+func SendChecksumAck(ctx context.Context, c *Client) error {
+	return c.Send(ctx, &commands.ChecksumAck{
 		Header: commands.BBHeader{Type: commands.LoginChecksumAckType},
 		Ack:    1,
 	})
@@ -423,12 +423,12 @@ func (s *CharacterServer) handleGuildcardDataStart(ctx context.Context, c *Clien
 	c.GuildcardData, size = MarshalStruct(gcData)
 	checksum := crc32.ChecksumIEEE(c.GuildcardData)
 
-	return SendGuildcardHeader(c, checksum, uint16(size))
+	return SendGuildcardHeader(ctx, c, checksum, uint16(size))
 }
 
 // send the header containing metadata about the guildcard chunk.
-func SendGuildcardHeader(c *Client, checksum uint32, dataLen uint16) error {
-	return c.Send(&commands.GuildcardHeader{
+func SendGuildcardHeader(ctx context.Context, c *Client, checksum uint32, dataLen uint16) error {
+	return c.Send(ctx, &commands.GuildcardHeader{
 		Header:   commands.BBHeader{Type: commands.LoginGuildcardHeaderType},
 		Unknown:  0x00000001,
 		Length:   dataLen,
@@ -437,16 +437,16 @@ func SendGuildcardHeader(c *Client, checksum uint32, dataLen uint16) error {
 }
 
 // send another chunk of the client's guildcard data.
-func (s *CharacterServer) handleGuildcardChunk(c *Client, chunkReq *commands.GuildcardChunkRequest) error {
+func (s *CharacterServer) handleGuildcardChunk(ctx context.Context, c *Client, chunkReq *commands.GuildcardChunkRequest) error {
 	if chunkReq.Continue == 0x01 {
-		return SendGuildcardChunk(c, chunkReq.ChunkRequested)
+		return SendGuildcardChunk(ctx, c, chunkReq.ChunkRequested)
 	}
 	// Anything else is a request to cancel sending guildcard chunks.
 	return nil
 }
 
 // send the specified chunk of guildcard data.
-func SendGuildcardChunk(c *Client, chunkNum uint32) error {
+func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {
 	pkt := &commands.GuildcardChunk{
 		Header: commands.BBHeader{Type: commands.LoginGuildcardChunkType},
 		Chunk:  chunkNum,
@@ -462,12 +462,12 @@ func SendGuildcardChunk(c *Client, chunkNum uint32) error {
 		pkt.Data = c.GuildcardData[offset:]
 	}
 
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }
 
 // send the header for the parameter files we're about to start sending.
-func SendParameterHeader(c *Client, numEntries uint32, entries []byte) error {
-	return c.Send(&commands.ParameterHeader{
+func SendParameterHeader(ctx context.Context, c *Client, numEntries uint32, entries []byte) error {
+	return c.Send(ctx, &commands.ParameterHeader{
 		Header: commands.BBHeader{
 			Type:  commands.LoginParameterHeaderType,
 			Flags: numEntries,
@@ -477,8 +477,8 @@ func SendParameterHeader(c *Client, numEntries uint32, entries []byte) error {
 }
 
 // Index into chunkData and send the specified chunk of parameter data.
-func SendParameterChunk(c *Client, chunkData []byte, chunk uint32) error {
-	return c.Send(&commands.ParameterChunk{
+func SendParameterChunk(ctx context.Context, c *Client, chunkData []byte, chunk uint32) error {
+	return c.Send(ctx, &commands.ParameterChunk{
 		Header: commands.BBHeader{Type: commands.LoginParameterChunkType},
 		Chunk:  chunk,
 		Data:   chunkData,
@@ -570,7 +570,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 	}
 
 	c.Config.SlotNum = uint8(charPkt.Slot)
-	return SendCharacterAck(c, charPkt.Slot, 0)
+	return SendCharacterAck(ctx, c, charPkt.Slot, 0)
 }
 
 func convertReadableName(name []uint8) string {

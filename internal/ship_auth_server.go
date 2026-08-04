@@ -77,11 +77,11 @@ func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPk
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return SendSecurity(c, commands.BBLoginErrorPassword)
+			return SendSecurity(ctx, c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return SendSecurity(c, commands.BBLoginErrorBanned)
+			return SendSecurity(ctx, c, commands.BBLoginErrorBanned)
 		default:
-			sendErr := SendMessage(c, cases.Title(language.English).String(err.Error()))
+			sendErr := SendMessage(ctx, c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
@@ -89,21 +89,21 @@ func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPk
 		}
 	}
 
-	if err := SendSecurity(c, commands.BBLoginErrorNone); err != nil {
+	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 
-	return s.sendGameServerRedirect(c)
+	return s.sendGameServerRedirect(ctx, c)
 }
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *GameAuthServer) sendGameServerRedirect(c *Client) error {
+func (s *GameAuthServer) sendGameServerRedirect(ctx context.Context, c *Client) error {
 	pkt := &commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
 		Port:   uint16(Config.ShipServer.GamePort),
 	}
 	ip := Config.BroadcastIP()
 	copy(pkt.IPAddr[:], ip[:])
-	return c.Send(pkt)
+	return c.Send(ctx, pkt)
 }

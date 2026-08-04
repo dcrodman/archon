@@ -65,11 +65,11 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return SendSecurity(c, commands.BBLoginErrorPassword)
+			return SendSecurity(ctx, c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return SendSecurity(c, commands.BBLoginErrorBanned)
+			return SendSecurity(ctx, c, commands.BBLoginErrorBanned)
 		default:
-			sendErr := SendMessage(c, cases.Title(language.English).String(err.Error()))
+			sendErr := SendMessage(ctx, c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
@@ -79,31 +79,31 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	c.Account = account
 	c.ActiveSlot = loginPkt.Slot
 
-	if err := SendSecurity(c, commands.BBLoginErrorNone); err != nil {
+	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
-	if err := SendLobbyMenu(c); err != nil {
+	if err := SendLobbyMenu(ctx, c); err != nil {
 		return err
 	}
 	return s.fetchAndSendCharacter(ctx, c)
 }
 
-func SendMessage(c *Client, message string) error {
-	return c.Send(&commands.LoginClientMessage{
+func SendMessage(ctx context.Context, c *Client, message string) error {
+	return c.Send(ctx, &commands.LoginClientMessage{
 		Header:   commands.BBHeader{Type: commands.ClientMessageType},
 		Language: 0x00450009,
 		Message:  ConvertToUtf16(message),
 	})
 }
 
-func SendLobbyMenu(c *Client) error {
+func SendLobbyMenu(ctx context.Context, c *Client) error {
 	lobbyEntries := make([]commands.LobbyListEntry, Config.ShipServer.NumLobbies)
 	for i := 0; i < Config.ShipServer.NumLobbies; i++ {
 		lobbyEntries[i].MenuID = 0x001A0001
 		lobbyEntries[i].LobbyID = uint32(i)
 	}
 
-	return c.Send(&commands.LobbyList{
+	return c.Send(ctx, &commands.LobbyList{
 		Header: commands.BBHeader{
 			Type:  commands.LobbyMenuType,
 			Flags: 0x0F, // PSOBB expects this to always contain 15 entries.
@@ -181,11 +181,11 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *Client) error
 
 	// TODO: Copy the techniques and inventory here.
 
-	return c.Send(charPkt)
+	return c.Send(ctx, charPkt)
 }
 
-func SendJoinLobby(c *Client) error {
-	return c.Send(&commands.JoinLobby{
+func SendJoinLobby(ctx context.Context, c *Client) error {
+	return c.Send(ctx, &commands.JoinLobby{
 		Header: commands.BBHeader{
 			Type: commands.JoinLobbyType,
 		},
