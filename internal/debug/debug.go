@@ -60,11 +60,9 @@ func PrintPacket(ctx context.Context, params PrintPacketParams) {
 		return
 	}
 
-	if err != nil {
-		if err := writeCommandBody(params, header.Size); err != nil {
-			fmt.Printf("error writing command body: %v\n", err)
-			return
-		}
+	if err := writeCommandBody(params, header.Size); err != nil {
+		fmt.Printf("error writing command body: %v\n", err)
+		return
 	}
 
 	// Reset the color.

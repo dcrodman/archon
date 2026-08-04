@@ -50,8 +50,7 @@ type Client struct {
 	Guildcard     uint32
 	GuildcardData []byte
 
-	// File list used exclusively by the Data server for tracking which
-	// files need updating.
+	// File list used exclusively by the Patch server for tracking which files need updating.
 	FilesToUpdate map[int]interface{}
 }
 
@@ -114,6 +113,7 @@ func (c *Client) Send(ctx context.Context, packet interface{}) error {
 func (c *Client) transmit(data []byte, length uint16) error {
 	bytesSent := 0
 
+	// TODO: Ought to wire up a cancel here, though it's a bit tricky.
 	for bytesSent < int(length) {
 		b, err := c.connection.Write(data[:length])
 		if err != nil {

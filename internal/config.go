@@ -84,10 +84,6 @@ type archonConfig struct {
 		SSLMode  string `mapstructure:"disable"`
 	} `mapstructure:"database"`
 
-	ShipgateServer struct {
-		Port int `mapstructure:"port"`
-	} `mapstructure:"shipgate_server"`
-
 	PatchServer struct {
 		AuthPort       int    `mapstructure:"auth_port"`
 		DataPort       int    `mapstructure:"data_port"`
@@ -136,14 +132,6 @@ func (c *archonConfig) DatabaseURL() string {
 		c.Database.Password,
 		c.Database.SSLMode,
 	)
-}
-
-// ShipgateAddress returns the fully qualified address of the ship server.
-// TODO: Since the current expectation is that the ship server is running alongside
-// the other servers, this just uses the hostname. This should be fixed at some point
-// to use an actual configurable address and the ship server given its own listen config.
-func (c *archonConfig) ShipgateAddress() string {
-	return fmt.Sprintf("http://%s:%v", c.Hostname, c.ShipgateServer.Port)
 }
 
 // BroadcastIP converts the configured broadcast IP string into 4 bytes to be used

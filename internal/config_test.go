@@ -34,23 +34,6 @@ func TestConfig_DatabaseURL(t *testing.T) {
 	}
 }
 
-func TestConfig_ShipgateAddress(t *testing.T) {
-	cfg := &archonConfig{
-		Hostname: "127.0.0.1",
-		ShipgateServer: struct {
-			Port int `mapstructure:"port"`
-		}{
-			Port: 12345,
-		},
-	}
-
-	addr := cfg.ShipgateAddress()
-	expected := "http://127.0.0.1:12345"
-	if addr != expected {
-		t.Errorf("ShipgateAddress() want = %s, got = %s", expected, addr)
-	}
-}
-
 func TestConfig_BroadcastIP(t *testing.T) {
 	cfg := &archonConfig{ExternalIP: "192.168.1.5"}
 
