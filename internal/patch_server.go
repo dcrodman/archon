@@ -12,22 +12,22 @@ import (
 	"github.com/dcrodman/archon/internal/encryption"
 )
 
-// PatchDataServer is responsible for exchanging file metadata with game clients
+// PatchServer is responsible for exchanging file metadata with game clients
 // in order to determine whether or not the client's files match the known patch
 // files. If any of the patch file checksums do not equal the checksums of their
 // corresponding client files (or do not exist), this server allows the client to
 // download the correct file contents and forces a restart.
-type PatchDataServer struct{}
+type PatchServer struct{}
 
-func (s PatchDataServer) Identifier() string {
+func (s PatchServer) Identifier() string {
 	return "PATCH:DATA"
 }
 
-func (s *PatchDataServer) Init(ctx context.Context) error {
+func (s *PatchServer) Init(ctx context.Context) error {
 	return InitializePatchData()
 }
 
-func (s *PatchDataServer) Handshake(c *Client) error {
+func (s *PatchServer) Handshake(c *Client) error {
 	c.CryptoSession = encryption.NewPCCryptoSession()
 	c.FilesToUpdate = make(map[int]interface{})
 
@@ -42,10 +42,10 @@ func (s *PatchDataServer) Handshake(c *Client) error {
 	return c.SendRaw(pkt)
 }
 
-func (s *PatchDataServer) Handle(ctx context.Context, c *Client, data []byte) error {
+func (s *PatchServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	var hdr commands.PCHeader
 
-	StructFromBytes(data[:commands.PCHeaderSize], &hdr)
+	UnmarshalStruct(data[:commands.PCHeaderSize], &hdr)
 
 	var err error
 	switch hdr.Type {
@@ -55,7 +55,7 @@ func (s *PatchDataServer) Handle(ctx context.Context, c *Client, data []byte) er
 		err = s.handlePatchLogin(c)
 	case commands.PatchFileStatusType:
 		var fileStatus commands.PatchFileStatus
-		StructFromBytes(data, &fileStatus)
+		UnmarshalStruct(data, &fileStatus)
 		s.handleFileStatus(c, &fileStatus)
 	case commands.PatchClientListDoneType:
 		err = updateClientFiles(c)
@@ -66,7 +66,7 @@ func (s *PatchDataServer) Handle(ctx context.Context, c *Client, data []byte) er
 }
 
 // Once the client has authenticated, send them the list of files to update.
-func (s *PatchDataServer) handlePatchLogin(c *Client) error {
+func (s *PatchServer) handlePatchLogin(c *Client) error {
 	if err := SendPatchDataAck(c); err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func SendPatchFileListDone(c *Client) error {
 
 // The client sent us a checksum for one of the patch files. Compare it to what we
 // have and add it to the list of files to update if there is any discrepancy.
-func (s *PatchDataServer) handleFileStatus(c *Client, fileStatus *commands.PatchFileStatus) {
+func (s *PatchServer) handleFileStatus(c *Client, fileStatus *commands.PatchFileStatus) {
 	patchFile := patchIndex[fileStatus.PatchID]
 
 	if fileStatus.Checksum != patchFile.checksum || fileStatus.FileSize != patchFile.fileSize {

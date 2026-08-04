@@ -33,10 +33,10 @@ func StripPadding(b []byte) []byte {
 	return []byte{}
 }
 
-// BytesFromStruct serializes the fields of a struct to an array of bytes in the
+// MarshalStruct serializes the fields of a struct to an array of bytes in the
 // order in which the fields are declared and returns total number of bytes converted.
 // Panics if data is not a struct or pointer to struct, or if there was an error writing a field.
-func BytesFromStruct(data interface{}) ([]byte, int) {
+func MarshalStruct(data interface{}) ([]byte, int) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()
 
@@ -59,7 +59,7 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 		var err error
 		switch kind := field.Kind(); kind {
 		case reflect.Struct, reflect.Ptr:
-			b, _ := BytesFromStruct(field.Interface())
+			b, _ := MarshalStruct(field.Interface())
 			err = binary.Write(convertedBytes, binary.LittleEndian, b)
 		default:
 			err = binary.Write(convertedBytes, binary.LittleEndian, field.Interface())
@@ -71,9 +71,9 @@ func BytesFromStruct(data interface{}) ([]byte, int) {
 	return convertedBytes.Bytes(), convertedBytes.Len()
 }
 
-// StructFromBytes populates the struct pointed to by targetStruct by reading in a
+// UnmarshalStruct populates the struct pointed to by targetStruct by reading in a
 // stream of bytes and filling the values in sequential order.
-func StructFromBytes(data []byte, targetStruct interface{}) {
+func UnmarshalStruct(data []byte, targetStruct interface{}) {
 	targetVal := reflect.ValueOf(targetStruct)
 
 	if valKind := targetVal.Kind(); valKind != reflect.Ptr {

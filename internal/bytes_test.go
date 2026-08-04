@@ -91,13 +91,13 @@ func TestStructConversions(t *testing.T) {
 	}
 
 	var welcomeCommand commands.PatchWelcome
-	StructFromBytes(command, &welcomeCommand)
+	UnmarshalStruct(command, &welcomeCommand)
 
 	if diff := cmp.Diff(welcomeCommand.Copyright[:], []byte("Patch Server. Copyright SonicTeam, LTD. 2001")); diff != "" {
 		t.Errorf("welcome command Copyright did not match expected, diff:\n%s", diff)
 	}
 
-	convertedCommand, bytes := BytesFromStruct(welcomeCommand)
+	convertedCommand, bytes := MarshalStruct(welcomeCommand)
 	if bytes != len(command) {
 		t.Errorf("expected bytes to equal the length of the command (%d), got = %v", convertedCommand, bytes)
 	}

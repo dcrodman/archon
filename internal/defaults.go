@@ -1,5 +1,6 @@
+package internal
+
 // Constants and structs associated with character data.
-package character
 
 // Default keyboard/joystick configuration used for players who are
 // logging in for the first time.

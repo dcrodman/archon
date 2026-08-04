@@ -42,10 +42,10 @@ func Start(ctx context.Context) {
 func runServers(ctx context.Context) {
 	// Set up all of the client-facing servers we'll be running.
 	servers := map[int]Backend{
-		Config.PatchServer.AuthPort: &PatchAuthServer{},
-		Config.PatchServer.DataPort: &PatchDataServer{},
-		// Config.CharacterServer.AuthPort: &character.AuthServer{},
-		// Config.CharacterServer.DataPort: &character.Server{},
+		Config.PatchServer.AuthPort:     &PatchAuthServer{},
+		Config.PatchServer.DataPort:     &PatchServer{},
+		Config.CharacterServer.AuthPort: &CharacterAuthServer{},
+		Config.CharacterServer.DataPort: &CharacterServer{},
 		// Note: Eventually the ship and block servers should be able to be run
 		// independently of the other four servers
 		// Config.ShipServer.AuthPort: &ship.AuthServer{},

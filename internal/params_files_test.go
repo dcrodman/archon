@@ -1,4 +1,4 @@
-package character
+package internal
 
 import (
 	"bytes"
@@ -6,8 +6,7 @@ import (
 	"os"
 	"testing"
 
-	bytes2 "github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/core/prs"
+	"github.com/dcrodman/archon/internal/prs"
 	"github.com/go-test/deep"
 )
 
@@ -47,7 +46,7 @@ func TestPRS(t *testing.T) {
 	stats := [NumCharacterClasses]stats{}
 	// Base character class stats are stored sequentially, each 14 bytes long.
 	for i := 0; i < 12; i++ {
-		bytes2.StructFromBytes(gotDecompressed[i*14:], &stats[i])
+		UnmarshalStruct(gotDecompressed[i*14:], &stats[i])
 	}
 
 	gotCharacterStats, err := json.Marshal(stats)

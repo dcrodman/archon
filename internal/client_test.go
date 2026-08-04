@@ -18,7 +18,7 @@ var (
 		Slot: 1,
 		Flag: 1,
 	}
-	testPacketBytes, _ = BytesFromStruct(testPacket)
+	testPacketBytes, _ = MarshalStruct(testPacket)
 )
 
 func newTestListener(t *testing.T) (*net.TCPListener, *net.TCPAddr) {
@@ -139,7 +139,7 @@ func Test_adjustPacketLength(t *testing.T) {
 		Slot: 1,
 		Flag: 1,
 	}
-	testPacketBytesNoSize, _ := BytesFromStruct(testPacketNoSize)
+	testPacketBytesNoSize, _ := MarshalStruct(testPacketNoSize)
 
 	longerTestPacket := make([]byte, len(testPacketBytes))
 	copy(longerTestPacket, testPacketBytes)

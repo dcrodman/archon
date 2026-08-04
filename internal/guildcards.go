@@ -1,4 +1,4 @@
-package character
+package internal
 
 // GuildcardData is the per-player guildcard data chunk.
 type GuildcardData struct {

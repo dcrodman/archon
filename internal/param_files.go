@@ -1,4 +1,4 @@
-package character
+package internal
 
 import (
 	"embed"
@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dcrodman/archon/internal/core/bytes"
-	"github.com/dcrodman/archon/internal/core/prs"
-	"go.uber.org/zap"
+	"github.com/dcrodman/archon/internal/prs"
 )
 
 const (
@@ -59,7 +57,7 @@ type parameterEntry struct {
 	Filename [0x40]uint8
 }
 
-func initParameterData(logger *zap.SugaredLogger) (int, error) {
+func initParameterData() (int, error) {
 	var (
 		numFilesLoaded int
 		initErr        error
@@ -67,7 +65,7 @@ func initParameterData(logger *zap.SugaredLogger) (int, error) {
 
 	paramInitLock.Do(func() {
 		var err error
-		if numFilesLoaded, err = loadParameterFiles(logger); err != nil {
+		if numFilesLoaded, err = loadParameterFiles(); err != nil {
 			initErr = fmt.Errorf("error loading parameter files: %w", err)
 			return
 		}
@@ -92,7 +90,7 @@ func initParameterData(logger *zap.SugaredLogger) (int, error) {
 
 		// Base character class stats are stored sequentially, each 14 bytes long.
 		for i := 0; i < NumCharacterClasses; i++ {
-			bytes.StructFromBytes(decompressedStatsFile[i*14:], &BaseStats[i])
+			UnmarshalStruct(decompressedStatsFile[i*14:], &BaseStats[i])
 		}
 	})
 
@@ -101,8 +99,8 @@ func initParameterData(logger *zap.SugaredLogger) (int, error) {
 
 // LoadConfig the PSOBB parameter files, build the parameter header,
 // and init/cache the param file chunks for the EB commands.
-func loadParameterFiles(logger *zap.SugaredLogger) (int, error) {
-	logger.Info("loading embedded parameter files")
+func loadParameterFiles() (int, error) {
+	Logger.Info("loading embedded parameter files")
 
 	offset := 0
 	var tmpChunkData []byte
@@ -130,13 +128,13 @@ func loadParameterFiles(logger *zap.SugaredLogger) (int, error) {
 		}
 		copy(entry.Filename[:], []uint8(paramFile.Name()))
 
-		bytes, _ := bytes.BytesFromStruct(entry)
+		bytes, _ := MarshalStruct(entry)
 		paramHeaderData = append(paramHeaderData, bytes...)
 		tmpChunkData = append(tmpChunkData, data...)
 
 		offset += fileSize
 
-		logger.Debugf("%s (%v bytes)", paramFile.Name(), fileSize)
+		Logger.Debugf("%s (%v bytes)", paramFile.Name(), fileSize)
 	}
 
 	// Offset should at this point be the total size of the files

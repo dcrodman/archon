@@ -79,7 +79,7 @@ func (c *Client) Close() error {
 // SendRaw writes all data contained in the slice to the client
 // as-is (e.g. without encrypting it first).
 func (c *Client) SendRaw(packet interface{}) error {
-	bytes, size := BytesFromStruct(packet)
+	bytes, size := MarshalStruct(packet)
 
 	// if c.Debug {
 	// 	debug.PrintPacket(debug.PrintPacketParams{
@@ -96,7 +96,7 @@ func (c *Client) SendRaw(packet interface{}) error {
 // Send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
 func (c *Client) Send(packet interface{}) error {
-	data, length := BytesFromStruct(packet)
+	data, length := MarshalStruct(packet)
 	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
 	// if c.Debug {

@@ -12,7 +12,7 @@ var PatchCopyright = []byte("Patch Server. Copyright SonicTeam, LTD. 2001")
 
 // PatchAuthServer exists as a first point of contact for connecting clients. We don't
 // care about actually enforcing auth here, so its chief responsibility being to send
-// clients the address of the [PatchDataServer]. Other server implementations may refer to
+// clients the address of the [PatchServer]. Other server implementations may refer to
 // as the "PATCH" server.
 type PatchAuthServer struct {
 	welcomeMessage []byte
@@ -52,7 +52,7 @@ func (s *PatchAuthServer) Handshake(c *Client) error {
 
 func (s *PatchAuthServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	var header commands.PCHeader
-	StructFromBytes(data[:commands.PCHeaderSize], &header)
+	UnmarshalStruct(data[:commands.PCHeaderSize], &header)
 
 	var err error
 	switch header.Type {
