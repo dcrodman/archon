@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -8,10 +9,12 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"runtime/debug"
+	"os"
+	rdbg "runtime/debug"
 	"sync"
 	"time"
 
+	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
@@ -48,8 +51,8 @@ func runServers(ctx context.Context) {
 		Config.CharacterServer.DataPort: &CharacterServer{},
 		// Note: Eventually the ship and block servers should be able to be run
 		// independently of the other four servers
-		// Config.ShipServer.AuthPort: &ship.AuthServer{},
-		// Config.ShipServer.GamePort: &ship.GameServer{},
+		Config.ShipServer.AuthPort: &GameAuthServer{},
+		Config.ShipServer.GamePort: &GameServer{},
 	}
 
 	// Configure, initialize, run all of our servers.
@@ -84,7 +87,7 @@ type Backend interface {
 	// Handshake performs any connection initialization necessary to begin
 	// communicating with the client. This likely involves sending a "welcome"
 	// command and choosing/initializing the appropriate encryption implementation.
-	Handshake(c *Client) error
+	Handshake(ctx context.Context, c *Client) error
 
 	// Handle is the main entry point for processing client commands. It's responsible
 	// for generally handling all commands from a client as well as sending any responses.
@@ -160,7 +163,7 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	c := NewClient(conn)
 	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c.IPAddr)
 
-	if err := backend.Handshake(c); err != nil {
+	if err := backend.Handshake(ctx, c); err != nil {
 		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr, err)
 	}
 
@@ -178,7 +181,13 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
 func processPackets(ctx context.Context, backend Backend, c *Client) {
-	defer closeConnectionAndRecover(backend.Identifier(), c)
+	clientCtx, clientCancel := context.WithCancel(debug.WithServerContext(ctx, backend.Identifier()))
+
+	defer func() {
+		clientCancel()
+		closeConnectionAndRecover(c)
+		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
+	}()
 
 	buffer := make([]byte, 2048)
 	var err error
@@ -200,18 +209,16 @@ func processPackets(ctx context.Context, backend Backend, c *Client) {
 			break
 		}
 
-		// TODO: Packet logging
-		// if Config.Debugging.PacketLoggingEnabled {
-		// 	archdebug.PrintPacket(archdebug.PrintPacketParams{
-		// 		Writer:        bufio.NewWriter(os.Stdout),
-		// 		ServerType:    backend.Identifier(),
-		// 		ClientCommand: true,
-		// 		Data:          buffer,
-		// 	})
-		// }
+		if Config.Debugging.PacketLoggingEnabled {
+			debug.PrintPacket(clientCtx, debug.PrintPacketParams{
+				Writer:        bufio.NewWriter(os.Stdout),
+				ClientCommand: true,
+				Data:          buffer,
+			})
+		}
 
-		if err = backend.Handle(ctx, c, buffer); err != nil {
-			Logger.Warn("error in client communication: " + err.Error())
+		if err = backend.Handle(clientCtx, c, buffer); err != nil {
+			Logger.Warnf("error communicating with client %s: %s", c.IPAddr, err)
 			return
 		}
 	}
@@ -219,19 +226,16 @@ func processPackets(ctx context.Context, backend Backend, c *Client) {
 
 // closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
 // client, and removes them from the list regardless of the state of the connection.
-func closeConnectionAndRecover(serverName string, c *Client) {
+func closeConnectionAndRecover(c *Client) {
 	if err := recover(); err != nil {
-		Logger.Errorf("error in client communication with %s: error=%s, trace: %s",
-			c.IPAddr, err, debug.Stack())
+		Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c.IPAddr, err, rdbg.Stack())
 	}
 
 	if err := c.Close(); err != nil {
-		Logger.Warnf("failed to close client connection: %s", err)
+		Logger.Warnf("error closing client connection: %s", err)
 	}
 
 	delete(connectedClients, c.IPAddr)
-
-	Logger.Infof("[%s] disconnected client %s", serverName, c.IPAddr)
 }
 
 // readNextPacket is a blocking call that only returns once the client has

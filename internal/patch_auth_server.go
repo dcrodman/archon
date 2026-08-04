@@ -35,7 +35,7 @@ func (s *PatchAuthServer) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *PatchAuthServer) Handshake(c *Client) error {
+func (s *PatchAuthServer) Handshake(ctx context.Context, c *Client) error {
 	// Initialize new encryption vectors for this session.
 	c.CryptoSession = encryption.NewPCCryptoSession()
 
@@ -47,7 +47,7 @@ func (s *PatchAuthServer) Handshake(c *Client) error {
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 
-	return c.SendRaw(pkt)
+	return c.SendRaw(ctx, pkt)
 }
 
 func (s *PatchAuthServer) Handle(ctx context.Context, c *Client, data []byte) error {

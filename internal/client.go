@@ -1,11 +1,15 @@
 package internal
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/dcrodman/archon/internal/data"
+	"github.com/dcrodman/archon/internal/debug"
 	"github.com/dcrodman/archon/internal/encryption"
 )
 
@@ -66,11 +70,6 @@ func (c *Client) Read(b []byte) (int, error) {
 	return c.connection.Read(b)
 }
 
-// Write directly sends data to the client over its TCP connection.
-func (c *Client) Write(bytes []byte) (int, error) {
-	return c.connection.Write(bytes)
-}
-
 // Close the TCP connection.
 func (c *Client) Close() error {
 	return c.connection.Close()
@@ -78,35 +77,33 @@ func (c *Client) Close() error {
 
 // SendRaw writes all data contained in the slice to the client
 // as-is (e.g. without encrypting it first).
-func (c *Client) SendRaw(packet interface{}) error {
+func (c *Client) SendRaw(ctx context.Context, packet interface{}) error {
 	bytes, size := MarshalStruct(packet)
 
-	// if c.Debug {
-	// 	debug.PrintPacket(debug.PrintPacketParams{
-	// 		Writer:        bufio.NewWriter(os.Stdout),
-	// 		ServerType:    string(c.DebugTags[debug.ServerType]),
-	// 		ClientCommand: false,
-	// 		Data:          bytes,
-	// 	})
-	// }
+	if Config.Debugging.PacketLoggingEnabled {
+		debug.PrintPacket(ctx, debug.PrintPacketParams{
+			Writer:        bufio.NewWriter(os.Stdout),
+			ClientCommand: false,
+			Data:          bytes,
+		})
+	}
 
 	return c.transmit(bytes, uint16(size))
 }
 
 // Send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
-func (c *Client) Send(packet interface{}) error {
+func (c *Client) Send(ctx context.Context, packet interface{}) error {
 	data, length := MarshalStruct(packet)
 	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
-	// if c.Debug {
-	// 	debug.PrintPacket(debug.PrintPacketParams{
-	// 		Writer:        bufio.NewWriter(os.Stdout),
-	// 		ServerType:    c.DebugTags[debug.ServerType],
-	// 		ClientCommand: false,
-	// 		Data:          bytes,
-	// 	})
-	// }
+	if Config.Debugging.PacketLoggingEnabled {
+		debug.PrintPacket(ctx, debug.PrintPacketParams{
+			Writer:        bufio.NewWriter(os.Stdout),
+			ClientCommand: false,
+			Data:          bytes,
+		})
+	}
 
 	c.CryptoSession.Encrypt(bytes, uint32(size))
 	return c.transmit(bytes, size)
@@ -118,7 +115,7 @@ func (c *Client) transmit(data []byte, length uint16) error {
 	bytesSent := 0
 
 	for bytesSent < int(length) {
-		b, err := c.Write(data[:length])
+		b, err := c.connection.Write(data[:length])
 		if err != nil {
 			return fmt.Errorf("error sending to client %v: %s", c.IPAddr, err.Error())
 		}

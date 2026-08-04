@@ -39,7 +39,7 @@ var (
 )
 
 // Server contains the bulk of the implementation for character management and
-// selection. Clients are redirected here after authenticating with [AuthServer].
+// selection. Clients are redirected here after authenticating with [GameAuthServer].
 // Each client can connect to this server in up to four different phases, with
 // each phase as a new connection:
 //
@@ -69,7 +69,7 @@ func (s *CharacterServer) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *CharacterServer) Handshake(c *Client) error {
+func (s *CharacterServer) Handshake(ctx context.Context, c *Client) error {
 	c.CryptoSession = encryption.NewBlueBurstCryptoSession()
 
 	pkt := &commands.Welcome{
@@ -82,7 +82,7 @@ func (s *CharacterServer) Handshake(c *Client) error {
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
-	return c.SendRaw(pkt)
+	return c.SendRaw(ctx, pkt)
 }
 
 func (s *CharacterServer) Handle(ctx context.Context, c *Client, data []byte) error {

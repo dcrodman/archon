@@ -28,7 +28,7 @@ func (s *CharacterAuthServer) Init(_ context.Context) error {
 	return nil
 }
 
-func (s *CharacterAuthServer) Handshake(c *Client) error {
+func (s *CharacterAuthServer) Handshake(ctx context.Context, c *Client) error {
 	c.CryptoSession = encryption.NewBlueBurstCryptoSession()
 
 	pkt := &commands.Welcome{
@@ -41,7 +41,7 @@ func (s *CharacterAuthServer) Handshake(c *Client) error {
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
-	return c.SendRaw(pkt)
+	return c.SendRaw(ctx, pkt)
 }
 
 func (s *CharacterAuthServer) Handle(ctx context.Context, c *Client, data []byte) error {

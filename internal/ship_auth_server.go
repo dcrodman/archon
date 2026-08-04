@@ -14,20 +14,20 @@ import (
 
 var GameCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
-// AuthServer is the SHIP server implementation. This is similar to PATCH and LOGIN
+// GameAuthServer is the SHIP server implementation. This is similar to PATCH and LOGIN
 // in that it really just exists to be a gateway. Is main responsibility is to
 // provide the client with the block list and then send the address of the
 // block that the user selects.
-type AuthServer struct {
+type GameAuthServer struct {
 }
 
-func (s *AuthServer) Identifier() string {
+func (s *GameAuthServer) Identifier() string {
 	return "SHIP:AUTH"
 }
 
 // Init connects the ship to the shipgate and registers so that it
 // can begin receiving players.
-func (s *AuthServer) Init(ctx context.Context) error {
+func (s *GameAuthServer) Init(ctx context.Context) error {
 	// Register this ship with the shipgate so that it can start accepting players.
 	shipgate.Shipgate.RegisterShip(ctx, data.Ship{
 		Name:    Config.ShipServer.Name,
@@ -37,11 +37,9 @@ func (s *AuthServer) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *AuthServer) SetUpClient(c *Client) {
+func (s *GameAuthServer) Handshake(ctx context.Context, c *Client) error {
 	c.CryptoSession = encryption.NewBlueBurstCryptoSession()
-}
 
-func (s *AuthServer) Handshake(c *Client) error {
 	pkt := &commands.Welcome{
 		Header:       commands.BBHeader{Type: commands.LoginWelcomeType, Size: 0xC8},
 		Copyright:    [96]byte{},
@@ -52,10 +50,10 @@ func (s *AuthServer) Handshake(c *Client) error {
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
-	return c.SendRaw(pkt)
+	return c.SendRaw(ctx, pkt)
 }
 
-func (s *AuthServer) Handle(ctx context.Context, c *Client, data []byte) error {
+func (s *GameAuthServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	var header commands.BBHeader
 	UnmarshalStruct(data[:commands.BBHeaderSize], &header)
 
@@ -71,7 +69,7 @@ func (s *AuthServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	return err
 }
 
-func (s *AuthServer) handleShipLogin(ctx context.Context, c *Client, loginPkt *commands.Login) error {
+func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPkt *commands.Login) error {
 	username := string(StripPadding(loginPkt.Username[:]))
 	password := string(StripPadding(loginPkt.Password[:]))
 
@@ -100,7 +98,7 @@ func (s *AuthServer) handleShipLogin(ctx context.Context, c *Client, loginPkt *c
 
 // Send the IP address and port of the character server to  which the client will
 // connect after disconnecting from this server.
-func (s *AuthServer) sendGameServerRedirect(c *Client) error {
+func (s *GameAuthServer) sendGameServerRedirect(c *Client) error {
 	pkt := &commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
 		Port:   uint16(Config.ShipServer.GamePort),

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -82,7 +83,7 @@ func TestClient_SendRaw(t *testing.T) {
 	client := NewClient(clientConn)
 
 	// Send bytes from the client and make sure they weren't altered.
-	if err := client.SendRaw(testPacket); err != nil {
+	if err := client.SendRaw(context.TODO(), testPacket); err != nil {
 		t.Fatalf("SendRaw() returned an unexpected error: %s", err)
 	}
 	client.Close()

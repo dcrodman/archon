@@ -27,7 +27,7 @@ func (s *PatchServer) Init(ctx context.Context) error {
 	return InitializePatchData()
 }
 
-func (s *PatchServer) Handshake(c *Client) error {
+func (s *PatchServer) Handshake(ctx context.Context, c *Client) error {
 	c.CryptoSession = encryption.NewPCCryptoSession()
 	c.FilesToUpdate = make(map[int]interface{})
 
@@ -39,7 +39,7 @@ func (s *PatchServer) Handshake(c *Client) error {
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
-	return c.SendRaw(pkt)
+	return c.SendRaw(ctx, pkt)
 }
 
 func (s *PatchServer) Handle(ctx context.Context, c *Client, data []byte) error {

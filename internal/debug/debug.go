@@ -2,7 +2,8 @@ package debug
 
 import (
 	"bufio"
-	stdbytes "bytes"
+	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	_ "net/http/pprof"
@@ -10,38 +11,29 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/dcrodman/archon/internal/commands"
-	"github.com/dcrodman/archon/internal/core/bytes"
 )
 
-// Used with Clients to attach debugging information.
+const serverTypeKey = "serverType"
 
-type Tag string
-
-var (
-	ServerType Tag = "server_type"
-)
+func WithServerContext(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, serverTypeKey, name)
+}
 
 type PrintPacketParams struct {
-	Writer     *bufio.Writer
-	ServerType string
+	Writer *bufio.Writer
 	// True if this command is client->server.
 	ClientCommand bool
 	Data          []byte
 	// Cut off the command output after a certain size.
 	TruncateThreshold int
-	// For known command types, read the data into each command and
-	// emit it as formatted JSON.
-	Interpret bool
 }
 
 // PrintCommand prints the contents of a command to a specified writer along with some
 // inferred metadata about the command itself.
-func PrintPacket(params PrintPacketParams) {
+func PrintPacket(ctx context.Context, params PrintPacketParams) {
 	var header commands.PCHeader
-	bytes.StructFromBytes(params.Data[:commands.PCHeaderSize], &header)
+	unmarshalStruct(params.Data[:commands.PCHeaderSize], &header)
 
 	// Set the output colors depending on the direction of the command.
 	if params.ClientCommand {
@@ -50,10 +42,11 @@ func PrintPacket(params PrintPacketParams) {
 		_, _ = params.Writer.WriteString("\033[33m")
 	}
 
+	serverType := ctx.Value(serverTypeKey)
+
 	// Write a header line for each command with some metadata.
 	var headerLine strings.Builder
-	headerLine.WriteString(fmt.Sprintf("[%s] %04X ", params.ServerType, header.Type))
-	headerLine.WriteString(fmt.Sprintf("(%s) ", getCommandName(params.ServerType, header.Type)))
+	headerLine.WriteString(fmt.Sprintf("[%s] %04X ", serverType, header.Type))
 	if params.ClientCommand {
 		headerLine.WriteString("| client->server ")
 	} else {
@@ -67,14 +60,7 @@ func PrintPacket(params PrintPacketParams) {
 		return
 	}
 
-	// Write out the contents of the actual command.
-	if params.Interpret {
-		// Attempt to print out any known commands as JSON, falling back to the standard
-		// format for any we don't recognize.
-		err = writeInterpretedCommandBodyToFile(params, header)
-	}
-
-	if !params.Interpret || err != nil {
+	if err != nil {
 		if err := writeCommandBody(params, header.Size); err != nil {
 			fmt.Printf("error writing command body: %v\n", err)
 			return
@@ -156,19 +142,25 @@ func buildSingleLine(data []uint8, length int, offset uint16) string {
 	return line.String()
 }
 
-func writeInterpretedCommandBodyToFile(params PrintPacketParams, header commands.PCHeader) error {
-	newCommand := getCommand(params.ServerType, params.ClientCommand, header.Type)
-	if !newCommand.IsValid() {
-		_, _ = params.Writer.WriteString("(cannot interpret - unrecognized command type)\n")
-		return fmt.Errorf("unrecognized command type: %02X", header.Type)
+// UnmarshalStruct populates the struct pointed to by targetStruct by reading in a
+// stream of bytes and filling the values in sequential order.
+//
+// Note: Duplicated from internal package to avoid a cyclical dependency.
+func unmarshalStruct(data []byte, targetStruct interface{}) {
+	targetVal := reflect.ValueOf(targetStruct)
+
+	if valKind := targetVal.Kind(); valKind != reflect.Ptr {
+		panic("StructFromBytes(): targetStruct must be a " +
+			"ptr to struct, got: " + valKind.String())
 	}
 
-	command := newCommand.Elem()
-	reader := stdbytes.NewReader(params.Data)
+	reader := bytes.NewReader(data)
+	val := targetVal.Elem()
 
-	var err error
-	for i := 0; i < command.NumField(); i++ {
-		field := command.Field(i)
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+
+		var err error
 		switch field.Kind() {
 		case reflect.Ptr:
 			err = binary.Read(reader, binary.LittleEndian, field.Interface())
@@ -176,16 +168,7 @@ func writeInterpretedCommandBodyToFile(params PrintPacketParams, header commands
 			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
 		}
 		if err != nil {
-			err = fmt.Errorf("error constructing field %s: %w", field.String(), err)
+			panic(err.Error())
 		}
 	}
-
-	spew.Config.Indent = "\t"
-	_, _ = params.Writer.WriteString(spew.Sdump(command.Interface()))
-	if err != nil {
-		_, _ = params.Writer.WriteString("WARNING: PARTIAL RESULT\n")
-		_, _ = params.Writer.WriteString("(make sure the command type is correctly mapped)\n")
-		_, _ = params.Writer.WriteString(err.Error() + "\n")
-	}
-	return nil
 }
