@@ -1,9 +1,6 @@
 package commands
 
-const (
-	PCHeaderSize = 0x04
-	BBHeaderSize = 0x08
-)
+const PCHeaderSize = 0x04
 
 // Blueburst, PC, and Gamecube clients all use a 4 byte header to
 // communicate with the patch server instead of the 8 byte one used
@@ -12,6 +9,8 @@ type PCHeader struct {
 	Size uint16
 	Type uint16
 }
+
+const BBHeaderSize = 0x08
 
 // BBHeader is the header for every command sent between the server and BlueBurst clients.
 type BBHeader struct {
@@ -37,11 +36,4 @@ const (
 	BBLoginErrorLocked
 	BBLoginErrorPatch
 	BBLoginErrorDisconnect
-)
-
-// Command types common to multiple servers.
-const (
-	DisconnectType    = 0x05
-	RedirectType      = 0x19
-	MenuSelectionType = 0x10
 )

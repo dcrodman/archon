@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	testPacket = &commands.CharacterAck{
+	testPacket = &commands.CharacterSelectionAck{
 		Header: commands.BBHeader{
 			Size: 0x10,
-			Type: commands.LoginCharAckType,
+			Type: commands.CharacterSelectionAckType,
 		},
 		Slot: 1,
 		Flag: 1,
@@ -134,9 +134,9 @@ func TestClient_Send(t *testing.T) {
 }
 
 func Test_adjustPacketLength(t *testing.T) {
-	testPacketNoSize := &commands.CharacterAck{
+	testPacketNoSize := &commands.CharacterSelectionAck{
 		Header: commands.BBHeader{
-			Type: commands.LoginCharAckType,
+			Type: commands.CharacterSelectionAckType,
 		},
 		Slot: 1,
 		Flag: 1,

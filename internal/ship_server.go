@@ -89,7 +89,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 }
 
 func SendMessage(ctx context.Context, c *Client, message string) error {
-	return c.Send(ctx, &commands.LoginClientMessage{
+	return c.Send(ctx, &commands.ClientMessage{
 		Header:   commands.BBHeader{Type: commands.ClientMessageType},
 		Language: 0x00450009,
 		Message:  ConvertToUtf16(message),
@@ -103,7 +103,7 @@ func SendLobbyMenu(ctx context.Context, c *Client) error {
 		lobbyEntries[i].LobbyID = uint32(i)
 	}
 
-	return c.Send(ctx, &commands.LobbyList{
+	return c.Send(ctx, &commands.LobbyMenu{
 		Header: commands.BBHeader{
 			Type:  commands.LobbyMenuType,
 			Flags: 0x0F, // PSOBB expects this to always contain 15 entries.

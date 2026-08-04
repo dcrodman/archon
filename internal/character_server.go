@@ -95,32 +95,32 @@ func (s *CharacterServer) Handle(ctx context.Context, c *Client, data []byte) er
 		var loginPkt commands.Login
 		UnmarshalStruct(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
-	case commands.LoginOptionsRequestType:
+	case commands.OptionsRequestType:
 		err = s.handleOptionsRequest(ctx, c)
-	case commands.LoginCharSelectType:
+	case commands.CharacterSelectionType:
 		var pkt commands.CharacterSelection
 		UnmarshalStruct(data, &pkt)
 		err = s.handleCharacterSelect(ctx, c, &pkt)
-	case commands.LoginChecksumType:
+	case commands.ChecksumType:
 		// Everybody else seems to ignore this, so...
 		err = SendChecksumAck(ctx, c)
-	case commands.LoginGuildcardReqType:
+	case commands.GuildcardRequestType:
 		err = s.handleGuildcardDataStart(ctx, c)
-	case commands.LoginGuildcardChunkReqType:
+	case commands.GuildcardChunkReqType:
 		var chunkReq commands.GuildcardChunkRequest
 		UnmarshalStruct(data, &chunkReq)
 		err = s.handleGuildcardChunk(ctx, c, &chunkReq)
-	case commands.LoginParameterHeaderReqType:
+	case commands.ParameterHeaderReqType:
 		err = SendParameterHeader(ctx, c, uint32(s.numParameterFiles), paramHeaderData)
-	case commands.LoginParameterChunkReqType:
+	case commands.ParameterChunkReqType:
 		var pkt commands.BBHeader
 		UnmarshalStruct(data, &pkt)
 		err = SendParameterChunk(ctx, c, paramChunkData[int(pkt.Flags)], pkt.Flags)
-	case commands.LoginSetFlagType:
+	case commands.SetFlagType:
 		var pkt commands.SetFlag
 		UnmarshalStruct(data, &pkt)
 		s.setClientFlag(c, &pkt)
-	case commands.LoginCharPreviewType:
+	case commands.CharacterSummaryType:
 		var charPkt commands.CharacterSummary
 		UnmarshalStruct(data, &charPkt)
 		err = s.handleCharacterUpdate(ctx, c, &charPkt)
@@ -185,7 +185,7 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 // Send a timestamp command in order to indicate the server's current time.
 func SendTimestamp(ctx context.Context, c *Client) error {
 	pkt := &commands.Timestamp{
-		Header:    commands.BBHeader{Type: commands.LoginTimestampType},
+		Header:    commands.BBHeader{Type: commands.TimestampType},
 		Timestamp: [28]byte{},
 	}
 
@@ -220,7 +220,7 @@ func SendShipList(ctx context.Context, c *Client) error {
 
 	return c.Send(ctx, &commands.ShipMenu{
 		Header: commands.BBHeader{
-			Type:  commands.BlockListType,
+			Type:  commands.ShipMenuType,
 			Flags: uint32(len(availableShips)),
 		},
 		Entries: entries,
@@ -240,7 +240,7 @@ func SendScrollMessage(ctx context.Context, c *Client) error {
 	})
 
 	return c.Send(ctx, &commands.ScrollMessage{
-		Header:  commands.BBHeader{Type: commands.LoginScrollMessageType},
+		Header:  commands.BBHeader{Type: commands.ScrollMessageType},
 		Message: shipSelectionScrollMessage,
 	})
 }
@@ -296,7 +296,7 @@ func SendOptions(ctx context.Context, c *Client, keyConfig []byte) error {
 	}
 
 	pkt := &commands.Options{
-		Header: commands.BBHeader{Type: commands.LoginOptionsType},
+		Header: commands.BBHeader{Type: commands.OptionsType},
 	}
 	pkt.PlayerKeyConfig.Guildcard = c.Guildcard
 	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
@@ -345,8 +345,8 @@ func (s *CharacterServer) handleCharacterSelect(ctx context.Context, c *Client, 
 // to 0 indicates a creation ack, 1 acks a selected character, and 2 indicates that a character
 // doesn't exist in the slot requested via preview request.
 func SendCharacterAck(ctx context.Context, c *Client, slotNum uint32, flag uint32) error {
-	return c.Send(ctx, &commands.CharacterAck{
-		Header: commands.BBHeader{Type: commands.LoginCharAckType},
+	return c.Send(ctx, &commands.CharacterSelectionAck{
+		Header: commands.BBHeader{Type: commands.CharacterSelectionAckType},
 		Slot:   slotNum,
 		Flag:   flag,
 	})
@@ -355,7 +355,7 @@ func SendCharacterAck(ctx context.Context, c *Client, slotNum uint32, flag uint3
 // send the preview command containing basic details about a character in the selected slot.
 func SendCharacterPreview(ctx context.Context, c *Client, char *data.Character) error {
 	previewCommand := &commands.CharacterSummary{
-		Header: commands.BBHeader{Type: commands.LoginCharPreviewType},
+		Header: commands.BBHeader{Type: commands.CharacterSummaryType},
 		Slot:   0,
 		Character: commands.CharacterPreview{
 			Experience:     char.Experience,
@@ -391,7 +391,7 @@ func SendCharacterPreview(ctx context.Context, c *Client, char *data.Character) 
 // anything with it but the client won't proceed otherwise.
 func SendChecksumAck(ctx context.Context, c *Client) error {
 	return c.Send(ctx, &commands.ChecksumAck{
-		Header: commands.BBHeader{Type: commands.LoginChecksumAckType},
+		Header: commands.BBHeader{Type: commands.ChecksumAckType},
 		Ack:    1,
 	})
 }
@@ -429,7 +429,7 @@ func (s *CharacterServer) handleGuildcardDataStart(ctx context.Context, c *Clien
 // send the header containing metadata about the guildcard chunk.
 func SendGuildcardHeader(ctx context.Context, c *Client, checksum uint32, dataLen uint16) error {
 	return c.Send(ctx, &commands.GuildcardHeader{
-		Header:   commands.BBHeader{Type: commands.LoginGuildcardHeaderType},
+		Header:   commands.BBHeader{Type: commands.GuildcardHeaderType},
 		Unknown:  0x00000001,
 		Length:   dataLen,
 		Checksum: checksum,
@@ -448,7 +448,7 @@ func (s *CharacterServer) handleGuildcardChunk(ctx context.Context, c *Client, c
 // send the specified chunk of guildcard data.
 func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {
 	pkt := &commands.GuildcardChunk{
-		Header: commands.BBHeader{Type: commands.LoginGuildcardChunkType},
+		Header: commands.BBHeader{Type: commands.GuildcardChunkType},
 		Chunk:  chunkNum,
 	}
 
@@ -469,7 +469,7 @@ func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {
 func SendParameterHeader(ctx context.Context, c *Client, numEntries uint32, entries []byte) error {
 	return c.Send(ctx, &commands.ParameterHeader{
 		Header: commands.BBHeader{
-			Type:  commands.LoginParameterHeaderType,
+			Type:  commands.ParameterHeaderType,
 			Flags: numEntries,
 		},
 		Entries: entries,
@@ -479,7 +479,7 @@ func SendParameterHeader(ctx context.Context, c *Client, numEntries uint32, entr
 // Index into chunkData and send the specified chunk of parameter data.
 func SendParameterChunk(ctx context.Context, c *Client, chunkData []byte, chunk uint32) error {
 	return c.Send(ctx, &commands.ParameterChunk{
-		Header: commands.BBHeader{Type: commands.LoginParameterChunkType},
+		Header: commands.BBHeader{Type: commands.ParameterChunkType},
 		Chunk:  chunk,
 		Data:   chunkData,
 	})
