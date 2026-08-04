@@ -3,6 +3,7 @@ package shipgate
 import (
 	"testing"
 
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/google/go-cmp/cmp"
 	"gorm.io/gorm"
 )
@@ -15,7 +16,7 @@ func TestFindPlayerOptions(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 
-	testPlayerOptions := &PlayerOptions{
+	testPlayerOptions := &data.PlayerOptions{
 		Account:   testAccount,
 		KeyConfig: []byte{1, 2, 3, 4},
 	}
@@ -23,7 +24,7 @@ func TestFindPlayerOptions(t *testing.T) {
 	tests := []struct {
 		name     string
 		seedData func(db *gorm.DB)
-		want     *PlayerOptions
+		want     *data.PlayerOptions
 		wantErr  bool
 	}{
 		{
@@ -67,13 +68,13 @@ func TestUpdatePlayerOptions(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 
-	testPlayerOptions := &PlayerOptions{
+	testPlayerOptions := &data.PlayerOptions{
 		Account:   testAccount,
 		KeyConfig: []byte{1, 2, 3, 4},
 	}
 
 	if err := createPlayerOptions(db, testPlayerOptions); err != nil {
-		t.Fatalf("CreatePlayerOptions() returned an unexpected error: %s", err)
+		t.Fatalf("CreatePlayerOptions() returned an unexpected error: data.%s", err)
 	}
 
 	testPlayerOptions.KeyConfig = []byte{5, 6, 7, 8}

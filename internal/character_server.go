@@ -163,7 +163,7 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	}
 
 	c.Account = account
-	c.TeamID = uint32(account.TeamId)
+	c.TeamID = uint32(account.TeamID)
 	c.Guildcard = uint32(account.Guildcard)
 
 	// At this point, the user has chosen (or created) a character and the
@@ -300,19 +300,19 @@ func (s *CharacterServer) handleShipSelection(ctx context.Context, c *Client, me
 
 // LoadConfig key config and other option data from the database or provide defaults for new accounts.
 func (s *CharacterServer) handleOptionsRequest(ctx context.Context, c *Client) error {
-	playerOptions, err := shipgate.Shipgate.GetPlayerOptions(ctx, c.Account.Id)
+	playerOptions, err := shipgate.Shipgate.GetPlayerOptions(ctx, c.Account.ID)
 	if err != nil {
 		return fmt.Errorf("error handling options request: %w", err)
 	}
 
 	if playerOptions == nil {
 		// We don't have any saved key config - give them the defaults.
-		playerOptions = &shipgate.PlayerOptions{
+		playerOptions = &data.PlayerOptions{
 			KeyConfig: make([]byte, 420),
 		}
 		copy(playerOptions.KeyConfig, BaseKeyConfig[:])
 
-		err = shipgate.Shipgate.UpsertPlayerOptions(ctx, c.Account.Id, playerOptions)
+		err = shipgate.Shipgate.UpsertPlayerOptions(ctx, c.Account.ID, playerOptions)
 		if err != nil {
 			return fmt.Errorf("error creating player options: %w", err)
 		}
@@ -351,7 +351,7 @@ func (s *CharacterServer) sendOptions(c *Client, keyConfig []byte) error {
 // The client also sends this command when  a character has been selected from the menu
 // (or after the dressing room or recreate), as indicated by the Selecting flag.
 func (s *CharacterServer) handleCharacterSelect(ctx context.Context, c *Client, pkt *commands.CharacterSelection) error {
-	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.Id, pkt.Slot)
+	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, pkt.Slot)
 	if err != nil {
 		return fmt.Errorf("error selecting character: %w", err)
 	}
@@ -385,7 +385,7 @@ func SendCharacterAck(c *Client, slotNum uint32, flag uint32) error {
 }
 
 // send the preview command containing basic details about a character in the selected slot.
-func SendCharacterPreview(c *Client, char *shipgate.Character) error {
+func SendCharacterPreview(c *Client, char *data.Character) error {
 	previewCommand := &commands.CharacterSummary{
 		Header: commands.BBHeader{Type: commands.LoginCharPreviewType},
 		Slot:   0,
@@ -430,7 +430,7 @@ func SendChecksumAck(c *Client) error {
 
 // LoadConfig the player's saved guildcards, build the chunk data, and send the chunk header.
 func (s *CharacterServer) handleGuildcardDataStart(ctx context.Context, c *Client) error {
-	entries, err := shipgate.Shipgate.GetGuildcardEntries(ctx, c.Account.Id)
+	entries, err := shipgate.Shipgate.GetGuildcardEntries(ctx, c.Account.ID)
 	if err != nil {
 		return fmt.Errorf("error loading guildcards: %w", err)
 	}
@@ -529,7 +529,7 @@ func (s *CharacterServer) setClientFlag(c *Client, pkt *commands.SetFlag) {
 }
 
 func clientFlagCacheKey(c *Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Account.Id)
+	return fmt.Sprintf("client-flags-%d", c.Account.ID)
 }
 
 // Performs a create or update/delete depending on whether the user followed the
@@ -544,9 +544,9 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 	} else {
 		// The "recreate" option. This is a request to create a character in a slot and is used
 		// for both creating new characters and replacing existing ones.
-		err := shipgate.Shipgate.DeleteCharacter(ctx, c.Account.Id, charPkt.Slot)
+		err := shipgate.Shipgate.DeleteCharacter(ctx, c.Account.ID, charPkt.Slot)
 		if err != nil {
-			msg := fmt.Errorf("error deleting character for account %d in slot %d ", c.Account.Id, charPkt.Slot)
+			msg := fmt.Errorf("error deleting character for account %d in slot %d ", c.Account.ID, charPkt.Slot)
 			Logger.Error(msg)
 			return msg
 		}
@@ -554,7 +554,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		p := charPkt.Character
 		stats := BaseStats[p.Class]
 
-		newCharacter := &shipgate.Character{
+		newCharacter := &data.Character{
 			Guildcard:         c.Account.Guildcard,
 			GuildcardStr:      p.GuildcardStr[:],
 			Slot:              charPkt.Slot,
@@ -595,7 +595,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		//--techniques blob,
 		//--options blob,
 
-		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.Id, newCharacter)
+		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, newCharacter)
 		if err != nil {
 			return err
 		}
@@ -638,7 +638,7 @@ func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *c
 	flags, _ := s.kvCache.Get(clientFlagCacheKey(c))
 	s.kvCache.Set(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
 
-	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.Id, pkt.Slot)
+	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, pkt.Slot)
 	if err != nil {
 		return err
 	} else if character == nil {
@@ -662,5 +662,5 @@ func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *c
 	character.Name = pc.Name[:]
 	character.ReadableName = convertReadableName(pc.Name[:])
 
-	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.Id, character)
+	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, character)
 }

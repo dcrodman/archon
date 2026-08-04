@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/google/go-cmp/cmp"
 	"gorm.io/gorm"
 )
@@ -19,16 +20,16 @@ func seedRandomAccounts(t *testing.T, db *gorm.DB) {
 	}
 }
 
-func generateAccount(t *testing.T) *Account {
+func generateAccount(t *testing.T) *data.Account {
 	t.Helper()
-	return &Account{
+	return &data.Account{
 		Username: strconv.Itoa(rand.Int()),
 		Password: strconv.Itoa(rand.Int()),
 		Email:    fmt.Sprintf("%d@%d.c", rand.Int(), rand.Int()),
 	}
 }
 
-func assertAccountsMatch(t *testing.T, expected *Account, got *Account) {
+func assertAccountsMatch(t *testing.T, expected *data.Account, got *data.Account) {
 	if expected == nil && got == nil {
 		return
 	}
@@ -49,7 +50,7 @@ func TestFindAccountByID(t *testing.T) {
 	tests := []struct {
 		name     string
 		seedData func(db *gorm.DB)
-		want     *Account
+		want     *data.Account
 		wantErr  bool
 	}{
 		{
@@ -91,7 +92,7 @@ func TestFindAccountByUsername(t *testing.T) {
 	tests := []struct {
 		name     string
 		seedData func(db *gorm.DB)
-		want     *Account
+		want     *data.Account
 		wantErr  bool
 	}{
 		{

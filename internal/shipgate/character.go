@@ -2,65 +2,17 @@ package shipgate
 
 import (
 	"errors"
-	"time"
+
+	"github.com/dcrodman/archon/internal/data"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-// Character is an instance of a character in one of the slots for an account.
-type Character struct {
-	ID uint64 `gorm:"primaryKey"`
-
-	Account   *Account
-	AccountID uint64 `gorm:"uniqueIndex:character_account_slot"`
-
-	Guildcard         uint64
-	GuildcardStr      []byte
-	Slot              uint32 `gorm:"uniqueIndex:character_account_slot"`
-	Experience        uint32
-	Level             uint32
-	NameColor         uint32
-	ModelType         byte
-	NameColorChecksum uint32
-	SectionID         byte
-	Class             byte
-	V2Flags           byte
-	Version           byte
-	V1Flags           uint32
-	Costume           uint16
-	Skin              uint16
-	Face              uint16
-	Head              uint16
-	Hair              uint16
-	HairRed           uint16
-	HairGreen         uint16
-	HairBlue          uint16
-	ProportionX       float32
-	ProportionY       float32
-	ReadableName      string
-	Name              []byte
-	Playtime          uint32
-	ATP               uint16
-	MST               uint16
-	EVP               uint16
-	HP                uint16
-	DFP               uint16
-	ATA               uint16
-	LCK               uint16
-	Meseta            uint32
-	HPMaterialsUsed   byte
-	TPMaterialsUsed   byte
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt
-}
-
 // findCharacter returns the Character associated with the account in
 // the given slot or nil if none exists.
-func findCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error) {
-	var character Character
+func findCharacter(db *gorm.DB, accountID uint64, slot uint32) (*data.Character, error) {
+	var character data.Character
 	err := db.
 		Where("slot = ? AND account_id = ?", slot, &accountID).
 		Preload("Account").
@@ -78,7 +30,7 @@ func findCharacter(db *gorm.DB, accountID uint, slot uint32) (*Character, error)
 }
 
 // upsertCharacter updates an existing Character row with the contents of character.
-func upsertCharacter(db *gorm.DB, character *Character) error {
+func upsertCharacter(db *gorm.DB, character *data.Character) error {
 	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "account_id"}, {Name: "slot"}},
 		UpdateAll: true,
@@ -86,7 +38,7 @@ func upsertCharacter(db *gorm.DB, character *Character) error {
 }
 
 // deleteCharacter soft-deletes a character record from the database.
-func deleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
+func deleteCharacter(db *gorm.DB, accountID uint64, slot uint32) error {
 	character, err := findCharacter(db, accountID, slot)
 	if err != nil {
 		return err
@@ -97,6 +49,6 @@ func deleteCharacter(db *gorm.DB, accountID uint, slot uint32) error {
 }
 
 // permanentlyDeleteCharacter permanently deletes a character record from the database.
-func permanentlyDeleteCharacter(db *gorm.DB, character *Character) error {
+func permanentlyDeleteCharacter(db *gorm.DB, character *data.Character) error {
 	return db.Unscoped().Delete(character).Error
 }

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -20,10 +21,10 @@ func setUpDatabase(t *testing.T) *gorm.DB {
 	}
 
 	if err = db.AutoMigrate(
-		&Account{},
-		&PlayerOptions{},
-		&Character{},
-		&GuildcardEntry{},
+		&data.Account{},
+		&data.PlayerOptions{},
+		&data.Character{},
+		&data.GuildcardEntry{},
 	); err != nil {
 		t.Fatalf("error auto migrating db: %s", err)
 	}

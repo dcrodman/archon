@@ -3,29 +3,14 @@ package shipgate
 import (
 	"errors"
 
+	"github.com/dcrodman/archon/internal/data"
+
 	"gorm.io/gorm"
 )
 
-type GuildcardEntry struct {
-	ID uint64 `gorm:"primaryKey"`
-
-	Account   *Account
-	AccountID int
-
-	Guildcard       uint64
-	FriendGuildcard int
-	Name            []byte
-	TeamName        []byte
-	Description     []byte
-	Language        byte
-	SectionID       byte
-	Class           byte
-	Comment         []byte
-}
-
 // findGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
-func findGuildcardEntries(db *gorm.DB, accountId uint64) ([]GuildcardEntry, error) {
-	var guildcardEntries []GuildcardEntry
+func findGuildcardEntries(db *gorm.DB, accountId uint64) ([]data.GuildcardEntry, error) {
+	var guildcardEntries []data.GuildcardEntry
 	err := db.Where("account_id = ?", accountId).Find(&guildcardEntries).Error
 
 	if err != nil {

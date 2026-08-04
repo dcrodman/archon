@@ -7,9 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/dcrodman/archon/internal_bak/core/proto"
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -78,10 +77,10 @@ func initDatabase(cfg DBConfig) (*gorm.DB, error) {
 	}
 
 	if err = db.AutoMigrate(
-		&Account{},
-		&PlayerOptions{},
-		&Character{},
-		&GuildcardEntry{},
+		&data.Account{},
+		&data.PlayerOptions{},
+		&data.Character{},
+		&data.GuildcardEntry{},
 	); err != nil {
 		return nil, fmt.Errorf("error auto migrating db: %s", err)
 	}
@@ -111,7 +110,7 @@ type ShipgateService struct {
 
 // AuthenticateAccount verifies an account. A password should be provided
 // via the rpc call metadata.
-func (s *ShipgateService) AuthenticateAccount(ctx context.Context, username, password string) (*proto.Account, error) {
+func (s *ShipgateService) AuthenticateAccount(ctx context.Context, username, password string) (*data.Account, error) {
 	s.logger.Debug("AuthenticateAccount")
 	account, err := findAccountByUsername(s.db, username)
 	if err != nil {
@@ -124,18 +123,7 @@ func (s *ShipgateService) AuthenticateAccount(ctx context.Context, username, pas
 		return nil, ErrAccountBanned
 	}
 
-	return &proto.Account{
-		Id:               uint64(account.ID),
-		Username:         account.Username,
-		Email:            account.Email,
-		RegistrationDate: account.RegistrationDate.Format(time.RFC3339),
-		Guildcard:        uint64(account.Guildcard),
-		Gm:               account.GM,
-		Banned:           account.Banned,
-		Active:           account.Active,
-		TeamId:           int64(account.TeamID),
-		PrivilegeLevel:   []byte{account.PrivilegeLevel},
-	}, nil
+	return account, nil
 }
 
 // HashPassword returns a version of password with Archon's chosen hashing strategy.
@@ -157,10 +145,10 @@ func stripBytePadding(b []byte) []byte {
 }
 
 // FindCharacter looks up character in a slot on an account.
-func (s *ShipgateService) FindCharacter(ctx context.Context, accountID uint32, slot uint32) (*Character, error) {
+func (s *ShipgateService) FindCharacter(ctx context.Context, accountID uint64, slot uint32) (*data.Character, error) {
 	s.logger.Debug("FindCharacter")
 
-	character, err := findCharacter(s.db, uint(accountID), slot)
+	character, err := findCharacter(s.db, accountID, slot)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving character for account %d slot %d: %w", accountID, slot, err)
 	}
@@ -168,7 +156,7 @@ func (s *ShipgateService) FindCharacter(ctx context.Context, accountID uint32, s
 }
 
 // UpsertCharacter creates a new character in a slot on an account.
-func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint32, c *Character) error {
+func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint64, c *data.Character) error {
 	s.logger.Debug("UpsertCharacter")
 
 	c.AccountID = uint64(accountID)
@@ -179,17 +167,17 @@ func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint32,
 }
 
 // DeleteCharacter deletes the character data in a slot on an account.
-func (s *ShipgateService) DeleteCharacter(ctx context.Context, accountID uint32, slot uint32) error {
+func (s *ShipgateService) DeleteCharacter(ctx context.Context, accountID uint64, slot uint32) error {
 	s.logger.Debug("DeleteCharacter")
 
-	if err := deleteCharacter(s.db, uint(accountID), slot); err != nil {
+	if err := deleteCharacter(s.db, accountID, slot); err != nil {
 		return fmt.Errorf("error deleting character for account %d slot %d: %w", accountID, slot, err)
 	}
 	return nil
 }
 
 // GetGuildcardEntires returns the list of guildcards on an account.
-func (s *ShipgateService) GetGuildcardEntries(ctx context.Context, accountID uint32) ([]GuildcardEntry, error) {
+func (s *ShipgateService) GetGuildcardEntries(ctx context.Context, accountID uint64) ([]data.GuildcardEntry, error) {
 	s.logger.Debug("GetGuildcardEntries")
 
 	entries, err := findGuildcardEntries(s.db, uint64(accountID))
@@ -200,7 +188,7 @@ func (s *ShipgateService) GetGuildcardEntries(ctx context.Context, accountID uin
 }
 
 // GetPlayerOptions returns the player options tied to an account.
-func (s *ShipgateService) GetPlayerOptions(ctx context.Context, accountID uint64) (*PlayerOptions, error) {
+func (s *ShipgateService) GetPlayerOptions(ctx context.Context, accountID uint64) (*data.PlayerOptions, error) {
 	s.logger.Debug("GetPlayerOptions")
 
 	playerOptions, err := findPlayerOptions(s.db, accountID)
@@ -211,10 +199,10 @@ func (s *ShipgateService) GetPlayerOptions(ctx context.Context, accountID uint64
 }
 
 // GetPlayerOptions updates or creates the player options tied to an account.
-func (s *ShipgateService) UpsertPlayerOptions(ctx context.Context, accountID uint64, po *PlayerOptions) error {
+func (s *ShipgateService) UpsertPlayerOptions(ctx context.Context, accountID uint64, po *data.PlayerOptions) error {
 	s.logger.Debug("UpsertPlayerOptions")
 
-	po.Account = &Account{ID: accountID}
+	po.Account = &data.Account{ID: accountID}
 	if err := createPlayerOptions(s.db, po); err != nil {
 		return fmt.Errorf("error creating player options: %v", err)
 	}

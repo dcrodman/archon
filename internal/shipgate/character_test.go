@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/google/go-cmp/cmp"
 	"gorm.io/gorm"
 )
@@ -15,7 +16,7 @@ func TestFindCharacter(t *testing.T) {
 	if err := db.Create(testAccount).Error; err != nil {
 		t.Fatalf("error creating test account: %v", err)
 	}
-	testCharacter := &Character{
+	testCharacter := &data.Character{
 		Account:   testAccount,
 		Slot:      1,
 		Guildcard: 12345,
@@ -24,7 +25,7 @@ func TestFindCharacter(t *testing.T) {
 	tests := []struct {
 		name     string
 		seedData func(db *gorm.DB)
-		want     *Character
+		want     *data.Character
 		wantErr  bool
 	}{
 		{
@@ -48,7 +49,7 @@ func TestFindCharacter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.seedData(db)
 
-			character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+			character, err := findCharacter(db, testAccount.ID, testCharacter.Slot)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("FindAccountByID() wantErr = %v, error = %v", tt.wantErr, err)
 			}
@@ -67,7 +68,7 @@ func TestUpsertCharacter(t *testing.T) {
 	if err := db.Create(testAccount).Error; err != nil {
 		t.Fatalf("error creating test account: %v", err)
 	}
-	testCharacter := &Character{
+	testCharacter := &data.Character{
 		Account:   testAccount,
 		Slot:      1,
 		Guildcard: 12345,
@@ -83,7 +84,7 @@ func TestUpsertCharacter(t *testing.T) {
 	}
 
 	// Ensure the upsert applied the change.
-	character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+	character, err := findCharacter(db, testAccount.ID, testCharacter.Slot)
 	if err != nil {
 		t.Fatalf("FindCharacter() returned an unexpected error: %s", err)
 	}
@@ -105,7 +106,7 @@ func TestDeleteCharacter(t *testing.T) {
 	if err := db.Create(testAccount).Error; err != nil {
 		t.Fatalf("error creating test account: %v", err)
 	}
-	testCharacter := &Character{
+	testCharacter := &data.Character{
 		Account:   testAccount,
 		Slot:      1,
 		Guildcard: 12345,
@@ -116,12 +117,12 @@ func TestDeleteCharacter(t *testing.T) {
 		t.Fatalf("error creating character: %v", err)
 	}
 
-	if err := deleteCharacter(db, uint(testAccount.ID), testCharacter.Slot); err != nil {
+	if err := deleteCharacter(db, testAccount.ID, testCharacter.Slot); err != nil {
 		t.Fatalf("DeleteCharacter() returned an unexpected error: %s", err)
 	}
 
 	// Once we've deleted it, make sure it's not returned by FindCharacter.
-	character, err := findCharacter(db, uint(testAccount.ID), testCharacter.Slot)
+	character, err := findCharacter(db, testAccount.ID, testCharacter.Slot)
 	if err != nil {
 		t.Fatalf("FindCharacter() returned an unexpected error: %s", err)
 	}
@@ -151,7 +152,7 @@ func TestPermanentlyDeleteCharacter(t *testing.T) {
 	if err := db.Create(testAccount).Error; err != nil {
 		t.Fatalf("error creating test account: %v", err)
 	}
-	testCharacter := &Character{
+	testCharacter := &data.Character{
 		Account:   testAccount,
 		Slot:      1,
 		Guildcard: 12345,
@@ -167,7 +168,7 @@ func TestPermanentlyDeleteCharacter(t *testing.T) {
 	}
 
 	// Ensure the character was hard deleted.
-	var character Character
+	var character data.Character
 	err := db.Unscoped().Where("id = ?", testCharacter.ID).First(&character).Error
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("querying for deleted character returned an unexpected error: %v", err)

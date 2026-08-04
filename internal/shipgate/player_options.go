@@ -3,21 +3,13 @@ package shipgate
 import (
 	"errors"
 
+	"github.com/dcrodman/archon/internal/data"
 	"gorm.io/gorm"
 )
 
-type PlayerOptions struct {
-	ID uint64 `gorm:"primaryKey"`
-
-	Account   *Account
-	AccountID int
-
-	KeyConfig []byte
-}
-
 // findPlayerOptions returns all of hte PlayerOptions associated with an Account.
-func findPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
-	var playerOptions PlayerOptions
+func findPlayerOptions(db *gorm.DB, accountId uint64) (*data.PlayerOptions, error) {
+	var playerOptions data.PlayerOptions
 	err := db.Where("account_id = ?", accountId).Preload("Account").First(&playerOptions).Error
 
 	if err != nil {
@@ -30,10 +22,10 @@ func findPlayerOptions(db *gorm.DB, accountId uint64) (*PlayerOptions, error) {
 	return &playerOptions, nil
 }
 
-func createPlayerOptions(db *gorm.DB, po *PlayerOptions) error {
+func createPlayerOptions(db *gorm.DB, po *data.PlayerOptions) error {
 	return db.Create(po).Error
 }
 
-func updatePlayerOptions(db *gorm.DB, po *PlayerOptions) error {
+func updatePlayerOptions(db *gorm.DB, po *data.PlayerOptions) error {
 	return db.Updates(&po).Error
 }
