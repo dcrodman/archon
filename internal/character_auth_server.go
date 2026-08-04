@@ -119,23 +119,13 @@ func SendSecurity(c *Client, errorCode uint32) error {
 
 	// Constants set according to how Newserv does it.
 	return c.Send(&commands.Security{
-		Header:       commands.BBHeader{Type: commands.LoginSecurityType},
+		Header:       commands.BBHeader{Type: commands.SecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
 		Guildcard:    c.Guildcard,
 		TeamID:       c.TeamID,
 		Config:       cfg,
 		Capabilities: 0x00000102,
-	})
-}
-
-// Sends a message to the  In this case whatever message is sent
-// here will be displayed in a dialog box after the patch screen.
-func SendMessage(c *Client, message string) error {
-	return c.Send(&commands.LoginClientMessage{
-		Header:   commands.BBHeader{Type: commands.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  ConvertToUtf16(message),
 	})
 }
 

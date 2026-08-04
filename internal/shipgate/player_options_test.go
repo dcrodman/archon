@@ -3,9 +3,10 @@ package shipgate
 import (
 	"testing"
 
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/google/go-cmp/cmp"
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 func TestFindPlayerOptions(t *testing.T) {

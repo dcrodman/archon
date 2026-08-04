@@ -4,9 +4,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/encryption"
-	"github.com/google/go-cmp/cmp"
 )
 
 var (

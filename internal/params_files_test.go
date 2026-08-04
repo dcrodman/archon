@@ -6,8 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dcrodman/archon/internal/prs"
 	"github.com/go-test/deep"
+
+	"github.com/dcrodman/archon/internal/prs"
 )
 
 func TestPRS(t *testing.T) {

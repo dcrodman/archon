@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dcrodman/archon/internal/commands"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/dcrodman/archon/internal/commands"
 )
 
 func TestConvertToUtf16(t *testing.T) {

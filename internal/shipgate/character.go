@@ -3,10 +3,10 @@ package shipgate
 import (
 	"errors"
 
-	"github.com/dcrodman/archon/internal/data"
-
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 // findCharacter returns the Character associated with the account in

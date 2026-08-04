@@ -18,7 +18,7 @@ type Account struct {
 	Banned           bool   `gorm:"default:false"`
 	Active           bool   `gorm:"default:true"`
 	TeamID           int
-	PrivilegeLevel   byte
+	PrivilegeLevel   uint8
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -31,7 +31,7 @@ type PlayerOptions struct {
 	Account   *Account
 	AccountID uint64
 
-	KeyConfig []byte
+	KeyConfig []uint8
 }
 
 // Character is an instance of a character in one of the slots for an account.
@@ -42,17 +42,17 @@ type Character struct {
 	AccountID uint64 `gorm:"uniqueIndex:character_account_slot"`
 
 	Guildcard         uint64
-	GuildcardStr      []byte
+	GuildcardStr      []uint8
 	Slot              uint32 `gorm:"uniqueIndex:character_account_slot"`
 	Experience        uint32
 	Level             uint32
 	NameColor         uint32
-	ModelType         byte
+	ModelType         uint8
 	NameColorChecksum uint32
-	SectionID         byte
-	Class             byte
-	V2Flags           byte
-	Version           byte
+	SectionID         uint8
+	Class             uint8
+	V2Flags           uint8
+	Version           uint8
 	V1Flags           uint32
 	Costume           uint16
 	Skin              uint16
@@ -65,7 +65,7 @@ type Character struct {
 	ProportionX       float32
 	ProportionY       float32
 	ReadableName      string
-	Name              []byte
+	Name              []uint8
 	Playtime          uint32
 	ATP               uint16
 	MST               uint16
@@ -75,8 +75,8 @@ type Character struct {
 	ATA               uint16
 	LCK               uint16
 	Meseta            uint32
-	HPMaterialsUsed   byte
-	TPMaterialsUsed   byte
+	HPMaterialsUsed   uint8
+	TPMaterialsUsed   uint8
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -91,18 +91,18 @@ type GuildcardEntry struct {
 
 	Guildcard       uint64
 	FriendGuildcard int
-	Name            []byte
-	TeamName        []byte
-	Description     []byte
-	Language        byte
-	SectionID       byte
-	Class           byte
-	Comment         []byte
+	Name            []uint8
+	TeamName        []uint8
+	Description     []uint8
+	Language        uint8
+	SectionID       uint8
+	Class           uint8
+	Comment         []uint8
 }
 
 // Ship contains the connection information for a Ship server.
 type Ship struct {
-	IP   string
-	Port int
-	Name string
+	Address string
+	Port    int
+	Name    string
 }

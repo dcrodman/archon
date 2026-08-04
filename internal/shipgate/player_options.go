@@ -3,8 +3,9 @@ package shipgate
 import (
 	"errors"
 
-	"github.com/dcrodman/archon/internal/data"
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 // findPlayerOptions returns all of hte PlayerOptions associated with an Account.

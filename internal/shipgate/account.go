@@ -3,8 +3,9 @@ package shipgate
 import (
 	"errors"
 
-	"github.com/dcrodman/archon/internal/data"
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 func findAccountByID(db *gorm.DB, id uint) (*data.Account, error) {

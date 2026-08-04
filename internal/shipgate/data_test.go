@@ -4,9 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 // Creates a database for testing. For the sake of simplicity, this only uses the

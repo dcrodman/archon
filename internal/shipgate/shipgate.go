@@ -7,13 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 var (
@@ -106,6 +108,9 @@ func Shutdown(ctx context.Context) {
 type ShipgateService struct {
 	logger *zap.SugaredLogger
 	db     *gorm.DB
+
+	ships    []data.Ship
+	shipsMtx sync.RWMutex
 }
 
 // AuthenticateAccount verifies an account. A password should be provided
@@ -207,4 +212,20 @@ func (s *ShipgateService) UpsertPlayerOptions(ctx context.Context, accountID uin
 		return fmt.Errorf("error creating player options: %v", err)
 	}
 	return nil
+}
+
+// RegisterShip adds a new Ship (i.e. game server) to its registry to indicate that players may join it.
+func (s *ShipgateService) RegisterShip(ctx context.Context, ship data.Ship) {
+	s.logger.Debug("RegisterShip")
+
+	s.shipsMtx.Lock()
+	defer s.shipsMtx.Unlock()
+	s.ships = append(s.ships, ship)
+}
+
+// GetAvailableShips returns a view of all known ships currently registered and active.
+func (s *ShipgateService) GetAvailableShips(ctx context.Context) []data.Ship {
+	s.shipsMtx.RLock()
+	defer s.shipsMtx.RUnlock()
+	return s.ships
 }

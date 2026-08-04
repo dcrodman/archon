@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/shipgate"
-	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
@@ -53,7 +53,6 @@ var (
 type CharacterServer struct {
 	numParameterFiles int
 	kvCache           *gocache.Cache
-	ships             []data.Ship
 }
 
 func (s *CharacterServer) Identifier() string {
@@ -146,11 +145,11 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
-			return s.sendSecurity(c, commands.BBLoginErrorPassword)
+			return SendSecurity(c, commands.BBLoginErrorPassword)
 		case shipgate.ErrAccountBanned:
-			return s.sendSecurity(c, commands.BBLoginErrorBanned)
+			return SendSecurity(c, commands.BBLoginErrorBanned)
 		default:
-			sendErr := s.sendMessage(c, cases.Title(language.English).String(err.Error()))
+			sendErr := SendMessage(c, cases.Title(language.English).String(err.Error()))
 			if sendErr == nil {
 				return sendErr
 			}
@@ -158,7 +157,7 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 		}
 	}
 
-	if err := s.sendSecurity(c, commands.BBLoginErrorNone); err != nil {
+	if err := SendSecurity(c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
 
@@ -169,13 +168,13 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
 	if loginPkt.Phase == commands.ShipSelection {
-		if err = s.sendTimestamp(c); err != nil {
+		if err = SendTimestamp(c); err != nil {
 			return err
 		}
-		if err = s.sendShipList(ctx, c); err != nil {
+		if err = SendShipList(ctx, c); err != nil {
 			return err
 		}
-		if err = s.sendScrollMessage(c); err != nil {
+		if err = SendScrollMessage(c); err != nil {
 			return err
 		}
 	}
@@ -183,43 +182,8 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	return nil
 }
 
-// send the security initialization command with information about the user's
-// authentication status.
-func (s *CharacterServer) sendSecurity(c *Client, errorCode uint32) error {
-	cfg := commands.ClientConfig{
-		Magic:        c.Config.Magic,
-		CharSelected: c.Config.CharSelected,
-		SlotNum:      c.Config.SlotNum,
-		Flags:        c.Config.Flags,
-	}
-	copy(cfg.Ports[:], c.Config.Ports[:])
-	copy(cfg.Unused[:], c.Config.Unused[:])
-	copy(cfg.Unused2[:], c.Config.Unused2[:])
-
-	// Constants set according to how Newserv does it.
-	return c.Send(&commands.Security{
-		Header:       commands.BBHeader{Type: commands.LoginSecurityType},
-		ErrorCode:    errorCode,
-		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
-		Config:       cfg,
-		Capabilities: 0x00000102,
-	})
-}
-
-// Sends a message to the client. In this case whatever message is sent
-// here will be displayed in a dialog box after the patch screen.
-func (s *CharacterServer) sendMessage(c *Client, message string) error {
-	return c.Send(&commands.LoginClientMessage{
-		Header:   commands.BBHeader{Type: commands.LoginClientMessageType},
-		Language: 0x00450009,
-		Message:  ConvertToUtf16(message),
-	})
-}
-
 // Send a timestamp command in order to indicate the server's current time.
-func (s *CharacterServer) sendTimestamp(c *Client) error {
+func SendTimestamp(c *Client) error {
 	pkt := &commands.Timestamp{
 		Header:    commands.BBHeader{Type: commands.LoginTimestampType},
 		Timestamp: [28]byte{},
@@ -237,15 +201,17 @@ func (s *CharacterServer) sendTimestamp(c *Client) error {
 // a single (bundled) ship server for the moment, the entries are hardcoded
 // rather than bothering with anything fancy like retrieving a list of active
 // ships from the shipgate, etc.
-func (s *CharacterServer) sendShipList(ctx context.Context, c *Client) error {
+func SendShipList(ctx context.Context, c *Client) error {
 	entries := []commands.ShipMenuEntry{
 		// The first item is ignored and just used for the menu title.
 		{MenuID: 0x11000011, ItemID: 0},
 	}
 	copy(entries[0].Name[:], ConvertToUtf16("Archon"))
 
+	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
+
 	// Append our active ship list.
-	for i, ship := range s.ships {
+	for i, ship := range availableShips {
 		var entry commands.ShipMenuEntry
 		entry.ItemID = uint32(i) + 1
 		copy(entry.Name[:], ConvertToUtf16(ship.Name))
@@ -255,14 +221,14 @@ func (s *CharacterServer) sendShipList(ctx context.Context, c *Client) error {
 	return c.Send(&commands.ShipMenu{
 		Header: commands.BBHeader{
 			Type:  commands.BlockListType,
-			Flags: uint32(len(s.ships)),
+			Flags: uint32(len(availableShips)),
 		},
 		Entries: entries,
 	})
 }
 
 // send whatever scrolling message was read out of the config file for the login screen.
-func (s *CharacterServer) sendScrollMessage(c *Client) error {
+func SendScrollMessage(c *Client) error {
 	// Returns the scroll message displayed along the top of the ship selection screen,
 	// lazily computing it from the config file and storing it in a package var.
 	shipSelectionScrollMessageInit.Do(func() {
@@ -283,13 +249,15 @@ func (s *CharacterServer) sendScrollMessage(c *Client) error {
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
 func (s *CharacterServer) handleShipSelection(ctx context.Context, c *Client, menuSelectionPkt *commands.MenuSelection) error {
+	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
+
 	selectedShip := menuSelectionPkt.ItemID - 1
-	if selectedShip >= uint32(len(s.ships)) {
+	if selectedShip >= uint32(len(availableShips)) {
 		return fmt.Errorf("invalid ship selection: %d", selectedShip)
 	}
 
-	ip := net.ParseIP(s.ships[selectedShip].IP).To4()
-	port := s.ships[selectedShip].Port
+	ip := net.ParseIP(availableShips[selectedShip].Address).To4()
+	port := availableShips[selectedShip].Port
 
 	return c.Send(&commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
@@ -317,12 +285,12 @@ func (s *CharacterServer) handleOptionsRequest(ctx context.Context, c *Client) e
 			return fmt.Errorf("error creating player options: %w", err)
 		}
 	}
-	return s.sendOptions(c, playerOptions.KeyConfig)
+	return SendOptions(c, playerOptions.KeyConfig)
 }
 
 // send the client's configuration options. keyConfig should be 420 bytes long and either
 // point to the default keys array or loaded from the database.
-func (s *CharacterServer) sendOptions(c *Client, keyConfig []byte) error {
+func SendOptions(c *Client, keyConfig []byte) error {
 	if len(keyConfig) != 420 {
 		return fmt.Errorf("received keyConfig of length %d; should be 420", len(keyConfig))
 	}

@@ -4,8 +4,8 @@ package commands
 const (
 	LoginWelcomeType            = 0x03
 	LoginType                   = 0x93
-	LoginSecurityType           = 0xE6
-	LoginClientMessageType      = 0x1A
+	SecurityType                = 0xE6
+	ClientMessageType           = 0x1A
 	LoginOptionsRequestType     = 0xE0
 	LoginOptionsType            = 0xE2
 	LoginCharSelectType         = 0xE3

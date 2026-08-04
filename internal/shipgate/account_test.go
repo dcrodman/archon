@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/google/go-cmp/cmp"
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 func seedRandomAccounts(t *testing.T, db *gorm.DB) {

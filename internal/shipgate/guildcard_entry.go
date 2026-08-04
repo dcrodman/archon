@@ -3,9 +3,9 @@ package shipgate
 import (
 	"errors"
 
-	"github.com/dcrodman/archon/internal/data"
-
 	"gorm.io/gorm"
+
+	"github.com/dcrodman/archon/internal/data"
 )
 
 // findGuildcardEntries returns all the GuildcardEntry rows associated with an Account.
