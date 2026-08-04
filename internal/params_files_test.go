@@ -12,7 +12,7 @@ import (
 )
 
 func TestPRS(t *testing.T) {
-	decompressedFile := "./testdata/decompressed_stats_file.prs"
+	decompressedFile := "./prs/testdata/decompressed_stats_file.prs"
 	wantDecompressed, err := os.ReadFile(decompressedFile)
 	if err != nil {
 		t.Fatalf("error opening decompressed_stats_file.prs: %v", err)

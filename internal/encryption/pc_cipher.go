@@ -76,24 +76,18 @@ func (crypt *pcCipher) mixKeys() {
 
 // Encrypt a block of data in place.
 func (crypt *pcCipher) Encrypt(data []byte, size uint32) {
-	for i := 0; i < int(size); i += PSOPCBlockSize {
-		block := data[i : i+PSOPCBlockSize]
-		crypt.process(block, len(block))
-	}
+	crypt.process(data, size)
 }
 
 // Decrypt a block of data in place.
 func (crypt *pcCipher) Decrypt(data []byte, size uint32) {
-	for i := 0; i < int(size); i += PSOPCBlockSize {
-		block := data[i : i+PSOPCBlockSize]
-		crypt.process(block, len(block))
-	}
+	crypt.process(data, size)
 }
 
 // Perform the actual encryption/decryption. The operation is
 // symmetrical, so the same algorithm can be applied for both.
-func (crypt *pcCipher) process(data []byte, size int) {
-	for x := 0; x < size; x += 4 {
+func (crypt *pcCipher) process(data []byte, size uint32) {
+	for x := uint32(0); x < size; x += 4 {
 		tmp := toLittleEndian(data[x : x+4])
 		tmp ^= crypt.getNextKey()
 		// Stick the data back in LE order.

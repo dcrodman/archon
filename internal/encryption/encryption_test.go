@@ -37,15 +37,17 @@ func TestPSOCrypt_BB(t *testing.T) {
 func TestPSOCrypt_PC(t *testing.T) {
 	// PCCrypt was presumably designed specifically for client/server interaction
 	// and attempting to encrypt and subsequently decrypt the same block of code
-	// will not yield the original string. To test the functionality, two crypt
-	// instances are used to mimic how the client and server use this cipher.
-	cryptSession := NewPCCryptoSession()
+	// will not yield the original string. Hence, we need to use the crypt session
+	// instead of a single cipher.
+	vector := createKey(4)
+	clientCipher := newPCCipher(vector)
+	serverCipher := newPCCipher(vector)
 
 	testData := []byte("test data with padding _")
 
 	encBuffer := make([]byte, len(testData))
 	copy(encBuffer, testData)
-	cryptSession.Encrypt(encBuffer, uint32(len(encBuffer)))
+	clientCipher.Encrypt(encBuffer, uint32(len(encBuffer)))
 
 	if reflect.DeepEqual(encBuffer, testData) {
 		t.Fatalf("expected Encrypt() to have encrypted data")
@@ -53,10 +55,10 @@ func TestPSOCrypt_PC(t *testing.T) {
 
 	decBuffer := make([]byte, len(testData))
 	copy(decBuffer, encBuffer)
-	cryptSession.Decrypt(decBuffer, uint32(len(decBuffer)))
+	serverCipher.Decrypt(decBuffer, uint32(len(decBuffer)))
 
 	if !reflect.DeepEqual(decBuffer, testData) {
-		t.Fatalf("expected Decrypt() to have decrypted to the original string")
+		t.Fatal("expected Decrypt() to have decrypted to the original string")
 	}
 
 	buffer2 := make([]byte, len(testData))
