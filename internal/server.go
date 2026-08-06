@@ -161,9 +161,17 @@ handleLoop:
 // into the packet processing loop.
 func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	c := NewClient(conn)
+
+	clientCtx, clientCancel := context.WithCancel(debug.WithServerContext(ctx, backend.Identifier()))
+	defer func() {
+		clientCancel()
+		closeConnectionAndRecover(c)
+		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
+	}()
+
 	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c.IPAddr)
 
-	if err := backend.Handshake(ctx, c); err != nil {
+	if err := backend.Handshake(clientCtx, c); err != nil {
 		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr, err)
 	}
 
@@ -175,20 +183,12 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	}
 
 	connectedClients[c.IPAddr] = c
-	processPackets(ctx, backend, c)
+	processPackets(clientCtx, backend, c)
 }
 
 // processPackets starts a blocking loop dedicated to reading data sent from
 // a game client and only returns once the connection has closed.
 func processPackets(ctx context.Context, backend Backend, c *Client) {
-	clientCtx, clientCancel := context.WithCancel(debug.WithServerContext(ctx, backend.Identifier()))
-
-	defer func() {
-		clientCancel()
-		closeConnectionAndRecover(c)
-		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
-	}()
-
 	buffer := make([]byte, 2048)
 	var err error
 
@@ -210,14 +210,14 @@ func processPackets(ctx context.Context, backend Backend, c *Client) {
 		}
 
 		if Config.Debugging.PacketLoggingEnabled {
-			debug.PrintPacket(clientCtx, debug.PrintPacketParams{
+			debug.PrintPacket(ctx, debug.PrintPacketParams{
 				Writer:        bufio.NewWriter(os.Stdout),
 				ClientCommand: true,
 				Data:          buffer,
 			})
 		}
 
-		if err = backend.Handle(clientCtx, c, buffer); err != nil {
+		if err = backend.Handle(ctx, c, buffer); err != nil {
 			Logger.Warnf("error communicating with client %s: %s", c.IPAddr, err)
 			return
 		}

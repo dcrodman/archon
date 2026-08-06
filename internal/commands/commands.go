@@ -120,18 +120,18 @@ const LoginType = 0x93
 // Login command sent to both the login and character servers.
 type Login struct {
 	Header        BBHeader
-	Unknown       [8]byte
+	Unknown       [8]uint8
 	ClientVersion uint16
 	Slot          uint32
 	Phase         LoginPhase
 	Unknown4      uint8 // It's not clear yet if this field is part of/related to the Phase field but it can take either 0 or e value on different clients
 	TeamID        uint32
-	Username      [16]byte
-	Padding       [32]byte
-	Password      [16]byte
-	Unknown3      [40]byte
-	HardwareInfo  [8]byte
-	Security      [40]byte
+	Username      [16]uint8
+	Padding       [32]uint8
+	Password      [16]uint8
+	Unknown3      [40]uint8
+	HardwareInfo  [8]uint8
+	Security      [40]uint8
 	Padding2      uint32
 }
 
