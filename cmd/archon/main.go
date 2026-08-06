@@ -83,19 +83,20 @@ func ServerCommand(cmd *cobra.Command, args []string) {
 var receivedSignal atomic.Bool
 
 func exitHandler(cancelFn func(), c chan os.Signal) {
-	<-c
+	for {
+		<-c
+		// Give the server a chance to shut down after the first ctrl-c.
+		if !receivedSignal.Load() {
+			fmt.Println("waiting to shut down gracefully...")
+			cancelFn()
+			receivedSignal.Store(true)
+			continue
+		}
 
-	// Give the server a chance to shut down after the first ctrl-c.
-	cancelFn()
-	if !receivedSignal.Load() {
-		fmt.Println("waiting to shut down gracefully...")
-		receivedSignal.Store(true)
-		return
+		// If the user does it again, just exit without waiting.
+		fmt.Println("hard exiting (killed)")
+		os.Exit(0)
 	}
-
-	// If the user does it again, just exit without waiting.
-	fmt.Println("hard exiting (killed)")
-	os.Exit(0)
 }
 
 // This function starts the default pprof HTTP server that can be accessed via localhost
@@ -106,7 +107,7 @@ func StartPprofServer(pprofPort int) {
 
 	go func() {
 		if err := http.ListenAndServe(listenerAddr, nil); err != nil {
-			fmt.Println("error starting pprof server: %s")
+			fmt.Println("error starting pprof server:")
 		}
 	}()
 }
