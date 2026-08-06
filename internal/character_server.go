@@ -6,7 +6,6 @@ import (
 	"hash/crc32"
 	"net"
 	"sync"
-	"syscall"
 	"time"
 	"unicode/utf16"
 
@@ -23,9 +22,7 @@ import (
 const (
 	// Maximum size of a block of parameter or guildcard data.
 	maxDataChunkSize = 0x6800
-	// Expected format of the timestamp sent to the client.
-	timeFormat = "2006:01:02: 15:05:05"
-	// Id sent in the menu selection command to tell the client
+	// ID sent in the menu selection command to tell the client
 	// that the selection was made on the ship menu.
 	ShipSelectionMenuId uint16 = 0x12
 )
@@ -182,16 +179,16 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	return nil
 }
 
+// Expected format of the timestamp sent to the client.
+const B1TimeFormat = "2006:01:02: 15:05:05.000"
+
 // Send a timestamp command in order to indicate the server's current time.
 func SendTimestamp(ctx context.Context, c *Client) error {
 	pkt := &commands.Timestamp{
 		Header:    commands.BBHeader{Type: commands.TimestampType},
-		Timestamp: [28]byte{},
+		Timestamp: [28]uint8{},
 	}
-
-	var tv syscall.Timeval
-	_ = syscall.Gettimeofday(&tv)
-	stamp := fmt.Sprintf("%s.%03d", time.Now().Format(timeFormat), uint64(tv.Usec/1000))
+	stamp := time.Now().Format(B1TimeFormat)
 	copy(pkt.Timestamp[:], stamp)
 
 	return c.Send(ctx, pkt)
