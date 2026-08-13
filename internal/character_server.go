@@ -18,14 +18,6 @@ import (
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
-const (
-	// Maximum size of a block of parameter or guildcard data.
-	maxDataChunkSize = 0x6800
-	// ID sent in the menu selection command to tell the client
-	// that the selection was made on the ship menu.
-	ShipSelectionMenuId uint16 = 0x12
-)
-
 var (
 	copyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyright 1999-2004 SONICTEAM.")
 
@@ -387,6 +379,29 @@ func SendChecksumAck(ctx context.Context, c *Client) error {
 	})
 }
 
+// GuildcardData is the per-player guildcard data chunk.
+type GuildcardData struct {
+	Unknown  [0x114]uint8
+	Blocked  [0x1DE8]uint8 //This should be a struct once implemented
+	Unknown2 [0x78]uint8
+	Entries  [104]GuildcardDataEntry
+	Unknown3 [0x1BC]uint8
+}
+
+// GuildcardDataEntry is the per-player friend guildcard entries.
+type GuildcardDataEntry struct {
+	Guildcard   uint32
+	Name        [48]byte
+	TeamName    [32]byte
+	Description [176]byte
+	Reserved    uint8
+	Language    uint8
+	SectionID   uint8
+	CharClass   uint8
+	Padding     uint32
+	Comment     [176]byte
+}
+
 // LoadConfig the player's saved guildcards, build the chunk data, and send the chunk header.
 func (s *CharacterServer) handleGuildcardDataStart(ctx context.Context, c *Client) error {
 	entries, err := shipgate.Shipgate.GetGuildcardEntries(ctx, c.Account.ID)
@@ -435,6 +450,9 @@ func (s *CharacterServer) handleGuildcardChunk(ctx context.Context, c *Client, c
 	// Anything else is a request to cancel sending guildcard chunks.
 	return nil
 }
+
+// Maximum size of a block of parameter or guildcard data.
+const maxDataChunkSize = 0x6800
 
 // send the specified chunk of guildcard data.
 func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {

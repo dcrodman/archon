@@ -89,7 +89,7 @@ func initParameterData() (int, error) {
 		}
 
 		// Base character class stats are stored sequentially, each 14 bytes long.
-		for i := 0; i < NumCharacterClasses; i++ {
+		for i := range NumCharacterClasses {
 			UnmarshalStruct(decompressedStatsFile[i*14:], &BaseStats[i])
 		}
 	})
