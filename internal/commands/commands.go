@@ -72,14 +72,17 @@ const JoinLobbyType = 0x67
 type JoinLobby struct {
 	Header BBHeader
 
-	ClientID    uint8
-	LeaderID    uint8
-	DisableUDP  uint8 // Always 1.
-	LobbyNumber uint8
-	BlockNumber uint8
-	Unused      uint8 // Dreamcast battle mode, according to newserv. Not relevant to BB.
-	Event       uint8
-	Unused2     [5]uint8 // 1 byte for something to do with voice chat and 4 bytes for some random seed.
+	ClientID         uint8
+	LeaderID         uint8
+	DisableUDP       uint8 // Always 1.
+	LobbyNumber      uint8
+	BlockNumber      uint8
+	EnableBattleMode uint8 // Dreamcast battle mode, according to newserv. Alway 1 in BB.
+	Event            uint8
+	EnableVoiceChat  uint8 // No idea, always 1.
+	RandomSeed       uint32
+
+	Unused [24]uint8 // Voice chat stuff that might be specific to xbox?
 
 	// Player entries.
 	Entries [12]LobbyEntry
@@ -298,37 +301,32 @@ type SyncCharacter struct {
 	ValidationFlags   uint32
 	CreationTimestamp uint32
 	Signature         uint32 // Always 0xC87ED5B1
-	PlayTime          uint32
-	OptionFlags       uint32
+	PlayTimeSeconds   uint32
+	OptionFlags       uint32 // Always 0x00040058
 	SaveCount         uint32
 
-	// Quest flags.
+	// TODO: This definition is incomplete relative to newserv.
 	QuestFlags [512]uint8
+	NumDeaths  uint32
 
-	NumDeaths uint32
-
-	// Bank.
-	BankNumItems uint32
-	BankMeseta   uint32
-	Bank         [200]BankItem
-
-	// Guild card (GuildCardBB, 0x0108 bytes).
+	Bank      Bank
 	GuildCard GuildCard
 
 	// Remaining character file sections (largely opaque).
-	GuildCardUnknown     uint32
-	SymbolChats          [0x4E0]uint8 // x12, 0x68 bytes each
-	Shortcuts            [0xA40]uint8 // x16, 0xA4 bytes each
-	AutoReply            [0x158]uint8 // UTF-16
-	InfoBoard            [0x158]uint8 // UTF-16
-	BattleRecords        [0x18]uint8
+	GuildCardUnknown uint32
+
+	SymbolChats          [1248]uint8 // 12 * 0x68 bytes each
+	Shortcuts            [2624]uint8 // 16 * 0xA4 bytes each
+	AutoReply            [344]uint8  // UTF-16
+	InfoBoard            [344]uint8  // UTF-16
+	BattleRecords        [24]uint8
 	Unknown4             [4]uint8
-	ChallengeRecords     [0x140]uint8
+	ChallengeRecords     [320]uint8
 	TechMenuShortcuts    [20]uint16
-	ChoiceSearch         [0x18]uint8
+	ChoiceSearch         [24]uint8
 	Unknown5             [16]uint8
 	QuestCounters        [16]uint32
-	OfflineBattleRecords [0x18]uint8
+	OfflineBattleRecords [24]uint8
 	Unknown6             [4]uint8
 
 	SystemChecksum          uint32
@@ -360,10 +358,12 @@ type SyncCharacter struct {
 	TeamRewardFlags uint32
 }
 
-type ItemData struct {
-	Data    [12]uint8
-	ItemID  uint32
-	MagData uint32
+type PlayerInventory struct {
+	NumItems        uint8
+	HPFromMaterials uint8
+	TPFromMaterials uint8
+	Language        uint8
+	Items           [30]PlayerInventoryItem
 }
 
 type PlayerInventoryItem struct {
@@ -376,12 +376,18 @@ type PlayerInventoryItem struct {
 	Item    ItemData
 }
 
-type PlayerInventory struct {
-	NumItems        uint8
-	HPFromMaterials uint8
-	TPFromMaterials uint8
-	Language        uint8
-	Items           [30]PlayerInventoryItem
+type ItemData struct {
+	Data    [12]uint8
+	ItemID  uint32
+	MagData uint32
+}
+
+type PlayerDisplayData struct {
+	Stats      PlayerStats
+	Visual     PlayerVisual
+	DispName   [32]uint8  // UTF-16
+	Config     [232]uint8 // Player key/action-bar config
+	TechLevels [20]uint8  // Technique levels v1
 }
 
 type PlayerStats struct {
@@ -393,8 +399,8 @@ type PlayerStats struct {
 	ATA            uint16
 	LCK            uint16
 	ESP            uint16
-	AttackRange    uint32 // float32
-	KnockbackRange uint32 // float32
+	AttackRange    float32
+	KnockbackRange float32
 	Level          uint32
 	Experience     uint32
 	Meseta         uint32
@@ -420,23 +426,22 @@ type PlayerVisual struct {
 	HairColorRed      uint16
 	HairColorGreen    uint16
 	HairColorBlue     uint16
-	ProportionX       uint32 // float32
-	ProportionY       uint32 // float32
+	ProportionX       float32
+	ProportionY       float32
 }
 
-type PlayerDisplayData struct {
-	Stats      PlayerStats
-	Visual     PlayerVisual
-	DispName   [16]uint8  // UTF-16
-	Config     [232]uint8 // Player key/action-bar config
-	TechLevels [20]uint8  // Technique levels v1
+type Bank struct {
+	NumItems uint32
+	Meseta   uint32
+	Bank     [200]BankItem
 }
 
 type BankItem struct {
-	Data      [12]uint8
-	ItemID    uint32
-	MagData   [4]uint8
-	BankCount uint32
+	Data     [12]uint8
+	ItemID   uint32
+	MagData  [4]uint8
+	Quantity uint16
+	Present  uint16
 }
 
 // GuildCard is the guild card data embedded in the character file.
@@ -444,7 +449,7 @@ type GuildCard struct {
 	GuildCardNumber uint32
 	Name            [48]uint8  // UTF-16, 0x18 chars
 	TeamName        [32]uint8  // UTF-16, 0x10 chars
-	Description     [176]uint8 // UTF-16, 0x58 chars; the player's guild card message
+	Description     [176]uint8 // UTF-16, 0x58 chars; the player's guild card messagess
 	Present         uint8
 	Language        uint8
 	SectionID       uint8
@@ -452,14 +457,8 @@ type GuildCard struct {
 }
 
 // Client sends this to indicate whether a character should be recreated or updated.
-// Note: newserv calls refers to this as "leave character select", which is probably more
-// accurate but this name fits better with how it's used in this server (for now).
+// We ignore this in favor of using the Phase from the login packet.
 const SetFlagType = 0xEC
-
-type SetFlag struct {
-	Header BBHeader
-	Flag   uint32
-}
 
 const ScrollMessageType = 0xEE
 
@@ -478,7 +477,7 @@ type ChecksumAck struct {
 	Ack    uint32
 }
 
-// TODO: ???
+// Client request for the guild card file checksum, which all servers (including Archon) ignore.
 const ChecksumType = 0x01E8
 
 // Client requesting guildcard data.

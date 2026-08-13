@@ -9,7 +9,6 @@ import (
 	"time"
 	"unicode/utf16"
 
-	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -49,7 +48,6 @@ var (
 // do not directly connect to this server.
 type CharacterServer struct {
 	numParameterFiles int
-	kvCache           *gocache.Cache
 }
 
 func (s *CharacterServer) Identifier() string {
@@ -57,8 +55,6 @@ func (s *CharacterServer) Identifier() string {
 }
 
 func (s *CharacterServer) Init(ctx context.Context) error {
-	s.kvCache = gocache.New(-1, 10*time.Second)
-
 	var err error
 	if s.numParameterFiles, err = initParameterData(); err != nil {
 		return err
@@ -114,9 +110,7 @@ func (s *CharacterServer) Handle(ctx context.Context, c *Client, data []byte) er
 		UnmarshalStruct(data, &pkt)
 		err = SendParameterChunk(ctx, c, paramChunkData[int(pkt.Flags)], pkt.Flags)
 	case commands.SetFlagType:
-		var pkt commands.SetFlag
-		UnmarshalStruct(data, &pkt)
-		s.setClientFlag(c, &pkt)
+		// Ignored.
 	case commands.CharacterSummaryType:
 		var charPkt commands.CharacterSummary
 		UnmarshalStruct(data, &charPkt)
@@ -159,12 +153,11 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 	}
 
 	c.Account = account
-	c.TeamID = uint32(account.TeamID)
-	c.Guildcard = uint32(account.Guildcard)
+	c.LoginPhase = loginPkt.Phase
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
-	if loginPkt.Phase == commands.ShipSelection {
+	if c.LoginPhase == commands.ShipSelection {
 		if err = SendTimestamp(ctx, c); err != nil {
 			return err
 		}
@@ -282,6 +275,7 @@ func (s *CharacterServer) handleOptionsRequest(ctx context.Context, c *Client) e
 			return fmt.Errorf("error creating player options: %w", err)
 		}
 	}
+
 	return SendOptions(ctx, c, playerOptions.KeyConfig)
 }
 
@@ -295,7 +289,7 @@ func SendOptions(ctx context.Context, c *Client, keyConfig []byte) error {
 	pkt := &commands.Options{
 		Header: commands.BBHeader{Type: commands.OptionsType},
 	}
-	pkt.PlayerKeyConfig.Guildcard = c.Guildcard
+	pkt.PlayerKeyConfig.Guildcard = uint32(c.Account.Guildcard)
 	copy(pkt.PlayerKeyConfig.KeyConfig[:], keyConfig[:0x16C])
 	copy(pkt.PlayerKeyConfig.JoystickConfig[:], keyConfig[0x16C:])
 
@@ -482,25 +476,10 @@ func SendParameterChunk(ctx context.Context, c *Client, chunkData []byte, chunk 
 	})
 }
 
-// The client may send us flags as a result of user actions in order to indicate
-// a change in state or desired behavior. For instance, setting 0x02 indicates
-// that the character dressing room has been opened.
-func (s *CharacterServer) setClientFlag(c *Client, pkt *commands.SetFlag) {
-	c.Flag = c.Flag | pkt.Flag
-	// Some flags are set right before the client disconnects, which means saving them
-	// on the Client struct alone isn't safe since the state is lost. To fix this the
-	// flags are also kept in memory to avoid bugs like accidentally recreating characters.
-	s.kvCache.Set(clientFlagCacheKey(c), c.Flag, -1)
-}
-
-func clientFlagCacheKey(c *Client) string {
-	return fmt.Sprintf("client-flags-%d", c.Account.ID)
-}
-
 // Performs a create or update/delete depending on whether the user followed the
 // "dressing room" or "recreate" flows (as indicated by a client flag).
 func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, charPkt *commands.CharacterSummary) error {
-	if s.hasDressingRoomFlag(c) {
+	if c.LoginPhase == commands.CharacterUpdate {
 		// "Dressing room"; a request to update an existing character.
 		if err := s.updateCharacter(ctx, c, charPkt); err != nil {
 			Logger.Error(err.Error())
@@ -586,28 +565,12 @@ func convertReadableName(name []uint8) string {
 	return string(utf16.Decode(utfName))
 }
 
-func (s *CharacterServer) hasDressingRoomFlag(c *Client) bool {
-	if (c.Flag & 0x02) != 0 {
-		return true
-	}
-
-	flags, found := s.kvCache.Get(clientFlagCacheKey(c))
-	if found {
-		return (flags.(uint32) & 0x02) != 0
-	}
-	return false
-}
-
 func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *commands.CharacterSummary) error {
-	// Clear the dressing room flag so that it doesn't get stuck and cause problems.
-	flags, _ := s.kvCache.Get(clientFlagCacheKey(c))
-	s.kvCache.Set(clientFlagCacheKey(c), flags.(uint32)^0x02, -1)
-
 	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, pkt.Slot)
 	if err != nil {
 		return err
 	} else if character == nil {
-		return fmt.Errorf("character does not exist in slot %d for guildcard %d", pkt.Slot, c.Guildcard)
+		return fmt.Errorf("character does not exist in slot %d for account %d", pkt.Slot, c.Account.ID)
 	}
 
 	pc := pkt.Character

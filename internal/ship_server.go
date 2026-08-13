@@ -8,20 +8,27 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon/internal/commands"
+	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
 
 type GameServer struct {
 	Name string
+
+	lobbies []*Lobby
 }
 
 func (s *GameServer) Identifier() string {
 	return "SHIP:GAME"
 }
 
-// Init connects to the shipgate.
 func (s *GameServer) Init(ctx context.Context) error {
+	// Create the game lobbies.
+	s.lobbies = make([]*Lobby, Config.ShipServer.NumLobbies)
+	for i := range Config.ShipServer.NumLobbies {
+		s.lobbies[i] = NewLobby(uint8(i))
+	}
 	return nil
 }
 
@@ -77,15 +84,23 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 		}
 	}
 	c.Account = account
-	c.ActiveSlot = loginPkt.Slot
+
+	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, loginPkt.Slot)
+	if err != nil {
+		return fmt.Errorf("error loading selected character: %v", err)
+	}
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
+		return err
+	}
+	if err := SendSyncCharacter(ctx, c, character); err != nil {
 		return err
 	}
 	if err := SendLobbyMenu(ctx, c); err != nil {
 		return err
 	}
-	return s.fetchAndSendCharacter(ctx, c)
+	// TODO: Send C5.
+	return s.addClientToLobby(ctx, c)
 }
 
 func SendMessage(ctx context.Context, c *Client, message string) error {
@@ -118,12 +133,7 @@ const (
 	NameColorGM     = 0xFF1D94F7
 )
 
-func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *Client) error {
-	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, c.ActiveSlot)
-	if err != nil {
-		return fmt.Errorf("error loading selected character: %v", err)
-	}
-
+func SendSyncCharacter(ctx context.Context, c *Client, character *data.Character) error {
 	charPkt := &commands.SyncCharacter{
 		Header: commands.BBHeader{Type: commands.SyncCharacterType},
 		Inventory: commands.PlayerInventory{
@@ -159,19 +169,16 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *Client) error
 				HairColorRed:   character.HairRed,
 				HairColorGreen: character.HairGreen,
 				HairColorBlue:  character.HairBlue,
-				ProportionX:    uint32(character.ProportionX),
-				ProportionY:    uint32(character.ProportionY),
+				ProportionX:    character.ProportionX,
+				ProportionY:    character.ProportionY,
 			},
 			// TODO: Tech levels.
 		},
-		Signature: 0xC87ED5B1,
-		PlayTime:  character.Playtime,
+		Signature:       0xC87ED5B1,
+		PlayTimeSeconds: character.Playtime,
 	}
 	copy(charPkt.GuildCard.Description[:], character.GuildcardStr)
 	copy(charPkt.DisplayData.Visual.Name[:], character.Name)
-	if c.IsGm {
-		charPkt.DisplayData.Visual.NameColor = NameColorGM
-	}
 	copy(charPkt.DisplayData.DispName[:], character.Name)
 
 	// TODO: Tethealla doesn't really support editing this either, so will need to figure out
@@ -179,16 +186,31 @@ func (s *GameServer) fetchAndSendCharacter(ctx context.Context, c *Client) error
 	copy(charPkt.KeyConfig[:], BaseKeyConfig[:0x16C])
 	copy(charPkt.JoystickConfig[:], BaseKeyConfig[0x16C:])
 
+	if c.Account.GM {
+		charPkt.DisplayData.Visual.NameColor = NameColorGM
+	}
 	// TODO: Copy the techniques and inventory here.
 
 	return c.Send(ctx, charPkt)
 }
 
-func SendJoinLobby(ctx context.Context, c *Client) error {
-	return c.Send(ctx, &commands.JoinLobby{
-		Header: commands.BBHeader{
-			Type: commands.JoinLobbyType,
-		},
-		DisableUDP: 1,
-	})
+// Find an available lobby and add the client to it, sending the appropriate notifications to
+// both the joining client and all existing clients in the lobby.
+func (s *GameServer) addClientToLobby(ctx context.Context, c *Client) error {
+	for _, lobby := range s.lobbies {
+		if lobby.IsFull() {
+			continue
+		}
+
+		err := lobby.AddClient(ctx, c)
+		switch err {
+		case nil:
+			return nil
+		case ErrLobbyFull:
+			continue
+		default:
+			return err
+		}
+	}
+	return nil
 }

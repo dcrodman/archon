@@ -122,8 +122,8 @@ func SendSecurity(ctx context.Context, c *Client, errorCode uint32) error {
 		Header:       commands.BBHeader{Type: commands.SecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
-		Guildcard:    c.Guildcard,
-		TeamID:       c.TeamID,
+		Guildcard:    uint32(c.Account.Guildcard),
+		TeamID:       uint32(c.Account.TeamID),
 		Config:       cfg,
 		Capabilities: 0x00000102,
 	})
