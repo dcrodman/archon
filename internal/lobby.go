@@ -62,6 +62,7 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 	l.mtx.Unlock()
 
 	c.Lock()
+	c.LobbyID = l.ID
 	c.LobbySlotID = lobbySlotID
 	c.Unlock()
 
@@ -82,6 +83,7 @@ func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
 	c.Lock()
 	currentLobbySlotID := c.LobbySlotID
 	// This is probably redundant and is technically still a valid slot.
+	c.LobbyID = 0
 	c.LobbySlotID = 0
 	c.Unlock()
 
@@ -101,7 +103,8 @@ func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
 	}
 	l.mtx.Unlock()
 
-	// TODO: Send the appropriate packets.
+	// Notify the other players that a player has left the lobby.
+	SendLeaveLobbyNotifications(ctx, l, c)
 }
 
 func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) error {
@@ -194,6 +197,28 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 
 		if err := oc.Send(ctx, joinCmd); err != nil {
 			Logger.Warnf("error sending lobby join notification to client %v", oc.IPAddr)
+		}
+	}
+}
+
+func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client) {
+	clients := make([]*Client, len(l.clients))
+	l.mtx.Lock()
+	lobbyLeaderID := l.leaderID
+	copy(clients, l.clients)
+	l.mtx.Unlock()
+
+	for _, oc := range clients {
+		if oc == c || oc == nil {
+			continue
+		}
+
+		if err := oc.Send(ctx, &commands.LeaveLobby{
+			ClientID:   c.LobbySlotID,
+			LeaderID:   lobbyLeaderID,
+			DisableUDP: 1,
+		}); err != nil {
+			Logger.Warnf("error sending lobby leave notification to client: %v", oc.IPAddr)
 		}
 	}
 }

@@ -57,6 +57,12 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var loginPkt commands.Login
 		UnmarshalStruct(data, &loginPkt)
 		err = s.handleLogin(ctx, c, &loginPkt)
+	case commands.SyncCharacterType:
+		var syncCommand commands.SyncCharacter
+		UnmarshalStruct(data, &syncCommand)
+		s.handleSyncCharacter(ctx, c, &syncCommand)
+	case commands.DisconnectType:
+		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	default:
 		Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr)
 	}
@@ -168,4 +174,23 @@ func (s *GameServer) addClientToLobby(ctx context.Context, c *Client) error {
 		}
 	}
 	return nil
+}
+
+// Client has requested to save the current game state, so flush it to the database.
+func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, syncCommand *commands.SyncCharacter) error {
+	c.Lock()
+	charData := *c.Character
+	c.Unlock()
+
+	// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the contents of the
+	// sync command from the client in favor of flushing the server-side state.
+
+	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
+}
+
+// handleDisconnectedClient is invoked when clients disconnect from the game server.
+func (s *GameServer) handleDisconnectedClient(ctx context.Context, c *Client) {
+	// Remove the client from the lobby they were in.
+	lobby := s.lobbies[c.LobbyID]
+	lobby.RemoveClient(ctx, c)
 }

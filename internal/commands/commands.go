@@ -66,10 +66,10 @@ type ClientMessage struct {
 	Message  []byte
 }
 
-// Sent to a player when joining a lobby.
+// Sent to a player when joining a lobby. Also used for games.
 const JoinLobbyType = 0x67
 
-// Sent to all other players when a player joins a lobby.
+// Sent to all other players when a player joins a lobby. Also used for games.
 const AddPlayerToLobby = 0x68
 
 type JoinLobby struct {
@@ -104,6 +104,15 @@ type LobbyEntry struct {
 
 	Inventory   CharacterInventory
 	DisplayData CharacterDisplayData
+}
+
+// Send to other players when a player leaves a lobby. Also used for games.
+const LeaveLobbyType = 0x66
+
+type LeaveLobby struct {
+	ClientID   uint8
+	LeaderID   uint8
+	DisableUDP uint8 // Always 1.
 }
 
 // LobbyList is the list of available lobbies in a block for use in the teleporter.

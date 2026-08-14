@@ -168,6 +168,13 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 		if err := recover(); err != nil {
 			Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c.IPAddr, err, rdbg.Stack())
 		}
+
+		// This is a bit of a hack, but we need to make sure that any disconnected clients
+		// are always removed from the lobby they were in.
+		if gs, ok := backend.(*GameServer); ok {
+			gs.handleDisconnectedClient(ctx, c)
+		}
+
 		closeConnection(c)
 		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
 	}()

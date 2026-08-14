@@ -17,8 +17,7 @@ var GameCopyright = []byte("Phantasy Star Online Blue Burst Game Server. Copyrig
 // in that it really just exists to be a gateway. Is main responsibility is to
 // provide the client with the block list and then send the address of the
 // block that the user selects.
-type GameAuthServer struct {
-}
+type GameAuthServer struct{}
 
 func (s *GameAuthServer) Identifier() string {
 	return "SHIP:AUTH"

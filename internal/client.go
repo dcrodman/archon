@@ -53,7 +53,9 @@ type Client struct {
 	sync.Mutex
 	// Character is a reference to the character selected during the login process.
 	Character *commands.CharacterData
-	// LobbySlotID is the position in the current Lobby.
+	// Lobby number they are currently in.
+	LobbyID uint8
+	// LobbySlotID is the position in the the lobby.
 	LobbySlotID uint8
 
 	// The following fields are server-specific and mainly used as a place to store
