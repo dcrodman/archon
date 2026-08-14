@@ -14,7 +14,9 @@ import (
 	"github.com/dcrodman/archon/internal/commands"
 )
 
-const serverTypeKey = "serverType"
+type contextKey string
+
+const serverTypeKey contextKey = "serverType"
 
 func WithServerContext(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, serverTypeKey, name)
@@ -46,13 +48,13 @@ func PrintPacket(ctx context.Context, params PrintPacketParams) {
 
 	// Write a header line for each command with some metadata.
 	var headerLine strings.Builder
-	headerLine.WriteString(fmt.Sprintf("[%s] %04X ", serverType, header.Type))
+	fmt.Fprintf(&headerLine, "[%s] %04X ", serverType, header.Type)
 	if params.ClientCommand {
 		headerLine.WriteString("| client->server ")
 	} else {
 		headerLine.WriteString("| server->client ")
 	}
-	headerLine.WriteString(fmt.Sprintf("(%d bytes)\n", header.Size))
+	fmt.Fprintf(&headerLine, "(%d bytes)\n", header.Size)
 
 	var err error
 	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
@@ -105,14 +107,14 @@ func writeCommandBody(params PrintPacketParams, pktLen uint16) error {
 func buildSingleLine(data []uint8, length int, offset uint16) string {
 	var line strings.Builder
 
-	line.WriteString(fmt.Sprintf("(%04X) ", offset))
+	fmt.Fprintf(&line, "(%04X) ", offset)
 
 	for i, j := 0, 0; i < length; i++ {
 		if j == 8 {
 			// Visual aid - spacing between groups of 8 bytes.
 			j = 0
 		}
-		line.WriteString(fmt.Sprintf("%02x ", data[i]))
+		fmt.Fprintf(&line, "%02x ", data[i])
 		j++
 	}
 

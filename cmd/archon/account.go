@@ -3,7 +3,16 @@
 package main
 
 import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/spf13/cobra"
+
+	archon "github.com/dcrodman/archon/internal"
+	"github.com/dcrodman/archon/internal/shipgate"
 )
 
 var accountCmd = &cobra.Command{
@@ -14,145 +23,101 @@ var accountCmd = &cobra.Command{
 var accountAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Registers new accounts in the database",
-	// Run:   AccountAddCommand,
+	Run:   AccountAddCommand,
 }
 
 var accountDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Deletes accounts from the database",
-	// Run:   AccountDeleteCommand,
+	Run:   AccountDeleteCommand,
 }
 
 var PermanentFlag bool
 
-// func initDB() *gorm.DB {
-// 	// Change to the same directory as the config file so that any relative
-// 	// paths in the config file will resolve.
-// 	if ConfigFlag != "" {
-// 		if err := os.Chdir(ConfigFlag); err != nil {
-// 			fmt.Println("error changing to config directory:", err)
-// 			os.Exit(1)
-// 		}
-// 	}
+func AccountAddCommand(cmd *cobra.Command, args []string) {
+	initShipgate()
+	var (
+		usernameInput string
+		username      string
 
-// 	cfg := core.LoadConfig(ConfigFlag)
-// 	var dialector gorm.Dialector
-// 	switch strings.ToLower(cfg.Database.Engine) {
-// 	case "sqlite":
-// 		dialector = sqlite.Open(cfg.QualifiedPath("archon.db"))
-// 	case "postgres":
-// 		dialector = postgres.Open(cfg.DatabaseURL())
-// 	default:
-// 		fmt.Println("unsupported database engine:", cfg.Database.Engine)
-// 		os.Exit(1)
-// 	}
+		passwordInput string
+		password      string
 
-// 	db, err := gorm.Open(dialector, &gorm.Config{Logger: gormlogger.Discard})
-// 	if err != nil {
-// 		fmt.Println("error connecting to database:", err.Error())
-// 		os.Exit(1)
-// 	}
-// 	return db
-// }
+		email string
+	)
 
-// func AccountAddCommand(cmd *cobra.Command, args []string) {
-// 	db := initDB()
-// 	var (
-// 		usernameInput string
-// 		username      string
+	usernameInput, args = popArg(args, "Username")
+	username = strings.ToLower(usernameInput)
+	if username != usernameInput {
+		fmt.Println("Warning: PSOBB client does not support capital letters in usernames. Using lowercase version")
+	}
 
-// 		passwordInput string
-// 		password      string
+	passwordInput, args = popArg(args, "Password")
+	password = strings.ToLower(passwordInput)
+	if password != usernameInput {
+		fmt.Println("Warning: PSOBB client does not support capital letters in passwords. Using lowercase version")
+	}
 
-// 		email string
-// 	)
+	email, _ = popArg(args, "Email")
 
-// 	usernameInput, args = popArg(args, "Username")
-// 	username = strings.ToLower(usernameInput)
-// 	if username != usernameInput {
-// 		fmt.Println("Warning: PSOBB client does not support capital letters in usernames. Using lowercase version")
-// 	}
+	account, err := shipgate.Shipgate.CreateAccount(context.Background(), email, username, password)
+	if err != nil {
+		fmt.Println("error creating account:", err)
+		return
+	}
 
-// 	passwordInput, args = popArg(args, "Password")
-// 	password = strings.ToLower(passwordInput)
-// 	if password != usernameInput {
-// 		fmt.Println("Warning: PSOBB client does not support capital letters in passwords. Using lowercase version")
-// 	}
+	fmt.Printf("created account for '%s' (ID: %d)\n", account.Username, account.ID)
+}
 
-// 	email, _ = popArg(args, "Email")
+func AccountDeleteCommand(cmd *cobra.Command, args []string) {
+	initShipgate()
 
-// 	account, err := findAccount(db, username)
-// 	if err != nil {
-// 		fmt.Println("error finding account:", err)
-// 		return
-// 	} else if account != nil {
-// 		fmt.Printf("account '%s' already exists; skipping\n", username)
-// 		return
-// 	}
+	usernameInput, _ := popArg(args, "Username")
+	username := strings.ToLower(usernameInput)
+	if username != usernameInput {
+		fmt.Println("Warning: PSOBB client does not support capital letters in usernames. Using lowercase version")
+	}
 
-// 	if err := data.CreateAccount(db, &data.Account{
-// 		Username: username,
-// 		Password: shipgate.HashPassword(password),
-// 		Email:    email,
-// 	}); err != nil {
-// 		fmt.Println("error creating account:", err)
-// 		return
-// 	}
+	if err := shipgate.Shipgate.DeleteAccount(context.Background(), username, PermanentFlag); err != nil {
+		fmt.Println("error deleting account:", err)
+		return
+	}
+	fmt.Println("deleted account")
+}
 
-// 	account, err = findAccount(db, username)
-// 	if err != nil {
-// 		fmt.Println("error finding account:", err)
-// 		return
-// 	}
-// 	fmt.Printf("created account for '%s' (ID: %d)\n", account.Username, account.ID)
-// }
+func initShipgate() {
+	archon.InitConfig(ConfigFlag)
+	if err := archon.InitLogger(); err != nil {
+		fmt.Println("error initializing logger:", err)
+		os.Exit(1)
+	}
 
-// func AccountDeleteCommand(cmd *cobra.Command, args []string) {
-// 	db := initDB()
+	// Change to the same directory as the config file so that any relative
+	// paths in the config file will resolve.
+	if ConfigFlag != "" {
+		if err := os.Chdir(ConfigFlag); err != nil {
+			fmt.Println("error changing to config directory:", err)
+			os.Exit(1)
+		}
+	}
 
-// 	usernameInput, _ := popArg(args, "Username")
-// 	username := strings.ToLower(usernameInput)
-// 	if username != usernameInput {
-// 		fmt.Println("Warning: PSOBB client does not support capital letters in usernames. Using lowercase version")
-// 	}
+	shipgate.Init(shipgate.DBConfig{
+		Engine:         archon.Config.Database.Engine,
+		Filename:       archon.Config.QualifiedPath(archon.Config.Database.Filename),
+		URL:            archon.Config.DatabaseURL(),
+		LoggingEnabled: archon.Config.Debugging.DatabaseLoggingEnabled,
+	}, archon.Logger)
+}
 
-// 	account, err := findAccount(db, username)
-// 	if err != nil {
-// 		fmt.Println("error finding account:", err)
-// 		return
-// 	}
+func popArg(args []string, prompt string) (string, []string) {
+	if len(args) == 1 {
+		return args[0], nil
+	} else if len(args) > 1 {
+		return args[0], args[1:]
+	}
 
-// 	if PermanentFlag {
-// 		if err := data.PermanentlyDeleteAccount(db, account); err != nil {
-// 			fmt.Println("error deleting account:", err)
-// 			return
-// 		}
-// 	} else {
-// 		if err := data.DeleteAccount(db, account); err != nil {
-// 			fmt.Println("error deleting account:", err)
-// 			return
-// 		}
-// 	}
-// 	fmt.Println("deleted account")
-// }
-
-// func popArg(args []string, prompt string) (string, []string) {
-// 	if len(args) == 1 {
-// 		return args[0], nil
-// 	} else if len(args) > 1 {
-// 		return args[0], args[1:]
-// 	}
-
-// 	fmt.Printf("%s: ", prompt)
-// 	scanner := bufio.NewScanner(os.Stdin)
-// 	scanner.Scan()
-// 	return scanner.Text(), args
-// }
-
-// func findAccount(db *gorm.DB, username string) (*data.Account, error) {
-// 	account, err := data.FindAccountByUsername(db, username)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error looking up account: %v", err)
-// 	}
-// 	return account, nil
-// }
+	fmt.Printf("%s: ", prompt)
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	return scanner.Text(), args
+}

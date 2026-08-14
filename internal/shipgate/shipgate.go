@@ -77,7 +77,7 @@ func initDatabase(cfg DBConfig) (*gorm.DB, error) {
 
 	db, err := gorm.Open(dialector, &gorm.Config{Logger: log})
 	if err != nil {
-		return nil, fmt.Errorf("error connecting to database: %s", err)
+		return nil, fmt.Errorf("connecting to database: %s", err)
 	}
 
 	if err = db.AutoMigrate(
@@ -86,7 +86,7 @@ func initDatabase(cfg DBConfig) (*gorm.DB, error) {
 		&data.Character{},
 		&data.GuildcardEntry{},
 	); err != nil {
-		return nil, fmt.Errorf("error auto migrating db: %s", err)
+		return nil, fmt.Errorf("auto migrating db: %s", err)
 	}
 	return db, nil
 }
@@ -137,7 +137,7 @@ func (s *ShipgateService) AuthenticateAccount(ctx context.Context, username, pas
 func HashPassword(password string) string {
 	hash := sha256.New()
 	if _, err := hash.Write(stripBytePadding([]byte(password))); err != nil {
-		panic(fmt.Errorf("error generating password hash: %v", err))
+		panic(fmt.Errorf("generating password hash: %v", err))
 	}
 	return hex.EncodeToString(hash.Sum(nil)[:])
 }
@@ -149,6 +149,49 @@ func stripBytePadding(b []byte) []byte {
 		}
 	}
 	return b
+}
+
+// CreateAccount registers a new account.
+func (s *ShipgateService) CreateAccount(ctx context.Context, email, username, password string) (*data.Account, error) {
+	account, err := findAccountByUsername(s.db, username)
+	if err != nil {
+		return nil, fmt.Errorf("finding account: %w", err)
+	} else if account != nil {
+		return nil, fmt.Errorf("account '%s' already exists", username)
+	}
+
+	if err := createAccount(s.db, &data.Account{
+		Username: username,
+		Password: HashPassword(password),
+		Email:    email,
+	}); err != nil {
+		return nil, fmt.Errorf("creating account: %w", err)
+	}
+
+	account, err = findAccountByUsername(s.db, username)
+	if err != nil {
+		return nil, fmt.Errorf("finding account: %w", err)
+	}
+	return account, nil
+}
+
+// DeleteAccount deactivates an account, or deletes it from the database entirely if permanent is true.
+func (s *ShipgateService) DeleteAccount(ctx context.Context, username string, permanent bool) error {
+	account, err := findAccountByUsername(s.db, username)
+	if err != nil {
+		return fmt.Errorf("finding account: %w", err)
+	}
+
+	if permanent {
+		if err := permanentlyDeleteAccount(s.db, account); err != nil {
+			return fmt.Errorf("deleting account: %w", err)
+		}
+	} else {
+		if err := deleteAccount(s.db, account); err != nil {
+			return fmt.Errorf("deleting account: %w", err)
+		}
+	}
+	return nil
 }
 
 // FindCharacter looks up character in a slot on an account. This method returns the wire protocol
@@ -181,7 +224,7 @@ func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint64,
 		Slot:         slot,
 		Data:         b,
 		DataVersion:  1,
-		ReadableName: convertReadableName(c.DisplayData.Visual.Name[:]),
+		ReadableName: convertReadableName(c.DisplayData.DispName[:]),
 		Level:        c.DisplayData.Stats.Level,
 	}
 	if err := upsertCharacter(s.db, dbc); err != nil {
@@ -211,7 +254,7 @@ func (s *ShipgateService) DeleteCharacter(ctx context.Context, accountID uint64,
 	s.logger.Debug("DeleteCharacter")
 
 	if err := deleteCharacter(s.db, accountID, slot); err != nil {
-		return fmt.Errorf("error deleting character for account %d slot %d: %w", accountID, slot, err)
+		return fmt.Errorf("deleting character for account %d slot %d: %w", accountID, slot, err)
 	}
 	return nil
 }
@@ -222,7 +265,7 @@ func (s *ShipgateService) GetGuildcardEntries(ctx context.Context, accountID uin
 
 	entries, err := findGuildcardEntries(s.db, uint64(accountID))
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving guildcard entries for account %d: %w", accountID, err)
+		return nil, fmt.Errorf("retrieving guildcard entries for account %d: %w", accountID, err)
 	}
 	return entries, nil
 }
@@ -233,7 +276,7 @@ func (s *ShipgateService) GetPlayerOptions(ctx context.Context, accountID uint64
 
 	playerOptions, err := findPlayerOptions(s.db, accountID)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving player options for account %d: %w", accountID, err)
+		return nil, fmt.Errorf("retrieving player options for account %d: %w", accountID, err)
 	}
 	return playerOptions, nil
 }
@@ -244,7 +287,7 @@ func (s *ShipgateService) UpsertPlayerOptions(ctx context.Context, accountID uin
 
 	po.Account = &data.Account{ID: accountID}
 	if err := createPlayerOptions(s.db, po); err != nil {
-		return fmt.Errorf("error creating player options: %v", err)
+		return fmt.Errorf("creating player options: %v", err)
 	}
 	return nil
 }
