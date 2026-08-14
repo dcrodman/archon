@@ -68,7 +68,7 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 	username := string(StripPadding(loginPkt.Username[:]))
 	password := string(StripPadding(loginPkt.Password[:]))
 
-	_, err := shipgate.Shipgate.AuthenticateAccount(ctx, username, password)
+	account, err := shipgate.Shipgate.AuthenticateAccount(ctx, username, password)
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
@@ -83,6 +83,7 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 			return err
 		}
 	}
+	c.Account = account
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
@@ -105,7 +106,7 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 }
 
 // send the security initialization command with information about the user's
-// authentication status.
+// authentication status. Requires that c.Account is set before calling.
 func SendSecurity(ctx context.Context, c *Client, errorCode uint32) error {
 	cfg := commands.ClientConfig{
 		Magic:        c.Config.Magic,
@@ -117,16 +118,20 @@ func SendSecurity(ctx context.Context, c *Client, errorCode uint32) error {
 	copy(cfg.Unused[:], c.Config.Unused[:])
 	copy(cfg.Unused2[:], c.Config.Unused2[:])
 
-	// Constants set according to how Newserv does it.
-	return c.Send(ctx, &commands.Security{
+	cmd := &commands.Security{
 		Header:       commands.BBHeader{Type: commands.SecurityType},
 		ErrorCode:    errorCode,
 		PlayerTag:    0x00010000,
-		Guildcard:    uint32(c.Account.Guildcard),
-		TeamID:       uint32(c.Account.TeamID),
 		Config:       cfg,
 		Capabilities: 0x00000102,
-	})
+	}
+	if c.Account != nil {
+		cmd.Guildcard = uint32(c.Account.Guildcard)
+		cmd.TeamID = uint32(c.Account.TeamID)
+	}
+
+	// Constants set according to how Newserv does it.
+	return c.Send(ctx, cmd)
 }
 
 // Send the IP address and port of the character server to which the client will

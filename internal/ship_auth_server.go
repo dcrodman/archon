@@ -72,7 +72,7 @@ func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPk
 	username := string(StripPadding(loginPkt.Username[:]))
 	password := string(StripPadding(loginPkt.Password[:]))
 
-	_, err := shipgate.Shipgate.AuthenticateAccount(ctx, username, password)
+	account, err := shipgate.Shipgate.AuthenticateAccount(ctx, username, password)
 	if err != nil {
 		switch err {
 		case shipgate.ErrInvalidCredentials:
@@ -87,6 +87,7 @@ func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPk
 			return err
 		}
 	}
+	c.Account = account
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err

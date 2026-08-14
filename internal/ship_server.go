@@ -8,7 +8,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/dcrodman/archon/internal/commands"
-	"github.com/dcrodman/archon/internal/data"
 	"github.com/dcrodman/archon/internal/encryption"
 	"github.com/dcrodman/archon/internal/shipgate"
 )
@@ -89,11 +88,14 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	if err != nil {
 		return fmt.Errorf("error loading selected character: %v", err)
 	}
+	c.Lock()
+	c.Character = character
+	c.Unlock()
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
-	if err := SendSyncCharacter(ctx, c, character); err != nil {
+	if err := SendSyncCharacter(ctx, c); err != nil {
 		return err
 	}
 	if err := SendLobbyMenu(ctx, c); err != nil {
@@ -133,65 +135,18 @@ const (
 	NameColorGM     = 0xFF1D94F7
 )
 
-func SendSyncCharacter(ctx context.Context, c *Client, character *data.Character) error {
-	charPkt := &commands.SyncCharacter{
-		Header: commands.BBHeader{Type: commands.SyncCharacterType},
-		Inventory: commands.PlayerInventory{
-			HPFromMaterials: character.HPMaterialsUsed,
-			TPFromMaterials: character.TPMaterialsUsed,
-			// Items: ,
-		},
-		DisplayData: commands.PlayerDisplayData{
-			Stats: commands.PlayerStats{
-				ATP: character.ATP,
-				MST: character.MST,
-				EVP: character.EVP,
-				HP:  character.HP,
-				DFP: character.DFP,
-				ATA: character.ATA,
-				LCK: character.LCK,
-				// TODO: ESP, AttackRange, KnockbackRange
-				Level:      uint32(character.Level),
-				Experience: character.Experience,
-				Meseta:     character.Meseta,
-			},
-			Visual: commands.PlayerVisual{
-				NameColor:      NameColorNormal,
-				SkinID:         character.ModelType,
-				SectionID:      character.SectionID,
-				Class:          character.Class,
-				SkinFlag:       character.V2Flags,
-				Costume:        character.Costume,
-				Skin:           character.Skin,
-				Face:           character.Face,
-				Head:           character.Head,
-				Hair:           character.Hair,
-				HairColorRed:   character.HairRed,
-				HairColorGreen: character.HairGreen,
-				HairColorBlue:  character.HairBlue,
-				ProportionX:    character.ProportionX,
-				ProportionY:    character.ProportionY,
-			},
-			// TODO: Tech levels.
-		},
-		Signature:       0xC87ED5B1,
-		PlayTimeSeconds: character.Playtime,
+func SendSyncCharacter(ctx context.Context, c *Client) error {
+	cmd := &commands.SyncCharacter{
+		Header:    commands.BBHeader{Type: commands.SyncCharacterType},
+		Character: *c.Character,
 	}
-	copy(charPkt.GuildCard.Description[:], character.GuildcardStr)
-	copy(charPkt.DisplayData.Visual.Name[:], character.Name)
-	copy(charPkt.DisplayData.DispName[:], character.Name)
 
-	// TODO: Tethealla doesn't really support editing this either, so will need to figure out
-	// how to save this and return it to the player rather than using the default.
-	copy(charPkt.KeyConfig[:], BaseKeyConfig[:0x16C])
-	copy(charPkt.JoystickConfig[:], BaseKeyConfig[0x16C:])
-
+	cmd.Character.DisplayData.Visual.NameColor = NameColorNormal
 	if c.Account.GM {
-		charPkt.DisplayData.Visual.NameColor = NameColorGM
+		cmd.Character.DisplayData.Visual.NameColor = NameColorGM
 	}
-	// TODO: Copy the techniques and inventory here.
 
-	return c.Send(ctx, charPkt)
+	return c.Send(ctx, cmd)
 }
 
 // Find an available lobby and add the client to it, sending the appropriate notifications to

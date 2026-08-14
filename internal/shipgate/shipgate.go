@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf16"
 
 	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
@@ -15,6 +16,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/dcrodman/archon/internal/commands"
 	"github.com/dcrodman/archon/internal/data"
 )
 
@@ -149,26 +151,59 @@ func stripBytePadding(b []byte) []byte {
 	return b
 }
 
-// FindCharacter looks up character in a slot on an account.
-func (s *ShipgateService) FindCharacter(ctx context.Context, accountID uint64, slot uint32) (*data.Character, error) {
+// FindCharacter looks up character in a slot on an account. This method returns the wire protocol
+// Character data as opposed to the database representation in order to avoid the potential for drift.
+func (s *ShipgateService) FindCharacter(ctx context.Context, accountID uint64, slot uint32) (*commands.CharacterData, error) {
 	s.logger.Debug("FindCharacter")
 
-	character, err := findCharacter(s.db, accountID, slot)
+	dbc, err := findCharacter(s.db, accountID, slot)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving character for account %d slot %d: %w", accountID, slot, err)
+	} else if dbc == nil {
+		return nil, nil
 	}
-	return character, nil
+
+	var character commands.CharacterData
+	UnmarshalStruct(dbc.Data, &character)
+
+	return &character, nil
 }
 
+// Note: implementation duplicated from bytes.go both for convenience and to prevent unrelated changes
+
 // UpsertCharacter creates a new character in a slot on an account.
-func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint64, c *data.Character) error {
+func (s *ShipgateService) UpsertCharacter(ctx context.Context, accountID uint64, slot uint32, c *commands.CharacterData) error {
 	s.logger.Debug("UpsertCharacter")
 
-	c.AccountID = uint64(accountID)
-	if err := upsertCharacter(s.db, c); err != nil {
-		return fmt.Errorf("error updating character for account %d slot %d: %w", accountID, c.Slot, err)
+	b, _ := MarshalStruct(c)
+	dbc := &data.Character{
+		AccountID:    accountID,
+		Slot:         slot,
+		Data:         b,
+		DataVersion:  1,
+		ReadableName: convertReadableName(c.DisplayData.Visual.Name[:]),
+		Level:        c.DisplayData.Stats.Level,
+	}
+	if err := upsertCharacter(s.db, dbc); err != nil {
+		return fmt.Errorf("error updating character for account %d slot %d: %w", accountID, slot, err)
 	}
 	return nil
+}
+
+func convertReadableName(name []uint8) string {
+	// The string is UTF-16LE encoded; convert it from from []uint8 to a []uint16
+	// slice with the bytes reversed and drops the language code prefix (0x09006900).
+	cleanedName := name[4:]
+	utfName := make([]uint16, 0)
+	for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
+		if cleanedName[i]|cleanedName[i+1] == 0 {
+			break
+		}
+		utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
+		j++
+	}
+
+	return string(utf16.Decode(utfName))
 }
 
 // DeleteCharacter deletes the character data in a slot on an account.

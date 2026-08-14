@@ -51,7 +51,9 @@ type Client struct {
 	// These fields may be included in commands send to other players and therefore may be
 	// accessed concurrently. All access is guarded by the embedded mutex.
 	sync.Mutex
-	// Position in the current Lobby.
+	// Character is a reference to the character selected during the login process.
+	Character *commands.CharacterData
+	// LobbySlotID is the position in the current Lobby.
 	LobbySlotID uint8
 
 	// The following fields are server-specific and mainly used as a place to store

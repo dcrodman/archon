@@ -47,10 +47,6 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 		return ErrLobbyFull
 	}
 
-	// First, copy the existing list of clients so we know which ones need to be notified.
-	notifyClients := make([]*Client, len(l.clients))
-	copy(notifyClients, l.clients)
-
 	// Now assign the client to a slot in the lobby and update its state.
 	var lobbySlotID uint8
 	for i := range l.clients {
@@ -74,12 +70,9 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 		return fmt.Errorf("assigning player to lobby: %v", err)
 	}
 
-	// TODO: Send 68 to notify other clients that a player joined.
-	// for _, c := range notifyClients {
-	// 	if c == nil {
-	// 		continue
-	// 	}
-	// }
+	// Notify the existing clients in the lobby that a player joined.
+	SendLobbyJoinNotification(ctx, l, c)
+
 	return nil
 }
 
@@ -121,15 +114,85 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 		LobbyNumber:      l.ID,
 		BlockNumber:      0, // Always going to be 0 unless we support more blocks.
 		EnableBattleMode: 1,
-		// TODO: Assign the lobby's event here once that is supported.
 		// Event:            0,
 		EnableVoiceChat: 1,
-		// Random seed is not used for lobbies.
 	}
 
+	otherClients := make([]*Client, len(l.clients))
 	l.mtx.Lock()
 	joinCmd.LeaderID = l.leaderID
+	copy(otherClients, l.clients)
 	l.mtx.Unlock()
 
+	// Build the full set of entries for all other clients in the lobby (excluding the joining player).
+	for _, oc := range otherClients {
+		if oc == c || oc == nil {
+			continue
+		}
+		oc.Lock()
+		playerEntry := commands.LobbyEntry{
+			PlayerTag: 0x00010000,
+			Guildcard: uint32(oc.Account.Guildcard),
+			// TODO: Will need to set this once teams are supported.
+			// TMGuildcard: ,
+			TeamID:         uint32(oc.Account.TeamID),
+			ClientID:       uint32(oc.LobbySlotID),
+			HideHelpPrompt: 1,
+			Inventory:      oc.Character.Inventory,
+			DisplayData:    oc.Character.DisplayData,
+		}
+		// TODO: Does this need to be decoded in any way?
+		copy(playerEntry.Name[:], oc.Character.GuildCard.Name[:])
+		oc.Unlock()
+
+		joinCmd.Entries = append(joinCmd.Entries, playerEntry)
+	}
+
 	return c.Send(ctx, joinCmd)
+}
+
+func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Client) {
+	clients := make([]*Client, len(l.clients))
+	l.mtx.Lock()
+	lobbyLeaderID := l.leaderID
+	copy(clients, l.clients)
+	l.mtx.Unlock()
+
+	baseCmd := commands.JoinLobby{
+		Header: commands.BBHeader{
+			Type: commands.AddPlayerToLobby,
+		},
+		DisableUDP:       1,
+		LobbyNumber:      l.ID,
+		BlockNumber:      0, // Always going to be 0 unless we support more blocks.
+		EnableBattleMode: 1,
+		LeaderID:         lobbyLeaderID,
+		// Event:            0,
+		EnableVoiceChat: 1,
+		Entries: []commands.LobbyEntry{
+			{
+				PlayerTag: 0x00010000,
+				Guildcard: uint32(joiningClient.Account.Guildcard),
+				// TODO: Will need to set this once teams are supported.
+				// TMGuildcard: ,
+				TeamID:         uint32(joiningClient.Account.TeamID),
+				ClientID:       uint32(joiningClient.LobbySlotID),
+				HideHelpPrompt: 1,
+				Inventory:      joiningClient.Character.Inventory,
+				DisplayData:    joiningClient.Character.DisplayData,
+			},
+		},
+	}
+	for _, oc := range clients {
+		if oc == joiningClient || oc == nil {
+			continue
+		}
+
+		joinCmd := baseCmd
+		joinCmd.ClientID = oc.LobbySlotID
+
+		if err := oc.Send(ctx, joinCmd); err != nil {
+			Logger.Warnf("error sending lobby join notification to client %v", oc.IPAddr)
+		}
+	}
 }

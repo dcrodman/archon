@@ -32,7 +32,10 @@ type PlayerOptions struct {
 	Account   *Account
 	AccountID uint64
 
+	// KeyConfig holds both the key and joystick config (0x1A4 bytes total); see SendOptions.
 	KeyConfig []uint8
+	// SystemSettings covers the client system/audio preferences section of SyncCharacter.
+	SystemSettings []uint8
 }
 
 // Character is an instance of a character in one of the slots for an account.
@@ -42,43 +45,18 @@ type Character struct {
 	Account   *Account
 	AccountID uint64 `gorm:"uniqueIndex:character_account_slot"`
 
-	Guildcard         uint64
-	GuildcardStr      []uint8
-	Slot              uint32 `gorm:"uniqueIndex:character_account_slot"`
-	Experience        uint32
-	Level             uint32
-	NameColor         uint32
-	ModelType         uint8
-	NameColorChecksum uint32
-	SectionID         uint8
-	Class             uint8
-	V2Flags           uint8
-	Version           uint8
-	V1Flags           uint32
-	Costume           uint16
-	Skin              uint16
-	Face              uint16
-	Head              uint16
-	Hair              uint16
-	HairRed           uint16
-	HairGreen         uint16
-	HairBlue          uint16
-	ProportionX       float32
-	ProportionY       float32
-	ReadableName      string
-	Name              []uint8
-	Playtime          uint32
-	ATP               uint16
-	MST               uint16
-	EVP               uint16
-	HP                uint16
-	DFP               uint16
-	ATA               uint16
-	LCK               uint16
-	Meseta            uint32
-	HPMaterialsUsed   uint8
-	TPMaterialsUsed   uint8
+	Slot uint32 `gorm:"uniqueIndex:character_account_slot"`
 
+	// Data stores the CharacterData blob as received on the wire format.
+	Data        []uint8
+	DataVersion int
+
+	// The following fields are extracted from Data as a convenience for querying
+	// and inspecting the database.
+	ReadableName string
+	Level        uint32
+
+	// Database timestamps.
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt

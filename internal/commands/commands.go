@@ -69,6 +69,9 @@ type ClientMessage struct {
 // Sent to a player when joining a lobby.
 const JoinLobbyType = 0x67
 
+// Sent to all other players when a player joins a lobby.
+const AddPlayerToLobby = 0x68
+
 type JoinLobby struct {
 	Header BBHeader
 
@@ -79,28 +82,28 @@ type JoinLobby struct {
 	BlockNumber      uint8
 	EnableBattleMode uint8 // Dreamcast battle mode, according to newserv. Alway 1 in BB.
 	Event            uint8
-	EnableVoiceChat  uint8 // No idea, always 1.
-	RandomSeed       uint32
+	EnableVoiceChat  uint8  // No idea, always 1.
+	RandomSeed       uint32 // Only used for games.
 
 	Unused [24]uint8 // Voice chat stuff that might be specific to xbox?
 
 	// Player entries.
-	Entries [12]LobbyEntry
+	Entries []LobbyEntry
 }
 
 type LobbyEntry struct {
-	PlayerTag   uint32
-	Guildcard   uint32
-	TMGuildcard uint32
-	TeamID      uint32
-	Unknown     [12]uint8
-	ClientID    uint32
-	Name        [32]uint8 // UTF-18
+	PlayerTag           uint32 // Always seems to be 0x00010000 in newserv.
+	Guildcard           uint32
+	TeamMasterGuildCard uint32
+	TeamID              uint32
+	Unknown             [12]uint8
+	ClientID            uint32
+	Name                [32]uint8 // UTF-18
 	// Per newserv, Should be set to 1 to hide the "Press F1 for help".
 	HideHelpPrompt uint32
 
-	Inventory   PlayerInventory
-	DisplayData PlayerDisplayData
+	Inventory   CharacterInventory
+	DisplayData CharacterDisplayData
 }
 
 // LobbyList is the list of available lobbies in a block for use in the teleporter.
@@ -223,44 +226,18 @@ type CharacterSelectionAck struct {
 	Flag   uint32
 }
 
+// Sent to the client for the selection menu and received from the client to update a character.
 const CharacterSummaryType = 0xE5
 
-// Sent to the client for the selection menu and received for updating a character.
 type CharacterSummary struct {
-	Header    BBHeader
-	Slot      uint32
-	Character CharacterPreview
-}
-
-// CharacterSummary is the common intermediate representation of a Character as it gets
-// passed around various servers and/or stored.
-type CharacterPreview struct {
-	Experience     uint32
-	Level          uint32
-	GuildcardStr   [16]byte
-	Unknown        [2]uint32
-	NameColor      uint32
-	Model          byte
-	Padding        [15]byte
-	NameColorChksm uint32
-	SectionID      byte
-	Class          byte
-	V2Flags        byte
-	Version        byte
-	V1Flags        uint32
-	Costume        uint16
-	Skin           uint16
-	Face           uint16
-	Head           uint16
-	Hair           uint16
-	HairRed        uint16
-	HairGreen      uint16
-	HairBlue       uint16
-	PropX          float32
-	PropY          float32
+	Header     BBHeader
+	Slot       uint32
+	Experience uint32
+	Level      uint32
+	Visual     CharacterVisual
 	// In reality this is [16]uint16 but []uint8 is more convenient to work with.
-	Name     [32]uint8
-	Playtime uint32
+	Name        [32]uint8
+	PlaytimeSec uint32
 }
 
 // Security command sent to the client to indicate the state of client login.
@@ -292,10 +269,13 @@ type ClientConfig struct {
 const SyncCharacterType = 0xE7
 
 type SyncCharacter struct {
-	Header BBHeader
+	Header    BBHeader
+	Character CharacterData
+}
 
-	Inventory   PlayerInventory
-	DisplayData PlayerDisplayData
+type CharacterData struct {
+	Inventory   CharacterInventory
+	DisplayData CharacterDisplayData
 
 	// Character file metadata.
 	ValidationFlags   uint32
@@ -358,15 +338,15 @@ type SyncCharacter struct {
 	TeamRewardFlags uint32
 }
 
-type PlayerInventory struct {
+type CharacterInventory struct {
 	NumItems        uint8
 	HPFromMaterials uint8
 	TPFromMaterials uint8
 	Language        uint8
-	Items           [30]PlayerInventoryItem
+	Items           [30]CharacterInventoryItem
 }
 
-type PlayerInventoryItem struct {
+type CharacterInventoryItem struct {
 	Present uint8
 	// Newserv somehow unearthed that these four uint8s are used for some tricky
 	// multipurpose backwards compatibility between games, which appear limited
@@ -382,15 +362,15 @@ type ItemData struct {
 	MagData uint32
 }
 
-type PlayerDisplayData struct {
-	Stats      PlayerStats
-	Visual     PlayerVisual
+type CharacterDisplayData struct {
+	Stats      CharacterStats
+	Visual     CharacterVisual
 	DispName   [32]uint8  // UTF-16
 	Config     [232]uint8 // Player key/action-bar config
 	TechLevels [20]uint8  // Technique levels v1
 }
 
-type PlayerStats struct {
+type CharacterStats struct {
 	ATP            uint16
 	MST            uint16
 	EVP            uint16
@@ -406,7 +386,7 @@ type PlayerStats struct {
 	Meseta         uint32
 }
 
-type PlayerVisual struct {
+type CharacterVisual struct {
 	Name              [16]uint8 // ASCII
 	Unknown2          [8]uint8
 	NameColor         uint32

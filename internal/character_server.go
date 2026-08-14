@@ -7,7 +7,6 @@ import (
 	"net"
 	"sync"
 	"time"
-	"unicode/utf16"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -139,13 +138,12 @@ func (s *CharacterServer) handleLogin(ctx context.Context, c *Client, loginPkt *
 			return err
 		}
 	}
+	c.Account = account
+	c.LoginPhase = loginPkt.Phase
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
 	}
-
-	c.Account = account
-	c.LoginPhase = loginPkt.Phase
 
 	// At this point, the user has chosen (or created) a character and the
 	// client needs the ship list.
@@ -336,36 +334,16 @@ func SendCharacterAck(ctx context.Context, c *Client, slotNum uint32, flag uint3
 }
 
 // send the preview command containing basic details about a character in the selected slot.
-func SendCharacterPreview(ctx context.Context, c *Client, char *data.Character) error {
+func SendCharacterPreview(ctx context.Context, c *Client, char *commands.CharacterData) error {
 	previewCommand := &commands.CharacterSummary{
-		Header: commands.BBHeader{Type: commands.CharacterSummaryType},
-		Slot:   0,
-		Character: commands.CharacterPreview{
-			Experience:     char.Experience,
-			Level:          char.Level,
-			NameColor:      char.NameColor,
-			Model:          byte(char.ModelType),
-			NameColorChksm: char.NameColorChecksum,
-			SectionID:      byte(char.SectionID),
-			Class:          byte(char.Class),
-			V2Flags:        byte(char.V2Flags),
-			Version:        byte(char.Version),
-			V1Flags:        char.V1Flags,
-			Costume:        uint16(char.Costume),
-			Skin:           uint16(char.Skin),
-			Face:           uint16(char.Face),
-			Head:           uint16(char.Head),
-			Hair:           uint16(char.Hair),
-			HairRed:        uint16(char.HairRed),
-			HairGreen:      uint16(char.HairGreen),
-			HairBlue:       uint16(char.HairBlue),
-			PropX:          char.ProportionX,
-			PropY:          char.ProportionY,
-			Playtime:       char.Playtime,
-		},
+		Header:      commands.BBHeader{Type: commands.CharacterSummaryType},
+		Slot:        0,
+		Experience:  char.DisplayData.Stats.Experience,
+		Level:       char.DisplayData.Stats.Level,
+		Visual:      char.DisplayData.Visual,
+		PlaytimeSec: char.PlayTimeSeconds,
 	}
-	copy(previewCommand.Character.GuildcardStr[:], char.GuildcardStr[:])
-	copy(previewCommand.Character.Name[:], char.Name[:])
+	copy(previewCommand.Name[:], char.GuildCard.Name[:])
 
 	return c.Send(ctx, previewCommand)
 }
@@ -513,51 +491,38 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 			return msg
 		}
 
-		p := charPkt.Character
-		stats := BaseStats[p.Class]
-
-		newCharacter := &data.Character{
-			Guildcard:         c.Account.Guildcard,
-			GuildcardStr:      p.GuildcardStr[:],
-			Slot:              charPkt.Slot,
-			Experience:        0,
-			Level:             0,
-			NameColor:         p.NameColor,
-			ModelType:         p.Model,
-			NameColorChecksum: p.NameColorChksm,
-			SectionID:         p.SectionID,
-			Class:             p.Class,
-			V2Flags:           p.V2Flags,
-			Version:           p.Version,
-			V1Flags:           p.V1Flags,
-			Costume:           p.Costume,
-			Skin:              p.Skin,
-			Face:              p.Face,
-			Head:              p.Head,
-			Hair:              p.Hair,
-			HairRed:           p.HairRed,
-			HairGreen:         p.HairGreen,
-			HairBlue:          p.HairBlue,
-			ProportionX:       p.PropX,
-			ProportionY:       p.PropY,
-			Name:              p.Name[:],
-			ATP:               stats.ATP,
-			MST:               stats.MST,
-			EVP:               stats.EVP,
-			HP:                stats.HP,
-			DFP:               stats.DFP,
-			ATA:               stats.ATA,
-			LCK:               stats.LCK,
-			Meseta:            StartingMeseta,
+		stats := BaseStats[charPkt.Visual.Class]
+		newCharacter := &commands.CharacterData{
+			DisplayData: commands.CharacterDisplayData{
+				// Set the base stats using our parameter file.
+				Stats: commands.CharacterStats{
+					ATP:        stats.ATP,
+					MST:        stats.MST,
+					EVP:        stats.EVP,
+					HP:         stats.HP,
+					DFP:        stats.DFP,
+					ATA:        stats.ATA,
+					LCK:        stats.LCK,
+					Level:      1,
+					Experience: 0,
+					Meseta:     StartingMeseta,
+				},
+				// Set the character's attributes directly from the preview packet.
+				Visual: charPkt.Visual,
+				// Config:
+				// TechLevels:
+			},
+			Signature:   0xC87ED5B1,
+			OptionFlags: 0x00040058,
+			// TODO: Inventory
 		}
-		newCharacter.ReadableName = convertReadableName(p.Name[:])
+		copy(newCharacter.GuildCard.Name[:], charPkt.Name[:])
+		copy(newCharacter.DisplayData.DispName[:], charPkt.Name[:])
 
-		// TODO: Add the rest of these.
-		//--unsigned char keyConfig[232]; // 0x3E8 - 0x4CF;
-		//--techniques blob,
-		//--options blob,
+		copy(newCharacter.SymbolChats[:], BaseSymbolChats[:])
+		copy(newCharacter.KeyConfig[:], BaseKeyConfig[:])
 
-		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, newCharacter)
+		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, charPkt.Slot, newCharacter)
 		if err != nil {
 			return err
 		}
@@ -565,22 +530,6 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 
 	c.Config.SlotNum = uint8(charPkt.Slot)
 	return SendCharacterAck(ctx, c, charPkt.Slot, 0)
-}
-
-func convertReadableName(name []uint8) string {
-	// The string is UTF-16LE encoded; convert it from from []uint8 to a []uint16
-	// slice with the bytes reversed and drops the language code prefix (0x09006900).
-	cleanedName := name[4:]
-	utfName := make([]uint16, 0)
-	for i, j := 0, 0; i <= len(cleanedName)-2; i += 2 {
-		if cleanedName[i]|cleanedName[i+1] == 0 {
-			break
-		}
-		utfName = append(utfName, uint16(cleanedName[i])|uint16(cleanedName[i+1]<<4))
-		j++
-	}
-
-	return string(utf16.Decode(utfName))
 }
 
 func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *commands.CharacterSummary) error {
@@ -591,22 +540,7 @@ func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *c
 		return fmt.Errorf("character does not exist in slot %d for account %d", pkt.Slot, c.Account.ID)
 	}
 
-	pc := pkt.Character
-	character.NameColor = pc.NameColor
-	character.ModelType = pc.Model
-	character.NameColorChecksum = pc.NameColorChksm
-	character.SectionID = pc.SectionID
-	character.Class = pc.Class
-	character.Costume = pc.Costume
-	character.Skin = pc.Skin
-	character.Head = pc.Head
-	character.HairRed = pc.HairRed
-	character.HairGreen = pc.HairGreen
-	character.HairBlue = pc.HairBlue
-	character.ProportionX = pc.PropX
-	character.ProportionY = pc.PropY
-	character.Name = pc.Name[:]
-	character.ReadableName = convertReadableName(pc.Name[:])
+	character.DisplayData.Visual = pkt.Visual
 
-	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, character)
+	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, pkt.Slot, character)
 }

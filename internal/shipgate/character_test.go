@@ -18,10 +18,9 @@ func TestFindCharacter(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 	testCharacter := &data.Character{
-		Account:   testAccount,
-		Slot:      1,
-		Guildcard: 12345,
-		Level:     1,
+		Account: testAccount,
+		Slot:    1,
+		Level:   1,
 	}
 	tests := []struct {
 		name     string
@@ -70,10 +69,9 @@ func TestUpsertCharacter(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 	testCharacter := &data.Character{
-		Account:   testAccount,
-		Slot:      1,
-		Guildcard: 12345,
-		Level:     1,
+		Account: testAccount,
+		Slot:    1,
+		Level:   1,
 	}
 
 	if err := db.Create(testCharacter).Error; err != nil {
@@ -108,10 +106,9 @@ func TestDeleteCharacter(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 	testCharacter := &data.Character{
-		Account:   testAccount,
-		Slot:      1,
-		Guildcard: 12345,
-		Level:     1,
+		Account: testAccount,
+		Slot:    1,
+		Level:   1,
 	}
 
 	if err := db.Create(testCharacter).Error; err != nil {
@@ -154,10 +151,9 @@ func TestPermanentlyDeleteCharacter(t *testing.T) {
 		t.Fatalf("error creating test account: %v", err)
 	}
 	testCharacter := &data.Character{
-		Account:   testAccount,
-		Slot:      1,
-		Guildcard: 12345,
-		Level:     1,
+		Account: testAccount,
+		Slot:    1,
+		Level:   1,
 	}
 
 	if err := db.Create(testCharacter).Error; err != nil {

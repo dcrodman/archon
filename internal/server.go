@@ -165,7 +165,10 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	clientCtx, clientCancel := context.WithCancel(debug.WithServerContext(ctx, backend.Identifier()))
 	defer func() {
 		clientCancel()
-		closeConnectionAndRecover(c)
+		if err := recover(); err != nil {
+			Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c.IPAddr, err, rdbg.Stack())
+		}
+		closeConnection(c)
 		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
 	}()
 
@@ -224,13 +227,9 @@ func processPackets(ctx context.Context, backend Backend, c *Client) {
 	}
 }
 
-// closeConnectionAndRecover is the failsafe that catches any panics, disconnects the
-// client, and removes them from the list regardless of the state of the connection.
-func closeConnectionAndRecover(c *Client) {
-	if err := recover(); err != nil {
-		Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c.IPAddr, err, rdbg.Stack())
-	}
-
+// closeConnection disconnects the client and removes them from the list
+// regardless of the state of the connection.
+func closeConnection(c *Client) {
 	if err := c.Close(); err != nil {
 		Logger.Warnf("error closing client connection: %s", err)
 	}
