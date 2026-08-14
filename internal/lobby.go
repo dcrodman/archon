@@ -126,7 +126,7 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 
 	// Build the full set of entries for all other clients in the lobby (excluding the joining player).
 	for _, oc := range otherClients {
-		if oc == c || oc == nil {
+		if oc == nil {
 			continue
 		}
 		oc.Lock()
@@ -148,6 +148,7 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 		joinCmd.Entries = append(joinCmd.Entries, playerEntry)
 	}
 
+	joinCmd.Header.Flags = uint32(len(joinCmd.Entries))
 	return c.Send(ctx, joinCmd)
 }
 
@@ -160,7 +161,8 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 
 	baseCmd := commands.JoinLobby{
 		Header: commands.BBHeader{
-			Type: commands.AddPlayerToLobby,
+			Type:  commands.AddPlayerToLobby,
+			Flags: 1,
 		},
 		DisableUDP:       1,
 		LobbyNumber:      l.ID,
