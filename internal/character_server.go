@@ -236,14 +236,11 @@ func (s *CharacterServer) handleShipSelection(ctx context.Context, c *Client, me
 		return fmt.Errorf("invalid ship selection: %d", selectedShip)
 	}
 
-	ip := net.ParseIP(availableShips[selectedShip].Address).To4()
-	port := availableShips[selectedShip].Port
+	var ip [4]uint8
+	copy(ip[:], net.ParseIP(availableShips[selectedShip].Address).To4())
+	port := uint16(availableShips[selectedShip].Port)
 
-	return c.Send(ctx, &commands.Redirect{
-		Header: commands.BBHeader{Type: commands.RedirectType},
-		IPAddr: [4]uint8{ip[0], ip[1], ip[2], ip[3]},
-		Port:   uint16(port),
-	})
+	return SendRedirect(ctx, c, ip, port)
 }
 
 // LoadConfig key config and other option data from the database or provide defaults for new accounts.

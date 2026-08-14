@@ -93,17 +93,7 @@ func (s *GameAuthServer) handleShipLogin(ctx context.Context, c *Client, loginPk
 		return err
 	}
 
-	return s.sendGameServerRedirect(ctx, c)
-}
-
-// Send the IP address and port of the character server to  which the client will
-// connect after disconnecting from this server.
-func (s *GameAuthServer) sendGameServerRedirect(ctx context.Context, c *Client) error {
-	pkt := &commands.Redirect{
-		Header: commands.BBHeader{Type: commands.RedirectType},
-		Port:   uint16(Config.ShipServer.GamePort),
-	}
-	ip := Config.BroadcastIP()
-	copy(pkt.IPAddr[:], ip[:])
-	return c.Send(ctx, pkt)
+	// Send the IP address and port of the character server to  which the client will
+	// connect after disconnecting from this server.
+	return SendRedirect(ctx, c, Config.BroadcastIP(), uint16(Config.ShipServer.GamePort))
 }

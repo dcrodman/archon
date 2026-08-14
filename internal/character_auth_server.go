@@ -102,7 +102,9 @@ func (s *CharacterAuthServer) handleLogin(ctx context.Context, c *Client, loginP
 	// but for now we'll just set it and leave it alone.
 	c.Config.Magic = 0x48615467
 
-	return SendDataServerRedirect(ctx, c)
+	// Send the IP address and port of the character server to which the client will
+	// connect after disconnecting from this server.
+	return SendRedirect(ctx, c, Config.BroadcastIP(), uint16(Config.CharacterServer.DataPort))
 }
 
 // send the security initialization command with information about the user's
@@ -134,16 +136,11 @@ func SendSecurity(ctx context.Context, c *Client, errorCode uint32) error {
 	return c.Send(ctx, cmd)
 }
 
-// Send the IP address and port of the character server to which the client will
-// connect after disconnecting from this server.
-func SendDataServerRedirect(ctx context.Context, c *Client) error {
-	pkt := &commands.Redirect{
+func SendRedirect(ctx context.Context, c *Client, ip [4]uint8, port uint16) error {
+	cmd := &commands.Redirect{
 		Header: commands.BBHeader{Type: commands.RedirectType},
-		IPAddr: [4]uint8{},
-		Port:   uint16(Config.CharacterServer.DataPort),
+		IPAddr: ip,
+		Port:   port,
 	}
-	ip := Config.BroadcastIP()
-	copy(pkt.IPAddr[:], ip[:])
-
-	return c.Send(ctx, pkt)
+	return c.Send(ctx, cmd)
 }

@@ -141,7 +141,6 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 			Inventory:      oc.Character.Inventory,
 			DisplayData:    oc.Character.DisplayData,
 		}
-		// TODO: Does this need to be decoded in any way?
 		copy(playerEntry.Name[:], oc.Character.GuildCard.Name[:])
 		oc.Unlock()
 
