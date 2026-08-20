@@ -177,9 +177,14 @@ func (s *ShipgateService) CreateAccount(ctx context.Context, email, username, pa
 
 // DeleteAccount deactivates an account, or deletes it from the database entirely if permanent is true.
 func (s *ShipgateService) DeleteAccount(ctx context.Context, username string, permanent bool) error {
-	account, err := findAccountByUsername(s.db, username)
+	account, err := findUnscopedAccount(s.db, username)
 	if err != nil {
 		return fmt.Errorf("finding account: %w", err)
+	}
+
+	// record not found
+	if account == nil {
+		return fmt.Errorf("no account found")
 	}
 
 	if permanent {
