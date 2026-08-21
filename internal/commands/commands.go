@@ -178,6 +178,12 @@ const (
 // TODO: ???
 const ShipListType = 0xA0
 
+type ShipList struct {
+	PlayerTag uint32
+	Guildcard uint32
+	Unused    [0x10]uint16
+}
+
 // Sends the client the current server timestamp.
 const TimestampType = 0xB1
 
