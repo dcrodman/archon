@@ -506,19 +506,31 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 				},
 				// Set the character's attributes directly from the preview packet.
 				Visual: charPkt.Visual,
-				// Config:
 				// TechLevels:
 			},
 			Signature:   0xC87ED5B1,
 			OptionFlags: 0x00040058,
-			// TODO: Inventory
 		}
 		copy(newCharacter.GuildCard.Name[:], charPkt.Name[:])
 		copy(newCharacter.DisplayData.DispName[:], charPkt.Name[:])
 
+		visualConfig := DefaultVisualConfigHunterRanger
+		// TODO: Sooner or later probably ought to add constants for the classes.
+		if charPkt.Visual.ClassFlags == 0x80 {
+			visualConfig = DefaultVisualConfigForce
+		}
+		copy(newCharacter.DisplayData.Config[:], visualConfig)
+
+		// Set up the default configuration.
 		copy(newCharacter.SymbolChats[:], BaseSymbolChats[:])
 		copy(newCharacter.KeyConfig[:], BaseKeyConfig[:])
 
+		// Set up the starting inventory.
+		copied := copy(newCharacter.Inventory.Items[:], DefaultInventory[:])
+		copied += copy(newCharacter.Inventory.Items[copied:], DefaultWeaponsByClass[int(charPkt.Visual.Class)])
+		newCharacter.Inventory.NumItems = uint8(copied)
+
+		// We're done, persist the new character.
 		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, charPkt.Slot, newCharacter)
 		if err != nil {
 			return err

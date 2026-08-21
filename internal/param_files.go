@@ -12,8 +12,6 @@ import (
 
 const (
 	NumCharacterClasses = 12
-	// Amount of meseta new characters are given when created.
-	StartingMeseta = 300
 
 	parametersDirName = "parameters"
 )

@@ -355,20 +355,25 @@ type CharacterInventory struct {
 	Items           [30]CharacterInventoryItem
 }
 
+type ItemFlags uint32
+
+const ItemFlagEquipped = 0x08
+
 type CharacterInventoryItem struct {
-	Present uint8
+	State uint8
 	// Newserv somehow unearthed that these four uint8s are used for some tricky
 	// multipurpose backwards compatibility between games, which appear limited
 	// to PSO V2 only and therefore we ignore them.
 	Unknown [3]uint8
-	Flags   uint32 // 0x08 is equipped
+	Flags   ItemFlags
 	Item    ItemData
 }
 
 type ItemData struct {
-	Data    [12]uint8
-	ItemID  uint32
-	MagData uint32
+	Data       [12]uint8
+	InstanceID uint32
+	// Only used for mags and meseta.
+	Data2 [4]uint8
 }
 
 type CharacterDisplayData struct {
