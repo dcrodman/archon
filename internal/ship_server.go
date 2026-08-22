@@ -60,7 +60,7 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	case commands.SyncCharacterType:
 		var syncCommand commands.SyncCharacter
 		UnmarshalStruct(data, &syncCommand)
-		s.handleSyncCharacter(ctx, c, &syncCommand)
+		err = s.handleSyncCharacter(ctx, c, &syncCommand)
 	case commands.DisconnectType:
 		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	default:
