@@ -120,8 +120,9 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 		}
 	}
 	c.Account = account
+	c.Config.SlotNum = loginPkt.Slot
 
-	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, loginPkt.Slot)
+	character, err := shipgate.Shipgate.FindCharacter(ctx, c.Account.ID, uint32(loginPkt.Slot))
 	if err != nil {
 		return fmt.Errorf("error loading selected character: %v", err)
 	}

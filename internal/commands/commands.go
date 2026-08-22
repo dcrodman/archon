@@ -137,7 +137,8 @@ type Login struct {
 	Header        BBHeader
 	Unknown       [8]uint8
 	ClientVersion uint16
-	Slot          uint32
+	Unknown2      [3]uint8
+	Slot          uint8
 	Phase         LoginPhase
 	Unknown4      uint8 // It's not clear yet if this field is part of/related to the Phase field but it can take either 0 or e value on different clients
 	TeamID        uint32
