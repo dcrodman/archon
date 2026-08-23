@@ -528,6 +528,17 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		// Set up the starting inventory.
 		copied := copy(newCharacter.Inventory.Items[:], DefaultInventory[:])
 		copied += copy(newCharacter.Inventory.Items[copied:], DefaultWeaponsByClass[int(charPkt.Visual.Class)])
+
+		colorIdx := charPkt.Visual.Costume
+		if class := charPkt.Visual.Class; class == 2 || class == 4 || class == 5 || class == 9 {
+			colorIdx = charPkt.Visual.Skin
+		}
+
+		// Set up the starting Mag.
+		mag := DefaultMag
+		mag.Item.Data2[3] = DefaultMagColors[charPkt.Visual.Class][colorIdx]
+
+		copied += copy(newCharacter.Inventory.Items[copied:], []commands.CharacterInventoryItem{mag})
 		newCharacter.Inventory.NumItems = uint8(copied)
 
 		// We're done, persist the new character.
