@@ -66,6 +66,14 @@ type ClientMessage struct {
 	Message  []byte
 }
 
+// Sent by clients and echoed to all other clients in a game/lobby.
+const BroadcastType = 0x60
+
+type Broadcast struct {
+	Header BBHeader
+	Data   []uint8
+}
+
 // Sent to a player when joining a lobby. Also used for games.
 const JoinLobbyType = 0x67
 
@@ -127,6 +135,22 @@ type LobbyListEntry struct {
 	MenuID  uint32 // Always 0x01 0x00 0x1A 0x00
 	LobbyID uint32
 	Padding uint32
+}
+
+// Sent to the client to set the arrow colors for each player in a lobby.
+const LobbyArrowUpdateType = 0x88
+
+type LobbyArrowUpdate struct {
+	Header  BBHeader
+	Entries []LobbyArrowUpdateEntry
+}
+
+type LobbyArrowUpdateEntry struct {
+	PlayerTag uint32 // Always 0x00010000, like the other lobby commands.
+	Guildcard uint32
+	// 1 = red, 2, = blue, 3 = green, 4 = yellow, 5 = purple, 6 = cyan, 7 = orange,
+	// 8 = pink, 09/0A/0B = white, 0C = black.
+	ArrowColor uint32
 }
 
 // Client sends this with credential information and metadata during the login process.

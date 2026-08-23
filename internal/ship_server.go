@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -55,21 +56,25 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	var err error
 	switch cmdHeader.Type {
 	case commands.LoginType:
-		var loginPkt commands.Login
-		UnmarshalStruct(data, &loginPkt)
-		err = s.handleLogin(ctx, c, &loginPkt)
+		var loginCmd commands.Login
+		UnmarshalStruct(data, &loginCmd)
+		err = s.handleLogin(ctx, c, &loginCmd)
 	case commands.SyncCharacterType:
 		var syncCommand commands.SyncCharacter
 		UnmarshalStruct(data, &syncCommand)
 		err = s.handleSyncCharacter(ctx, c, &syncCommand)
 	case commands.ShipListType:
-		var shipListPkt commands.ShipList
-		UnmarshalStruct(data, &shipListPkt)
-		err = s.handleShipList(ctx, c, &shipListPkt)
+		var shipListCmd commands.ShipList
+		UnmarshalStruct(data, &shipListCmd)
+		err = s.handleShipList(ctx, c, &shipListCmd)
 	case commands.MenuSelectionType:
-		var menuSelectionPkt commands.MenuSelection
-		UnmarshalStruct(data, &menuSelectionPkt)
-		err = s.handleShipSelection(ctx, c, &menuSelectionPkt)
+		var menuSelectionCmd commands.MenuSelection
+		UnmarshalStruct(data, &menuSelectionCmd)
+		err = s.handleShipSelection(ctx, c, &menuSelectionCmd)
+	case commands.BroadcastType:
+		var broadcastCmd commands.Broadcast
+		UnmarshalStruct(data, &broadcastCmd)
+		s.handleBroadcastCommand(ctx, c, broadcastCmd)
 	case commands.DisconnectType:
 		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	default:
@@ -139,7 +144,16 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	if err := SendLobbyMenu(ctx, c); err != nil {
 		return err
 	}
+
 	// TODO: Send C5.
+
+	// Newserv notes that the client may ignore this packet if it's sent while the client
+	// is still joining the lobby (aka "bursting") so add a delay before we send this.
+	time.AfterFunc(2*time.Second, func() {
+		if err := SendLobbyArrowUpdate(ctx, c, s.lobbies[c.LobbyID]); err != nil {
+			Logger.Warnf("error sending lobby update to client %v: %v", c.IPAddr, err)
+		}
+	})
 	return s.addClientToLobby(ctx, c)
 }
 
@@ -209,7 +223,7 @@ func (s *GameServer) addClientToLobby(ctx context.Context, c *Client) error {
 }
 
 // Client has requested to save the current game state, so flush it to the database.
-func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, syncCommand *commands.SyncCharacter) error {
+func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *commands.SyncCharacter) error {
 	c.Lock()
 	charData := *c.Character
 	c.Unlock()
@@ -225,4 +239,20 @@ func (s *GameServer) handleDisconnectedClient(ctx context.Context, c *Client) {
 	// Remove the client from the lobby they were in.
 	lobby := s.lobbies[c.LobbyID]
 	lobby.RemoveClient(ctx, c)
+}
+
+func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
+	s.lobbies[c.LobbyID].Broadcast(ctx, c, cmd)
+}
+
+// SendLobbyArrowUpdate sends the lobby arrows for all clients in lobby l to c.
+func SendLobbyArrowUpdate(ctx context.Context, c *Client, l *Lobby) error {
+	entries := l.BuildLobbyArrowEntries()
+	return c.Send(ctx, &commands.LobbyArrowUpdate{
+		Header: commands.BBHeader{
+			Type:  commands.LobbyArrowUpdateType,
+			Flags: uint32(len(entries)),
+		},
+		Entries: entries,
+	})
 }

@@ -15,8 +15,8 @@ var ErrLobbyFull = errors.New("lobby contains the maximum number of players")
 
 type Lobby struct {
 	ID uint8
-	// mtx must be held when accessing any state variables.
-	mtx            sync.RWMutex
+	// Lock must be held when accessing any state variables.
+	sync.RWMutex
 	clients        []*Client
 	currentClients int
 	leaderID       uint8
@@ -30,8 +30,8 @@ func NewLobby(id uint8) *Lobby {
 }
 
 func (l *Lobby) IsFull() bool {
-	l.mtx.RLock()
-	defer l.mtx.RUnlock()
+	l.RLock()
+	defer l.RUnlock()
 	return l.currentClients >= MaxLobbyPlayers
 }
 
@@ -40,10 +40,10 @@ func (l *Lobby) IsFull() bool {
 // LobbyID (i.e. its index/slot in the lobby) is set if they were successfully added,
 // otherwise an error is returned if the lobby is full or the client could not be added.
 func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
-	l.mtx.Lock()
+	l.Lock()
 
 	if l.currentClients >= MaxLobbyPlayers {
-		l.mtx.Unlock()
+		l.Unlock()
 		return ErrLobbyFull
 	}
 
@@ -59,7 +59,7 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 		l.currentClients++
 		break
 	}
-	l.mtx.Unlock()
+	l.Unlock()
 
 	c.Lock()
 	c.LobbyID = l.ID
@@ -77,36 +77,6 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 	return nil
 }
 
-// RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
-// being removed was the current leader, a new leader is selected from the remaining set of players.
-func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
-	c.Lock()
-	currentLobbySlotID := c.LobbySlotID
-	// This is probably redundant and is technically still a valid slot.
-	c.LobbyID = 0
-	c.LobbySlotID = 0
-	c.Unlock()
-
-	l.mtx.Lock()
-	l.clients[currentLobbySlotID] = nil
-	l.currentClients--
-
-	// Select a new leader starting from the lowest index
-	if l.leaderID == currentLobbySlotID {
-		l.leaderID = 0
-		for i := range l.clients {
-			if l.clients[i] != nil {
-				l.leaderID = uint8(i)
-				break
-			}
-		}
-	}
-	l.mtx.Unlock()
-
-	// Notify the other players that a player has left the lobby.
-	SendLeaveLobbyNotifications(ctx, l, c)
-}
-
 func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) error {
 	joinCmd := &commands.JoinLobby{
 		Header: commands.BBHeader{
@@ -121,11 +91,11 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 		EnableVoiceChat: 1,
 	}
 
-	otherClients := make([]*Client, len(l.clients))
-	l.mtx.Lock()
+	l.Lock()
 	joinCmd.LeaderID = l.leaderID
+	otherClients := make([]*Client, len(l.clients))
 	copy(otherClients, l.clients)
-	l.mtx.Unlock()
+	l.Unlock()
 
 	// Build the full set of entries for all other clients in the lobby (excluding the joining player).
 	for _, oc := range otherClients {
@@ -155,11 +125,11 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 }
 
 func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Client) {
-	clients := make([]*Client, len(l.clients))
-	l.mtx.Lock()
+	l.Lock()
 	lobbyLeaderID := l.leaderID
+	clients := make([]*Client, len(l.clients))
 	copy(clients, l.clients)
-	l.mtx.Unlock()
+	l.Unlock()
 
 	baseCmd := commands.JoinLobby{
 		Header: commands.BBHeader{
@@ -196,17 +166,47 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 		joinCmd.ClientID = oc.LobbySlotID
 
 		if err := oc.Send(ctx, joinCmd); err != nil {
-			Logger.Warnf("error sending lobby join notification to client %v", oc.IPAddr)
+			Logger.Warnf("error sending lobby join notification to client %v: %v", oc.IPAddr, err)
 		}
 	}
 }
 
+// RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
+// being removed was the current leader, a new leader is selected from the remaining set of players.
+func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
+	c.Lock()
+	currentLobbySlotID := c.LobbySlotID
+	// This is probably redundant and is technically still a valid slot.
+	c.LobbyID = 0
+	c.LobbySlotID = 0
+	c.Unlock()
+
+	l.Lock()
+	l.clients[currentLobbySlotID] = nil
+	l.currentClients--
+
+	// Select a new leader starting from the lowest index
+	if l.leaderID == currentLobbySlotID {
+		l.leaderID = 0
+		for i := range l.clients {
+			if l.clients[i] != nil {
+				l.leaderID = uint8(i)
+				break
+			}
+		}
+	}
+	l.Unlock()
+
+	// Notify the other players that a player has left the lobby.
+	SendLeaveLobbyNotifications(ctx, l, c)
+}
+
 func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client) {
-	clients := make([]*Client, len(l.clients))
-	l.mtx.Lock()
+	l.Lock()
 	lobbyLeaderID := l.leaderID
+	clients := make([]*Client, len(l.clients))
 	copy(clients, l.clients)
-	l.mtx.Unlock()
+	l.Unlock()
 
 	for _, oc := range clients {
 		if oc == c || oc == nil {
@@ -218,7 +218,51 @@ func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client) {
 			LeaderID:   lobbyLeaderID,
 			DisableUDP: 1,
 		}); err != nil {
-			Logger.Warnf("error sending lobby leave notification to client: %v", oc.IPAddr)
+			Logger.Warnf("error sending lobby leave notification to client %v: %v", oc.IPAddr, err)
 		}
 	}
+}
+
+// Broadcast sends cmd to all players in the lobby except for sender.
+func (l *Lobby) Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast) {
+	l.Lock()
+	clients := make([]*Client, len(l.clients))
+	copy(clients, l.clients)
+	l.Unlock()
+
+	for _, c := range clients {
+		if c == nil || c == sender {
+			continue
+		}
+		if err := c.Send(ctx, cmd); err != nil {
+			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
+		}
+	}
+}
+
+// BuildLobbyArrowEntries calculates the arrow colors for all players currently in the lobby
+// and returns the entries for the LobbyArrowUpdate command.
+func (l *Lobby) BuildLobbyArrowEntries() []commands.LobbyArrowUpdateEntry {
+	l.Lock()
+	defer l.Unlock()
+
+	entries := make([]commands.LobbyArrowUpdateEntry, l.currentClients)
+	i := 0
+	for _, c := range l.clients {
+		if c == nil {
+			continue
+		}
+		var arrowColor uint32
+		// GMs get orange arrows by default.
+		if c.Account.GM {
+			arrowColor = 7
+		}
+		entries[i] = commands.LobbyArrowUpdateEntry{
+			PlayerTag:  0x00010000,
+			Guildcard:  c.Character.GuildCard.GuildCardNumber,
+			ArrowColor: arrowColor,
+		}
+		i++
+	}
+	return entries
 }

@@ -12,8 +12,8 @@ const StartingMeseta = 300
 // NewItemData creates a new ItemData representing the item literal defined by first
 // and second. Since the full item data is a total of 16 bytes (12 bytes for all items
 // and an additional 4 for mags and meseta), first is copied as-is into the high
-// 8 bytes of item data along with the high 32 bits of second, with the remainder
-// of second comprising that additional 4 bytes (all BE order).
+// 64 bits of item data along with the high 32 bits of second, with the remaining 32
+// bits of second copied to the additional 4 bytes (all BE order).
 func NewItemData(first, second uint64) commands.ItemData {
 	var item commands.ItemData
 	binary.BigEndian.PutUint64(item.Data[:8], first)
