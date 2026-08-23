@@ -469,6 +469,10 @@ func SendParameterChunk(ctx context.Context, c *Client, chunkData []byte, chunk 
 	})
 }
 
+func IsForce(charPkt *commands.CharacterSummary) bool {
+	return charPkt.Visual.ClassFlags > 80
+}
+
 // Performs a create or update/delete depending on whether the user followed the
 // "dressing room" or "recreate" flows (as indicated by a client flag).
 func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, charPkt *commands.CharacterSummary) error {
@@ -506,7 +510,6 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 				},
 				// Set the character's attributes directly from the preview packet.
 				Visual: charPkt.Visual,
-				// TechLevels:
 			},
 			Signature:   0xC87ED5B1,
 			OptionFlags: 0x00040058,
@@ -516,7 +519,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 
 		visualConfig := DefaultVisualConfigHunterRanger
 		// TODO: Sooner or later probably ought to add constants for the classes.
-		if charPkt.Visual.ClassFlags == 0x80 {
+		if IsForce(charPkt) {
 			visualConfig = DefaultVisualConfigForce
 		}
 		copy(newCharacter.DisplayData.Config[:], visualConfig)
@@ -540,6 +543,19 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 
 		copied += copy(newCharacter.Inventory.Items[copied:], []commands.CharacterInventoryItem{mag})
 		newCharacter.Inventory.NumItems = uint8(copied)
+
+		// All characters start with no techniques.
+		techLevels := [20]uint8{}
+		for i := range techLevels {
+			// disabled
+			techLevels[i] = 0xFF
+		}
+
+		// Forces, however, start with Foie.
+		if IsForce(charPkt) {
+			techLevels[0] = 0x00
+		}
+		copy(newCharacter.DisplayData.TechLevels[:], techLevels[:])
 
 		// We're done, persist the new character.
 		err = shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, charPkt.Slot, newCharacter)
