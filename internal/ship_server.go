@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -61,12 +62,42 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var syncCommand commands.SyncCharacter
 		UnmarshalStruct(data, &syncCommand)
 		err = s.handleSyncCharacter(ctx, c, &syncCommand)
+	case commands.ShipListType:
+		var shipListPkt commands.ShipList
+		UnmarshalStruct(data, &shipListPkt)
+		err = s.handleShipList(ctx, c, &shipListPkt)
+	case commands.MenuSelectionType:
+		var menuSelectionPkt commands.MenuSelection
+		UnmarshalStruct(data, &menuSelectionPkt)
+		err = s.handleShipSelection(ctx, c, &menuSelectionPkt)
 	case commands.DisconnectType:
 		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	default:
 		Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr)
 	}
 	return err
+}
+
+func (s *GameServer) handleShipList(ctx context.Context, c *Client, _ *commands.ShipList) error {
+	return SendShipList(ctx, c)
+}
+
+// Player selected one of the items on the ship select screen; respond with the
+// IP address and port of the ship server to  which the client will connect after
+// disconnecting from this server.
+func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSelectionPkt *commands.MenuSelection) error {
+	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
+
+	selectedShip := menuSelectionPkt.ItemID - 1
+	if selectedShip >= uint32(len(availableShips)) {
+		return fmt.Errorf("invalid ship selection: %d", selectedShip)
+	}
+
+	var ip [4]uint8
+	copy(ip[:], net.ParseIP(availableShips[selectedShip].Address).To4())
+	port := uint16(availableShips[selectedShip].Port)
+
+	return SendRedirect(ctx, c, ip, port)
 }
 
 func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *commands.Login) error {
