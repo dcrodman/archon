@@ -181,20 +181,69 @@ func (s *ShipgateService) DeleteAccount(ctx context.Context, username string, pe
 	if err != nil {
 		return fmt.Errorf("finding account: %w", err)
 	}
-
-	// record not found
 	if account == nil {
 		return fmt.Errorf("no account found")
 	}
 
 	if permanent {
-		if err := permanentlyDeleteAccount(s.db, account); err != nil {
-			return fmt.Errorf("deleting account: %w", err)
-		}
+		err = permanentlyDeleteAccount(s.db, account)
 	} else {
-		if err := deleteAccount(s.db, account); err != nil {
-			return fmt.Errorf("deleting account: %w", err)
-		}
+		err = deleteAccount(s.db, account)
+	}
+	if err != nil {
+		return fmt.Errorf("deleting account: %w", err)
+	}
+	return nil
+}
+
+// PromoteAccount promotes an account from normal status to GM.
+func (s *ShipgateService) PromoteAccount(ctx context.Context, username string) error {
+	account, err := findAccountByUsername(s.db, username)
+	if err != nil {
+		return fmt.Errorf("finding account: %w", err)
+	}
+	if account == nil {
+		return fmt.Errorf("no account found")
+	}
+
+	account.GM = true
+	if err := updateAccount(s.db, account); err != nil {
+		return fmt.Errorf("updating account: %v", account)
+	}
+	return nil
+}
+
+// BanAccount promotes an account from normal status to GM.
+func (s *ShipgateService) BanAccount(ctx context.Context, username string) error {
+	account, err := findAccountByUsername(s.db, username)
+	if err != nil {
+		return fmt.Errorf("finding account: %w", err)
+	}
+	if account == nil {
+		return fmt.Errorf("no account found")
+	}
+
+	account.Banned = true
+	if err := updateAccount(s.db, account); err != nil {
+		return fmt.Errorf("updating account: %v", account)
+	}
+	return nil
+}
+
+// RestoreAccount promotes an account from normal status to GM.
+func (s *ShipgateService) RestoreAccount(ctx context.Context, username string) error {
+	account, err := findAccountByUsername(s.db, username)
+	if err != nil {
+		return fmt.Errorf("finding account: %w", err)
+	}
+	if account == nil {
+		return fmt.Errorf("no account found")
+	}
+
+	account.Active = true
+	account.Banned = false
+	if err := updateAccount(s.db, account); err != nil {
+		return fmt.Errorf("updating account: %v", account)
 	}
 	return nil
 }

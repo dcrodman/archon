@@ -69,3 +69,8 @@ func deleteAccount(db *gorm.DB, account *data.Account) error {
 func permanentlyDeleteAccount(db *gorm.DB, account *data.Account) error {
 	return db.Unscoped().Delete(account).Error
 }
+
+// updateAccount updates one or more fields on an account.
+func updateAccount(db *gorm.DB, account *data.Account) error {
+	return db.Save(account).Error
+}

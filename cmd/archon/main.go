@@ -16,23 +16,25 @@ import (
 var ConfigFlag string
 
 func main() {
+	patchCmd.Flags().StringVarP(&NewAddressFlag, "address", "a", "127.0.0.1", "The new address or IPv4 address")
+	patchCmd.Flags().StringVarP(&ExeVersionFlag, "version", "v", "TethVer12513", "Version of the PSOBB client")
+
+	accountCmd.AddCommand(
+		accountAddCmd,
+		accountDeleteCmd,
+		accountPromoteCmd,
+		accountBanCmd,
+		accountRestoreCmd,
+	)
+	accountDeleteCmd.Flags().BoolVar(&PermanentFlag, "permanent", false, "Permanently delete the account (as opposed to a soft delete)")
+
 	rootCmd := &cobra.Command{
 		Use:   "archon",
 		Short: "Archon PSOBB server and related tools",
 		Run:   ServerCommand,
 	}
 	rootCmd.PersistentFlags().StringVarP(&ConfigFlag, "config", "c", "", "Path to the server config/data directory")
-
-	accountCmd.AddCommand(accountAddCmd)
-	accountCmd.AddCommand(accountDeleteCmd)
-	accountDeleteCmd.Flags().BoolVar(&PermanentFlag, "permanent", false, "Permanently delete the account (as opposed to a soft delete)")
-
-	rootCmd.AddCommand(accountCmd)
-
-	patchCmd.Flags().StringVarP(&NewAddressFlag, "address", "a", "127.0.0.1", "The new address or IPv4 address")
-	patchCmd.Flags().StringVarP(&ExeVersionFlag, "version", "v", "TethVer12513", "Version of the PSOBB client")
-
-	rootCmd.AddCommand(patchCmd)
+	rootCmd.AddCommand(patchCmd, accountCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
