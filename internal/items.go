@@ -28,8 +28,9 @@ var DefaultInventory = []commands.CharacterInventoryItem{
 	{Item: NewItemData(0x0301000000040000, 0)},
 	{Item: NewItemData(0x0300000000040000, 0)},
 	{Item: NewItemData(0x0101000000000000, 0), Flags: commands.ItemFlagEquipped},
-	{Item: NewItemData(0x02000500F4010000, 0x0000000028000012), Flags: commands.ItemFlagEquipped},
 }
+
+var DefaultMag = commands.CharacterInventoryItem{Item: NewItemData(0x02000500F4010000, 0x0000000028000012), Flags: commands.ItemFlagEquipped}
 
 // DefaultWeaponsByClass are the class specific starting weapons, in canonical order of class.
 var DefaultWeaponsByClass = [][]commands.CharacterInventoryItem{
