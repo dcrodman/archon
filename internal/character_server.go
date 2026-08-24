@@ -618,3 +618,20 @@ func (c CharacterClassFlags) IsFemale() bool {
 func (c CharacterClassFlags) IsMale() bool {
 	return c.hasBit(0)
 }
+
+type CharacterClass uint8
+
+const HUMAR CharacterClass = 0x00
+const HUNEWEARL CharacterClass = 0x01
+const HUCAST CharacterClass = 0x02
+const HUCASEAL CharacterClass = 0x09
+
+const RAMAR CharacterClass = 0x03
+const RAMARL CharacterClass = 0x0b
+const RACAST CharacterClass = 0x04
+const RACASEAL CharacterClass = 0x05
+
+const FOMAR CharacterClass = 0x0A
+const FOMARL CharacterClass = 0x06
+const FONEWM CharacterClass = 0x07
+const FONEWEARL CharacterClass = 0x08
