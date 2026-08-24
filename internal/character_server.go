@@ -469,10 +469,6 @@ func SendParameterChunk(ctx context.Context, c *Client, chunkData []byte, chunk 
 	})
 }
 
-func IsForce(charPkt *commands.CharacterSummary) bool {
-	return charPkt.Visual.ClassFlags > 80
-}
-
 // Performs a create or update/delete depending on whether the user followed the
 // "dressing room" or "recreate" flows (as indicated by a client flag).
 func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, charPkt *commands.CharacterSummary) error {
@@ -517,9 +513,10 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		copy(newCharacter.GuildCard.Name[:], charPkt.Name[:])
 		copy(newCharacter.DisplayData.DispName[:], charPkt.Name[:])
 
+		cf := CharacterClassFlags(charPkt.Visual.ClassFlags)
+
 		visualConfig := DefaultVisualConfigHunterRanger
-		// TODO: Sooner or later probably ought to add constants for the classes.
-		if IsForce(charPkt) {
+		if cf.IsForce() {
 			visualConfig = DefaultVisualConfigForce
 		}
 		copy(newCharacter.DisplayData.Config[:], visualConfig)
@@ -533,7 +530,8 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		copied += copy(newCharacter.Inventory.Items[copied:], DefaultWeaponsByClass[int(charPkt.Visual.Class)])
 
 		colorIdx := charPkt.Visual.Costume
-		if class := charPkt.Visual.Class; class == 2 || class == 4 || class == 5 || class == 9 {
+		// Androids don't have costumes, so we need to use their skin instead.
+		if cf.IsAndroid() {
 			colorIdx = charPkt.Visual.Skin
 		}
 
@@ -552,7 +550,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 		}
 
 		// Forces, however, start with Foie.
-		if IsForce(charPkt) {
+		if cf.IsForce() {
 			techLevels[0] = 0x00
 		}
 		copy(newCharacter.DisplayData.TechLevels[:], techLevels[:])
@@ -579,4 +577,44 @@ func (s *CharacterServer) updateCharacter(ctx context.Context, c *Client, pkt *c
 	character.DisplayData.Visual = pkt.Visual
 
 	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, pkt.Slot, character)
+}
+
+// Character class flags specify attributes of different character classes.
+type CharacterClassFlags uint32
+
+func (c CharacterClassFlags) hasBit(pos int) bool {
+	val := c & (1 << pos)
+	return val > 0
+}
+
+func (c CharacterClassFlags) IsForce() bool {
+	return c.hasBit(7)
+}
+
+func (c CharacterClassFlags) IsRanger() bool {
+	return c.hasBit(6)
+}
+
+func (c CharacterClassFlags) IsHunter() bool {
+	return c.hasBit(5)
+}
+
+func (c CharacterClassFlags) IsAndroid() bool {
+	return c.hasBit(4)
+}
+
+func (c CharacterClassFlags) IsNewman() bool {
+	return c.hasBit(3)
+}
+
+func (c CharacterClassFlags) IsHuman() bool {
+	return c.hasBit(2)
+}
+
+func (c CharacterClassFlags) IsFemale() bool {
+	return c.hasBit(1)
+}
+
+func (c CharacterClassFlags) IsMale() bool {
+	return c.hasBit(0)
 }
