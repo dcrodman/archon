@@ -39,7 +39,7 @@ func (s *GameServer) Init(ctx context.Context) error {
 	}
 	// Lobby IDs are uint8s and since this is just an array of pointers we can set
 	// the capacity and spare ourselves from having to deal with expanding it.
-	s.games = make([]*Game, 0, math.MaxUint8)
+	s.games = make([]*Game, math.MaxUint8)
 	return nil
 }
 
