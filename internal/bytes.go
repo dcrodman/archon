@@ -7,8 +7,8 @@ import (
 	"unicode/utf16"
 )
 
-// ConvertToUtf16 converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
-func ConvertToUtf16(str string) []byte {
+// EncodeUTF16 converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
+func EncodeUTF16(str string) []byte {
 	strRunes := bytes.Runes([]byte(str))
 	encoded := utf16.Encode(strRunes)
 

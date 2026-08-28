@@ -186,7 +186,7 @@ func SendShipList(ctx context.Context, c *Client) error {
 		// The first item is ignored and just used for the menu title.
 		{MenuID: 0x11000011, ItemID: 0},
 	}
-	copy(entries[0].Name[:], ConvertToUtf16("Archon"))
+	copy(entries[0].Name[:], EncodeUTF16("Archon"))
 
 	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
 
@@ -194,7 +194,7 @@ func SendShipList(ctx context.Context, c *Client) error {
 	for i, ship := range availableShips {
 		var entry commands.ShipMenuEntry
 		entry.ItemID = uint32(i) + 1
-		copy(entry.Name[:], ConvertToUtf16(ship.Name))
+		copy(entry.Name[:], EncodeUTF16(ship.Name))
 		entries = append(entries, entry)
 	}
 
@@ -212,7 +212,7 @@ func SendScrollMessage(ctx context.Context, c *Client) error {
 	// Returns the scroll message displayed along the top of the ship selection screen,
 	// lazily computing it from the config file and storing it in a package var.
 	shipSelectionScrollMessageInit.Do(func() {
-		shipSelectionScrollMessage = ConvertToUtf16(
+		shipSelectionScrollMessage = EncodeUTF16(
 			Config.CharacterServer.ScrollMessage,
 		)
 		// The end of the message appears to be garbled unless there is an extra byte...?

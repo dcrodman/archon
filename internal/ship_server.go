@@ -2,8 +2,12 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
+	"math/rand/v2"
 	"net"
+	"sync"
 	"time"
 
 	"golang.org/x/text/cases"
@@ -18,6 +22,9 @@ type GameServer struct {
 	Name string
 
 	lobbies []*Lobby
+
+	gamesMtx sync.Mutex
+	games    []*Game
 }
 
 func (s *GameServer) Identifier() string {
@@ -25,11 +32,14 @@ func (s *GameServer) Identifier() string {
 }
 
 func (s *GameServer) Init(ctx context.Context) error {
-	// Create the game lobbies.
+	// Create the available lobbies.
 	s.lobbies = make([]*Lobby, Config.ShipServer.NumLobbies)
 	for i := range Config.ShipServer.NumLobbies {
 		s.lobbies[i] = NewLobby(uint8(i))
 	}
+	// Lobby IDs are uint8s and since this is just an array of pointers we can set
+	// the capacity and spare ourselves from having to deal with expanding it.
+	s.games = make([]*Game, 0, math.MaxUint8)
 	return nil
 }
 
@@ -75,6 +85,10 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var broadcastCmd commands.Broadcast
 		UnmarshalStruct(data, &broadcastCmd)
 		s.handleBroadcastCommand(ctx, c, broadcastCmd)
+	case commands.CreateGameType:
+		var createCmd commands.CreateGame
+		UnmarshalStruct(data, &createCmd)
+		err = s.handleCreateGame(ctx, c, createCmd)
 	case commands.DisconnectType:
 		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	default:
@@ -150,7 +164,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	// Newserv notes that the client may ignore this packet if it's sent while the client
 	// is still joining the lobby (aka "bursting") so add a delay before we send this.
 	time.AfterFunc(2*time.Second, func() {
-		if err := SendLobbyArrowUpdate(ctx, c, s.lobbies[c.LobbyID]); err != nil {
+		if err := SendLobbyArrowUpdate(ctx, c, c.Lobby); err != nil {
 			Logger.Warnf("error sending lobby update to client %v: %v", c.IPAddr, err)
 		}
 	})
@@ -161,7 +175,7 @@ func SendMessage(ctx context.Context, c *Client, message string) error {
 	return c.Send(ctx, &commands.ClientMessage{
 		Header:   commands.BBHeader{Type: commands.ClientMessageType},
 		Language: 0x00450009,
-		Message:  ConvertToUtf16(message),
+		Message:  EncodeUTF16(message),
 	})
 }
 
@@ -237,12 +251,24 @@ func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *comm
 // handleDisconnectedClient is invoked when clients disconnect from the game server.
 func (s *GameServer) handleDisconnectedClient(ctx context.Context, c *Client) {
 	// Remove the client from the lobby they were in.
-	lobby := s.lobbies[c.LobbyID]
-	lobby.RemoveClient(ctx, c)
+	c.Lock()
+	lobby := c.Lobby
+	c.Unlock()
+	if lobby != nil {
+		lobby.RemoveClient(ctx, c)
+	}
 }
 
 func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
-	s.lobbies[c.LobbyID].Broadcast(ctx, c, cmd)
+	c.Lock()
+	lobby := c.Lobby
+	game := c.Game
+	c.Unlock()
+	if lobby != nil {
+		lobby.Broadcast(ctx, c, cmd)
+	} else if game != nil {
+		game.Broadcast(ctx, c, cmd)
+	}
 }
 
 // SendLobbyArrowUpdate sends the lobby arrows for all clients in lobby l to c.
@@ -255,4 +281,59 @@ func SendLobbyArrowUpdate(ctx context.Context, c *Client, l *Lobby) error {
 		},
 		Entries: entries,
 	})
+}
+
+// handleCreateGame sets up a new Game in response to a player creating one from the lobby kiosk.
+func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd commands.CreateGame) error {
+	// TODO: Check that the current character's level qualifies for the difficulty mode.
+
+	game := &Game{
+		Episode:    cmd.Episode,
+		Difficulty: GameDifficulty(cmd.Difficulty),
+		RandomSeed: rand.Uint32(),
+	}
+	copy(game.Name[:], cmd.Name[:])
+	copy(game.Password[:], cmd.Password[:])
+
+	c.Lock()
+	game.SectionID = c.Character.GuildCard.SectionID
+	c.Unlock()
+
+	switch {
+	case cmd.BattleMode == 1:
+		game.Mode = BattleMode
+	case cmd.ChallengeMode == 1:
+		game.Mode = ChallengeMode
+	case cmd.SoloMode == 1:
+		game.Mode = SoloMode
+	}
+
+	var assigned bool
+	s.gamesMtx.Lock()
+	// Put the game in the first available slot.
+	for i := range s.games {
+		if s.games[i] == nil {
+			s.games[i] = game
+			game.ID = uint8(i)
+			assigned = true
+		}
+	}
+	s.gamesMtx.Unlock()
+	if !assigned {
+		// TODO: Send the player a notification rather than erroring.
+		return errors.New("lobby is full")
+	}
+
+	// Move the player out of their current lobby and into the game they just created.
+	c.Lock()
+	lobby := c.Lobby
+	c.Unlock()
+	lobby.RemoveClient(ctx, c)
+	if err := game.AddClient(ctx, c); err != nil {
+		return fmt.Errorf("creating game and joining: %v", err)
+	}
+
+	// TODO: Send 1D
+
+	return nil
 }

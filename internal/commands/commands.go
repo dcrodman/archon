@@ -74,7 +74,42 @@ type Broadcast struct {
 	Data   []uint8
 }
 
-// Sent to a player when joining a lobby. Also used for games.
+// Sent to a player when joining a game.
+const JoinGameType = 0x64
+
+type JoinGame struct {
+	Header BBHeader
+
+	Variations [16]JoinGameVariations
+	Players    [4]PlayerLobbyData
+
+	ClientID      uint8
+	LeaderID      uint8
+	DisableUDP    uint8 // Always 1.
+	Difficulty    uint8
+	BattleMode    uint8 // Dreamcast battle mode, according to newserv. Alway 1 in BB.
+	Event         uint8
+	SectionID     uint8
+	ChallengeMode uint8
+	RandomSeed    uint32
+	Episode       uint8
+	Unused        uint8
+	SoloMode      uint8
+	InQuest       uint8
+}
+
+type JoinGameVariations struct {
+	Layout   uint32
+	Entities uint32
+}
+
+// Sent to all other players when a player joins a game.
+const AddPlayerToGame = 0x65
+
+// Sent to all players remaining in a game when a player leaves.
+const RemovePlayerFromGame = 0x66
+
+// Sent to a player when joining a lobby.
 const JoinLobbyType = 0x67
 
 // Sent to all other players when a player joins a lobby. Also used for games.
@@ -92,14 +127,19 @@ type JoinLobby struct {
 	Event            uint8
 	EnableVoiceChat  uint8  // No idea, always 1.
 	RandomSeed       uint32 // Only used for games.
-
-	Unused [24]uint8 // Voice chat stuff that might be specific to xbox?
-
+	// Voice chat stuff that might be specific to xbox?
+	Unused [24]uint8
 	// Player entries.
-	Entries []LobbyEntry
+	Entries []PlayerLobbyEntry
 }
 
-type LobbyEntry struct {
+type PlayerLobbyEntry struct {
+	PlayerLobbyData
+	Inventory   CharacterInventory
+	DisplayData CharacterDisplayData
+}
+
+type PlayerLobbyData struct {
 	PlayerTag           uint32 // Always seems to be 0x00010000 in newserv.
 	Guildcard           uint32
 	TeamMasterGuildCard uint32
@@ -109,15 +149,14 @@ type LobbyEntry struct {
 	Name                [32]uint8 // UTF-18
 	// Per newserv, Should be set to 1 to hide the "Press F1 for help".
 	HideHelpPrompt uint32
-
-	Inventory   CharacterInventory
-	DisplayData CharacterDisplayData
 }
 
-// Send to other players when a player leaves a lobby. Also used for games.
-const LeaveLobbyType = 0x66
+// Send to other players when a player leaves a lobby.
+const RemovePlayerFromLobbyType = 0x69
 
+// Used for both lobbies and games.
 type LeaveLobby struct {
+	Header     BBHeader
 	ClientID   uint8
 	LeaderID   uint8
 	DisableUDP uint8 // Always 1.
@@ -216,6 +255,22 @@ const TimestampType = 0xB1
 type Timestamp struct {
 	Header    BBHeader
 	Timestamp [28]byte
+}
+
+// Client sends to create a new game.
+const CreateGameType = 0xC1
+
+type CreateGame struct {
+	MenuID        uint32
+	ItemID        uint32
+	Name          [16]uint8 // UTF-16
+	Password      [16]uint8
+	Difficulty    uint8
+	BattleMode    uint8
+	ChallengeMode uint8
+	Episode       uint8
+	SoloMode      uint8
+	Unused        [3]uint8
 }
 
 // Client sends this to request the keyboard configuration and player options.
