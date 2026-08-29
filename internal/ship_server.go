@@ -379,6 +379,12 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 		game.Mode = SoloMode
 	}
 
+	v, err := game.GenerateVariations()
+	if err != nil {
+		return fmt.Errorf("failed to generate variations: %w", err)
+	}
+	game.Variations = v
+
 	var assigned bool
 	s.gamesMtx.Lock()
 	// Put the game in the first available slot.
