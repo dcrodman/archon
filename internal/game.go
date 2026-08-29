@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
+	"math/rand"
 	"sync"
 
 	"github.com/dcrodman/archon/internal/commands"
@@ -49,6 +49,7 @@ type Game struct {
 	Mode       GameMode
 	Difficulty GameDifficulty
 	RandomSeed uint32
+	Variations [16]commands.JoinGameVariations
 
 	// Lock must be held when accessing any of the remaining fields.
 	sync.Mutex
@@ -170,7 +171,7 @@ func SendJoinGame(ctx context.Context, g *Game, c *Client, lobbySlotID uint8) er
 		Header: commands.BBHeader{
 			Type: commands.JoinGameType,
 		},
-		// Variations: ,
+		Variations: g.Variations,
 		ClientID:   lobbySlotID,
 		DisableUDP: 1,
 		Difficulty: uint8(g.Difficulty),
@@ -387,4 +388,45 @@ func (g *Game) PlayerFinishedBursting() {
 	// Unblock one of the other clients waiting to join, if any.
 	g.burstingCond.Signal()
 	g.Unlock()
+}
+
+// GenerateVariations creates a different game - whether layout or entities.
+// The client supports different game versions of different areas. For example,
+// Forest1 has one supported layout and 3 or 5 supported entity variations.
+func (g *Game) GenerateVariations() ([16]commands.JoinGameVariations, error) {
+	// There's some weird logic here where the client sends 3 even when you click
+	// on episode 4. Let's just pretend we're in episode 4 for the purpose of variations.
+	ep := g.Episode
+	if ep == 3 {
+		ep = 4
+	}
+
+	v, ok := maxVariations[ep]
+	if !ok {
+		return [16]commands.JoinGameVariations{}, fmt.Errorf("unsupported episode: %d", g.Episode)
+	}
+
+	m := v.Multiplayer
+	if g.Mode == SoloMode {
+		m = v.Solo
+	}
+
+	rs := rand.NewSource(int64(g.RandomSeed))
+
+	var variations [16]commands.JoinGameVariations
+	for i := range variations {
+		// Not all episodes have 16 areas.
+		if i >= len(m) {
+			variations[i].Layout = 1
+			variations[i].Entities = 1
+			continue
+		}
+
+		v := m[i]
+
+		variations[i].Layout = (uint32(rs.Int63()) % v.Layout)
+		variations[i].Entities = (uint32(rs.Int63()) % v.Entities)
+	}
+
+	return variations, nil
 }
