@@ -316,6 +316,7 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 			s.games[i] = game
 			game.ID = uint8(i)
 			assigned = true
+			break
 		}
 	}
 	s.gamesMtx.Unlock()
