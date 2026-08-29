@@ -165,22 +165,6 @@ func SendMessage(ctx context.Context, c *Client, message string) error {
 	})
 }
 
-func SendLobbyMenu(ctx context.Context, c *Client) error {
-	lobbyEntries := make([]commands.LobbyListEntry, Config.ShipServer.NumLobbies)
-	for i := 0; i < Config.ShipServer.NumLobbies; i++ {
-		lobbyEntries[i].MenuID = 0x001A0001
-		lobbyEntries[i].LobbyID = uint32(i)
-	}
-
-	return c.Send(ctx, &commands.LobbyMenu{
-		Header: commands.BBHeader{
-			Type:  commands.LobbyMenuType,
-			Flags: 0x0F, // PSOBB expects this to always contain 15 entries.
-		},
-		Lobbies: lobbyEntries,
-	})
-}
-
 const (
 	// Values stolen from Tethealla, though it almost certainly doesn't matter.
 	NameColorNormal = 0xFFFFFFFF
@@ -199,6 +183,33 @@ func SendSyncCharacter(ctx context.Context, c *Client) error {
 	}
 
 	return c.Send(ctx, cmd)
+}
+
+func SendLobbyMenu(ctx context.Context, c *Client) error {
+	lobbyEntries := make([]commands.LobbyListEntry, Config.ShipServer.NumLobbies)
+	for i := 0; i < Config.ShipServer.NumLobbies; i++ {
+		lobbyEntries[i].MenuID = 0x001A0001
+		lobbyEntries[i].LobbyID = uint32(i)
+	}
+
+	return c.Send(ctx, &commands.LobbyMenu{
+		Header: commands.BBHeader{
+			Type:  commands.LobbyMenuType,
+			Flags: 0x0F, // PSOBB expects this to always contain 15 entries.
+		},
+		Lobbies: lobbyEntries,
+	})
+}
+
+func SendLobbyArrowUpdate(ctx context.Context, c *Client, l *Lobby) error {
+	entries := l.BuildLobbyArrowEntries()
+	return c.Send(ctx, &commands.LobbyArrowUpdate{
+		Header: commands.BBHeader{
+			Type:  commands.LobbyArrowUpdateType,
+			Flags: uint32(len(entries)),
+		},
+		Entries: entries,
+	})
 }
 
 // Find an available lobby and add the client to it, sending the appropriate notifications to
@@ -253,6 +264,7 @@ func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSel
 	return SendRedirect(ctx, c, ip, port)
 }
 
+// Client has selected a new lobby from the teleporter or just left a game to return to the lobby.
 func (s *GameServer) handleLobbySelection(ctx context.Context, c *Client, cmd commands.LobbySelect) error {
 	return s.addClientToLobby(ctx, c, int(cmd.LobbyID))
 }
@@ -290,18 +302,6 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd 
 	} else if game != nil {
 		game.Broadcast(ctx, c, cmd)
 	}
-}
-
-// SendLobbyArrowUpdate sends the lobby arrows for all clients in lobby l to c.
-func SendLobbyArrowUpdate(ctx context.Context, c *Client, l *Lobby) error {
-	entries := l.BuildLobbyArrowEntries()
-	return c.Send(ctx, &commands.LobbyArrowUpdate{
-		Header: commands.BBHeader{
-			Type:  commands.LobbyArrowUpdateType,
-			Flags: uint32(len(entries)),
-		},
-		Entries: entries,
-	})
 }
 
 // handleCreateGame sets up a new Game in response to a player creating one from the lobby kiosk.
