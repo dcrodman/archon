@@ -69,10 +69,8 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var loginCmd commands.Login
 		UnmarshalStruct(data, &loginCmd)
 		err = s.handleLogin(ctx, c, &loginCmd)
-	case commands.SyncCharacterType:
-		var syncCommand commands.SyncCharacter
-		UnmarshalStruct(data, &syncCommand)
-		err = s.handleSyncCharacter(ctx, c, &syncCommand)
+	case commands.DisconnectType:
+		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
 	case commands.ShipListType:
 		var shipListCmd commands.ShipList
 		UnmarshalStruct(data, &shipListCmd)
@@ -80,43 +78,31 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	case commands.MenuSelectionType:
 		var menuSelectionCmd commands.MenuSelection
 		UnmarshalStruct(data, &menuSelectionCmd)
-		err = s.handleShipSelection(ctx, c, &menuSelectionCmd)
-	case commands.BroadcastType:
-		var broadcastCmd commands.Broadcast
-		UnmarshalStruct(data, &broadcastCmd)
-		s.handleBroadcastCommand(ctx, c, broadcastCmd)
+		err = s.handleShipSelection(ctx, c, menuSelectionCmd)
+	case commands.LobbySelectType:
+		var lobbySelectCmd commands.LobbySelect
+		UnmarshalStruct(data, &lobbySelectCmd)
+		err = s.handleLobbySelection(ctx, c, lobbySelectCmd)
 	case commands.CreateGameType:
 		var createCmd commands.CreateGame
 		UnmarshalStruct(data, &createCmd)
 		err = s.handleCreateGame(ctx, c, createCmd)
-	case commands.DisconnectType:
-		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
+	case commands.LeaveGameType:
+		var playerData commands.PlayerData
+		UnmarshalStruct(data, &playerData)
+		s.handleLeaveGame(ctx, c, playerData)
+	case commands.BroadcastType:
+		var broadcastCmd commands.Broadcast
+		UnmarshalStruct(data, &broadcastCmd)
+		s.handleBroadcastCommand(ctx, c, broadcastCmd)
+	case commands.SyncCharacterType:
+		var syncCommand commands.SyncCharacter
+		UnmarshalStruct(data, &syncCommand)
+		err = s.handleSyncCharacter(ctx, c, &syncCommand)
 	default:
 		Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr)
 	}
 	return err
-}
-
-func (s *GameServer) handleShipList(ctx context.Context, c *Client, _ *commands.ShipList) error {
-	return SendShipList(ctx, c)
-}
-
-// Player selected one of the items on the ship select screen; respond with the
-// IP address and port of the ship server to  which the client will connect after
-// disconnecting from this server.
-func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSelectionPkt *commands.MenuSelection) error {
-	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
-
-	selectedShip := menuSelectionPkt.ItemID - 1
-	if selectedShip >= uint32(len(availableShips)) {
-		return fmt.Errorf("invalid ship selection: %d", selectedShip)
-	}
-
-	var ip [4]uint8
-	copy(ip[:], net.ParseIP(availableShips[selectedShip].Address).To4())
-	port := uint16(availableShips[selectedShip].Port)
-
-	return SendRedirect(ctx, c, ip, port)
 }
 
 func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *commands.Login) error {
@@ -168,7 +154,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 			Logger.Warnf("error sending lobby update to client %v: %v", c.IPAddr, err)
 		}
 	})
-	return s.addClientToLobby(ctx, c)
+	return s.addClientToLobby(ctx, c, -1)
 }
 
 func SendMessage(ctx context.Context, c *Client, message string) error {
@@ -217,23 +203,58 @@ func SendSyncCharacter(ctx context.Context, c *Client) error {
 
 // Find an available lobby and add the client to it, sending the appropriate notifications to
 // both the joining client and all existing clients in the lobby.
-func (s *GameServer) addClientToLobby(ctx context.Context, c *Client) error {
+func (s *GameServer) addClientToLobby(ctx context.Context, c *Client, preferredLobbyID int) error {
+	// Try to add the player to the lobby the client selected. If we're unable to do so (for
+	// instance because the lobby has filled), fall through to the usual lobby selection logic.
+	if preferredLobbyID >= 0 {
+		lobby := s.lobbies[preferredLobbyID]
+		if err := lobby.AddClient(ctx, c); err == nil {
+			return nil
+		}
+	}
+
 	for _, lobby := range s.lobbies {
 		if lobby.IsFull() {
 			continue
 		}
 
 		err := lobby.AddClient(ctx, c)
-		switch err {
-		case nil:
-			return nil
-		case ErrLobbyFull:
+		switch {
+		case err != nil:
+			return err
+		case err == ErrLobbyFull:
 			continue
 		default:
-			return err
+			return nil
 		}
 	}
 	return nil
+}
+
+func (s *GameServer) handleShipList(ctx context.Context, c *Client, _ *commands.ShipList) error {
+	return SendShipList(ctx, c)
+}
+
+// Player selected one of the items on the ship select screen; respond with the
+// IP address and port of the ship server to  which the client will connect after
+// disconnecting from this server.
+func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSelectionPkt commands.MenuSelection) error {
+	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
+
+	selectedShip := menuSelectionPkt.ItemID - 1
+	if selectedShip >= uint32(len(availableShips)) {
+		return fmt.Errorf("invalid ship selection: %d", selectedShip)
+	}
+
+	var ip [4]uint8
+	copy(ip[:], net.ParseIP(availableShips[selectedShip].Address).To4())
+	port := uint16(availableShips[selectedShip].Port)
+
+	return SendRedirect(ctx, c, ip, port)
+}
+
+func (s *GameServer) handleLobbySelection(ctx context.Context, c *Client, cmd commands.LobbySelect) error {
+	return s.addClientToLobby(ctx, c, int(cmd.LobbyID))
 }
 
 // Client has requested to save the current game state, so flush it to the database.
@@ -337,4 +358,34 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	// TODO: Send 1D
 
 	return nil
+}
+
+func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd commands.PlayerData) {
+	c.Lock()
+	game := c.Game
+	c.Unlock()
+
+	// Disconnect the player from the current lobby, but don't add them to another one -
+	// that will be handled by the 84 command.
+	if game != nil {
+		game.RemoveClient(ctx, c)
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	// Update the client's Character with the contents of this command, with the exception
+	// of display data and inventory since that is maintained server-side.
+	copy(c.Character.ChallengeRecords[:], cmd.Records.ChallengeRecords[:])
+	copy(c.Character.BattleRecords[:], cmd.Records.BattleRecords[:])
+	copy(c.Character.InfoBoard[:], cmd.InfoBoard[:])
+	copy(c.Character.ChoiceSearch[:], cmd.ChoiceSearch[:])
+
+	// TODO: Skipping auto reply for now since I don't yet know what to do with that.
+	// TODO: Blocked guildcards, which may require revisiting the guildcard data model (see character server).
+
+	// Persist the character data we just updated, which was expected in the original game.
+	if err := shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), c.Character); err != nil {
+		Logger.Warnf("error saving character data for client %v: %v", c.IPAddr, err)
+	}
 }

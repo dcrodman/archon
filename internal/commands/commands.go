@@ -74,6 +74,28 @@ type Broadcast struct {
 	Data   []uint8
 }
 
+// TODO: Don't know what this does yet.
+const PlayerDataType = 0x61
+
+type PlayerData struct {
+	Header BBHeader
+
+	Inventory        CharacterInventory
+	Visual           CharacterDisplayData
+	Records          PlayerRecordsEntry
+	ChoiceSearch     [24]uint8
+	InfoBoard        [172]uint8 // UTF-16
+	BlockedSenders   [30]uint32
+	AutoReplyEnabled uint32
+	AutoReply        []uint16
+}
+
+type PlayerRecordsEntry struct {
+	ClientID         uint32
+	ChallengeRecords [320]uint8
+	BattleRecords    [24]uint8
+}
+
 // Sent to a player when joining a game.
 const JoinGameType = 0x64
 
@@ -176,6 +198,15 @@ type LobbyListEntry struct {
 	Padding uint32
 }
 
+// Sent by the client when they choose a lobby.
+const LobbySelectType = 0x84
+
+type LobbySelect struct {
+	Header  BBHeader
+	MenuID  uint32
+	LobbyID uint32
+}
+
 // Sent to the client to set the arrow colors for each player in a lobby.
 const LobbyArrowUpdateType = 0x88
 
@@ -238,6 +269,10 @@ const (
 	// to receive the ship list and the IP address of the selected Ship server.
 	ShipSelection
 )
+
+// Sent by the client when leaving a game from the teleporter. The format of this command is
+// shared with 61 (PlayerData) above.
+const LeaveGameType = 0x98
 
 // TODO: ???
 const ShipListType = 0xA0
