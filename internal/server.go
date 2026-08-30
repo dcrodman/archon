@@ -172,7 +172,7 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 		// This is a bit of a hack, but we need to make sure that any disconnected clients
 		// are always removed from the lobby they were in.
 		if gs, ok := backend.(*GameServer); ok {
-			gs.handleDisconnectedClient(ctx, c)
+			gs.cleanupDisconnectedClient(ctx, c)
 		}
 
 		closeConnection(c)

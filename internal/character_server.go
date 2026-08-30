@@ -182,7 +182,7 @@ func SendTimestamp(ctx context.Context, c *Client) error {
 // rather than bothering with anything fancy like retrieving a list of active
 // ships from the shipgate, etc.
 func SendShipList(ctx context.Context, c *Client) error {
-	entries := []commands.ShipMenuEntry{
+	entries := []commands.MenuEntry{
 		// The first item is ignored and just used for the menu title.
 		{MenuID: 0x11000011, ItemID: 0},
 	}
@@ -192,13 +192,13 @@ func SendShipList(ctx context.Context, c *Client) error {
 
 	// Append our active ship list.
 	for i, ship := range availableShips {
-		var entry commands.ShipMenuEntry
+		var entry commands.MenuEntry
 		entry.ItemID = uint32(i) + 1
 		copy(entry.Name[:], EncodeUTF16(ship.Name))
 		entries = append(entries, entry)
 	}
 
-	return c.Send(ctx, &commands.ShipMenu{
+	return c.Send(ctx, &commands.Menu{
 		Header: commands.BBHeader{
 			Type:  commands.ShipMenuType,
 			Flags: uint32(len(availableShips)),

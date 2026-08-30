@@ -1,5 +1,13 @@
 package commands
 
+// Sent to the client to display a dialog window in the lobby, typically for errors.
+const LobbyMessageBoxType = 0x01
+
+type LobbyMessageBox struct {
+	Header  BBHeader
+	Message []uint8
+}
+
 // Definitions for the game commands exchanged between the client and server.
 // Most types have some sort of comment alluding to their nature, but they are
 // intentionally succinct. For (much) more information and a far better reference,
@@ -20,19 +28,26 @@ const DisconnectType = 0x05
 // List containing the available blocks or ships in a menu.
 const ShipMenuType = 0x07
 
-type ShipMenu struct {
+// Sent by the client to request the current game list and sent by the server to
+// fulfill that request. In the client form it's just a header, the server response
+// shares the same format as 0x07.
+const GameListType = 0x08
+
+type Menu struct {
 	Header  BBHeader
-	Entries []ShipMenuEntry
+	Entries []MenuEntry
 }
 
-type ShipMenuEntry struct {
+type MenuEntry struct {
 	MenuID     uint32
 	ItemID     uint32
 	Difficulty uint8
 	NumPlayers uint8
 	Name       [32]uint8
 	Episode    uint8
-	Flags      uint8
+	// Relevant flags are: 02 (locked with password), 04 (solo mode), 10 (battle mode),
+	// 20 (challenge mode), 40 (episode 1), 80 (episode 2), C0 (episode 4) (courtesy of newserv).
+	Flags uint8
 }
 
 // Client sends this to indicate a selection from the ship or block menu.
@@ -278,6 +293,7 @@ const LeaveGameType = 0x98
 const ShipListType = 0xA0
 
 type ShipList struct {
+	Header    BBHeader
 	PlayerTag uint32
 	Guildcard uint32
 	Unused    [0x10]uint16
@@ -296,16 +312,17 @@ type Timestamp struct {
 const CreateGameType = 0xC1
 
 type CreateGame struct {
+	Header        BBHeader
 	MenuID        uint32
 	ItemID        uint32
-	Name          [16]uint8 // UTF-16
-	Password      [16]uint8
+	Name          [32]uint8 // UTF-16
+	Password      [32]uint8
 	Difficulty    uint8
 	BattleMode    uint8
 	ChallengeMode uint8
 	Episode       uint8
 	SoloMode      uint8
-	Unused        [3]uint8
+	Unused2       [3]uint8
 }
 
 // Client sends this to request the keyboard configuration and player options.

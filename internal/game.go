@@ -2,13 +2,24 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/dcrodman/archon/internal/commands"
 )
 
+var ErrGameAbandoned = errors.New("all players have left the game")
+
 const MaxPlayersPerGame = 4
+
+type GameEpisode uint8
+
+const (
+	Episode1 GameEpisode = 1
+	Episode2 GameEpisode = 2
+	Episode4 GameEpisode = 4
+)
 
 type GameMode uint8
 
@@ -31,20 +42,33 @@ const (
 type Game struct {
 	ID uint8
 
-	// TODO: Any reason to decode this?
-	Name       [16]uint8
-	Password   [16]uint8
-	Episode    uint8
+	Name       [32]uint8
+	Password   [32]uint8
+	Episode    GameEpisode
 	Mode       GameMode
 	Difficulty GameDifficulty
-	SectionID  uint8
 	RandomSeed uint32
 
-	sync.RWMutex
+	// Lock must be held when accessing any of the remaining fields.
+	sync.Mutex
 	clients        [MaxPlayersPerGame]*Client
 	currentClients int
-	leaderID       uint8
-	inQuest        bool
+
+	leaderID  uint8
+	sectionID uint8
+
+	inQuest   bool
+	abandoned bool
+}
+
+func (g *Game) NumPlayers() int {
+	g.Lock()
+	defer g.Unlock()
+	return g.currentClients
+}
+
+func (g *Game) IsFull() bool {
+	return g.NumPlayers() >= MaxPlayersPerGame
 }
 
 // AddClient adds a client to a lobby and sends the appropriate lobby join notifications
@@ -53,9 +77,13 @@ type Game struct {
 // otherwise an error is returned if the lobby is full or the client could not be added.
 func (g *Game) AddClient(ctx context.Context, c *Client) error {
 	g.Lock()
-	if g.currentClients >= MaxPlayersPerGame {
+	switch {
+	case g.currentClients >= MaxPlayersPerGame:
 		g.Unlock()
 		return ErrLobbyFull
+	case g.abandoned:
+		g.Unlock()
+		return ErrGameAbandoned
 	}
 
 	// Now assign the client to a slot in the lobby and update its state.
@@ -98,8 +126,8 @@ func SendJoinGame(ctx context.Context, g *Game, c *Client, lobbySlotID uint8) er
 		ClientID:   lobbySlotID,
 		DisableUDP: 1,
 		Difficulty: uint8(g.Difficulty),
-		SectionID:  g.SectionID,
 		RandomSeed: g.RandomSeed,
+		Episode:    uint8(g.Episode),
 	}
 	switch g.Mode {
 	case BattleMode:
@@ -213,16 +241,34 @@ func (g *Game) RemoveClient(ctx context.Context, c *Client) {
 	g.clients[currentLobbySlotID] = nil
 	g.currentClients--
 
+	if g.currentClients == 0 {
+		// All players have left the game; prevent any new players from joining and notify the
+		// ship server that it can be cleaned up.
+		g.abandoned = true
+		g.Unlock()
+		return
+	}
+
 	// Select a new leader starting from the lowest index
 	if g.leaderID == currentLobbySlotID {
 		g.leaderID = 0
 		for i := range g.clients {
 			if g.clients[i] != nil {
 				g.leaderID = uint8(i)
+
+				g.clients[i].Lock()
+				g.sectionID = g.clients[i].Character.DisplayData.Visual.SectionID
+				g.clients[i].Unlock()
+
 				break
 			}
 		}
 	}
+
+	// TODO: This is where we'll need to trigger updating the drop tables to match the new leader.
+	// Newserv supports disabling this behavior and only ever using the drop tables (and thus
+	// section ID) of the leader that created the game, but for now we just do it.
+
 	g.Unlock()
 
 	// Notify the other players that a player has left the lobby.

@@ -83,6 +83,8 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var lobbySelectCmd commands.LobbySelect
 		UnmarshalStruct(data, &lobbySelectCmd)
 		err = s.handleLobbySelection(ctx, c, lobbySelectCmd)
+	case commands.GameListType:
+		err = s.handleGameList(ctx, c)
 	case commands.CreateGameType:
 		var createCmd commands.CreateGame
 		UnmarshalStruct(data, &createCmd)
@@ -103,6 +105,21 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr)
 	}
 	return err
+}
+
+// cleanupDisconnectedClient is invoked when clients disconnect from the game server.
+func (s *GameServer) cleanupDisconnectedClient(ctx context.Context, c *Client) {
+	// Remove the client from the lobby they were in.
+	c.Lock()
+	lobby := c.Lobby
+	game := c.Game
+	c.Unlock()
+
+	if lobby != nil {
+		lobby.RemoveClient(ctx, c)
+	} else if game != nil {
+		game.RemoveClient(ctx, c)
+	}
 }
 
 func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *commands.Login) error {
@@ -281,15 +298,52 @@ func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *comm
 	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
 }
 
-// handleDisconnectedClient is invoked when clients disconnect from the game server.
-func (s *GameServer) handleDisconnectedClient(ctx context.Context, c *Client) {
-	// Remove the client from the lobby they were in.
-	c.Lock()
-	lobby := c.Lobby
-	c.Unlock()
-	if lobby != nil {
-		lobby.RemoveClient(ctx, c)
+func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
+	cmd := commands.Menu{
+		Header: commands.BBHeader{
+			Type: commands.GameListType,
+		},
+		// TODO: Need to set a menu ID
+		Entries: make([]commands.MenuEntry, 1),
 	}
+	// Like for the ship menu, the client expects a placeholder first entry that does not
+	// count towards the total number of entries.
+	copy(cmd.Entries[0].Name[:], EncodeUTF16("archon")[:])
+
+	s.gamesMtx.Lock()
+	var games uint32
+	for i, game := range s.games {
+		if game == nil {
+			continue
+		}
+		entry := commands.MenuEntry{
+			ItemID: uint32(i) + 1,
+			// Shamelessly ripping off newserv here but the difficulty needs 0x22 added for some reason.
+			Difficulty: uint8(game.Difficulty) + 0x22,
+			NumPlayers: uint8(game.NumPlayers()),
+			Episode:    uint8(game.Episode),
+		}
+		copy(entry.Name[:], game.Name[:])
+
+		if game.Password[0] != 0 {
+			entry.Flags |= 0x02
+		}
+		if game.IsFull() {
+			entry.Flags |= 0x04
+		}
+		switch game.Mode {
+		case BattleMode:
+			entry.Flags |= 0x10
+		case ChallengeMode:
+			entry.Flags |= 0x20
+		}
+		cmd.Entries = append(cmd.Entries, entry)
+		games++
+	}
+	cmd.Header.Flags = games
+	s.gamesMtx.Unlock()
+
+	return c.Send(ctx, cmd)
 }
 
 func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
@@ -309,16 +363,12 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	// TODO: Check that the current character's level qualifies for the difficulty mode.
 
 	game := &Game{
-		Episode:    cmd.Episode,
+		Episode:    GameEpisode(cmd.Episode),
 		Difficulty: GameDifficulty(cmd.Difficulty),
 		RandomSeed: rand.Uint32(),
 	}
 	copy(game.Name[:], cmd.Name[:])
 	copy(game.Password[:], cmd.Password[:])
-
-	c.Lock()
-	game.SectionID = c.Character.GuildCard.SectionID
-	c.Unlock()
 
 	switch {
 	case cmd.BattleMode == 1:
@@ -343,7 +393,7 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	s.gamesMtx.Unlock()
 	if !assigned {
 		// TODO: Send the player a notification rather than erroring.
-		return errors.New("lobby is full")
+		return errors.New("block is full")
 	}
 
 	// Move the player out of their current lobby and into the game they just created.
@@ -388,4 +438,17 @@ func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd command
 	if err := shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), c.Character); err != nil {
 		Logger.Warnf("error saving character data for client %v: %v", c.IPAddr, err)
 	}
+}
+
+func SendLobbyMessageBox(ctx context.Context, c *Client, msg string) error {
+	cmd := commands.LobbyMessageBox{
+		Header: commands.BBHeader{
+			Type: commands.LobbyMessageBoxType,
+		},
+		Message: EncodeUTF16(msg),
+	}
+	if len(cmd.Message) > 0x200 {
+		return errors.New("message must not exceed 0x200 bytes")
+	}
+	return c.Send(ctx, cmd)
 }
