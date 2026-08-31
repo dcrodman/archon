@@ -71,6 +71,10 @@ func (g *Game) IsFull() bool {
 	return g.NumPlayers() >= MaxPlayersPerGame
 }
 
+func (g *Game) HasPassword() bool {
+	return g.Password[0] != 0
+}
+
 // AddClient adds a client to a lobby and sends the appropriate lobby join notifications
 // to both the player being added and all other players in the lobby. The client's
 // LobbyID (i.e. its index/slot in the lobby) is set if they were successfully added,

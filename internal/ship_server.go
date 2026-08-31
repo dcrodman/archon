@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -71,14 +72,12 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		err = s.handleLogin(ctx, c, &loginCmd)
 	case commands.DisconnectType:
 		// Ignore and allow the upstream call to handleDisconnectedClient to clean up the client.
-	case commands.ShipListType:
+	case commands.ShipListRequestType:
 		var shipListCmd commands.ShipList
 		UnmarshalStruct(data, &shipListCmd)
-		err = s.handleShipList(ctx, c, &shipListCmd)
+		err = s.handleShipListRequest(ctx, c, &shipListCmd)
 	case commands.MenuSelectionType:
-		var menuSelectionCmd commands.MenuSelection
-		UnmarshalStruct(data, &menuSelectionCmd)
-		err = s.handleShipSelection(ctx, c, menuSelectionCmd)
+		err = s.handleMenuSelection(ctx, c, data)
 	case commands.LobbySelectType:
 		var lobbySelectCmd commands.LobbySelect
 		UnmarshalStruct(data, &lobbySelectCmd)
@@ -259,17 +258,31 @@ func (s *GameServer) addClientToLobby(ctx context.Context, c *Client, preferredL
 	return nil
 }
 
-func (s *GameServer) handleShipList(ctx context.Context, c *Client, _ *commands.ShipList) error {
+func (s *GameServer) handleShipListRequest(ctx context.Context, c *Client, _ *commands.ShipList) error {
 	return SendShipList(ctx, c)
+}
+
+func (s *GameServer) handleMenuSelection(ctx context.Context, c *Client, data []byte) error {
+	var cmd commands.MenuSelection
+	UnmarshalStruct(data, &cmd)
+
+	switch cmd.MenuID {
+	case ShipListMenuID:
+		return s.handleShipSelection(ctx, c, cmd)
+	case GameListMenuID:
+		return s.handleGameSelection(ctx, c, data, cmd)
+	default:
+		return fmt.Errorf("unrecognized menu ID: %v", cmd.MenuID)
+	}
 }
 
 // Player selected one of the items on the ship select screen; respond with the
 // IP address and port of the ship server to  which the client will connect after
 // disconnecting from this server.
-func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSelectionPkt commands.MenuSelection) error {
+func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, cmd commands.MenuSelection) error {
 	availableShips := shipgate.Shipgate.GetAvailableShips(ctx)
 
-	selectedShip := menuSelectionPkt.ItemID - 1
+	selectedShip := cmd.ItemID - 1
 	if selectedShip >= uint32(len(availableShips)) {
 		return fmt.Errorf("invalid ship selection: %d", selectedShip)
 	}
@@ -281,7 +294,53 @@ func (s *GameServer) handleShipSelection(ctx context.Context, c *Client, menuSel
 	return SendRedirect(ctx, c, ip, port)
 }
 
-// Client has selected a new lobby from the teleporter or just left a game to return to the lobby.
+// Player has selected a game from the kiosk (after receiving the game list).
+func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []byte, cmd commands.MenuSelection) error {
+	s.gamesMtx.Lock()
+	game := s.games[cmd.ItemID-1]
+	s.gamesMtx.Unlock()
+
+	if game == nil {
+		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it no longer exists")
+	}
+
+	// If the game was password-protected, the game will have prompted the player for one and included
+	// the input in this command. This check is valid even if the password is empty.
+	if game.HasPassword() {
+		if cmd.Header.Size < 0x30 || !bytes.Equal(game.Password[:], data[16:cmd.Header.Size]) {
+			return SendLobbyMessageBox(ctx, c, "The password was incorrect")
+		}
+	}
+
+	// TODO: Like when creating a game, check the player's level (or do it in game) relative to difficulty.
+
+	// Transfer them to the game they requested to join.
+	c.Lock()
+	if c.Lobby != nil {
+		lobby := c.Lobby
+		c.Unlock()
+		lobby.RemoveClient(ctx, c)
+	} else {
+		currentGame := c.Game
+		c.Unlock()
+		currentGame.RemoveClient(ctx, c)
+	}
+
+	err := game.AddClient(ctx, c)
+	switch err {
+	case nil:
+		return nil
+	case ErrGameAbandoned:
+		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it no longer exists")
+	case ErrLobbyFull:
+		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it is full")
+	default:
+		Logger.Warnw("client %v encountered error joining game %s: %v", c.IPAddr, string(game.Name[:]), err)
+		return SendLobbyMessageBox(ctx, c, "You cannot join this game")
+	}
+}
+
+// Player has selected a new lobby from the teleporter or just left a game to return to the lobby.
 func (s *GameServer) handleLobbySelection(ctx context.Context, c *Client, cmd commands.LobbySelect) error {
 	return s.addClientToLobby(ctx, c, int(cmd.LobbyID))
 }
@@ -298,16 +357,12 @@ func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *comm
 	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
 }
 
+const GameListMenuID = 0x22222222
+
 func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
-	cmd := commands.Menu{
-		Header: commands.BBHeader{
-			Type: commands.GameListType,
-		},
-		// TODO: Need to set a menu ID
-		Entries: make([]commands.MenuEntry, 1),
-	}
-	// Like for the ship menu, the client expects a placeholder first entry that does not
-	// count towards the total number of entries.
+	cmd := commands.Menu{Entries: make([]commands.MenuEntry, 1)}
+	// Like for the ship menu, the client expects a placeholder first entry.
+	cmd.Entries[0].MenuID = GameListMenuID
 	copy(cmd.Entries[0].Name[:], EncodeUTF16("archon")[:])
 
 	s.gamesMtx.Lock()
@@ -317,6 +372,7 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 			continue
 		}
 		entry := commands.MenuEntry{
+			MenuID: GameListMenuID,
 			ItemID: uint32(i) + 1,
 			// Shamelessly ripping off newserv here but the difficulty needs 0x22 added for some reason.
 			Difficulty: uint8(game.Difficulty) + 0x22,
@@ -325,7 +381,7 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 		}
 		copy(entry.Name[:], game.Name[:])
 
-		if game.Password[0] != 0 {
+		if game.HasPassword() {
 			entry.Flags |= 0x02
 		}
 		if game.IsFull() {
@@ -340,9 +396,12 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 		cmd.Entries = append(cmd.Entries, entry)
 		games++
 	}
-	cmd.Header.Flags = games
 	s.gamesMtx.Unlock()
 
+	cmd.Header = commands.BBHeader{
+		Type:  commands.GameListType,
+		Flags: games,
+	}
 	return c.Send(ctx, cmd)
 }
 

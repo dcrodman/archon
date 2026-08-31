@@ -290,7 +290,7 @@ const (
 const LeaveGameType = 0x98
 
 // TODO: ???
-const ShipListType = 0xA0
+const ShipListRequestType = 0xA0
 
 type ShipList struct {
 	Header    BBHeader
