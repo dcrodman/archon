@@ -110,14 +110,10 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 func (s *GameServer) cleanupDisconnectedClient(ctx context.Context, c *Client) {
 	// Remove the client from the lobby they were in.
 	c.Lock()
-	lobby := c.Lobby
-	game := c.Game
+	room := c.Room
 	c.Unlock()
-
-	if lobby != nil {
-		lobby.RemoveClient(ctx, c)
-	} else if game != nil {
-		game.RemoveClient(ctx, c)
+	if room != nil {
+		room.RemoveClient(ctx, c)
 	}
 }
 
@@ -166,7 +162,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	// Newserv notes that the client may ignore this packet if it's sent while the client
 	// is still joining the lobby (aka "bursting") so add a delay before we send this.
 	time.AfterFunc(2*time.Second, func() {
-		if err := SendLobbyArrowUpdate(ctx, c, c.Lobby); err != nil {
+		if err := SendLobbyArrowUpdate(ctx, c, c.Room.(*Lobby)); err != nil {
 			Logger.Warnf("error sending lobby update to client %v: %v", c.IPAddr, err)
 		}
 	})
@@ -316,14 +312,10 @@ func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []
 
 	// Transfer them to the game they requested to join.
 	c.Lock()
-	if c.Lobby != nil {
-		lobby := c.Lobby
-		c.Unlock()
-		lobby.RemoveClient(ctx, c)
-	} else {
-		currentGame := c.Game
-		c.Unlock()
-		currentGame.RemoveClient(ctx, c)
+	currentRoom := c.Room
+	c.Unlock()
+	if currentRoom != nil {
+		currentRoom.RemoveClient(ctx, c)
 	}
 
 	err := game.AddClient(ctx, c)
@@ -407,13 +399,10 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 
 func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
 	c.Lock()
-	lobby := c.Lobby
-	game := c.Game
+	room := c.Room
 	c.Unlock()
-	if lobby != nil {
-		lobby.Broadcast(ctx, c, cmd)
-	} else if game != nil {
-		game.Broadcast(ctx, c, cmd)
+	if room != nil {
+		room.Broadcast(ctx, c, cmd)
 	}
 }
 
@@ -457,7 +446,7 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 
 	// Move the player out of their current lobby and into the game they just created.
 	c.Lock()
-	lobby := c.Lobby
+	lobby := c.Room
 	c.Unlock()
 	lobby.RemoveClient(ctx, c)
 	if err := game.AddClient(ctx, c); err != nil {
@@ -471,7 +460,7 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 
 func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd commands.PlayerData) {
 	c.Lock()
-	game := c.Game
+	game := c.Room
 	c.Unlock()
 
 	// Disconnect the player from the current lobby, but don't add them to another one -

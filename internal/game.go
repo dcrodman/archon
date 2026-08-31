@@ -105,7 +105,7 @@ func (g *Game) AddClient(ctx context.Context, c *Client) error {
 	g.Unlock()
 
 	c.Lock()
-	c.Game = g
+	c.Room = g
 	c.LobbySlotID = lobbySlotID
 	c.Unlock()
 
@@ -238,7 +238,7 @@ func (g *Game) RemoveClient(ctx context.Context, c *Client) {
 	currentLobbySlotID := c.LobbySlotID
 	// This is probably redundant and is technically still a valid slot.
 	c.LobbySlotID = 0
-	c.Game = nil
+	c.Room = nil
 	c.Unlock()
 
 	g.Lock()

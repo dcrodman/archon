@@ -15,6 +15,13 @@ import (
 	"github.com/dcrodman/archon/internal/encryption"
 )
 
+// Joinable may be either a Game or a Lobby joined by a player.
+type Room interface {
+	AddClient(ctx context.Context, c *Client) error
+	RemoveClient(ctx context.Context, c *Client)
+	Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast)
+}
+
 type ClientConfig struct {
 	Magic        uint32 // Must be set to 0x48615467
 	CharSelected uint8  // Has a character been selected?
@@ -53,10 +60,8 @@ type Client struct {
 	sync.Mutex
 	// Character is a reference to the character selected during the login process.
 	Character *commands.CharacterData
-	// Lobby they are currently in (if applicable).
-	Lobby *Lobby
-	// Game they are currently in (if applicable).
-	Game *Game
+	// Joinable is the Lobby or Game the player is currently in.
+	Room Room
 	// LobbySlotID is the position in the the lobby or game.
 	LobbySlotID uint8
 
