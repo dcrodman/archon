@@ -1,5 +1,7 @@
 package internal
 
+import "github.com/dcrodman/archon/internal/commands"
+
 // Constants and structs associated with character data. Most of these defaults are based on newserv
 // (though some I initially found through Tethealla).
 // https://github.com/fuzziqersoftware/newserv/blob/master/src/SaveFileFormats.cc
@@ -166,4 +168,116 @@ var DefaultMagColors = [][]uint8{
 	{0x00, 0x01, 0x02, 0x0C, 0x04, 0x05, 0x0F, 0x0A, 0x04, 0x0D, 0x01, 0x08, 0x11, 0x04, 0x05, 0x0F, 0x05, 0x10, 0x10, 0x07, 0x02, 0x0B, 0x0A, 0x0A, 0x0F},
 	{0x00, 0x01, 0x0B, 0x0C, 0x04, 0x05, 0x06, 0x08, 0x0A, 0x0D, 0x07, 0x02, 0x11, 0x0A, 0x05, 0x06, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 	{0x00, 0x07, 0x02, 0x11, 0x04, 0x05, 0x06, 0x09, 0x0C, 0x00, 0x01, 0x02, 0x11, 0x0D, 0x05, 0x10, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+}
+
+// These are the maximum values of each variation (layout and entity) supported by
+// each area. We'll use this to generate different variations per game.
+var maxVariations = map[GameEpisode]struct {
+	Multiplayer [16]commands.JoinGameVariations
+	Solo        [16]commands.JoinGameVariations
+}{
+	Episode1: {
+		Multiplayer: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 1},  // PIONEER 2
+			{Layout: 1, Entities: 5},  // FOREST 1
+			{Layout: 1, Entities: 5},  // FOREST 2
+			{Layout: 3, Entities: 2},  // CAVES 1
+			{Layout: 3, Entities: 2},  // CAVES 2
+			{Layout: 3, Entities: 2},  // CAVES 3
+			{Layout: 3, Entities: 2},  // MINES 1
+			{Layout: 3, Entities: 2},  // MINES 2
+			{Layout: 3, Entities: 2},  // RUINS 1
+			{Layout: 3, Entities: 2},  // RUINS 2
+			{Layout: 3, Entities: 2},  // RUINS 3
+			{Layout: 1, Entities: 1},  // DRAGON
+			{Layout: 1, Entities: 1},  // DE ROL LE
+			{Layout: 1, Entities: 1},  // VOL OPT
+			{Layout: 1, Entities: 1},  // DARK FALZ
+			{Layout: 10, Entities: 1}, // LOBBY
+		},
+		Solo: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 1},  // PIONEER 2
+			{Layout: 1, Entities: 3},  // FOREST 1
+			{Layout: 1, Entities: 3},  // FOREST 2
+			{Layout: 3, Entities: 1},  // CAVES 1
+			{Layout: 3, Entities: 1},  // CAVES 2
+			{Layout: 3, Entities: 1},  // CAVES 3
+			{Layout: 3, Entities: 2},  // MINES 1
+			{Layout: 3, Entities: 2},  // MINES 2
+			{Layout: 3, Entities: 2},  // RUINS 1
+			{Layout: 3, Entities: 2},  // RUINS 2
+			{Layout: 3, Entities: 2},  // RUINS 3
+			{Layout: 1, Entities: 1},  // DRAGON
+			{Layout: 1, Entities: 1},  // DE ROL LE
+			{Layout: 1, Entities: 1},  // VOL OPT
+			{Layout: 1, Entities: 1},  // DARK FALZ
+			{Layout: 10, Entities: 1}, // LOBBY
+		},
+	},
+	Episode2: {
+		Multiplayer: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 1}, // PIONEER 2
+			{Layout: 2, Entities: 1}, // VRTA
+			{Layout: 2, Entities: 1}, // VRTB
+			{Layout: 2, Entities: 1}, // VRSA
+			{Layout: 2, Entities: 1}, // VRSB
+			{Layout: 1, Entities: 3}, // CCA
+			{Layout: 1, Entities: 3}, // JN
+			{Layout: 1, Entities: 3}, // JS
+			{Layout: 2, Entities: 2}, // MNTN
+			{Layout: 1, Entities: 3}, // SEAS
+			{Layout: 2, Entities: 2}, // SBU
+			{Layout: 2, Entities: 2}, // SBL
+			{Layout: 1, Entities: 1}, // GG
+			{Layout: 1, Entities: 1}, // OF
+			{Layout: 1, Entities: 1}, // BR
+			{Layout: 1, Entities: 1}, // GD
+		},
+		Solo: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 1}, // PIONEER 2
+			{Layout: 2, Entities: 1}, // VRTA
+			{Layout: 2, Entities: 1}, // VRTB
+			{Layout: 2, Entities: 1}, // VRSA
+			{Layout: 2, Entities: 1}, // VRSB
+			{Layout: 1, Entities: 3}, // CCA
+			{Layout: 1, Entities: 3}, // JN
+			{Layout: 1, Entities: 3}, // JS
+			{Layout: 2, Entities: 2}, // MNTN
+			{Layout: 1, Entities: 3}, // SEAS
+			{Layout: 2, Entities: 1}, // SBU
+			{Layout: 2, Entities: 1}, // SBL
+			{Layout: 1, Entities: 1}, // GG
+			{Layout: 1, Entities: 1}, // OF
+			{Layout: 1, Entities: 1}, // BR
+			{Layout: 1, Entities: 1}, // GD
+		},
+	},
+	Episode4: {
+		Multiplayer: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 3}, // CE
+			{Layout: 1, Entities: 3}, // CW
+			{Layout: 1, Entities: 3}, // CS
+			{Layout: 1, Entities: 3}, // CN
+			{Layout: 1, Entities: 3}, // CI
+			{Layout: 3, Entities: 1}, // DES1
+			{Layout: 1, Entities: 3}, // DES2
+			{Layout: 3, Entities: 1}, // DES3
+			{Layout: 1, Entities: 1}, // SMIL
+			{Layout: 1, Entities: 1}, // PIONEER 2
+			{Layout: 1, Entities: 1}, // TEST
+		},
+		Solo: [16]commands.JoinGameVariations{
+			{Layout: 1, Entities: 3}, // CE
+			{Layout: 1, Entities: 3}, // CW
+			{Layout: 1, Entities: 3}, // CS
+			{Layout: 1, Entities: 3}, // CN
+			{Layout: 1, Entities: 3}, // CI
+			{Layout: 3, Entities: 1}, // DES1
+			{Layout: 1, Entities: 3}, // DES2
+			{Layout: 3, Entities: 1}, // DES3
+			{Layout: 1, Entities: 1}, // SMIL
+			{Layout: 1, Entities: 1}, // PIONEER 2
+			{Layout: 1, Entities: 1}, // TEST
+		},
+	},
 }
