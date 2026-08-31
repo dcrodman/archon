@@ -7,20 +7,25 @@ import (
 	"unicode/utf16"
 )
 
-// EncodeUTF16 converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
-func EncodeUTF16(str string) []byte {
+// EncodeUTF16LEString converts a UTF-8 string to UTF-16 LE and return it as an array of bytes.
+func EncodeUTF16LEString(str string) []byte {
 	strRunes := bytes.Runes([]byte(str))
 	encoded := utf16.Encode(strRunes)
 
-	// Convert the array of UTF-16 elements to a slice of uint8 elements in
-	// little endian order. E.g: [0x1234] -> [0x34, 0x12]
-	expanded := make([]uint8, 2*len(encoded))
-	for i, v := range encoded {
-		idx := i * 2
-		expanded[idx] = uint8(v)
-		expanded[idx+1] = uint8((v >> 8) & 0xFF)
+	leEncoded := make([]byte, 0, len(encoded))
+	for _, b := range encoded {
+		leEncoded = binary.LittleEndian.AppendUint16(leEncoded, b)
 	}
-	return expanded
+	return leEncoded
+}
+
+// DecodeUTF16LE converts a UTF-16 LE encoded array of bytes to a UTF-8 string.
+func DecodeUTF16LE(data []byte) string {
+	decoded := make([]uint16, 0, len(data)/2)
+	for i := 0; i+1 < len(data); i += 2 {
+		decoded = append(decoded, binary.LittleEndian.Uint16(data[i:i+2]))
+	}
+	return string(utf16.Decode(decoded))
 }
 
 // StripPadding returns a slice of b without the trailing 0s.

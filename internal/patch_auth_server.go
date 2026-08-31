@@ -23,7 +23,7 @@ func (s *PatchAuthServer) Identifier() string {
 }
 
 func (s *PatchAuthServer) Init(ctx context.Context) error {
-	s.welcomeMessage = EncodeUTF16(Config.PatchServer.WelcomeMessage)
+	s.welcomeMessage = EncodeUTF16LEString(Config.PatchServer.WelcomeMessage)
 
 	if len(s.welcomeMessage) > (1 << 16) {
 		Logger.Warn("patch server welcome message exceeds 65,000 characters")

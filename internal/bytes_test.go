@@ -35,7 +35,7 @@ func TestConvertToUtf16(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := EncodeUTF16(tt.args.str); !reflect.DeepEqual(got, tt.want) {
+			if got := EncodeUTF16LEString(tt.args.str); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ConvertToUtf16() = %v, want %v", got, tt.want)
 			}
 		})

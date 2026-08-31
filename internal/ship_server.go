@@ -173,7 +173,7 @@ func SendMessage(ctx context.Context, c *Client, message string) error {
 	return c.Send(ctx, &commands.ClientMessage{
 		Header:   commands.BBHeader{Type: commands.ClientMessageType},
 		Language: 0x00450009,
-		Message:  EncodeUTF16(message),
+		Message:  EncodeUTF16LEString(message),
 	})
 }
 
@@ -297,14 +297,14 @@ func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []
 	s.gamesMtx.Unlock()
 
 	if game == nil {
-		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it no longer exists")
+		return SendLobbyMessageBox(ctx, c, "$C7This game no longer exists.")
 	}
 
 	// If the game was password-protected, the game will have prompted the player for one and included
 	// the input in this command. This check is valid even if the password is empty.
 	if game.HasPassword() {
 		if cmd.Header.Size < 0x30 || !bytes.Equal(game.Password[:], data[16:cmd.Header.Size]) {
-			return SendLobbyMessageBox(ctx, c, "The password was incorrect")
+			return SendLobbyMessageBox(ctx, c, "$C7Incorrect password.")
 		}
 	}
 
@@ -323,12 +323,12 @@ func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []
 	case nil:
 		return nil
 	case ErrGameAbandoned:
-		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it no longer exists")
+		return SendLobbyMessageBox(ctx, c, "$C7This game no longer exists.")
 	case ErrLobbyFull:
-		return SendLobbyMessageBox(ctx, c, "You cannot join this game because it is full")
+		return SendLobbyMessageBox(ctx, c, "$C7This game is full.")
 	default:
-		Logger.Warnw("client %v encountered error joining game %s: %v", c.IPAddr, string(game.Name[:]), err)
-		return SendLobbyMessageBox(ctx, c, "You cannot join this game")
+		Logger.Warnw("client %v encountered error joining game %s: %v", c.IPAddr, DecodeUTF16LE(game.Name[:]), err)
+		return SendLobbyMessageBox(ctx, c, "$C7You cannot join this game.")
 	}
 }
 
@@ -355,7 +355,7 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 	cmd := commands.Menu{Entries: make([]commands.MenuEntry, 1)}
 	// Like for the ship menu, the client expects a placeholder first entry.
 	cmd.Entries[0].MenuID = GameListMenuID
-	copy(cmd.Entries[0].Name[:], EncodeUTF16("archon")[:])
+	copy(cmd.Entries[0].Name[:], EncodeUTF16LEString("archon")[:])
 
 	s.gamesMtx.Lock()
 	var games uint32
@@ -493,7 +493,7 @@ func SendLobbyMessageBox(ctx context.Context, c *Client, msg string) error {
 		Header: commands.BBHeader{
 			Type: commands.LobbyMessageBoxType,
 		},
-		Message: EncodeUTF16(msg),
+		Message: EncodeUTF16LEString(msg),
 	}
 	if len(cmd.Message) > 0x200 {
 		return errors.New("message must not exceed 0x200 bytes")
