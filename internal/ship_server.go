@@ -246,10 +246,10 @@ func (s *GameServer) addClientToLobby(ctx context.Context, c *Client, preferredL
 
 		err := lobby.AddClient(ctx, c)
 		switch {
-		case err != nil:
-			return err
 		case err == ErrLobbyFull:
 			continue
+		case err != nil:
+			return err
 		default:
 			return nil
 		}

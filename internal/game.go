@@ -327,19 +327,20 @@ func SendLeaveGameNotifications(ctx context.Context, g *Game, c *Client, departi
 		if oc == c || oc == nil {
 			continue
 		}
-		oc.State.Lock()
-		lobbySlotID := oc.State.LobbySlotID
-		oc.State.Unlock()
 
-		if err := oc.Send(ctx, &commands.LeaveLobby{
+		oc.State.Lock()
+		cmd := &commands.LeaveLobby{
 			Header: commands.BBHeader{
 				Type:  commands.RemovePlayerFromGame,
 				Flags: uint32(departingSlotID),
 			},
-			ClientID:   lobbySlotID,
+			ClientID:   oc.State.LobbySlotID,
 			LeaderID:   lobbyLeaderID,
 			DisableUDP: 1,
-		}); err != nil {
+		}
+		oc.State.Unlock()
+
+		if err := oc.Send(ctx, cmd); err != nil {
 			Logger.Warnf("error sending lobby leave notification to client %v: %v", oc.IPAddr, err)
 		}
 	}

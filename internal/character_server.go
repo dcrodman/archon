@@ -177,13 +177,12 @@ func SendTimestamp(ctx context.Context, c *Client) error {
 	return c.Send(ctx, pkt)
 }
 
+const ShipListMenuID = 0x11111111
+
 // Send the menu items for the ship select screen. Since we're only supporting
 // a single (bundled) ship server for the moment, the entries are hardcoded
 // rather than bothering with anything fancy like retrieving a list of active
 // ships from the shipgate, etc.
-
-const ShipListMenuID = 0x11111111
-
 func SendShipList(ctx context.Context, c *Client) error {
 	entries := []commands.MenuEntry{
 		// The first item is ignored and just used for the menu title.
