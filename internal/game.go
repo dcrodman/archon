@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 
 	"github.com/dcrodman/archon/internal/commands"
@@ -53,12 +54,39 @@ type Game struct {
 	sync.Mutex
 	clients        [MaxPlayersPerGame]*Client
 	currentClients int
+	// playerBursting indicates whether a player is in the process of joining the game.
+	playerBursting bool
+	// burstingCond is used to prevent multiple players from joining simultaneously
+	// and must be Wait()ed upon until playerBursting is false.
+	burstingCond *sync.Cond
 
 	leaderID  uint8
 	sectionID uint8
 
 	inQuest   bool
 	abandoned bool
+}
+
+func NewGame(cmd commands.CreateGame) *Game {
+	game := &Game{
+		Episode:    GameEpisode(cmd.Episode),
+		Difficulty: GameDifficulty(cmd.Difficulty),
+		RandomSeed: rand.Uint32(),
+	}
+	game.burstingCond = sync.NewCond(&game.Mutex)
+	copy(game.Name[:], cmd.Name[:])
+	copy(game.Password[:], cmd.Password[:])
+
+	switch {
+	case cmd.BattleMode == 1:
+		game.Mode = BattleMode
+	case cmd.ChallengeMode == 1:
+		game.Mode = ChallengeMode
+	case cmd.SoloMode == 1:
+		game.Mode = SoloMode
+	}
+
+	return game
 }
 
 // RoomName returns the Game's name. Name may be accessed directly above, and this is mainly
@@ -96,6 +124,12 @@ func (g *Game) AddClient(ctx context.Context, c *Client) error {
 		return ErrGameAbandoned
 	}
 
+	// Wait until any currently joining players have finished up before proceeding.
+	for g.playerBursting {
+		g.burstingCond.Wait()
+	}
+	g.playerBursting = true
+
 	// Now assign the client to the first available slot in the lobby and update its state.
 	var lobbySlotID uint8
 	for i := range g.clients {
@@ -117,6 +151,10 @@ func (g *Game) AddClient(ctx context.Context, c *Client) error {
 
 	// Inform the client of its new lobby assignment.
 	if err := SendJoinGame(ctx, g, c, lobbySlotID); err != nil {
+		g.Lock()
+		g.playerBursting = false
+		g.burstingCond.Signal()
+		g.Unlock()
 		return fmt.Errorf("assigning player to lobby: %v", err)
 	}
 
@@ -322,4 +360,19 @@ func (g *Game) Broadcast(ctx context.Context, sender *Client, cmd commands.Broad
 			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
 		}
 	}
+}
+
+// PlayerFinishedBursting relays the notification from a client that they have finished
+// loading the game, thus allowing other players to join.
+//
+// TODO: There is a nasty edge case here (in part stemming from the design of this protocol)
+// where a client disconnecting mid-join could leave the lobby in an unjoinable state. I'm
+// not certain how to handle that situation wrt the join/notification commands, so punting on
+// wrangling that for now as it's going to involve some sort of timed unlock.
+func (g *Game) PlayerFinishedBursting() {
+	g.Lock()
+	g.playerBursting = false
+	// Unblock one of the other clients waiting to join, if any.
+	g.burstingCond.Signal()
+	g.Unlock()
 }

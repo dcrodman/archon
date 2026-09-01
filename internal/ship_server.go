@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand/v2"
 	"net"
 	"sync"
 	"time"
@@ -88,6 +87,8 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var createCmd commands.CreateGame
 		UnmarshalStruct(data, &createCmd)
 		err = s.handleCreateGame(ctx, c, createCmd)
+	case commands.PlayerDoneLoadingType:
+		s.handlePlayerDoneLoading(c)
 	case commands.LeaveGameType:
 		var playerData commands.PlayerData
 		UnmarshalStruct(data, &playerData)
@@ -391,22 +392,7 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd commands.CreateGame) error {
 	// TODO: Check that the current character's level qualifies for the difficulty mode.
 
-	game := &Game{
-		Episode:    GameEpisode(cmd.Episode),
-		Difficulty: GameDifficulty(cmd.Difficulty),
-		RandomSeed: rand.Uint32(),
-	}
-	copy(game.Name[:], cmd.Name[:])
-	copy(game.Password[:], cmd.Password[:])
-
-	switch {
-	case cmd.BattleMode == 1:
-		game.Mode = BattleMode
-	case cmd.ChallengeMode == 1:
-		game.Mode = ChallengeMode
-	case cmd.SoloMode == 1:
-		game.Mode = SoloMode
-	}
+	game := NewGame(cmd)
 
 	var assigned bool
 	s.gamesMtx.Lock()
@@ -437,6 +423,16 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	// TODO: Send 1D
 
 	return nil
+}
+
+func (s *GameServer) handlePlayerDoneLoading(c *Client) {
+	c.State.Lock()
+	room := c.State.Room
+	c.State.Unlock()
+
+	if game, ok := room.(*Game); ok {
+		game.PlayerFinishedBursting()
+	}
 }
 
 func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd commands.PlayerData) {

@@ -199,6 +199,9 @@ type LeaveLobby struct {
 	DisableUDP uint8 // Always 1.
 }
 
+// Sent by the client when they've finished joining a game.
+const PlayerDoneLoadingType = 0x6F
+
 // LobbyList is the list of available lobbies in a block for use in the teleporter.
 const LobbyMenuType = 0x83
 
