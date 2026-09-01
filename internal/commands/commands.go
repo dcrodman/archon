@@ -111,6 +111,9 @@ type PlayerRecordsEntry struct {
 	BattleRecords    [24]uint8
 }
 
+// Sent by the client to echo to a specific player. Same format as 60.
+const BroadcastToPlayerType = 0x62
+
 // Sent to a player when joining a game.
 const JoinGameType = 0x64
 

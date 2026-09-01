@@ -95,7 +95,7 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var playerData commands.PlayerData
 		UnmarshalStruct(data, &playerData)
 		s.handleLeaveGame(ctx, c, playerData)
-	case commands.BroadcastType:
+	case commands.BroadcastType, commands.BroadcastToPlayerType:
 		var broadcastCmd commands.Broadcast
 		UnmarshalStruct(data, &broadcastCmd)
 		s.handleBroadcastCommand(ctx, c, broadcastCmd)

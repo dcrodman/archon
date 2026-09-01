@@ -346,11 +346,22 @@ func SendLeaveGameNotifications(ctx context.Context, g *Game, c *Client, departi
 	}
 }
 
-// Broadcast sends cmd to all players in the lobby except for sender.
+// Broadcast sends cmd to either all players in the lobby (except for sender) or a specific
+// player depending on which broadcast command we received..
 func (g *Game) Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast) {
+	var clients []*Client
 	g.Lock()
-	clients := make([]*Client, len(g.clients))
-	copy(clients[:], g.clients[:])
+	if cmd.Header.Type == commands.BroadcastToPlayerType {
+		targetPlayer := cmd.Header.Flags
+		if targetPlayer >= MaxLobbyPlayers {
+			Logger.Warnf("received broadcast request for player %v; ignoring", targetPlayer)
+			return
+		}
+		clients = []*Client{g.clients[targetPlayer]}
+	} else {
+		clients = make([]*Client, len(g.clients))
+		copy(clients[:], g.clients[:])
+	}
 	g.Unlock()
 
 	for _, c := range clients {
