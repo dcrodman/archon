@@ -30,6 +30,12 @@ func NewLobby(id uint8) *Lobby {
 	}
 }
 
+// RoomName returns the Lobby's name. Mainly for consistency with the Room interface.
+func (l *Lobby) RoomName() []byte {
+	lobbyName := fmt.Sprintf("LOBBY %02d", l.ID)
+	return EncodeUTF16LEString(lobbyName)
+}
+
 func (l *Lobby) IsFull() bool {
 	l.RLock()
 	defer l.RUnlock()

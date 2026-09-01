@@ -61,6 +61,12 @@ type Game struct {
 	abandoned bool
 }
 
+// RoomName returns the Game's name. Name may be accessed directly above, and this is mainly
+// for consistency with the Room interface.
+func (g *Game) RoomName() []byte {
+	return g.Name[:]
+}
+
 func (g *Game) NumPlayers() int {
 	g.Lock()
 	defer g.Unlock()

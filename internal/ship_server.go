@@ -96,6 +96,8 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var broadcastCmd commands.Broadcast
 		UnmarshalStruct(data, &broadcastCmd)
 		s.handleBroadcastCommand(ctx, c, broadcastCmd)
+	case commands.RoomNameType:
+		err = s.handleRoomNameRequest(ctx, c)
 	case commands.SyncCharacterType:
 		var syncCommand commands.SyncCharacter
 		UnmarshalStruct(data, &syncCommand)
@@ -337,18 +339,6 @@ func (s *GameServer) handleLobbySelection(ctx context.Context, c *Client, cmd co
 	return s.addClientToLobby(ctx, c, int(cmd.LobbyID))
 }
 
-// Client has requested to save the current game state, so flush it to the database.
-func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *commands.SyncCharacter) error {
-	c.Lock()
-	charData := *c.Character
-	c.Unlock()
-
-	// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the contents of the
-	// sync command from the client in favor of flushing the server-side state.
-
-	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
-}
-
 const GameListMenuID = 0x22222222
 
 func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
@@ -395,15 +385,6 @@ func (s *GameServer) handleGameList(ctx context.Context, c *Client) error {
 		Flags: games,
 	}
 	return c.Send(ctx, cmd)
-}
-
-func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
-	c.Lock()
-	room := c.Room
-	c.Unlock()
-	if room != nil {
-		room.Broadcast(ctx, c, cmd)
-	}
 }
 
 // handleCreateGame sets up a new Game in response to a player creating one from the lobby kiosk.
@@ -499,4 +480,46 @@ func SendLobbyMessageBox(ctx context.Context, c *Client, msg string) error {
 		return errors.New("message must not exceed 0x200 bytes")
 	}
 	return c.Send(ctx, cmd)
+}
+
+func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
+	c.Lock()
+	room := c.Room
+	c.Unlock()
+	if room != nil {
+		room.Broadcast(ctx, c, cmd)
+	}
+}
+
+func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error {
+	c.Lock()
+	room := c.Room
+	c.Unlock()
+	// This shouldn't ever really happen but the command appears to be safe to ignore.
+	if room == nil {
+		return nil
+	}
+
+	cmd := struct {
+		Header  commands.BBHeader
+		Message []uint8
+	}{
+		Header: commands.BBHeader{
+			Type: commands.RoomNameType,
+		},
+		Message: room.RoomName(),
+	}
+	return c.Send(ctx, cmd)
+}
+
+// Client has requested to save the current game state, so flush it to the database.
+func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *commands.SyncCharacter) error {
+	c.Lock()
+	charData := *c.Character
+	c.Unlock()
+
+	// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the contents of the
+	// sync command from the client in favor of flushing the server-side state.
+
+	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
 }

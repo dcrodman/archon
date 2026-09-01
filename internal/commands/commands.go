@@ -238,6 +238,10 @@ type LobbyArrowUpdateEntry struct {
 	ArrowColor uint32
 }
 
+// Sent by the client to request the game/lobby name and sent by the
+// server with the response to that request.
+const RoomNameType = 0x8A
+
 // Client sends this with credential information and metadata during the login process.
 const LoginType = 0x93
 
