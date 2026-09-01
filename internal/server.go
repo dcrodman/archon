@@ -12,6 +12,7 @@ import (
 	"os"
 	rdbg "runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dcrodman/archon/internal/debug"
@@ -110,7 +111,12 @@ func startAccepting(ctx context.Context, wg *sync.WaitGroup, addr string, backen
 	return nil
 }
 
-var connectedClients = make(map[string]*Client)
+var (
+	numClients       atomic.Uint32
+	connectedClients sync.Map
+)
+
+// var connectedClients = make(map[string]*Client)
 
 // startHandlingConnections implements a connection handling loop that's purely responsible for
 // accepting new connections and spinning off goroutines for the Backend to handle them.
@@ -121,7 +127,7 @@ func startHandlingConnections(ctx context.Context, wg *sync.WaitGroup, socket *n
 	go func() {
 		for {
 			// Poll until we can accept more clients.
-			for len(connectedClients) > Config.MaxConnections {
+			for numClients.Load() >= uint32(Config.MaxConnections) {
 				time.Sleep(5 * time.Second)
 			}
 
@@ -186,13 +192,13 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	}
 
 	// Prevent multiple clients from connecting from the same IP address.
-	if _, ok := connectedClients[c.IPAddr]; ok {
+	if _, ok := connectedClients.Load(c.IPAddr); ok {
 		Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr)
 		_ = conn.Close()
 		return
 	}
 
-	connectedClients[c.IPAddr] = c
+	connectedClients.Store(c.IPAddr, c)
 	processPackets(clientCtx, backend, c)
 }
 
@@ -240,8 +246,7 @@ func closeConnection(c *Client) {
 	if err := c.Close(); err != nil {
 		Logger.Warnf("error closing client connection: %s", err)
 	}
-
-	delete(connectedClients, c.IPAddr)
+	connectedClients.Delete(c.IPAddr)
 }
 
 // readNextPacket is a blocking call that only returns once the client has
