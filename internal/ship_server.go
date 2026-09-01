@@ -111,9 +111,9 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 // cleanupDisconnectedClient is invoked when clients disconnect from the game server.
 func (s *GameServer) cleanupDisconnectedClient(ctx context.Context, c *Client) {
 	// Remove the client from the lobby they were in.
-	c.Lock()
-	room := c.Room
-	c.Unlock()
+	c.State.Lock()
+	room := c.State.Room
+	c.State.Unlock()
 	if room != nil {
 		room.RemoveClient(ctx, c)
 	}
@@ -145,9 +145,9 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	if err != nil {
 		return fmt.Errorf("error loading selected character: %v", err)
 	}
-	c.Lock()
-	c.Character = character
-	c.Unlock()
+	c.State.Lock()
+	c.State.Character = character
+	c.State.Unlock()
 
 	if err := SendSecurity(ctx, c, commands.BBLoginErrorNone); err != nil {
 		return err
@@ -164,7 +164,7 @@ func (s *GameServer) handleLogin(ctx context.Context, c *Client, loginPkt *comma
 	// Newserv notes that the client may ignore this packet if it's sent while the client
 	// is still joining the lobby (aka "bursting") so add a delay before we send this.
 	time.AfterFunc(2*time.Second, func() {
-		if err := SendLobbyArrowUpdate(ctx, c, c.Room.(*Lobby)); err != nil {
+		if err := SendLobbyArrowUpdate(ctx, c, c.State.Room.(*Lobby)); err != nil {
 			Logger.Warnf("error sending lobby update to client %v: %v", c.IPAddr, err)
 		}
 	})
@@ -188,7 +188,7 @@ const (
 func SendSyncCharacter(ctx context.Context, c *Client) error {
 	cmd := &commands.SyncCharacter{
 		Header:    commands.BBHeader{Type: commands.SyncCharacterType},
-		Character: *c.Character,
+		Character: *c.State.Character,
 	}
 
 	cmd.Character.DisplayData.Visual.NameColor = NameColorNormal
@@ -313,9 +313,9 @@ func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []
 	// TODO: Like when creating a game, check the player's level (or do it in game) relative to difficulty.
 
 	// Transfer them to the game they requested to join.
-	c.Lock()
-	currentRoom := c.Room
-	c.Unlock()
+	c.State.Lock()
+	currentRoom := c.State.Room
+	c.State.Unlock()
 	if currentRoom != nil {
 		currentRoom.RemoveClient(ctx, c)
 	}
@@ -426,9 +426,9 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	}
 
 	// Move the player out of their current lobby and into the game they just created.
-	c.Lock()
-	lobby := c.Room
-	c.Unlock()
+	c.State.Lock()
+	lobby := c.State.Room
+	c.State.Unlock()
 	lobby.RemoveClient(ctx, c)
 	if err := game.AddClient(ctx, c); err != nil {
 		return fmt.Errorf("creating game and joining: %v", err)
@@ -440,9 +440,9 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 }
 
 func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd commands.PlayerData) {
-	c.Lock()
-	game := c.Room
-	c.Unlock()
+	c.State.Lock()
+	game := c.State.Room
+	c.State.Unlock()
 
 	// Disconnect the player from the current lobby, but don't add them to another one -
 	// that will be handled by the 84 command.
@@ -450,21 +450,21 @@ func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd command
 		game.RemoveClient(ctx, c)
 	}
 
-	c.Lock()
-	defer c.Unlock()
+	c.State.Lock()
+	defer c.State.Unlock()
 
 	// Update the client's Character with the contents of this command, with the exception
 	// of display data and inventory since that is maintained server-side.
-	copy(c.Character.ChallengeRecords[:], cmd.Records.ChallengeRecords[:])
-	copy(c.Character.BattleRecords[:], cmd.Records.BattleRecords[:])
-	copy(c.Character.InfoBoard[:], cmd.InfoBoard[:])
-	copy(c.Character.ChoiceSearch[:], cmd.ChoiceSearch[:])
+	copy(c.State.Character.ChallengeRecords[:], cmd.Records.ChallengeRecords[:])
+	copy(c.State.Character.BattleRecords[:], cmd.Records.BattleRecords[:])
+	copy(c.State.Character.InfoBoard[:], cmd.InfoBoard[:])
+	copy(c.State.Character.ChoiceSearch[:], cmd.ChoiceSearch[:])
 
 	// TODO: Skipping auto reply for now since I don't yet know what to do with that.
 	// TODO: Blocked guildcards, which may require revisiting the guildcard data model (see character server).
 
 	// Persist the character data we just updated, which was expected in the original game.
-	if err := shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), c.Character); err != nil {
+	if err := shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), c.State.Character); err != nil {
 		Logger.Warnf("error saving character data for client %v: %v", c.IPAddr, err)
 	}
 }
@@ -483,18 +483,18 @@ func SendLobbyMessageBox(ctx context.Context, c *Client, msg string) error {
 }
 
 func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, cmd commands.Broadcast) {
-	c.Lock()
-	room := c.Room
-	c.Unlock()
+	c.State.Lock()
+	room := c.State.Room
+	c.State.Unlock()
 	if room != nil {
 		room.Broadcast(ctx, c, cmd)
 	}
 }
 
 func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error {
-	c.Lock()
-	room := c.Room
-	c.Unlock()
+	c.State.Lock()
+	room := c.State.Room
+	c.State.Unlock()
 	// This shouldn't ever really happen but the command appears to be safe to ignore.
 	if room == nil {
 		return nil
@@ -514,9 +514,9 @@ func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error
 
 // Client has requested to save the current game state, so flush it to the database.
 func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *commands.SyncCharacter) error {
-	c.Lock()
-	charData := *c.Character
-	c.Unlock()
+	c.State.Lock()
+	charData := *c.State.Character
+	c.State.Unlock()
 
 	// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the contents of the
 	// sync command from the client in favor of flushing the server-side state.

@@ -53,7 +53,7 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 		return ErrLobbyFull
 	}
 
-	// Now assign the client to a slot in the lobby and update its state.
+	// Now assign the client to the first available slot in the lobby and update its state.
 	var lobbySlotID uint8
 	for i := range l.clients {
 		if l.clients[i] != nil {
@@ -67,10 +67,10 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 	}
 	l.Unlock()
 
-	c.Lock()
-	c.Room = l
-	c.LobbySlotID = lobbySlotID
-	c.Unlock()
+	c.State.Lock()
+	c.State.Room = l
+	c.State.LobbySlotID = lobbySlotID
+	c.State.Unlock()
 
 	// Inform the client of its new lobby assignment.
 	if err := SendJoinLobby(ctx, l, c, lobbySlotID); err != nil {
@@ -155,28 +155,19 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 		// Event:            0,
 		EnableVoiceChat: 1,
 		Entries: []commands.PlayerLobbyEntry{
-			{
-				PlayerLobbyData: commands.PlayerLobbyData{
-					PlayerTag: 0x00010000,
-					Guildcard: uint32(joiningClient.Account.Guildcard),
-					// TODO: Will need to set this once teams are supported.
-					// TMGuildcard: ,
-					TeamID:         uint32(joiningClient.Account.TeamID),
-					ClientID:       uint32(joiningClient.LobbySlotID),
-					HideHelpPrompt: 1,
-				},
-				Inventory:   joiningClient.Character.Inventory,
-				DisplayData: joiningClient.Character.DisplayData,
-			},
+			buildPlayerLobbyEntry(joiningClient),
 		},
 	}
+
 	for _, oc := range clients {
 		if oc == joiningClient || oc == nil {
 			continue
 		}
 
 		joinCmd := baseCmd
-		joinCmd.ClientID = oc.LobbySlotID
+		oc.State.Lock()
+		joinCmd.ClientID = oc.State.LobbySlotID
+		oc.State.Unlock()
 
 		if err := oc.Send(ctx, joinCmd); err != nil {
 			Logger.Warnf("error sending lobby join notification to client %v: %v", oc.IPAddr, err)
@@ -187,12 +178,12 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 // RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
 // being removed was the current leader, a new leader is selected from the remaining set of players.
 func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
-	c.Lock()
-	currentLobbySlotID := c.LobbySlotID
+	c.State.Lock()
+	currentLobbySlotID := c.State.LobbySlotID
 	// This is probably redundant and is technically still a valid slot.
-	c.LobbySlotID = 0
-	c.Room = nil
-	c.Unlock()
+	c.State.LobbySlotID = 0
+	c.State.Room = nil
+	c.State.Unlock()
 
 	l.Lock()
 	l.clients[currentLobbySlotID] = nil
@@ -225,13 +216,16 @@ func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client, depar
 		if oc == c || oc == nil {
 			continue
 		}
+		oc.State.Lock()
+		lobbySlotID := oc.State.LobbySlotID
+		oc.State.Unlock()
 
 		if err := oc.Send(ctx, &commands.LeaveLobby{
 			Header: commands.BBHeader{
 				Type:  commands.RemovePlayerFromLobbyType,
 				Flags: uint32(departingSlotID),
 			},
-			ClientID:   c.LobbySlotID,
+			ClientID:   lobbySlotID,
 			LeaderID:   lobbyLeaderID,
 			DisableUDP: 1,
 		}); err != nil {
@@ -274,11 +268,13 @@ func (l *Lobby) BuildLobbyArrowEntries() []commands.LobbyArrowUpdateEntry {
 		if c.Account.GM {
 			arrowColor = 7
 		}
+		c.State.Lock()
 		entries[i] = commands.LobbyArrowUpdateEntry{
 			PlayerTag:  0x00010000,
-			Guildcard:  c.Character.GuildCard.GuildCardNumber,
+			Guildcard:  c.State.Character.GuildCard.GuildCardNumber,
 			ArrowColor: arrowColor,
 		}
+		c.State.Unlock()
 		i++
 	}
 	return entries

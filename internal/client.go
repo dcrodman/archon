@@ -33,6 +33,18 @@ type ClientConfig struct {
 	Unused2      [2]uint32
 }
 
+type PlayerState struct {
+	// Mutex guards access to all fields and must be held while making any reads or
+	// writes, including to any sub-fields of Character.
+	sync.Mutex
+	// Character is a reference to the character selected during the login process.
+	Character *commands.CharacterData
+	// Joinable is the Lobby or Game the player is currently in.
+	Room Room
+	// LobbySlotID is the position in the the lobby or game.
+	LobbySlotID uint8
+}
+
 // Client represents a user connected through a PSOBB game client.
 type Client struct {
 	connection *net.TCPConn
@@ -56,15 +68,9 @@ type Client struct {
 	// the client has initiated.
 	LoginPhase commands.LoginPhase
 
-	// These fields may be included in commands send to other players and therefore may be
-	// accessed concurrently. All access is guarded by the embedded mutex.
-	sync.Mutex
-	// Character is a reference to the character selected during the login process.
-	Character *commands.CharacterData
-	// Joinable is the Lobby or Game the player is currently in.
-	Room Room
-	// LobbySlotID is the position in the the lobby or game.
-	LobbySlotID uint8
+	// State contains data about a player that may be accessed by other player
+	// goroutines and thus needs to be synchronized.
+	State *PlayerState
 
 	// The following fields are server-specific and mainly used as a place to store
 	// client-specific information without needing a separate structure.
@@ -82,17 +88,13 @@ func NewClient(connection *net.TCPConn) *Client {
 		connection: connection,
 		IPAddr:     addr[0],
 		Port:       addr[1],
+		State:      &PlayerState{},
 	}
 }
 
 // Read consumes the available bytes directly the client's TCP connection.
 func (c *Client) Read(b []byte) (int, error) {
 	return c.connection.Read(b)
-}
-
-// Close the TCP connection.
-func (c *Client) Close() error {
-	return c.connection.Close()
 }
 
 // SendRaw writes all data contained in the slice to the client
@@ -165,4 +167,9 @@ func (c *Client) transmit(data []byte, length uint16) error {
 		bytesSent += b
 	}
 	return nil
+}
+
+// Close the TCP connection.
+func (c *Client) Close() error {
+	return c.connection.Close()
 }
