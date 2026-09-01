@@ -155,26 +155,11 @@ func SendJoinGame(ctx context.Context, g *Game, c *Client, lobbySlotID uint8) er
 	}
 
 	// Build the full set of entries for all other clients in the lobby (excluding the joining player).
-	for _, oc := range g.clients {
+	for i, oc := range g.clients {
 		if oc == nil {
 			continue
 		}
-		oc.Lock()
-		playerEntry := commands.PlayerLobbyEntry{
-			PlayerLobbyData: commands.PlayerLobbyData{
-				PlayerTag: 0x00010000,
-				Guildcard: uint32(oc.Account.Guildcard),
-				// TODO: Will need to set this once teams are supported.
-				// TMGuildcard: ,
-				TeamID:         uint32(oc.Account.TeamID),
-				ClientID:       uint32(oc.LobbySlotID),
-				HideHelpPrompt: 1,
-			},
-			Inventory:   oc.Character.Inventory,
-			DisplayData: oc.Character.DisplayData,
-		}
-		copy(playerEntry.Name[:], oc.Character.GuildCard.Name[:])
-		oc.Unlock()
+		joinCmd.Players[i] = buildPlayerLobbyEntry(oc).PlayerLobbyData
 	}
 	joinCmd.Header.Flags = uint32(g.currentClients)
 	g.Unlock()
@@ -227,20 +212,7 @@ func SendJoinGameNotifications(ctx context.Context, g *Game, c *Client) {
 	// Entries works differently than it does for lobbies in that the player data is
 	// filled in according to their slot positions.
 	joinCmd.Entries = make([]commands.PlayerLobbyEntry, MaxPlayersPerGame)
-	joinCmd.Entries[lobbySlotID] = commands.PlayerLobbyEntry{
-		PlayerLobbyData: commands.PlayerLobbyData{
-			PlayerTag: 0x00010000,
-			Guildcard: uint32(c.Account.Guildcard),
-			// TODO: Will need to set this once teams are supported.
-			// TMGuildcard: ,
-			TeamID:         uint32(c.Account.TeamID),
-			ClientID:       uint32(c.LobbySlotID),
-			HideHelpPrompt: 1,
-		},
-		Inventory:   c.Character.Inventory,
-		DisplayData: c.Character.DisplayData,
-	}
-	copy(joinCmd.Entries[lobbySlotID].Name[:], c.Character.GuildCard.Name[:])
+	joinCmd.Entries[lobbySlotID] = buildPlayerLobbyEntry(c)
 
 	g.Lock()
 	joinCmd.LeaderID = g.leaderID

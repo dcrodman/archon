@@ -109,24 +109,7 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 		if oc == nil {
 			continue
 		}
-		oc.Lock()
-		playerEntry := commands.PlayerLobbyEntry{
-			PlayerLobbyData: commands.PlayerLobbyData{
-				PlayerTag: 0x00010000,
-				Guildcard: uint32(oc.Account.Guildcard),
-				// TODO: Will need to set this once teams are supported.
-				// TMGuildcard: ,
-				TeamID:         uint32(oc.Account.TeamID),
-				ClientID:       uint32(oc.LobbySlotID),
-				HideHelpPrompt: 1,
-			},
-			Inventory:   oc.Character.Inventory,
-			DisplayData: oc.Character.DisplayData,
-		}
-		copy(playerEntry.Name[:], oc.Character.GuildCard.Name[:])
-		oc.Unlock()
-
-		joinCmd.Entries = append(joinCmd.Entries, playerEntry)
+		joinCmd.Entries = append(joinCmd.Entries, buildPlayerLobbyEntry(c))
 	}
 
 	joinCmd.Header.Flags = uint32(len(joinCmd.Entries))
