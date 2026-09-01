@@ -5,3 +5,8 @@ server/patches/*
 
 # Compiled Go binaries.
 bin/
+
+# Various IDE settings.
+.idea/
+.vscode/
+.gram/
