@@ -56,6 +56,8 @@ func (s *GameServer) Handshake(ctx context.Context, c *Client) error {
 	copy(pkt.ServerVector[:], c.CryptoSession.ServerVector())
 	copy(pkt.ClientVector[:], c.CryptoSession.ClientVector())
 
+	go s.startCharacterAutoSync(ctx, c)
+
 	return c.SendRaw(ctx, pkt)
 }
 
@@ -100,13 +102,36 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 	case commands.RoomNameType:
 		err = s.handleRoomNameRequest(ctx, c)
 	case commands.SyncCharacterType:
-		var syncCommand commands.SyncCharacter
-		UnmarshalStruct(data, &syncCommand)
-		err = s.handleSyncCharacter(ctx, c, &syncCommand)
+		// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the
+		// data in the sync command from the client in favor of flushing the server-side state.
+		// var syncCommand commands.SyncCharacter
+		// UnmarshalStruct(data, &syncCommand)
+		err = s.handleSyncCharacter(ctx, c)
 	default:
 		Logger.Infof("received unknown command %x from %s", cmdHeader.Type, c.IPAddr)
 	}
 	return err
+}
+
+// Periodically persist the player's state so that they don't lose progress if they
+// disconnect unexpectedly. This loop is tied to the client's context and will silently
+// exit once the client disconnects.
+func (s *GameServer) startCharacterAutoSync(ctx context.Context, c *Client) {
+	defer func() {
+		if err := recover(); err != nil {
+			Logger.Errorf("panic in character auto-sync for %v: %v", c.IPAddr, err)
+		}
+	}()
+
+	ticker := time.NewTicker(time.Minute)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.handleSyncCharacter(ctx, c)
+		}
+	}
 }
 
 // cleanupDisconnectedClient is invoked when clients disconnect from the game server.
@@ -509,13 +534,14 @@ func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error
 }
 
 // Client has requested to save the current game state, so flush it to the database.
-func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client, _ *commands.SyncCharacter) error {
+func (s *GameServer) handleSyncCharacter(ctx context.Context, c *Client) error {
 	c.State.Lock()
+	if c.State.Character == nil {
+		c.State.Unlock()
+		return nil
+	}
 	charData := *c.State.Character
 	c.State.Unlock()
-
-	// Based on my youth of hacking the s*** out of this game, I'm opting to ignore the contents of the
-	// sync command from the client in favor of flushing the server-side state.
 
 	return shipgate.Shipgate.UpsertCharacter(ctx, c.Account.ID, uint32(c.Config.SlotNum), &charData)
 }
