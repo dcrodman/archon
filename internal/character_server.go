@@ -195,8 +195,10 @@ func SendShipList(ctx context.Context, c *Client) error {
 
 	// Append our active ship list.
 	for i, ship := range availableShips {
-		var entry commands.MenuEntry
-		entry.ItemID = uint32(i) + 1
+		entry := commands.MenuEntry{
+			MenuID: ShipListMenuID,
+			ItemID: uint32(i) + 1,
+		}
 		copy(entry.Name[:], EncodeUTF16LEString(ship.Name))
 		entries = append(entries, entry)
 	}
