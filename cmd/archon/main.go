@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync/atomic"
 	"syscall"
 
@@ -50,11 +51,10 @@ func ServerCommand(cmd *cobra.Command, args []string) {
 
 	// Change to the same directory as the config file so that any relative
 	// paths in the config file will resolve.
-	if ConfigFlag != "" {
-		if err := os.Chdir(ConfigFlag); err != nil {
-			fmt.Println("error changing to config directory:", err)
-			os.Exit(1)
-		}
+	wd := filepath.Dir(archon.Config.FilePath)
+	if err := os.Chdir(wd); err != nil {
+		fmt.Println("error changing to config directory:", err)
+		os.Exit(1)
 	}
 
 	// Start any debug utilities if we're configured to do so.

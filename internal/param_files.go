@@ -1,9 +1,9 @@
 package internal
 
 import (
-	"embed"
 	"fmt"
 	"hash/crc32"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -11,20 +11,15 @@ import (
 )
 
 const (
-	NumCharacterClasses = 12
-
+	// Relative directory containing the various parameter files such as
+	// BattleParamEntry*, ItemPMT.prs, etc.
 	parametersDirName = "parameters"
+
+	NumCharacterClasses = 12
 )
 
 var (
 	paramInitLock sync.Once
-
-	// Directly embedding the vanilla parameter files to make it a little easier to
-	// run the server for most people.
-	// TODO: Support overriding these (see config.go).
-	//
-	//go:embed parameters/*
-	paramFiles embed.FS
 
 	// Cached parameter data to avoid computing it every time.
 	paramHeaderData []byte
@@ -60,7 +55,6 @@ func initParameterData() (int, error) {
 		numFilesLoaded int
 		initErr        error
 	)
-
 	paramInitLock.Do(func() {
 		var err error
 		if numFilesLoaded, err = loadParameterFiles(); err != nil {
@@ -69,7 +63,7 @@ func initParameterData() (int, error) {
 		}
 
 		// LoadConfig the base stats for creating new characters.
-		compressedStatsData, err := paramFiles.ReadFile(filepath.Join(parametersDirName, "PlyLevelTbl.prs"))
+		compressedStatsData, err := os.ReadFile(filepath.Join(parametersDirName, "PlyLevelTbl.prs"))
 		if err != nil {
 			initErr = fmt.Errorf("error loading PlyLevelTbl.prs: %w", err)
 			return
@@ -103,14 +97,14 @@ func loadParameterFiles() (int, error) {
 	offset := 0
 	var tmpChunkData []byte
 
-	defaultFiles, err := paramFiles.ReadDir(parametersDirName)
+	defaultFiles, err := os.ReadDir(parametersDirName)
 	if err != nil {
 		return 0, fmt.Errorf("error loading embedded parameter files: %w", err)
 	}
 
 	var numFilesLoaded int
 	for _, paramFile := range defaultFiles {
-		data, err := paramFiles.ReadFile(fmt.Sprintf("%s/%s", parametersDirName, paramFile.Name()))
+		data, err := os.ReadFile(fmt.Sprintf("%s/%s", parametersDirName, paramFile.Name()))
 		if err != nil {
 			return 0, fmt.Errorf("error reading parameter file: %w", err)
 		}
