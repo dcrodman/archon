@@ -129,7 +129,10 @@ func (s *GameServer) startCharacterAutoSync(ctx context.Context, c *Client) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.handleSyncCharacter(ctx, c)
+			err := s.handleSyncCharacter(ctx, c)
+			if err != nil {
+				Logger.Errorf("error auto syncing character for %v: %v", c.IPAddr, err)
+			}
 		}
 	}
 }
