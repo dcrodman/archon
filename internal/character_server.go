@@ -38,7 +38,6 @@ var (
 // The ship list is obtained by communicating with the shipgate server since ships
 // do not directly connect to this server.
 type CharacterServer struct {
-	numParameterFiles int
 }
 
 func (s *CharacterServer) Identifier() string {
@@ -46,8 +45,7 @@ func (s *CharacterServer) Identifier() string {
 }
 
 func (s *CharacterServer) Init(ctx context.Context) error {
-	var err error
-	if s.numParameterFiles, err = initParameterData(); err != nil {
+	if err := LoadParameterFiles(); err != nil {
 		return err
 	}
 	return nil
@@ -95,7 +93,7 @@ func (s *CharacterServer) Handle(ctx context.Context, c *Client, data []byte) er
 		UnmarshalStruct(data, &chunkReq)
 		err = s.handleGuildcardChunk(ctx, c, &chunkReq)
 	case commands.ParameterHeaderReqType:
-		err = SendParameterHeader(ctx, c, uint32(s.numParameterFiles), paramHeaderData)
+		err = SendParameterHeader(ctx, c, uint32(len(requiredClientFiles)), paramHeaderData)
 	case commands.ParameterChunkReqType:
 		var pkt commands.BBHeader
 		UnmarshalStruct(data, &pkt)
@@ -433,7 +431,6 @@ func (s *CharacterServer) handleGuildcardChunk(ctx context.Context, c *Client, c
 // Maximum size of a block of parameter or guildcard data.
 const maxDataChunkSize = 0x6800
 
-// send the specified chunk of guildcard data.
 func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {
 	pkt := &commands.GuildcardChunk{
 		Header: commands.BBHeader{Type: commands.GuildcardChunkType},
@@ -453,7 +450,6 @@ func SendGuildcardChunk(ctx context.Context, c *Client, chunkNum uint32) error {
 	return c.Send(ctx, pkt)
 }
 
-// send the header for the parameter files we're about to start sending.
 func SendParameterHeader(ctx context.Context, c *Client, numEntries uint32, entries []byte) error {
 	return c.Send(ctx, &commands.ParameterHeader{
 		Header: commands.BBHeader{
@@ -492,7 +488,7 @@ func (s *CharacterServer) handleCharacterUpdate(ctx context.Context, c *Client, 
 			return msg
 		}
 
-		stats := BaseStats[charPkt.Visual.Class]
+		stats := LevelTable.BaseStats[charPkt.Visual.Class]
 		newCharacter := &commands.CharacterData{
 			DisplayData: commands.CharacterDisplayData{
 				// Set the base stats using our parameter file.

@@ -21,12 +21,7 @@ func TestPRS(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 
-	size, err := DecompressSize(golden)
-	if err != nil {
-		t.Fatalf("decompress size err: %v", err)
-	}
-
-	gotDecompressed, err := Decompress(golden, size)
+	gotDecompressed, err := Decompress(golden)
 	if err != nil {
 		t.Fatalf("decompress err: %v", err)
 	}
@@ -48,24 +43,7 @@ func BenchmarkDecompress(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("decompress_with_size", func(b *testing.B) {
-		size, err := DecompressSize(golden)
-		if err != nil {
-			b.Fatalf("decompress size err: %v", err)
-		}
-
-		gotDecompressed, err := Decompress(golden, size)
-		if err != nil {
-			b.Fatalf("decompress err: %v", err)
-		}
-		result = gotDecompressed
-	})
-	b.Run("decompress_without_size", func(b *testing.B) {
-		size, err := DecompressSize(golden)
-		if err != nil {
-			b.Fatalf("decompress size err: %v", err)
-		}
-
-		gotDecompressed, err := Decompress(golden, size)
+		gotDecompressed, err := Decompress(golden)
 		if err != nil {
 			b.Fatalf("decompress err: %v", err)
 		}

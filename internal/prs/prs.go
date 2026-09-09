@@ -1,17 +1,9 @@
 // https://github.com/Sewer56/dlang-prs
 package prs
 
-func Decompress(src []byte, size int) ([]byte, error) {
-	d := newDecompressor(src, size, true)
+func Decompress(src []byte) ([]byte, error) {
+	d := newDecompressor(src, true)
 	return d.decompress()
-}
-
-func DecompressSize(src []byte) (int, error) {
-	d := newDecompressor(src, 0, false)
-	if _, err := d.decompress(); err != nil {
-		return 0, err
-	}
-	return d.dstSize, nil
 }
 
 type decompressor struct {
@@ -36,14 +28,14 @@ type decompressor struct {
 // indicating we can shift the controlByte 8 times before we need a new one.
 //
 // The srcPos starts at 1 because we exclude the first control byte.
-func newDecompressor(src []byte, size int, copy bool) *decompressor {
+func newDecompressor(src []byte, copy bool) *decompressor {
 	return &decompressor{
 		controlByte: src[0],
 		bitPos:      8,
 		src:         src,
 		srcPos:      1,
 		copy:        copy,
-		dst:         make([]byte, 0, size),
+		dst:         make([]byte, 0),
 	}
 }
 

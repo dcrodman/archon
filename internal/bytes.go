@@ -76,9 +76,14 @@ func MarshalStruct(data interface{}) ([]byte, int) {
 	return convertedBytes.Bytes(), convertedBytes.Len()
 }
 
-// UnmarshalStruct populates the struct pointed to by targetStruct by reading in a
-// stream of bytes and filling the values in sequential order.
+// UnmarshalStruct is the same as UnmarshalStructWithOrder but assumes LE order.
 func UnmarshalStruct(data []byte, targetStruct interface{}) {
+	UnmarshalStructWithOrder(data, targetStruct, binary.LittleEndian)
+}
+
+// UnmarshalStructWithOrder populates the struct pointed to by targetStruct by reading in a
+// stream of bytes and filling the values sequentially according to order.
+func UnmarshalStructWithOrder(data []byte, targetStruct interface{}, order binary.ByteOrder) {
 	targetVal := reflect.ValueOf(targetStruct)
 
 	if valKind := targetVal.Kind(); valKind != reflect.Ptr {
@@ -95,9 +100,9 @@ func UnmarshalStruct(data []byte, targetStruct interface{}) {
 		var err error
 		switch field.Kind() {
 		case reflect.Ptr:
-			err = binary.Read(reader, binary.LittleEndian, field.Interface())
+			err = binary.Read(reader, order, field.Interface())
 		default:
-			err = binary.Read(reader, binary.LittleEndian, field.Addr().Interface())
+			err = binary.Read(reader, order, field.Addr().Interface())
 		}
 		if err != nil {
 			panic(err.Error())
