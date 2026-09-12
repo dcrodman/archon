@@ -167,8 +167,6 @@ type JoinLobby struct {
 	Event            uint8
 	EnableVoiceChat  uint8  // No idea, always 1.
 	RandomSeed       uint32 // Only used for games.
-	// Voice chat stuff that might be specific to xbox?
-	Unused [24]uint8
 	// Player entries.
 	Entries []PlayerLobbyEntry
 }
