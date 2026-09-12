@@ -347,34 +347,6 @@ func SendLeaveGameNotifications(ctx context.Context, g *Game, c *Client, departi
 	}
 }
 
-// Broadcast sends cmd to either all players in the lobby (except for sender) or a specific
-// player depending on which broadcast command we received..
-func (g *Game) Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast) {
-	var clients []*Client
-	g.Lock()
-	if cmd.Header.Type == commands.BroadcastToPlayerType {
-		targetPlayer := cmd.Header.Flags
-		if targetPlayer >= MaxLobbyPlayers {
-			Logger.Warnf("received broadcast request for player %v; ignoring", targetPlayer)
-			return
-		}
-		clients = []*Client{g.clients[targetPlayer]}
-	} else {
-		clients = make([]*Client, len(g.clients))
-		copy(clients[:], g.clients[:])
-	}
-	g.Unlock()
-
-	for _, c := range clients {
-		if c == nil || c == sender {
-			continue
-		}
-		if err := c.Send(ctx, cmd); err != nil {
-			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
-		}
-	}
-}
-
 // PlayerFinishedBursting relays the notification from a client that they have finished
 // loading the game, thus allowing other players to join.
 //
@@ -429,4 +401,13 @@ func (g *Game) GenerateVariations() ([16]commands.JoinGameVariations, error) {
 	}
 
 	return variations, nil
+}
+
+func (g *Game) Clients() []*Client {
+	g.Lock()
+	defer g.Unlock()
+
+	clients := make([]*Client, len(g.clients))
+	copy(clients, g.clients[:])
+	return clients
 }

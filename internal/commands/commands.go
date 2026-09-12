@@ -85,8 +85,9 @@ type ClientMessage struct {
 const BroadcastType = 0x60
 
 type Broadcast struct {
-	Header BBHeader
-	Data   []uint8
+	Header          BBHeader
+	BroadcastHeader BroadcastHeader
+	Data            []uint8
 }
 
 // TODO: Don't know what this does yet.
