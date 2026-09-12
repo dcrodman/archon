@@ -97,6 +97,9 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		s.handleLeaveGame(ctx, c, playerData)
 	case commands.BroadcastType, commands.BroadcastToPlayerType:
 		var broadcastCmd commands.Broadcast
+		if cmdHeader.Size > commands.BBHeaderSize {
+			broadcastCmd.Data = make([]uint8, cmdHeader.Size-commands.BBHeaderSize)
+		}
 		UnmarshalStruct(data, &broadcastCmd)
 		s.handleBroadcastCommand(ctx, c, broadcastCmd)
 	case commands.RoomNameType:

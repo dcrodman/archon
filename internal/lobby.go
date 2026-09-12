@@ -228,7 +228,7 @@ func (l *Lobby) Broadcast(ctx context.Context, sender *Client, cmd commands.Broa
 		if c == nil || c == sender {
 			continue
 		}
-		if err := c.Send(ctx, cmd); err != nil {
+		if err := c.SendBroadcast(ctx, cmd); err != nil {
 			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
 		}
 	}
