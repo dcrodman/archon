@@ -217,23 +217,6 @@ func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client, depar
 	}
 }
 
-// Broadcast sends cmd to all players in the lobby except for sender.
-func (l *Lobby) Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast) {
-	l.Lock()
-	clients := make([]*Client, len(l.clients))
-	copy(clients, l.clients)
-	l.Unlock()
-
-	for _, c := range clients {
-		if c == nil || c == sender {
-			continue
-		}
-		if err := c.Send(ctx, cmd); err != nil {
-			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
-		}
-	}
-}
-
 // BuildLobbyArrowEntries calculates the arrow colors for all players currently in the lobby
 // and returns the entries for the LobbyArrowUpdate command.
 func (l *Lobby) BuildLobbyArrowEntries() []commands.LobbyArrowUpdateEntry {
@@ -261,4 +244,13 @@ func (l *Lobby) BuildLobbyArrowEntries() []commands.LobbyArrowUpdateEntry {
 		i++
 	}
 	return entries
+}
+
+func (l *Lobby) Clients() []*Client {
+	l.Lock()
+	defer l.Unlock()
+
+	clients := make([]*Client, len(l.clients))
+	copy(clients, l.clients)
+	return clients
 }

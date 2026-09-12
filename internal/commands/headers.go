@@ -37,3 +37,11 @@ const (
 	BBLoginErrorPatch
 	BBLoginErrorDisconnect
 )
+
+const BroadcastHeaderSize = 0x04
+
+type BroadcastHeader struct {
+	Type     uint8
+	Size     uint8
+	ClientID uint16
+}

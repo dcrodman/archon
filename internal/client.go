@@ -20,7 +20,7 @@ type Room interface {
 	RoomName() []byte
 	AddClient(ctx context.Context, c *Client) error
 	RemoveClient(ctx context.Context, c *Client)
-	Broadcast(ctx context.Context, sender *Client, cmd commands.Broadcast)
+	Clients() []*Client
 }
 
 type ClientConfig struct {
