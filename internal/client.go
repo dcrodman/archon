@@ -122,6 +122,19 @@ func (c *Client) Send(ctx context.Context, packet interface{}) error {
 	data, length := MarshalStruct(packet)
 	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
 
+	return c.send(ctx, bytes, size)
+}
+
+// Send converts a packet struct to bytes and encrypts it before  using the
+// server's session key before sending the data to the client.
+func (c *Client) SendBroadcast(ctx context.Context, packet commands.Broadcast) error {
+	data, length := MarshalStruct(packet)
+	bytes, size := adjustBroadcastPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
+
+	return c.send(ctx, bytes, size)
+}
+
+func (c *Client) send(ctx context.Context, bytes []byte, size uint16) error {
 	if Config.Debugging.PacketLoggingEnabled {
 		debug.PrintPacket(ctx, debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
@@ -150,6 +163,24 @@ func adjustPacketLength(data []byte, length uint16, headerSize uint16) ([]byte, 
 
 	data[0] = byte(length & 0xFF)
 	data[1] = byte((length & 0xFF00) >> 8)
+
+	return data, length
+}
+
+// adjustPacketLength pads the length of a packet to a multiple of the header length and
+// adjusts first two bytes of the header to the corrected size (may be a no-op). Returns
+// the adjusted packet as well as the new length.
+//
+// PSOBB clients will reject packets that are not multiples of the header size.
+func adjustBroadcastPacketLength(data []byte, length uint16, headerSize uint16) ([]byte, uint16) {
+	for length%headerSize != 0 {
+		length++
+		data = append(data, 0)
+	}
+
+	data[0] = byte(length & 0xFF)
+	data[1] = byte((length & 0xFF00) >> 8)
+	data[9] = byte((length - headerSize) / 4)
 
 	return data, length
 }
