@@ -109,7 +109,7 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 		if oc == nil {
 			continue
 		}
-		joinCmd.Entries = append(joinCmd.Entries, buildPlayerLobbyEntry(c))
+		joinCmd.Entries = append(joinCmd.Entries, buildPlayerLobbyEntry(oc))
 	}
 
 	joinCmd.Header.Flags = uint32(len(joinCmd.Entries))
