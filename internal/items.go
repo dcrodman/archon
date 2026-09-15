@@ -85,33 +85,17 @@ var (
 
 // InitItemPT loads the item drop tables.
 func InitItemPT(data []byte) {
-	type ptEntry struct {
-		filename string
-		offset   uint32
-		size     uint32
-	}
-
 	// Read the headeers so that we know what the files are and where they're stored.
-	entries := make(map[string]ptEntry)
-	for i := 0; ; i += 48 {
-		if data[i] == 0 {
-			break
-		}
-		filename := string(StripPadding(data[i : i+32]))
-		entries[filename] = ptEntry{
-			filename: filename,
-			offset:   binary.BigEndian.Uint32(data[i+32:i+36]) * 2048,
-			size:     binary.BigEndian.Uint32(data[i+36 : i+40]),
-		}
-	}
-	// 2 episodes * 4 difficulties * 10 section IDs = 160.
-	if len(entries) != 160 {
-		panic(fmt.Sprintf("expected 160 entries but found %v", len(entries)))
+	entries := readGSLHeaders(data)
+
+	// 3 episodes * 4 difficulties * 10 section IDs + (ep1/2 challenge) = 200.
+	if len(entries) != 200 {
+		panic(fmt.Sprintf("expected 200 entries but found %v", len(entries)))
 	}
 
 	var (
 		modes        = []string{"", "c"}
-		episodes     = []string{"", "l"}
+		episodes     = []string{"", "l", "bb"}
 		difficulties = []string{"n", "h", "v", "u"}
 		nSectionIDs  = 10
 	)
@@ -130,6 +114,11 @@ func InitItemPT(data []byte) {
 
 			for sectionID := range nSectionIDs {
 				for _, mode := range modes {
+					// Episode 4 does not have a challenge mode.
+					if mode == "c" && episodes[episode] == "bb" {
+						continue
+					}
+
 					filename := fmt.Sprintf(
 						"ItemPT%s%s%s%d.rel",
 						mode,
@@ -141,20 +130,42 @@ func InitItemPT(data []byte) {
 					entryData := data[entry.offset : entry.offset+entry.size]
 
 					if mode == "c" {
-						UnmarshalStructWithOrder(
-							entryData,
-							&ChallengeItemTables[episode][difficulty][sectionID],
-							binary.BigEndian,
-						)
+						UnmarshalStruct(entryData, &ChallengeItemTables[episode][difficulty][sectionID])
 					} else {
-						UnmarshalStructWithOrder(
-							entryData,
-							&ItemTables[episode][difficulty][sectionID],
-							binary.BigEndian,
-						)
+						UnmarshalStruct(entryData, &ItemTables[episode][difficulty][sectionID])
 					}
 				}
 			}
 		}
 	}
+}
+
+func InitItemRT(data []byte) {
+	entries := readGSLHeaders(data)
+	for _, entry := range entries {
+		fmt.Println(entry.filename)
+	}
+	fmt.Printf("%d entries total\n", len(entries))
+}
+
+type ptEntry struct {
+	filename string
+	offset   uint32
+	size     uint32
+}
+
+func readGSLHeaders(data []byte) map[string]ptEntry {
+	entries := make(map[string]ptEntry)
+	for i := 0; ; i += 48 {
+		if data[i] == 0 {
+			break
+		}
+		filename := string(StripPadding(data[i : i+32]))
+		entries[filename] = ptEntry{
+			filename: filename,
+			offset:   binary.LittleEndian.Uint32(data[i+32:i+36]) * 2048,
+			size:     binary.LittleEndian.Uint32(data[i+36 : i+40]),
+		}
+	}
+	return entries
 }

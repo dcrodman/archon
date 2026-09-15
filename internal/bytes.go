@@ -77,13 +77,13 @@ func MarshalStruct(data interface{}) ([]byte, int) {
 }
 
 // UnmarshalStruct is the same as UnmarshalStructWithOrder but assumes LE order.
-func UnmarshalStruct(data []byte, targetStruct interface{}) {
+func UnmarshalStruct(data []byte, targetStruct any) {
 	UnmarshalStructWithOrder(data, targetStruct, binary.LittleEndian)
 }
 
 // UnmarshalStructWithOrder populates the struct pointed to by targetStruct by reading in a
 // stream of bytes and filling the values sequentially according to order.
-func UnmarshalStructWithOrder(data []byte, targetStruct interface{}, order binary.ByteOrder) {
+func UnmarshalStructWithOrder(data []byte, targetStruct any, order binary.ByteOrder) {
 	targetVal := reflect.ValueOf(targetStruct)
 
 	if valKind := targetVal.Kind(); valKind != reflect.Ptr {
