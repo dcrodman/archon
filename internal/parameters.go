@@ -26,6 +26,7 @@ var (
 	}
 	otherParamFiles = []string{
 		"ItemPT.gsl",
+		"ItemRT.gsl",
 	}
 	// Cached parameter data to avoid computing it every time for the client
 	// login process.
@@ -113,5 +114,7 @@ func initParamFile(filename string, data []byte) {
 		InitLevelTable(data)
 	case "ItemPT.gsl":
 		InitItemPT(data)
+	case "ItemRT.gsl":
+		InitItemRT(data)
 	}
 }

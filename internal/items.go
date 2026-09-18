@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/binary"
 	"fmt"
+	"reflect"
 
 	"github.com/dcrodman/archon/internal/commands"
 )
@@ -51,7 +52,7 @@ var DefaultWeaponsByClass = [][]commands.CharacterInventoryItem{
 	{{Item: NewItemData(0x0006000000000000, 0), Flags: commands.ItemFlagEquipped}},
 }
 
-type ItemPTEntry struct {
+type ItemTableEntry struct {
 	WeaponRatio        [12]int8
 	WeaponMinRank      [12]int8
 	WeapinUPGFloor     [12]int8
@@ -77,13 +78,34 @@ type ItemPTEntry struct {
 	ArmorLevel         int32
 }
 
+type RareTableEntry struct {
+	// These files typically contain either 101 or 112 entries depending on whether or not
+	// the files include episode 4 rates. Since it's assumed pretty much everywhere that
+	// Episode 4 is available, we use the latter number.
+	MonsterRares [112]RareDropEntry
+	BoxRares     [30]RareDropEntry
+}
+
+type RareDropEntry struct {
+	Probability uint32
+	ItemData    [12]uint8
+	Area        uint32 // Only used for box drops, not enemies.
+}
+
 var (
 	// Keyed by [episode][difficulty][section ID].
-	ItemTables          [][][]ItemPTEntry
-	ChallengeItemTables [][][]ItemPTEntry
+	ItemTables          = make([][][]ItemTableEntry, len(ptEpisodes))
+	ChallengeItemTables = make([][][]ItemTableEntry, len(ptEpisodes))
+	RareItemTables      = make([][][]RareTableEntry, len(ptEpisodes))
+
+	// Constants used for parsing the contents of GSL archives.
+	ptModes        = []string{"", "c"}
+	ptEpisodes     = []string{"", "l", "bb"}
+	ptDifficulties = []string{"n", "h", "v", "u"}
+	ptSectionIDs   = 10
 )
 
-// InitItemPT loads the item drop tables.
+// InitItemPT populates the global item drop tables from ItemPT.gsl.
 func InitItemPT(data []byte) {
 	// Read the headeers so that we know what the files are and where they're stored.
 	entries := readGSLHeaders(data)
@@ -93,39 +115,24 @@ func InitItemPT(data []byte) {
 		panic(fmt.Sprintf("expected 200 entries but found %v", len(entries)))
 	}
 
-	var (
-		modes        = []string{"", "c"}
-		episodes     = []string{"", "l", "bb"}
-		difficulties = []string{"n", "h", "v", "u"}
-		nSectionIDs  = 10
-	)
-	ItemTables = make([][][]ItemPTEntry, len(episodes))
-	ChallengeItemTables = make([][][]ItemPTEntry, len(episodes))
-
 	// Step through the combinations of item files we need and read the
 	// contents of each file into the corresponding entry in the table.
-	for episode := range episodes {
-		ItemTables[episode] = make([][]ItemPTEntry, len(difficulties))
-		ChallengeItemTables[episode] = make([][]ItemPTEntry, len(difficulties))
+	for episode := range ptEpisodes {
+		ItemTables[episode] = make([][]ItemTableEntry, len(ptDifficulties))
+		ChallengeItemTables[episode] = make([][]ItemTableEntry, len(ptDifficulties))
 
-		for difficulty := range difficulties {
-			ItemTables[episode][difficulty] = make([]ItemPTEntry, nSectionIDs)
-			ChallengeItemTables[episode][difficulty] = make([]ItemPTEntry, nSectionIDs)
+		for difficulty := range ptDifficulties {
+			ItemTables[episode][difficulty] = make([]ItemTableEntry, ptSectionIDs)
+			ChallengeItemTables[episode][difficulty] = make([]ItemTableEntry, ptSectionIDs)
 
-			for sectionID := range nSectionIDs {
-				for _, mode := range modes {
+			for sectionID := range ptSectionIDs {
+				for _, mode := range ptModes {
 					// Episode 4 does not have a challenge mode.
-					if mode == "c" && episodes[episode] == "bb" {
+					if mode == "c" && ptEpisodes[episode] == "bb" {
 						continue
 					}
 
-					filename := fmt.Sprintf(
-						"ItemPT%s%s%s%d.rel",
-						mode,
-						episodes[episode],
-						difficulties[difficulty],
-						sectionID,
-					)
+					filename := fmt.Sprintf("ItemPT%s%s%s%d.rel", mode, ptEpisodes[episode], ptDifficulties[difficulty], sectionID)
 					entry := entries[filename]
 					entryData := data[entry.offset : entry.offset+entry.size]
 
@@ -140,28 +147,97 @@ func InitItemPT(data []byte) {
 	}
 }
 
+// InitItemPT populates the global item drop tables from ItemRT.gsl.
 func InitItemRT(data []byte) {
+	// Read the headeers so that we know what the files are and where they're stored.
 	entries := readGSLHeaders(data)
-	for _, entry := range entries {
-		fmt.Println(entry.filename)
+
+	// 2 episodes * 4 difficulties * 10 section IDs + Ep1 challenge mode = 120.
+	if len(entries) != 120 {
+		panic(fmt.Sprintf("expected 120 entries but found %v", len(entries)))
 	}
-	fmt.Printf("%d entries total\n", len(entries))
+
+	// Temporary struct to hold the drop rates we read from the file since we need to
+	// expand the probabilities and cannot just UnmarshalStruct straight in.
+	type rtEntry struct {
+		Probability uint8
+		ItemCode    [3]uint8
+	}
+
+	// Step through the combinations of item files we need and read the
+	// contents of each file into the corresponding entry in the table.
+	for episode := range ptEpisodes {
+		RareItemTables[episode] = make([][]RareTableEntry, len(ptDifficulties))
+
+		for difficulty := range ptDifficulties {
+			RareItemTables[episode][difficulty] = make([]RareTableEntry, ptSectionIDs)
+
+			for sectionID := range ptSectionIDs {
+				filename := fmt.Sprintf("ItemRT%s%s%d.rel", ptEpisodes[episode], ptDifficulties[difficulty], sectionID)
+				entry := entries[filename]
+				entryData := data[entry.offset : entry.offset+entry.size]
+				offset := 0
+
+				rt := &RareItemTables[episode][difficulty][sectionID]
+
+				// First parse out the monster drop rates.
+				for i := range len(rt.MonsterRares) {
+					var tmpEntry rtEntry
+					UnmarshalStruct(entryData[offset:], &tmpEntry)
+					offset += int(reflect.TypeFor[rtEntry]().Size())
+
+					rt.MonsterRares[i].Probability = expandRareItemProbability(tmpEntry.Probability)
+					rt.MonsterRares[i].ItemData[0] = tmpEntry.ItemCode[0]
+					rt.MonsterRares[i].ItemData[1] = tmpEntry.ItemCode[1]
+					rt.MonsterRares[i].ItemData[2] = tmpEntry.ItemCode[2]
+				}
+
+				// Now parse out the areas corresponding to each box entry.
+				areas := make([]uint8, len(rt.BoxRares))
+				for i := range areas {
+					areas[i] = entryData[offset]
+					offset++
+				}
+
+				// Finally, the box rares.
+				for i := range len(rt.BoxRares) {
+					var tmpEntry rtEntry
+					UnmarshalStruct(entryData[offset:], &tmpEntry)
+					offset += int(reflect.TypeFor[rtEntry]().Size())
+
+					rt.BoxRares[i].Probability = expandRareItemProbability(tmpEntry.Probability)
+					rt.BoxRares[i].ItemData[0] = tmpEntry.ItemCode[0]
+					rt.BoxRares[i].ItemData[1] = tmpEntry.ItemCode[1]
+					rt.BoxRares[i].ItemData[2] = tmpEntry.ItemCode[2]
+					rt.BoxRares[i].Area = uint32(areas[i])
+				}
+			}
+		}
+	}
 }
 
-type ptEntry struct {
+// Expand the single byte probability value into a percentage out of the max uint32.
+// Taken from a combination of how sylverant and newserv handle this.
+// https://github.com/fuzziqersoftware/newserv/blob/master/src/RareItemSet.cc#L27
+func expandRareItemProbability(pc uint8) uint32 {
+	shift := max(0, (int8(pc)>>3)-4)
+	return uint32(2<<shift) * uint32((pc&7)+7)
+}
+
+type gslHeaderEntry struct {
 	filename string
 	offset   uint32
 	size     uint32
 }
 
-func readGSLHeaders(data []byte) map[string]ptEntry {
-	entries := make(map[string]ptEntry)
+func readGSLHeaders(data []byte) map[string]gslHeaderEntry {
+	entries := make(map[string]gslHeaderEntry)
 	for i := 0; ; i += 48 {
 		if data[i] == 0 {
 			break
 		}
 		filename := string(StripPadding(data[i : i+32]))
-		entries[filename] = ptEntry{
+		entries[filename] = gslHeaderEntry{
 			filename: filename,
 			offset:   binary.LittleEndian.Uint32(data[i+32:i+36]) * 2048,
 			size:     binary.LittleEndian.Uint32(data[i+36 : i+40]),
