@@ -205,7 +205,7 @@ func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client, depar
 				Type:  commands.RemovePlayerFromLobbyType,
 				Flags: uint32(departingSlotID),
 			},
-			ClientID:   oc.State.LobbySlotID,
+			ClientID:   departingSlotID,
 			LeaderID:   lobbyLeaderID,
 			DisableUDP: 1,
 		}

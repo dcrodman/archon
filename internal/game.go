@@ -335,7 +335,7 @@ func SendLeaveGameNotifications(ctx context.Context, g *Game, c *Client, departi
 				Type:  commands.RemovePlayerFromGame,
 				Flags: uint32(departingSlotID),
 			},
-			ClientID:   oc.State.LobbySlotID,
+			ClientID:   departingSlotID,
 			LeaderID:   lobbyLeaderID,
 			DisableUDP: 1,
 		}
