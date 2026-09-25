@@ -20,7 +20,7 @@ func NewBlueBurstCryptoSessionWithVector(clientVec, serverVec []uint8) CryptoSes
 	}
 }
 
-func (c *BlueBurstCryptSession) HeaderSize() uint16 {
+func (c *BlueBurstCryptSession) BlockSize() uint16 {
 	return BlowfishBlockSize
 }
 

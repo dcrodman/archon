@@ -14,8 +14,8 @@ import (
 // of one or more ciphers that handle encrypting commands from the server and
 // decrypting commands from the client.
 type CryptoSession interface {
-	// HeaderSize returns the length of the header of all client commands.
-	HeaderSize() uint16
+	// BlockSize returns the block length required for all data.
+	BlockSize() uint16
 
 	// Encrypt encrypts bytes in place with the encryption key for the server.
 	Encrypt(bytes []byte, length uint32)
@@ -39,7 +39,7 @@ type CryptoSession interface {
 func createKey(size int) []byte {
 	key := make([]byte, size)
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		if err := binary.Read(rand.Reader, binary.LittleEndian, &key[i]); err != nil {
 			panic(fmt.Errorf("error creating key: %v", err))
 		}

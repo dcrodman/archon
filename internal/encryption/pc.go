@@ -19,7 +19,7 @@ func NewPCCryptoSessionWithVector(clientVec, serverVec []uint8) CryptoSession {
 	}
 }
 
-func (c *PCCryptSession) HeaderSize() uint16 {
+func (c *PCCryptSession) BlockSize() uint16 {
 	return PSOPCBlockSize
 }
 func (c *PCCryptSession) Encrypt(bytes []byte, length uint32) {

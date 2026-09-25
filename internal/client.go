@@ -3,6 +3,7 @@ package internal
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -122,54 +123,49 @@ func (c *Client) SendRaw(ctx context.Context, packet interface{}) error {
 	c.transmitLock.Lock()
 	defer c.transmitLock.Unlock()
 
-	return c.transmit(bytes, uint16(size))
+	return c.transmit(bytes, int(size))
 }
 
 // Send converts a packet struct to bytes and encrypts it before  using the
 // server's session key before sending the data to the client.
 func (c *Client) Send(ctx context.Context, packet interface{}) error {
-	data, length := MarshalStruct(packet)
-	bytes, size := adjustPacketLength(data, uint16(length), c.CryptoSession.HeaderSize())
+	data, size := MarshalStruct(packet)
+
+	// PSOBB clients will reject packets with header lengths that are not multiples of 4.
+	// Additionally, because the encryption protocol is a block cipher the total length
+	// of the packet must also be divisible by the block size. This additional padding
+	// does not need to be reflected in the header.
+	for size%commands.PCHeaderSize != 0 {
+		size++
+		data = append(data, 0)
+	}
+	for len(data)%int(c.CryptoSession.HeaderSize()) != 0 {
+		data = append(data, 0)
+	}
+	binary.LittleEndian.PutUint16(data, uint16(size))
 
 	if Config.Debugging.PacketLoggingEnabled {
 		debug.PrintPacket(ctx, debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
 			ClientAddr:    c.String(),
 			ClientCommand: false,
-			Data:          bytes,
+			Data:          data,
 		})
 	}
 
 	c.transmitLock.Lock()
 	defer c.transmitLock.Unlock()
 
-	c.CryptoSession.Encrypt(bytes, uint32(size))
-	return c.transmit(bytes, size)
-}
-
-// adjustPacketLength pads the length of a packet to a multiple of the header length and
-// adjusts first two bytes of the header to the corrected size (may be a no-op). Returns
-// the adjusted packet as well as the new length.
-//
-// PSOBB clients will reject packets that are not multiples of the header size.
-func adjustPacketLength(data []byte, length uint16, headerSize uint16) ([]byte, uint16) {
-	for length%headerSize != 0 {
-		length++
-		data = append(data, 0)
-	}
-
-	data[0] = byte(length & 0xFF)
-	data[1] = byte((length & 0xFF00) >> 8)
-
-	return data, length
+	c.CryptoSession.Encrypt(data, uint32(len(data)))
+	return c.transmit(data, len(data))
 }
 
 // transmit writes the contents of data to the TCP connection until the number
 // of bytes written >= length.
-func (c *Client) transmit(data []byte, length uint16) error {
+func (c *Client) transmit(data []byte, length int) error {
 	// TODO: Ought to wire up a cancel here, though it's a bit tricky.
 	bytesSent := 0
-	for bytesSent < int(length) {
+	for bytesSent < length {
 		b, err := c.connection.Write(data[:length])
 		if err != nil {
 			return fmt.Errorf("error sending to client %v: %s", c.IPAddr, err.Error())

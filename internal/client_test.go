@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"encoding/binary"
+	"io"
 	"net"
 	"testing"
 
@@ -99,114 +101,101 @@ func TestClient_SendRaw(t *testing.T) {
 }
 
 func TestClient_Send(t *testing.T) {
-	serverListener, addr := newTestListener(t)
-	// Connect to the server as if from a PSO client.
-	conn := newTestConnection(t, addr)
-
-	// Handle the connection on the server side and drop it into a Client.
-	clientConn, err := serverListener.AcceptTCP()
-	if err != nil {
-		t.Fatalf("error initializing client connection: %s", err)
-	}
-	client := NewClient(clientConn)
-	client.CryptoSession = encryption.NewBlueBurstCryptoSession()
-
-	// Send bytes from the client and make sure they were encrypted.
-	if err := client.Send(context.TODO(), testPacket); err != nil {
-		t.Fatalf("SendRaw() returned an unexpected error: %s", err)
-	}
-	client.Close()
-
-	buf := make([]byte, 16)
-	if _, err := conn.Read(buf); err != nil {
-		t.Fatalf("error reading from test connection: %s", err)
+	// withSize returns a copy of data with the header size set to size and zero padding
+	// appended out to length bytes.
+	withSize := func(data []byte, size uint16, length int) []byte {
+		out := make([]byte, length)
+		copy(out, data)
+		binary.LittleEndian.PutUint16(out, size)
+		return out
 	}
 
-	if diff := cmp.Diff(testPacketBytes, buf); diff == "" {
-		t.Fatalf("bytes read from test connection were not encrypted")
+	noSizePacket := &commands.CharacterSelectionAck{
+		Header: commands.BBHeader{Type: commands.CharacterSelectionAckType},
+		Slot:   1,
+		Flag:   1,
 	}
+	noSizePacketBytes, _ := MarshalStruct(noSizePacket)
 
-	client.CryptoSession.DecryptServer(buf, uint32(len(testPacketBytes)))
-
-	if diff := cmp.Diff(testPacketBytes, buf); diff != "" {
-		t.Fatalf("bytes decrypted from test connection did not match expected; diff:\n%s", diff)
+	// 12 bytes, like a 6x23 broadcast: the header size should stay 0x0C, but 16 bytes
+	// should be sent to satisfy the block size.
+	shortPacket := &commands.Broadcast{
+		Header: commands.BBHeader{Type: commands.BroadcastType},
+		Data:   []byte{0x23, 0x01, 0x01, 0x00},
 	}
-}
+	shortPacketBytes, _ := MarshalStruct(shortPacket)
 
-func Test_adjustPacketLength(t *testing.T) {
-	testPacketNoSize := &commands.CharacterSelectionAck{
-		Header: commands.BBHeader{
-			Type: commands.CharacterSelectionAckType,
-		},
-		Slot: 1,
-		Flag: 1,
+	// 18 bytes: the header size should be rounded up to 0x14 and 24 bytes should be sent.
+	unalignedPacket := &commands.Broadcast{
+		Header: commands.BBHeader{Type: commands.BroadcastType},
+		Data:   []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A},
 	}
-	testPacketBytesNoSize, _ := MarshalStruct(testPacketNoSize)
+	unalignedPacketBytes, _ := MarshalStruct(unalignedPacket)
 
-	longerTestPacket := make([]byte, len(testPacketBytes))
-	copy(longerTestPacket, testPacketBytes)
-	longerTestPacket = append(longerTestPacket, 0x01, 0x01)
-
-	expectedLongerTestPacket := make([]byte, len(longerTestPacket))
-	copy(expectedLongerTestPacket, longerTestPacket)
-	expectedLongerTestPacket = append(expectedLongerTestPacket, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
-	expectedLongerTestPacket[0] = 24
-
-	type args struct {
-		data       []byte
-		length     uint16
-		headerSize uint16
-	}
 	tests := []struct {
-		name       string
-		args       args
-		want       []byte
-		wantLength uint16
+		name   string
+		packet any
+		want   []byte
 	}{
 		{
-			name: "packet is the correct size",
-			args: args{
-				data:       testPacketBytes,
-				length:     uint16(len(testPacketBytes)),
-				headerSize: commands.BBHeaderSize,
-			},
-			want:       testPacketBytes,
-			wantLength: uint16(len(testPacketBytes)),
+			name:   "packet is the correct size",
+			packet: testPacket,
+			want:   testPacketBytes,
 		},
 		{
-			name: "packet size is not set",
-			args: args{
-				data:       testPacketBytesNoSize,
-				length:     uint16(len(testPacketBytesNoSize)),
-				headerSize: commands.BBHeaderSize,
-			},
-			want:       testPacketBytes,
-			wantLength: uint16(len(testPacketBytes)),
+			name:   "packet size is not set",
+			packet: noSizePacket,
+			want:   withSize(noSizePacketBytes, 0x10, 0x10),
 		},
 		{
-			name: "packet length is not a multiple of the header size",
-			args: args{
-				data:       longerTestPacket,
-				length:     uint16(len(longerTestPacket)),
-				headerSize: commands.BBHeaderSize,
-			},
-			want:       expectedLongerTestPacket,
-			wantLength: uint16(len(expectedLongerTestPacket)),
+			name:   "packet size is a multiple of 4 but not 8",
+			packet: shortPacket,
+			want:   withSize(shortPacketBytes, 0x0C, 0x10),
+		},
+		{
+			name:   "packet size is not a multiple of 4",
+			packet: unalignedPacket,
+			want:   withSize(unalignedPacketBytes, 0x14, 0x18),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pkt, length := adjustPacketLength(tt.args.data, tt.args.length, tt.args.headerSize)
-			if diff := cmp.Diff(tt.want, pkt); diff != "" {
-				t.Errorf("adjustPacketLength() want = %v, got = %v", tt.want, pkt)
+			serverListener, addr := newTestListener(t)
+			defer serverListener.Close()
+			// Connect to the server as if from a PSO client.
+			conn := newTestConnection(t, addr)
+			defer conn.Close()
+
+			// Handle the connection on the server side and drop it into a Client.
+			clientConn, err := serverListener.AcceptTCP()
+			if err != nil {
+				t.Fatalf("error initializing client connection: %s", err)
+			}
+			client := NewClient(clientConn)
+			client.CryptoSession = encryption.NewBlueBurstCryptoSession()
+
+			// Send bytes from the client and make sure they were encrypted.
+			if err := client.Send(context.TODO(), tt.packet); err != nil {
+				t.Fatalf("Send() returned an unexpected error: %s", err)
+			}
+			client.Close()
+
+			buf, err := io.ReadAll(conn)
+			if err != nil {
+				t.Fatalf("error reading from test connection: %s", err)
+			}
+			if len(buf) != len(tt.want) {
+				t.Fatalf("expected %d bytes to be sent, got %d", len(tt.want), len(buf))
 			}
 
-			if length != tt.wantLength {
-				t.Errorf("adjustPacketLength() want = %v, got = %v", tt.wantLength, length)
+			if diff := cmp.Diff(tt.want, buf); diff == "" {
+				t.Fatalf("bytes read from test connection were not encrypted")
 			}
 
-			if pkt[00] != byte(tt.wantLength) {
-				t.Errorf("header size was not updated; want = %d, got = %d", tt.wantLength, pkt[00])
+			client.CryptoSession.DecryptServer(buf, uint32(len(buf)))
+
+			if diff := cmp.Diff(tt.want, buf); diff != "" {
+				t.Fatalf("bytes decrypted from test connection did not match expected; diff:\n%s", diff)
 			}
 		})
 	}
