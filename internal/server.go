@@ -191,14 +191,15 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr, err)
 	}
 
-	// Prevent multiple clients from connecting from the same IP address.
-	if _, ok := connectedClients.Load(c.IPAddr); ok {
-		Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr)
-		_ = conn.Close()
-		return
+	if !Config.Debugging.Enabled {
+		// Prevent multiple clients from connecting from the same IP address.
+		if _, ok := connectedClients.Load(c.IPAddr); ok {
+			Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr)
+			return
+		}
+		connectedClients.Store(c.IPAddr, c)
 	}
 
-	connectedClients.Store(c.IPAddr, c)
 	processPackets(clientCtx, backend, c)
 }
 

@@ -66,6 +66,8 @@ logging:
 
 # With the exception of pprof, these should only be enabled for development.
 debugging:
+  # Enable debugging features.
+  enabled: false
   # Enable extra info-providing mechanisms for the server.
   pprof_enabled: true
   # Port on which a pprof server will be started if enabled.

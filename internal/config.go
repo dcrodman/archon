@@ -112,6 +112,7 @@ type archonConfig struct {
 	} `mapstructure:"logging"`
 
 	Debugging struct {
+		Enabled                bool `mapstructure:"enabled"`
 		PprofEnabled           bool `mapstructure:"pprof_enabled"`
 		PprofPort              int  `mapstructure:"pprof_port"`
 		PacketLoggingEnabled   bool `mapstructure:"packet_logging_enabled"`
