@@ -172,7 +172,7 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 	defer func() {
 		clientCancel()
 		if err := recover(); err != nil {
-			Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c.IPAddr, err, rdbg.Stack())
+			Logger.Errorf("error communicating with client %s: error=%s, trace: %s", c, err, rdbg.Stack())
 		}
 
 		// This is a bit of a hack, but we need to make sure that any disconnected clients
@@ -182,19 +182,19 @@ func acceptClient(ctx context.Context, backend Backend, conn *net.TCPConn) {
 		}
 
 		closeConnection(c)
-		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c.IPAddr)
+		Logger.Infof("[%s] disconnected client %s", backend.Identifier(), c)
 	}()
 
-	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c.IPAddr)
+	Logger.Infof("[%s] accepted connection from %s", backend.Identifier(), c)
 
 	if err := backend.Handshake(clientCtx, c); err != nil {
-		Logger.Errorf("Handshake() failed for client %s: %s", c.IPAddr, err)
+		Logger.Errorf("Handshake() failed for client %s: %s", c, err)
 	}
 
 	if !Config.Debugging.Enabled {
 		// Prevent multiple clients from connecting from the same IP address.
 		if _, ok := connectedClients.Load(c.IPAddr); ok {
-			Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c.IPAddr)
+			Logger.Infof("[%s] rejected second connection from %s", backend.Identifier(), c)
 			return
 		}
 		connectedClients.Store(c.IPAddr, c)
@@ -229,13 +229,14 @@ func processPackets(ctx context.Context, backend Backend, c *Client) {
 		if Config.Debugging.PacketLoggingEnabled {
 			debug.PrintPacket(ctx, debug.PrintPacketParams{
 				Writer:        bufio.NewWriter(os.Stdout),
+				ClientAddr:    c.String(),
 				ClientCommand: true,
 				Data:          buffer,
 			})
 		}
 
 		if err = backend.Handle(ctx, c, buffer); err != nil {
-			Logger.Warnf("error communicating with client %s: %s", c.IPAddr, err)
+			Logger.Warnf("error communicating with client %s: %s", c, err)
 			return
 		}
 	}
@@ -292,7 +293,7 @@ func readDataFromClient(c *Client, n int, buffer []byte) error {
 		if bytesRead == 0 || err == io.EOF {
 			return err
 		} else if err != nil {
-			return errors.New("socket error (" + c.IPAddr + ") " + err.Error())
+			return fmt.Errorf("socket error (%s): %v", c, err)
 		}
 	}
 

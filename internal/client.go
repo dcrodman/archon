@@ -113,6 +113,7 @@ func (c *Client) SendRaw(ctx context.Context, packet interface{}) error {
 	if Config.Debugging.PacketLoggingEnabled {
 		debug.PrintPacket(ctx, debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
+			ClientAddr:    c.String(),
 			ClientCommand: false,
 			Data:          bytes,
 		})
@@ -133,6 +134,7 @@ func (c *Client) Send(ctx context.Context, packet interface{}) error {
 	if Config.Debugging.PacketLoggingEnabled {
 		debug.PrintPacket(ctx, debug.PrintPacketParams{
 			Writer:        bufio.NewWriter(os.Stdout),
+			ClientAddr:    c.String(),
 			ClientCommand: false,
 			Data:          bytes,
 		})
@@ -180,4 +182,8 @@ func (c *Client) transmit(data []byte, length uint16) error {
 // Close the TCP connection.
 func (c *Client) Close() error {
 	return c.connection.Close()
+}
+
+func (c *Client) String() string {
+	return c.IPAddr + ":" + c.Port
 }

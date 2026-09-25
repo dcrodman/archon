@@ -23,7 +23,8 @@ func WithServerContext(ctx context.Context, name string) context.Context {
 }
 
 type PrintPacketParams struct {
-	Writer *bufio.Writer
+	Writer     *bufio.Writer
+	ClientAddr string
 	// True if this command is client->server.
 	ClientCommand bool
 	Data          []byte
@@ -54,7 +55,8 @@ func PrintPacket(ctx context.Context, params PrintPacketParams) {
 	} else {
 		headerLine.WriteString("| server->client ")
 	}
-	fmt.Fprintf(&headerLine, "(%d bytes)\n", header.Size)
+	fmt.Fprintf(&headerLine, "(%d bytes) ", header.Size)
+	fmt.Fprintf(&headerLine, "(ip: %v)\n", params.ClientAddr)
 
 	var err error
 	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
