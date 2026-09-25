@@ -138,9 +138,7 @@ func (s *GameServer) startCharacterAutoSync(ctx context.Context, c *Client) {
 // cleanupDisconnectedClient is invoked when clients disconnect from the game server.
 func (s *GameServer) cleanupDisconnectedClient(ctx context.Context, c *Client) {
 	// Remove the client from the lobby they were in.
-	c.State.Lock()
-	room := c.State.Room
-	c.State.Unlock()
+	room := c.CurrentRoom()
 	if room != nil {
 		room.RemoveClient(ctx, c)
 	}
@@ -340,9 +338,7 @@ func (s *GameServer) handleGameSelection(ctx context.Context, c *Client, data []
 	// TODO: Like when creating a game, check the player's level (or do it in game) relative to difficulty.
 
 	// Transfer them to the game they requested to join.
-	c.State.Lock()
-	currentRoom := c.State.Room
-	c.State.Unlock()
+	currentRoom := c.CurrentRoom()
 	if currentRoom != nil {
 		currentRoom.RemoveClient(ctx, c)
 	}
@@ -444,10 +440,9 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 	}
 
 	// Move the player out of their current lobby and into the game they just created.
-	c.State.Lock()
-	lobby := c.State.Room
-	c.State.Unlock()
+	lobby := c.CurrentRoom()
 	lobby.RemoveClient(ctx, c)
+
 	if err := game.AddClient(ctx, c); err != nil {
 		return fmt.Errorf("creating game and joining: %v", err)
 	}
@@ -458,22 +453,16 @@ func (s *GameServer) handleCreateGame(ctx context.Context, c *Client, cmd comman
 }
 
 func (s *GameServer) handlePlayerDoneLoading(c *Client) {
-	c.State.Lock()
-	room := c.State.Room
-	c.State.Unlock()
-
+	room := c.CurrentRoom()
 	if game, ok := room.(*Game); ok {
 		game.PlayerFinishedBursting()
 	}
 }
 
 func (s *GameServer) handleLeaveGame(ctx context.Context, c *Client, cmd commands.PlayerData) {
-	c.State.Lock()
-	game := c.State.Room
-	c.State.Unlock()
-
 	// Disconnect the player from the current lobby, but don't add them to another one -
 	// that will be handled by the 84 command.
+	game := c.CurrentRoom()
 	if game != nil {
 		game.RemoveClient(ctx, c)
 	}
@@ -516,10 +505,7 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, sender *Client,
 	//
 	// This is a nice, central place to take care of massaging the broadcast packet before
 	// abstracting it at the room level.
-	sender.State.Lock()
-	room := sender.State.Room
-	sender.State.Unlock()
-
+	room := sender.CurrentRoom()
 	if room == nil {
 		return
 	}
@@ -579,9 +565,7 @@ func adjustBroadcastPacketLength(data []byte, length uint16, headerSize uint16) 
 }
 
 func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error {
-	c.State.Lock()
-	room := c.State.Room
-	c.State.Unlock()
+	room := c.CurrentRoom()
 	// This shouldn't ever really happen but the command appears to be safe to ignore.
 	if room == nil {
 		return nil

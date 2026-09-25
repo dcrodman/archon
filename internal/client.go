@@ -92,6 +92,14 @@ func NewClient(connection *net.TCPConn) *Client {
 	}
 }
 
+// CurrentRoom is a convenience function for retrieving the Room the client is currently
+// in (i.e. the Lobby or Game).
+func (c *Client) CurrentRoom() Room {
+	c.State.Lock()
+	defer c.State.Unlock()
+	return c.State.Room
+}
+
 // Read consumes the available bytes directly the client's TCP connection.
 func (c *Client) Read(b []byte) (int, error) {
 	return c.connection.Read(b)
