@@ -527,9 +527,12 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data
 		} else {
 			// Some subcommands use an extended format and the size is a uint32 after the base header.
 			subSize = int(binary.LittleEndian.Uint32(cmd.Data[offset+4:]))
+			if subSize < 8 || subSize%4 != 0 {
+				return errors.New("invalid subcommand size")
+			}
 		}
-		if subSize == 0 || subSize < 8 || subSize%4 == 0 {
-			return errors.New("invalid subcommand size")
+		if subSize > len(cmd.Data[offset:]) {
+			return errors.New("not enough data remaining for subcommand")
 		}
 
 		// Pass any additional handling of the command off to the appropriate handler.
