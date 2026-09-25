@@ -99,7 +99,7 @@ func TestStructConversions(t *testing.T) {
 	}
 
 	convertedCommand, bytes := MarshalStruct(welcomeCommand)
-	if bytes != len(command) {
+	if bytes != uint16(len(command)) {
 		t.Errorf("expected bytes to equal the length of the command (%d), got = %v", convertedCommand, bytes)
 	}
 

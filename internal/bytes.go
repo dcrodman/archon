@@ -41,7 +41,7 @@ func StripPadding(b []byte) []byte {
 // MarshalStruct serializes the fields of a struct to an array of bytes in the
 // order in which the fields are declared and returns total number of bytes converted.
 // Panics if data is not a struct or pointer to struct, or if there was an error writing a field.
-func MarshalStruct(data interface{}) ([]byte, int) {
+func MarshalStruct(data interface{}) ([]byte, uint16) {
 	val := reflect.ValueOf(data)
 	valKind := val.Kind()
 
@@ -73,7 +73,7 @@ func MarshalStruct(data interface{}) ([]byte, int) {
 			panic(err.Error())
 		}
 	}
-	return convertedBytes.Bytes(), convertedBytes.Len()
+	return convertedBytes.Bytes(), uint16(convertedBytes.Len())
 }
 
 // UnmarshalStruct is the same as UnmarshalStructWithOrder but assumes LE order.

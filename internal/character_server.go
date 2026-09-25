@@ -402,11 +402,11 @@ func (s *CharacterServer) handleGuildcardDataStart(ctx context.Context, c *Clien
 		copy(pktEntry.Comment[:], entry.Comment)
 	}
 
-	var size int
+	var size uint16
 	c.GuildcardData, size = MarshalStruct(gcData)
 	checksum := crc32.ChecksumIEEE(c.GuildcardData)
 
-	return SendGuildcardHeader(ctx, c, checksum, uint16(size))
+	return SendGuildcardHeader(ctx, c, checksum, size)
 }
 
 // send the header containing metadata about the guildcard chunk.

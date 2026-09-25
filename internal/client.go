@@ -139,7 +139,7 @@ func (c *Client) Send(ctx context.Context, packet interface{}) error {
 		size++
 		data = append(data, 0)
 	}
-	for len(data)%int(c.CryptoSession.HeaderSize()) != 0 {
+	for len(data)%int(c.CryptoSession.BlockSize()) != 0 {
 		data = append(data, 0)
 	}
 	binary.LittleEndian.PutUint16(data, uint16(size))

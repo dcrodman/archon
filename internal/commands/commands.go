@@ -1,5 +1,14 @@
 package commands
 
+const BBHeaderSize = 0x08
+
+// BBHeader is the header for every command sent between the server and BlueBurst clients.
+type BBHeader struct {
+	Size  uint16
+	Type  uint16
+	Flags uint32
+}
+
 // Sent to the client to display a dialog window in the lobby, typically for errors.
 const LobbyMessageBoxType = 0x01
 
@@ -85,9 +94,8 @@ type ClientMessage struct {
 const BroadcastType = 0x60
 
 type Broadcast struct {
-	Header          BBHeader
-	BroadcastHeader BroadcastHeader
-	Data            []uint8
+	Header BBHeader
+	Data   []uint8
 }
 
 // TODO: Don't know what this does yet.
@@ -113,7 +121,7 @@ type PlayerRecordsEntry struct {
 }
 
 // Sent by the client to echo to a specific player. Same format as 60.
-const BroadcastToPlayerType = 0x62
+const BroadcastTargetType = 0x62
 
 // Sent to a player when joining a game.
 const JoinGameType = 0x64
@@ -398,6 +406,23 @@ type CharacterSummary struct {
 
 // Security command sent to the client to indicate the state of client login.
 const SecurityType = 0xE6
+
+// Available error codes for the security response.
+const (
+	BBLoginErrorNone = iota
+	BBLoginErrorUnknown
+	BBLoginErrorPassword
+	BBLoginErrorPassword2 // Same as password
+	BBLoginErrorMaintenance
+	BBLoginErrorUserInUse
+	BBLoginErrorBanned
+	BBLoginErrorBanned2 // Same as banned
+	BBLoginErrorUnregistered
+	BBLoginErrorExpiredSub
+	BBLoginErrorLocked
+	BBLoginErrorPatch
+	BBLoginErrorDisconnect
+)
 
 type Security struct {
 	Header       BBHeader

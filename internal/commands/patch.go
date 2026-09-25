@@ -1,6 +1,16 @@
 // Commands specific to the patch and data servers.
 package commands
 
+// Blueburst, PC, and Gamecube clients all use a 4 byte header to communicate with the
+// patch server instead of the 8 byte one used by Blueburst for the other servers.
+const PCHeaderSize = 0x04
+
+// PCHeader is the header structure for all patch server packets.
+type PCHeader struct {
+	Size uint16
+	Type uint16
+}
+
 // Welcome command with encryption vectors sent to the client upon initial connection.
 const PatchWelcomeType = 0x02
 

@@ -255,7 +255,7 @@ func closeConnection(c *Client) {
 // sent the next packet to be processed. The buffer in c.ConnectionState is
 // updated with the decrypted packet.
 func readNextPacket(c *Client, buffer []byte) ([]byte, error) {
-	headerSize := int(c.CryptoSession.HeaderSize())
+	headerSize := int(c.CryptoSession.BlockSize())
 
 	// Read and decrypt the packet header.
 	if err := readDataFromClient(c, headerSize, buffer); err != nil {

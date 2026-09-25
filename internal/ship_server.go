@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -95,8 +96,8 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var playerData commands.PlayerData
 		UnmarshalStruct(data, &playerData)
 		s.handleLeaveGame(ctx, c, playerData)
-	case commands.BroadcastType, commands.BroadcastToPlayerType:
-		s.handleBroadcastCommand(ctx, c, data[:cmdHeader.Size])
+	case commands.BroadcastType, commands.BroadcastTargetType:
+		err = s.handleBroadcastCommand(ctx, c, data[:cmdHeader.Size])
 	case commands.RoomNameType:
 		err = s.handleRoomNameRequest(ctx, c)
 	case commands.SyncCharacterType:
@@ -499,69 +500,75 @@ func SendLobbyMessageBox(ctx context.Context, c *Client, msg string) error {
 	return c.Send(ctx, cmd)
 }
 
-func (s *GameServer) handleBroadcastCommand(ctx context.Context, sender *Client, data []byte) {
-	// The broadcast packet has the normal BBHeader (packet size in the first two bytes)
-	// and a second sub-header in bytes 8-11. The 9th byte is the size of the sub-command.
-	//
-	// This is a nice, central place to take care of massaging the broadcast packet before
-	// abstracting it at the room level.
-	room := sender.CurrentRoom()
+func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data []byte) error {
+	room := c.CurrentRoom()
 	if room == nil {
-		return
+		Logger.Warnf("client %v not in a room; dropped subcommand", c.IPAddr)
+		return nil
 	}
 
-	var cmd commands.Broadcast
-	headerSize := commands.BBHeaderSize + commands.BroadcastHeaderSize
-	if len(data) > headerSize {
-		cmd.Data = make([]byte, len(data)-headerSize)
-	}
+	var hdr commands.BBHeader
+	UnmarshalStruct(data, &hdr)
+	cmd := commands.Broadcast{Data: make([]byte, hdr.Size-commands.BBHeaderSize)}
 	UnmarshalStruct(data, &cmd)
 
+	// Broadcast packets may contain any number of subcommands, so we need to step through the
+	// contents of the command and inspect each one.
+	offset := 0
+	for offset < len(cmd.Data) {
+		var subHdr commands.BroadcastSubcommandHeader
+		UnmarshalStruct(cmd.Data[offset:], &subHdr)
+
+		var subSize int
+		if subHdr.Size > 0 {
+			// Unlike the standard header, curiously this size denotes the number of 4-byte words
+			// comprising the command rather than the total number of bytes.
+			subSize = int(subHdr.Size * 4)
+		} else {
+			// Some subcommands use an extended format and the size is a uint32 after the base header.
+			subSize = int(binary.LittleEndian.Uint32(cmd.Data[offset+4:]))
+		}
+		if subSize == 0 || subSize < 8 || subSize%4 == 0 {
+			return errors.New("invalid subcommand size")
+		}
+
+		// Pass any additional handling of the command off to the appropriate handler.
+		switch subHdr.Type {
+		case commands.SubcommandPositionChangedType:
+			s.handleSubcommandMovement(ctx, c, cmd.Data[offset:offset+subSize])
+		}
+
+		offset += subSize
+	}
+
+	// Broadcast commands are expected to be echoed to other clients, so figure out which clients need
+	// to receive it and pass the entire thing through.
 	clients := room.Clients()
-	if cmd.Header.Type == commands.BroadcastToPlayerType {
+	if cmd.Header.Type == commands.BroadcastTargetType {
 		targetPlayer := cmd.Header.Flags
 		if targetPlayer >= uint32(len(clients)) {
 			Logger.Warnf("received broadcast request for player %v; ignoring", targetPlayer)
-			return
+			return nil
 		}
 		clients = []*Client{clients[targetPlayer]}
 	}
 
-	data, length := MarshalStruct(cmd)
-	var broadcastCmd commands.Broadcast
-	bytes, size := adjustBroadcastPacketLength(data, uint16(length), sender.CryptoSession.HeaderSize())
-	if size > uint16(headerSize) {
-		broadcastCmd.Data = make([]uint8, length-headerSize)
-	}
-	UnmarshalStruct(bytes, &broadcastCmd)
-
-	for _, c := range clients {
-		if c == nil || c == sender {
+	for _, oc := range clients {
+		if oc == nil || oc == c {
 			continue
 		}
-
-		if err := c.Send(ctx, broadcastCmd); err != nil {
-			Logger.Warnf("error sending broadcast command to client %v: %v", c.IPAddr, err)
+		if err := oc.Send(ctx, cmd); err != nil {
+			Logger.Warnf("error sending broadcast command to client %v: %v", oc.IPAddr, err)
 		}
 	}
+	return nil
 }
 
-// adjustPacketLength pads the length of a packet to a multiple of the header length and
-// adjusts first two bytes of the header to the corrected size (may be a no-op). Returns
-// the adjusted packet as well as the new length.
-//
-// PSOBB clients will reject packets that are not multiples of the header size.
-func adjustBroadcastPacketLength(data []byte, length uint16, headerSize uint16) ([]byte, uint16) {
-	for length%headerSize != 0 {
-		length++
-		data = append(data, 0)
-	}
+func (s *GameServer) handleSubcommandMovement(ctx context.Context, c *Client, data []byte) {
+	var moveCmd commands.SubcommandPositionChanged
+	UnmarshalStruct(data, &moveCmd)
 
-	data[0] = byte(length & 0xFF)
-	data[1] = byte((length & 0xFF00) >> 8)
-	data[9] = byte((length - headerSize) / 4)
-
-	return data, length
+	// TODO: We will probably need to store and update the client's position sooner or later.
 }
 
 func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error {
