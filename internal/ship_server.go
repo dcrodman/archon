@@ -96,7 +96,10 @@ func (s *GameServer) Handle(ctx context.Context, c *Client, data []byte) error {
 		var playerData commands.PlayerData
 		UnmarshalStruct(data, &playerData)
 		s.handleLeaveGame(ctx, c, playerData)
-	case commands.BroadcastType, commands.BroadcastTargetType:
+	case commands.BroadcastType,
+		commands.BroadcastTargetType,
+		commands.LargeBroadcastCommand,
+		commands.LargeBroadcastTargetCommand:
 		err = s.handleBroadcastCommand(ctx, c, data[:cmdHeader.Size])
 	case commands.RoomNameType:
 		err = s.handleRoomNameRequest(ctx, c)
@@ -523,7 +526,7 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data
 		if subHdr.Size > 0 {
 			// Unlike the standard header, curiously this size denotes the number of 4-byte words
 			// comprising the command rather than the total number of bytes.
-			subSize = int(subHdr.Size * 4)
+			subSize = int(subHdr.Size) * 4
 		} else {
 			// Some subcommands use an extended format and the size is a uint32 after the base header.
 			subSize = int(binary.LittleEndian.Uint32(cmd.Data[offset+4:]))

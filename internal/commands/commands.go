@@ -209,6 +209,12 @@ type LeaveLobby struct {
 	DisableUDP uint8 // Always 1.
 }
 
+// Extended format Broadcast command, otherwise same as 60.
+const LargeBroadcastCommand = 0x6C
+
+// Extended format BroadcastTarget command, otherwise same as 62.
+const LargeBroadcastTargetCommand = 0x6D
+
 // Sent by the client when they've finished joining a game.
 const PlayerDoneLoadingType = 0x6F
 

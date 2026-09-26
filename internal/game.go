@@ -159,9 +159,8 @@ func (g *Game) AddClient(ctx context.Context, c *Client) error {
 		g.Unlock()
 		return fmt.Errorf("assigning player to lobby: %v", err)
 	}
-
 	// Notify the existing clients in the lobby that a player joined.
-	SendJoinGameNotifications(ctx, g, c)
+	SendRoomJoinNotifications(ctx, g, c, commands.AddPlayerToGame)
 
 	return nil
 }
@@ -194,7 +193,8 @@ func SendJoinGame(ctx context.Context, g *Game, c *Client, lobbySlotID uint8) er
 		joinCmd.InQuest = 1
 	}
 
-	// Build the full set of entries for all other clients in the lobby (excluding the joining player).
+	// Entries works differently than it does for lobbies in that the player data is
+	// filled in according to their slot positions.
 	for i, oc := range g.clients {
 		if oc == nil {
 			continue
@@ -205,69 +205,6 @@ func SendJoinGame(ctx context.Context, g *Game, c *Client, lobbySlotID uint8) er
 	g.Unlock()
 
 	return c.Send(ctx, joinCmd)
-}
-
-func buildPlayerLobbyEntry(c *Client) commands.PlayerLobbyEntry {
-	c.State.Lock()
-	defer c.State.Unlock()
-
-	entry := commands.PlayerLobbyEntry{
-		PlayerLobbyData: commands.PlayerLobbyData{
-			PlayerTag: 0x00010000,
-			Guildcard: uint32(c.Account.Guildcard),
-			// TODO: Will need to set this once teams are supported.
-			// TMGuildcard: ,
-			TeamID:         uint32(c.Account.TeamID),
-			ClientID:       uint32(c.State.LobbySlotID),
-			HideHelpPrompt: 1,
-		},
-		Inventory:   c.State.Character.Inventory,
-		DisplayData: c.State.Character.DisplayData,
-	}
-	copy(entry.Name[:], c.State.Character.GuildCard.Name[:])
-	return entry
-}
-
-// SendJoinGameNotifications is used to inform all other players in the game that a new
-// player has joined.
-func SendJoinGameNotifications(ctx context.Context, g *Game, c *Client) {
-	c.State.Lock()
-	lobbySlotID := c.State.LobbySlotID
-	c.State.Unlock()
-
-	joinCmd := &commands.JoinLobby{
-		Header: commands.BBHeader{
-			Type:  commands.AddPlayerToGame,
-			Flags: 1, // 1 indicates that this only contains one entry (the joining client).
-		},
-		ClientID:         lobbySlotID,
-		DisableUDP:       1,
-		LobbyNumber:      g.ID,
-		BlockNumber:      0, // Always going to be 0 unless we support more blocks.
-		EnableBattleMode: 1,
-		// Event:            0,
-		EnableVoiceChat: 1,
-	}
-
-	// Entries works differently than it does for lobbies in that the player data is
-	// filled in according to their slot positions.
-	joinCmd.Entries = make([]commands.PlayerLobbyEntry, MaxPlayersPerGame)
-	joinCmd.Entries[lobbySlotID] = buildPlayerLobbyEntry(c)
-
-	g.Lock()
-	joinCmd.LeaderID = g.leaderID
-	otherClients := make([]*Client, len(g.clients))
-	copy(otherClients[:], g.clients[:])
-	g.Unlock()
-
-	for _, oc := range otherClients {
-		if oc == nil || oc == c {
-			continue
-		}
-		if err := oc.Send(ctx, joinCmd); err != nil {
-			Logger.Warnf("error sending game join notification to client %v: %v", oc.IPAddr, err)
-		}
-	}
 }
 
 // RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
@@ -310,37 +247,7 @@ func (g *Game) RemoveClient(ctx context.Context, c *Client) {
 	g.Unlock()
 
 	// Notify the other players that a player has left the lobby.
-	SendLeaveGameNotifications(ctx, g, c, currentLobbySlotID)
-}
-
-func SendLeaveGameNotifications(ctx context.Context, g *Game, c *Client, departingSlotID uint8) {
-	g.Lock()
-	lobbyLeaderID := g.leaderID
-	clients := make([]*Client, len(g.clients))
-	copy(clients[:], g.clients[:])
-	g.Unlock()
-
-	for _, oc := range clients {
-		if oc == c || oc == nil {
-			continue
-		}
-
-		oc.State.Lock()
-		cmd := &commands.LeaveLobby{
-			Header: commands.BBHeader{
-				Type:  commands.RemovePlayerFromGame,
-				Flags: uint32(departingSlotID),
-			},
-			ClientID:   departingSlotID,
-			LeaderID:   lobbyLeaderID,
-			DisableUDP: 1,
-		}
-		oc.State.Unlock()
-
-		if err := oc.Send(ctx, cmd); err != nil {
-			Logger.Warnf("error sending lobby leave notification to client %v: %v", oc.IPAddr, err)
-		}
-	}
+	SendLeaveRoomNotifications(ctx, g, c, currentLobbySlotID, commands.RemovePlayerFromGame)
 }
 
 // PlayerFinishedBursting relays the notification from a client that they have finished

@@ -77,9 +77,8 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 	if err := SendJoinLobby(ctx, l, c, lobbySlotID); err != nil {
 		return fmt.Errorf("assigning player to lobby: %v", err)
 	}
-
 	// Notify the existing clients in the lobby that a player joined.
-	SendLobbyJoinNotification(ctx, l, c)
+	SendRoomJoinNotifications(ctx, l, c, commands.AddPlayerToLobby)
 
 	return nil
 }
@@ -117,25 +116,40 @@ func SendJoinLobby(ctx context.Context, l *Lobby, c *Client, lobbySlotID uint8) 
 	return c.Send(ctx, joinCmd)
 }
 
-// SendLobbyJoinNotification is used to send notifications to all other players
-// when a client joins a lobby.
-func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Client) {
-	l.Lock()
-	lobbyLeaderID := l.leaderID
-	clients := make([]*Client, len(l.clients))
-	copy(clients, l.clients)
-	l.Unlock()
+func buildPlayerLobbyEntry(c *Client) commands.PlayerLobbyEntry {
+	c.State.Lock()
+	defer c.State.Unlock()
 
+	entry := commands.PlayerLobbyEntry{
+		PlayerLobbyData: commands.PlayerLobbyData{
+			PlayerTag: 0x00010000,
+			Guildcard: uint32(c.Account.Guildcard),
+			// TODO: Will need to set this once teams are supported.
+			// TMGuildcard: ,
+			TeamID:         uint32(c.Account.TeamID),
+			ClientID:       uint32(c.State.LobbySlotID),
+			HideHelpPrompt: 1,
+		},
+		Inventory:   c.State.Character.Inventory,
+		DisplayData: c.State.Character.DisplayData,
+	}
+	copy(entry.Name[:], c.State.Character.GuildCard.Name[:])
+	return entry
+}
+
+// SendRoomJoinNotifications (shared by Lobby and Game) sends notifications to all other players
+// when a client joins a room.
+func SendRoomJoinNotifications(ctx context.Context, r Room, joiningClient *Client, cmd uint16) {
 	baseCmd := commands.JoinLobby{
 		Header: commands.BBHeader{
-			Type:  commands.AddPlayerToLobby,
+			Type:  cmd,
 			Flags: 1, // 1 indicates that this only contains one entry (the joining client).
 		},
 		DisableUDP:       1,
-		LobbyNumber:      l.ID,
+		LobbyNumber:      r.RoomID(),
 		BlockNumber:      0, // Always going to be 0 unless we support more blocks.
 		EnableBattleMode: 1,
-		LeaderID:         lobbyLeaderID,
+		LeaderID:         r.LeaderID(),
 		// Event:            0,
 		EnableVoiceChat: 1,
 		Entries: []commands.PlayerLobbyEntry{
@@ -143,7 +157,7 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 		},
 	}
 
-	for _, oc := range clients {
+	for _, oc := range r.Clients() {
 		if oc == joiningClient || oc == nil {
 			continue
 		}
@@ -181,28 +195,25 @@ func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
 	l.Unlock()
 
 	// Notify the other players that a player has left the lobby.
-	SendLeaveLobbyNotifications(ctx, l, c, currentLobbySlotID)
+	SendLeaveRoomNotifications(ctx, l, c, currentLobbySlotID, commands.RemovePlayerFromLobbyType)
 }
 
-func SendLeaveLobbyNotifications(ctx context.Context, l *Lobby, c *Client, departingSlotID uint8) {
-	l.Lock()
-	lobbyLeaderID := l.leaderID
-	clients := make([]*Client, len(l.clients))
-	copy(clients, l.clients)
-	l.Unlock()
-
-	for _, oc := range clients {
+// SendLeaveRoomNotifications (shared by Lobby and Game) sends notifications to all other
+// players when a client leaves a room.
+func SendLeaveRoomNotifications(ctx context.Context, r Room, c *Client, departingSlotID uint8, cmd uint16) {
+	roomLeaderID := r.LeaderID()
+	for _, oc := range r.Clients() {
 		if oc == c || oc == nil {
 			continue
 		}
 		oc.State.Lock()
 		cmd := &commands.LeaveLobby{
 			Header: commands.BBHeader{
-				Type:  commands.RemovePlayerFromLobbyType,
+				Type:  cmd,
 				Flags: uint32(departingSlotID),
 			},
 			ClientID:   departingSlotID,
-			LeaderID:   lobbyLeaderID,
+			LeaderID:   roomLeaderID,
 			DisableUDP: 1,
 		}
 		oc.State.Unlock()
