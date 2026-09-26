@@ -18,9 +18,13 @@ import (
 
 // Joinable may be either a Game or a Lobby joined by a player.
 type Room interface {
+	RoomID() uint8
 	RoomName() []byte
+
 	AddClient(ctx context.Context, c *Client) error
 	RemoveClient(ctx context.Context, c *Client)
+
+	LeaderID() uint8
 	Clients() []*Client
 }
 
@@ -93,12 +97,29 @@ func NewClient(connection *net.TCPConn) *Client {
 	}
 }
 
+func (c *Client) String() string {
+	return c.IPAddr + ":" + c.Port
+}
+
 // CurrentRoom is a convenience function for retrieving the Room the client is currently
 // in (i.e. the Lobby or Game).
 func (c *Client) CurrentRoom() Room {
 	c.State.Lock()
 	defer c.State.Unlock()
 	return c.State.Room
+}
+
+// UpdateRoom updates the Client's current room assignment and slot ID,
+// returning the previous slot ID.
+func (c *Client) UpdateRoom(r Room, slotID uint8) uint8 {
+	c.State.Lock()
+	defer c.State.Unlock()
+
+	currentID := c.State.LobbySlotID
+	c.State.LobbySlotID = slotID
+	c.State.Room = r
+
+	return currentID
 }
 
 // Read consumes the available bytes directly the client's TCP connection.
@@ -178,8 +199,4 @@ func (c *Client) transmit(data []byte, length int) error {
 // Close the TCP connection.
 func (c *Client) Close() error {
 	return c.connection.Close()
-}
-
-func (c *Client) String() string {
-	return c.IPAddr + ":" + c.Port
 }

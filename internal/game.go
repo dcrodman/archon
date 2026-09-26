@@ -90,6 +90,10 @@ func NewGame(cmd commands.CreateGame) *Game {
 	return game
 }
 
+func (g *Game) RoomID() uint8 {
+	return g.ID
+}
+
 // RoomName returns the Game's name. Name may be accessed directly above, and this is mainly
 // for consistency with the Room interface.
 func (g *Game) RoomName() []byte {
@@ -145,10 +149,7 @@ func (g *Game) AddClient(ctx context.Context, c *Client) error {
 	}
 	g.Unlock()
 
-	c.State.Lock()
-	c.State.Room = g
-	c.State.LobbySlotID = lobbySlotID
-	c.State.Unlock()
+	c.UpdateRoom(g, lobbySlotID)
 
 	// Inform the client of its new lobby assignment.
 	if err := SendJoinGame(ctx, g, c, lobbySlotID); err != nil {
@@ -272,12 +273,7 @@ func SendJoinGameNotifications(ctx context.Context, g *Game, c *Client) {
 // RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
 // being removed was the current leader, a new leader is selected from the remaining set of players.
 func (g *Game) RemoveClient(ctx context.Context, c *Client) {
-	c.State.Lock()
-	currentLobbySlotID := c.State.LobbySlotID
-	// This is probably redundant and is technically still a valid slot.
-	c.State.LobbySlotID = 0
-	c.State.Room = nil
-	c.State.Unlock()
+	currentLobbySlotID := c.UpdateRoom(nil, 0)
 
 	g.Lock()
 	g.clients[currentLobbySlotID] = nil
@@ -403,6 +399,14 @@ func (g *Game) GenerateVariations() ([16]commands.JoinGameVariations, error) {
 	return variations, nil
 }
 
+// LeaderID returns the slot ID of the current leader.
+func (g *Game) LeaderID() uint8 {
+	g.Lock()
+	defer g.Unlock()
+	return g.leaderID
+}
+
+// Clients returns the set of clients currently in the game.
 func (g *Game) Clients() []*Client {
 	g.Lock()
 	defer g.Unlock()

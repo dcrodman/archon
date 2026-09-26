@@ -30,6 +30,10 @@ func NewLobby(id uint8) *Lobby {
 	}
 }
 
+func (l *Lobby) RoomID() uint8 {
+	return l.ID
+}
+
 // RoomName returns the Lobby's name. Mainly for consistency with the Room interface.
 func (l *Lobby) RoomName() []byte {
 	lobbyName := fmt.Sprintf("LOBBY %02d", l.ID)
@@ -67,10 +71,7 @@ func (l *Lobby) AddClient(ctx context.Context, c *Client) error {
 	}
 	l.Unlock()
 
-	c.State.Lock()
-	c.State.Room = l
-	c.State.LobbySlotID = lobbySlotID
-	c.State.Unlock()
+	c.UpdateRoom(l, lobbySlotID)
 
 	// Inform the client of its new lobby assignment.
 	if err := SendJoinLobby(ctx, l, c, lobbySlotID); err != nil {
@@ -161,12 +162,7 @@ func SendLobbyJoinNotification(ctx context.Context, l *Lobby, joiningClient *Cli
 // RemoveClient removes a client from a lobby, resetting the Client's LobbySlotID. If the player
 // being removed was the current leader, a new leader is selected from the remaining set of players.
 func (l *Lobby) RemoveClient(ctx context.Context, c *Client) {
-	c.State.Lock()
-	currentLobbySlotID := c.State.LobbySlotID
-	// This is probably redundant and is technically still a valid slot.
-	c.State.LobbySlotID = 0
-	c.State.Room = nil
-	c.State.Unlock()
+	currentLobbySlotID := c.UpdateRoom(nil, 0)
 
 	l.Lock()
 	l.clients[currentLobbySlotID] = nil
@@ -246,6 +242,14 @@ func (l *Lobby) BuildLobbyArrowEntries() []commands.LobbyArrowUpdateEntry {
 	return entries
 }
 
+// LeaderID returns the slot ID of the current leader.
+func (l *Lobby) LeaderID() uint8 {
+	l.Lock()
+	defer l.Unlock()
+	return l.leaderID
+}
+
+// Clients returns the set of clients currently in the lobby.
 func (l *Lobby) Clients() []*Client {
 	l.Lock()
 	defer l.Unlock()

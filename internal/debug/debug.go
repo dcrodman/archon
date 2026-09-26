@@ -56,7 +56,7 @@ func PrintPacket(ctx context.Context, params PrintPacketParams) {
 		headerLine.WriteString("| server->client ")
 	}
 	fmt.Fprintf(&headerLine, "(%d bytes) ", header.Size)
-	fmt.Fprintf(&headerLine, "(ip: %v)\n", params.ClientAddr)
+	fmt.Fprintf(&headerLine, "(%v)\n", params.ClientAddr)
 
 	var err error
 	if _, err = params.Writer.WriteString(headerLine.String()); err != nil {
