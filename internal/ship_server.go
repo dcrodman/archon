@@ -519,7 +519,7 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data
 	// contents of the command and inspect each one.
 	offset := 0
 	for offset < len(cmd.Data) {
-		var subHdr commands.BroadcastSubcommandHeader
+		var subHdr commands.BSubcommandHeader
 		UnmarshalStruct(cmd.Data[offset:], &subHdr)
 
 		var subSize int
@@ -540,8 +540,22 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data
 
 		// Pass any additional handling of the command off to the appropriate handler.
 		switch subHdr.Type {
-		case commands.SubcommandPositionChangedType:
+		case commands.SubcommandChangeFloorType:
+			// TODO: Like movement, probably need to store this sooner or later.
+		case commands.SubcommandSetPlayerInisible, commands.SubcommandSetPlayerVisible:
+			// TODO: Newserv sends team data at this point.
+		case commands.SubcommandWalkType, commands.SubcommandRunType,
+			commands.SubcommandSetPositionType, commands.SubcommandStopPositionType:
 			s.handleSubcommandMovement(ctx, c, cmd.Data[offset:offset+subSize])
+		case commands.SubcommandSyncItemState, commands.SubcommandSyncEnemyState,
+			commands.SubcommandSyncObjectState, commands.SubcommandSyncFlagState:
+			// Pass them through for now but there might be state in here that we need?
+		case commands.SubcommandSyncPlayerDataType:
+			s.handleSubcommandSyncData(ctx, c, cmd.Data[offset:offset+subSize])
+		case 0x3B, 0x52, commands.SubcommandSetQuestFlags, 0x71:
+			// These commands are just forwarded.
+		default:
+			Logger.Infof("unrecognized subcommand: %x", subHdr.Type)
 		}
 
 		offset += subSize
@@ -571,10 +585,42 @@ func (s *GameServer) handleBroadcastCommand(ctx context.Context, c *Client, data
 }
 
 func (s *GameServer) handleSubcommandMovement(ctx context.Context, c *Client, data []byte) {
-	var moveCmd commands.SubcommandPositionChanged
-	UnmarshalStruct(data, &moveCmd)
-
 	// TODO: We will probably need to store and update the client's position sooner or later.
+	// Fow now, we just allow it to pass through.
+	//
+	// var moveCmd commands.SubcommandPositionChanged
+	// UnmarshalStruct(data, &moveCmd)
+}
+
+func (s *GameServer) handleSubcommandSyncData(ctx context.Context, c *Client, _ []byte) {
+	// Note: here newserv explicitly decodes and selects a target for the command from the incoming
+	// command's flags. However based on what I understand about this command (as we as what sylverant
+	// appears to do), forwarding its contents is sufficient.
+
+	// Now we need to tell the client that sent this command that the game can be resumed,
+	// clearing the "please wait" dialog.
+	SendResumeGame(ctx, c)
+}
+
+func SendResumeGame(ctx context.Context, c *Client) {
+	var (
+		subcommandHeader = commands.BSubcommandClientHeader{
+			Type: commands.SubcommandResume,
+			Size: 1,
+		}
+		subHeaderBytes, _ = MarshalStruct(&subcommandHeader)
+
+		cmd = commands.Broadcast{
+			Header: commands.BBHeader{
+				Size: 12,
+				Type: commands.BroadcastType,
+			},
+			Data: subHeaderBytes,
+		}
+	)
+	if err := c.Send(ctx, cmd); err != nil {
+		Logger.Warnf("error sending resume subcommand to %s: %s", c, err)
+	}
 }
 
 func (s *GameServer) handleRoomNameRequest(ctx context.Context, c *Client) error {
