@@ -1,36 +1,26 @@
 # Archon
 ![license](https://img.shields.io/github/license/dcrodman/archon) 
 
-Private server implementation for Phantasy Star Online Blue Burst by SEGA.
+Private server implementation for the game Phantasy Star Online Blue Burst, originally developed by SEGA.
 
-The goal of the Archon project is to build a modern, easy-to-use, customizable, and 
-high-performing PSOBB server that can be run across multiple platforms with little 
-setup overhead. The project is currently in relatively active development and things
-change frequently while I piece together the PSO protocol and lean how the client works.
+Substantial credit is due to the authors of [Newserv](http://www.fuzziqersoftware.com),
+[Sylverant](http://sylverant.net), and [Tethealla](http://pioneer2.net), whose
+implementations make this project possible in the absence of the official servers from
+which to learn the protocol.
 
-Credit is due to the authors of [Tethealla](http://pioneer2.net), 
-[Sylverant](http://sylverant.net), and [Newserv](http://www.fuzziqersoftware.com), 
-whose servers I'm studying as I write Archon.
+## Goals and contributing
 
-This is a long running project that I work on when I have time, which is pretty sporadic
-given how time-intensive this endeavor is. That said, forks, bug fixes, issue reports,
-explanations of some of the client's bizarre behavior, questions, etc. are welcome to
-help move things along. Some starter information can be found in CONTRIBUTING.md.
+There are many other servers out there with varying aims and degrees of functionality. The
+goal of this one is to be a modern, easy-to-use, and high-performing PSOBB server that can be run 
+across multiple platforms with little setup overhead. Simplicity is a guiding tenant, attempting to
+be accessible to newcomers and relatively easy to hack on by virtue of clear code and the use of well 
+known standards/practices.
 
-
-## Requirements
-
-Archon requires Git and Go to build and run. On Debian/Ubuntu-based systems you will also need a few native development packages for building cgo bindings and tools used by Archon:
-
-```bash
-sudo apt update
-sudo apt install -y git build-essential libc6-dev libpcap-dev
-```
-
-These packages provide a compiler and headers (build-essential, libc6-dev), and the development headers for libpcap (libpcap-dev) used by the sniffer.
-
-On other distributions install the equivalent packages (for example, glibc-devel, libpcap-devel on CentOS/RHEL/Fedora).
-
+Archon is a long-running personal passion project and the idea of building it is what got me into
+software engineering in the first place. I work on it when I have time, which typically sporadic given
+how time-intensive this endeavor can be. Forks, bug fixes, issue reports, explanations of some of the
+client's bizarre behavior, questions, etc. are all encouraged. As this project stems from a love of both
+the game and the craft, **AI code contributions are not welcome** and will be rejected.
 
 ## Running the server
 
