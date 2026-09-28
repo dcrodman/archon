@@ -3,7 +3,7 @@
 
 Private server implementation for the game Phantasy Star Online Blue Burst, originally developed by SEGA.
 
-Substantial credit is due to the authors of [Newserv](http://www.fuzziqersoftware.com),
+Substantial credit is due to the authors of [Newserv](https://github.com/fuzziqersoftware/newserv),
 [Sylverant](http://sylverant.net), and [Tethealla](http://pioneer2.net), whose
 implementations make this project possible in the absence of the official servers from
 which to learn the protocol.
